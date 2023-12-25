@@ -28,7 +28,7 @@ parsed_memes_telegram = Table(
     "parsed_memes_telegram",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("post_id", String, nullable=False),
+    Column("post_id", Integer, nullable=False),
     Column("url", String, nullable=False),
     Column("content", String, nullable=False),
     Column("out_links", ARRAY(String)),
