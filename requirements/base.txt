@@ -1,6 +1,7 @@
 redis==5.0.*
 alembic==1.11.*
 bcrypt==4.0.*
+psycopg2==2.9.*
 python-jose==3.3.*
 SQLAlchemy==2.0.20
 httpx==0.24.*
