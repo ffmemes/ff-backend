@@ -39,6 +39,17 @@ services:
     ports:
       - 36379:6379
 
+  app_flow:
+    container_name: app_flow
+    image: app_flow_image
+    env_file:
+      - .env
+    build:
+      context: .
+      dockerfile: Dockerfile.flow
+    depends_on:
+      - app_db
+
 volumes:
   app_pg_data:
     driver: "local"

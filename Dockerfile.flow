@@ -1,0 +1,15 @@
+FROM prefecthq/prefect:2-python3.10
+
+COPY requirements/ /tmp/requirements
+
+RUN  pip install --upgrade pip && pip install -r /tmp/requirements/flow.txt --trusted-host pypi.python.org --no-cache-dir
+
+COPY . /src
+
+ENV PYTHONPATH /src
+
+WORKDIR /src
+
+# Run our flow script when the container starts
+
+CMD ["python", "flow_deployments/parsers.py", "serve_flow"]

@@ -1,0 +1,7 @@
+-r base.txt
+pandas==2.1.4
+psycopg2-binary==2.9.9
+beautifulsoup4==4.12.2
+lxml==4.9.4
+filelock==3.13.1
+requests==2.31.0
