@@ -12,7 +12,6 @@ import logging
 import random
 import requests
 import requests.adapters
-from src.storage.parsers.snscrape import utils, version
 import urllib3.connection
 import time
 import warnings
@@ -100,7 +99,7 @@ class _JSONDataclass:
 			warnings.filterwarnings(action = 'ignore', category = DeprecatedFeatureWarning)
 			out = _json_dataclass_to_dict(self, forBuggyIntParser = forBuggyIntParser)
 		assert '_snscrape' not in out, 'Metadata collision on _snscrape'
-		out['_snscrape'] = version.__version__
+		out['_snscrape'] = '0.0.1'
 		return json.dumps(out, default = _json_serialise_datetime_enum)
 
 
@@ -144,7 +143,6 @@ _DEFAULT_USER_AGENT = _random_user_agent()
 class _HTTPSAdapter(requests.adapters.HTTPAdapter):
 	def init_poolmanager(self, *args, **kwargs):
 		super().init_poolmanager(*args, **kwargs)
-		#FIXME: Uses private urllib3.PoolManager attribute pool_classes_by_scheme.
 		try:
 			self.poolmanager.pool_classes_by_scheme['https'].ConnectionCls = _HTTPSConnection
 		except (AttributeError, KeyError) as e:
@@ -154,7 +152,6 @@ class _HTTPSAdapter(requests.adapters.HTTPAdapter):
 class _HTTPSConnection(urllib3.connection.HTTPSConnection):
 	def connect(self, *args, **kwargs):
 		conn = super().connect(*args, **kwargs)
-		#FIXME: Uses undocumented attribute self.sock and beyond.
 		try:
 			_logger.debug(f'Connected to: {self.sock.getpeername()}')
 		except AttributeError:
@@ -275,18 +272,3 @@ class Scraper:
 
 	def _post(self, *args, **kwargs):
 		return self._request('POST', *args, **kwargs)
-
-	@classmethod
-	def _cli_setup_parser(cls, subparser):
-		pass
-
-	@classmethod
-	def _cli_from_args(cls, args):
-		return cls._cli_construct(args)
-
-	@classmethod
-	def _cli_construct(cls, argparseArgs, *args, **kwargs):
-		return cls(*args, **kwargs, retries = argparseArgs.retries)
-
-
-__getattr__, __dir__ = utils.module_deprecation_helper(__all__, Entity = Item)

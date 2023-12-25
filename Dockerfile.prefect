@@ -1,0 +1,21 @@
+FROM prefecthq/prefect:2-python3.10
+
+# Install libpq-dev
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONIOENCODING=utf-8
+
+COPY requirements/ /tmp/requirements
+
+RUN  pip install --upgrade pip && pip install -r /tmp/requirements/prefect.txt --trusted-host pypi.python.org --no-cache-dir
+
+COPY . /src
+
+ENV PYTHONPATH /src
+
+WORKDIR /src
+
+# Run our flow script when the container starts
+
+CMD ["python", "flow_deployments/parsers.py", "serve_flow"]

@@ -1,0 +1,5 @@
+-r base.txt
+beautifulsoup4==4.12.2
+lxml==4.9.4
+filelock==3.13.1
+requests==2.31.0
