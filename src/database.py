@@ -13,7 +13,7 @@ from sqlalchemy import (
     Table,
     Update
 )
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from src.config import settings
@@ -28,12 +28,12 @@ parsed_memes_telegram = Table(
     "parsed_memes_telegram",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("post_id", String, nullable=False),
+    Column("post_id", Integer, nullable=False),
     Column("url", String, nullable=False),
     Column("content", String, nullable=False),
-    Column("out_links", ARRAY(String)),
-    Column("mentions", ARRAY(String)),
-    Column("hashtags", ARRAY(String)),
+    Column("out_links", JSONB),
+    Column("mentions", JSONB),
+    Column("hashtags", JSONB),
     Column("forwarded", JSON),
     Column("media", ARRAY(JSON)),
     Column("views", Integer, nullable=False),

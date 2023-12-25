@@ -27,6 +27,6 @@ def parse_source(source: str, num_of_posts: Optional[int] = None) -> List[dict]:
         post["forwarded_url"] = post.pop("forwardedUrl")
         post["link_preview"] = post.pop("linkPreview")
         post["out_links"] = post.pop("outlinks")
-        post["post_id"] = post["url"].split("/")[-1]
+        post["post_id"] = int(post["url"].split("/")[-1])
         post["views"] = post["views"][0] if post["views"] else 0
     return posts
