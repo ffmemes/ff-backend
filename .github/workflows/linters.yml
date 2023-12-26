@@ -31,6 +31,9 @@ jobs:
       - name: Lint with ruff
         run: |
           ruff src
+      - name: Format with ruff
+        run: |
+          ruff format src --diff
       - name: Lint with mypy
         run: |
           mypy src tests
