@@ -1,35 +1,46 @@
 from typing import Any
 
 from sqlalchemy import (
-    Boolean,
-    Column,
     CursorResult,
+    JSON,
+    Column,
     DateTime,
-    ForeignKey,
-    Identity,
     Insert,
     Integer,
-    LargeBinary,
     MetaData,
     Select,
     String,
     Table,
-    Update,
-    func,
+    Update
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from src.config import settings
 from src.constants import DB_NAMING_CONVENTION
 
 DATABASE_URL = str(settings.DATABASE_URL)
-
 engine = create_async_engine(DATABASE_URL)
+
 metadata = MetaData(naming_convention=DB_NAMING_CONVENTION)
 
-
-# TODO: put tables here
+parsed_memes_telegram = Table(
+    "parsed_memes_telegram",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("post_id", Integer, nullable=False),
+    Column("url", String, nullable=False),
+    Column("content", String, nullable=False),
+    Column("out_links", JSONB),
+    Column("mentions", JSONB),
+    Column("hashtags", JSONB),
+    Column("forwarded", JSON),
+    Column("media", ARRAY(JSON)),
+    Column("views", Integer, nullable=False),
+    Column("created_at", DateTime, nullable=False),
+    Column("forwarded_url", String),
+    Column("link_preview", JSON)
+)
 
 
 async def fetch_one(select_query: Select | Insert | Update) -> dict[str, Any] | None:

@@ -39,6 +39,7 @@ services:
     ports:
       - 36379:6379
 
+
 volumes:
   app_pg_data:
     driver: "local"
