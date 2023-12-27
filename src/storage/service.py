@@ -19,11 +19,11 @@ from src.storage.constants import (
 
 
 async def insert_parsed_posts_from_telegram(
-    source_id: int,
+    meme_source_id: int,
     telegram_posts: list[TgChannelPostParsingResult],
 ) -> None:
     posts = [
-        post.model_dump() | {"source_id": source_id}
+        post.model_dump() | {"meme_source_id": meme_source_id}
         for post in telegram_posts
     ]
     insert_statement = insert(meme_raw_telegram).values(posts)
@@ -51,10 +51,10 @@ async def get_telegram_sources_to_parse(limit=10) -> list[dict[str, Any]]:
     return await fetch_all(select_query)
 
 
-async def update_meme_source(source_id: int, **kwargs) -> dict[str, Any] | None:
+async def update_meme_source(meme_source_id: int, **kwargs) -> dict[str, Any] | None:
     update_query = (
         meme_source.update()
-        .where(meme_source.c.id == source_id)
+        .where(meme_source.c.id == meme_source_id)
         .values(**kwargs)
         .returning(meme_source)
     )
