@@ -9,4 +9,9 @@ from src.storage.parsers import telegram
     version="0.1.0"
 )
 def parse_telegram_source() -> None:
-    telegram.parse_source()
+    # 1. get LIMIT=10 tg sources to parse
+    # 2. data = telegram.parse_tg_channel(tg_channel_username)
+    # 3. save data to db
+    # 4. update parsed at for tg source
+
+    pass

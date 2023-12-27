@@ -8,4 +8,5 @@ async def parse_vk_source() -> None:
     logger = get_run_logger()
     logger.info("Starting flow for scraping vk source")
 
-    result = vk.parse_source()
+    # TODO:
+    # result = vk.parse_source()
