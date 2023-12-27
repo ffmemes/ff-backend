@@ -31,7 +31,7 @@ so there might be some workarounds instead of neat solutions, but overall idea o
 
 ### First Build Only
 1. `cp .env.example .env`
-2. `docker network create app_main`
+2. `docker network create ffmemes_network`
 3. `docker-compose up -d --build`
 
 ### Linters

@@ -1,17 +1,27 @@
 from prefect import flow
+from datetime import datetime
 
 from src.storage.parsers import telegram
+from src.storage.service import (
+    get_telegram_sources_to_parse,
+    insert_parsed_posts_from_telegram,
+    update_meme_source,
+)
 
 
 @flow(
-    name="Parse raw telegram",
+    name="Parse Telegram Channels",
     description="Flow for parsing telegram channels to get posts",
     version="0.1.0"
 )
-def parse_telegram_source() -> None:
-    # 1. get LIMIT=10 tg sources to parse
-    # 2. data = telegram.parse_tg_channel(tg_channel_username)
-    # 3. save data to db
-    # 4. update parsed at for tg source
+async def parse_telegram_sources(limit=10) -> None:
+    tg_sources = await get_telegram_sources_to_parse(limit=limit)
 
-    pass
+    for tg_source in tg_sources:
+        tg_username = tg_source["url"].split("/")[-1]  # is it ok?
+
+        # TODO: make scrapper async
+        posts = telegram.parse_tg_channel(tg_username)
+        await insert_parsed_posts_from_telegram(posts)
+
+        await update_meme_source(source_id=tg_source["id"], parsed_at=datetime.utcnow())

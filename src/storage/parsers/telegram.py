@@ -1,10 +1,13 @@
 import dataclasses
-from typing import List, Optional
 
 from src.storage.parsers.snscrape.modules.telegram import TelegramChannelScraper
+from src.storage.parsers.schemas import TgChannelPostParsingResult
 
-
-def parse_tg_channel(tg_username: str, num_of_posts: Optional[int] = None) -> List[dict]:
+# TODO: async + requests -> httpx
+def parse_tg_channel(
+    tg_username: str, 
+    num_of_posts: int | None = None,
+) -> list[TgChannelPostParsingResult]:
     """
     Parses source for memes
     :param source: Telegram channel
@@ -23,12 +26,27 @@ def parse_tg_channel(tg_username: str, num_of_posts: Optional[int] = None) -> Li
     except StopIteration:
         pass
 
-    for post in posts:
-        post["created_at"] = post.pop("date")
-        post["forwarded_url"] = post.pop("forwardedUrl")
-        post["link_preview"] = post.pop("linkPreview")
-        post["out_links"] = post.pop("outlinks")
-        post["post_id"] = int(post["url"].split("/")[-1])
-        post["views"] = post["views"][0] if post["views"] else 0
+    # for post in posts:
+    #     post["forwarded_url"] = post.pop("forwardedUrl")
+    #     post["link_preview"] = post.pop("linkPreview")
+    #     post["out_links"] = post.pop("outlinks")
+    #     post["post_id"] = int(post["url"].split("/")[-1])
+    #     post["views"] = post["views"][0] if post["views"] else 0
 
-    return posts
+    return [
+        TgChannelPostParsingResult(
+            post_id=int(post["url"].split("/")[-1]),
+            url=post["url"],
+            date=post["date"],
+            content=post["content"],
+            media=post["media"],
+            mentions=post["mentions"],
+            hashtags=post["hashtags"],
+            forwarded_from=post["forwarded"],
+            forwarded_url=post["forwardedUrl"],
+            link_preview=post["linkPreview"],
+            out_links=post["outlinks"],
+            views=post["views"][0] if post["views"] else 0,
+        )
+        for post in posts
+    ]
