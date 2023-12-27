@@ -1,5 +1,7 @@
 from enum import Enum
 
+MEME_SOURCE_POST_UNIQUE_CONSTRAINT = "meme_source_id_post_id_key"
+
 
 class MemeType(str, Enum):
     IMAGE = "image"
