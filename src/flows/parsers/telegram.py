@@ -14,7 +14,7 @@ from src.storage.service import (
     description="Flow for parsing telegram channels to get posts",
     version="0.1.0"
 )
-async def parse_telegram_source(limit=10) -> None:
+async def parse_telegram_sources(limit=10) -> None:
     tg_sources = await get_telegram_sources_to_parse(limit=limit)
 
     for tg_source in tg_sources:
