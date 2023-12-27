@@ -24,4 +24,4 @@ async def parse_telegram_sources(limit=10) -> None:
         posts = telegram.parse_tg_channel(tg_username)
         await insert_parsed_posts_from_telegram(tg_source["id"], posts)
 
-        await update_meme_source(source_id=tg_source["id"], parsed_at=datetime.utcnow())
+        await update_meme_source(meme_source_id=tg_source["id"], parsed_at=datetime.utcnow())
