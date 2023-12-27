@@ -11,8 +11,10 @@ class MemeSourceType(str, Enum):
     TELEGRAM = "telegram"
     VK = "vk"
     REDDIT = "reddit"
-
-    # TODO: add memes uploaded by users
+    INSTAGRAM = "instagram"
+    TWITTER = "twitter"
+    TIKTOK = "tiktok"
+    USER_SUBMITTED = "user_submitted"
 
 
 class MemeSourceStatus(str, Enum):
