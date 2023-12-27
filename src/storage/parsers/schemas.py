@@ -7,14 +7,14 @@ class TgChannelPostParsingResult(CustomModel):
     post_id: int
     url: str
     content: str  # post text
-    media: list[dict] | None
+    media: list[dict] | None = None
     views: int
     date: datetime
 
-    mentions: list[str] | None  # mentioned usernames
-    hashtags: list[str] | None
-    forwarded: dict | None
-    forwarded_url: str | None  # url to forwarded post
-    link_preview: dict | None
-    out_links: list[str] | None
+    mentions: list[str] | None = None # mentioned usernames
+    hashtags: list[str] | None = None
+    forwarded: dict | None = None
+    forwarded_url: str | None = None  # url to forwarded post
+    link_preview: dict | None = None
+    out_links: list[str] | None = None
 
