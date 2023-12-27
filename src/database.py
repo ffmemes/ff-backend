@@ -11,7 +11,10 @@ from sqlalchemy import (
     Select,
     String,
     Table,
-    Update
+    Update,
+    Identity,
+    ForeignKey,
+    func,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -24,22 +27,54 @@ engine = create_async_engine(DATABASE_URL)
 
 metadata = MetaData(naming_convention=DB_NAMING_CONVENTION)
 
+
+language = Table(
+    "language",
+    metadata,
+    Column("code", String, primary_key=True),
+    Column("emoji", String, nullable=False),
+)
+
+
+meme_source = Table(
+    "meme_source",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("type", String, nullable=False),
+    Column("url", String, nullable=False),
+
+    Column("status", String, nullable=False),  # in_moderation, parsing_enabled, parsing_disabled
+
+    Column("language_code", ForeignKey("language.code", ondelete="SET_NULL")),  # nullable=False ?
+
+    Column("parsed_at", DateTime),
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime, onupdate=func.now()),
+)
+
+
 parsed_memes_telegram = Table(
     "parsed_memes_telegram",
     metadata,
-    Column("id", Integer, primary_key=True),
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("meme_source_id", ForeignKey("meme_source.id", ondelete="CASCADE"), nullable=False),
     Column("post_id", Integer, nullable=False),
+
     Column("url", String, nullable=False),
     Column("content", String, nullable=False),
+    Column("date", DateTime, nullable=False),
+
     Column("out_links", JSONB),
     Column("mentions", JSONB),
     Column("hashtags", JSONB),
     Column("forwarded", JSON),
     Column("media", ARRAY(JSON)),
     Column("views", Integer, nullable=False),
-    Column("created_at", DateTime, nullable=False),
     Column("forwarded_url", String),
-    Column("link_preview", JSON)
+    Column("link_preview", JSON),
+
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime, onupdate=func.now()),
 )
 
 

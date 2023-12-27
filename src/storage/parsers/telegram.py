@@ -3,7 +3,8 @@ from typing import List, Optional
 
 from src.storage.parsers.snscrape.modules.telegram import TelegramChannelScraper
 
-
+# TODO: async + requests -> httpx
+# TODO: -> List[TgChannelPostParsingResult]
 def parse_tg_channel(tg_username: str, num_of_posts: Optional[int] = None) -> List[dict]:
     """
     Parses source for memes
@@ -24,7 +25,6 @@ def parse_tg_channel(tg_username: str, num_of_posts: Optional[int] = None) -> Li
         pass
 
     for post in posts:
-        post["created_at"] = post.pop("date")
         post["forwarded_url"] = post.pop("forwardedUrl")
         post["link_preview"] = post.pop("linkPreview")
         post["out_links"] = post.pop("outlinks")

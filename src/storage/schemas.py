@@ -1,3 +1,12 @@
-# здесь схемы данных для сырых данных из VK
-# схема данных для общей таблицы с мемами
-# и мини-схема для мема с инфой для очереди отправки
+from datetime import datetime
+
+from src.models import CustomModel
+from src.storage.constants import MemeType
+
+
+# minimal data to send a meme
+class MemeData(CustomModel):
+    meme_id: int
+    meme_type: MemeType
+    file_id: str
+    caption: str | None
