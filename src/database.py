@@ -2,7 +2,6 @@ from typing import Any
 
 from sqlalchemy import (
     CursorResult,
-    JSON,
     Column,
     DateTime,
     Insert,
@@ -16,7 +15,7 @@ from sqlalchemy import (
     ForeignKey,
     func,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from src.config import settings
@@ -67,11 +66,11 @@ parsed_memes_telegram = Table(
     Column("out_links", JSONB),
     Column("mentions", JSONB),
     Column("hashtags", JSONB),
-    Column("forwarded", JSON),
-    Column("media", ARRAY(JSON)),
+    Column("forwarded", JSONB),
+    Column("media", JSONB),
     Column("views", Integer, nullable=False),
     Column("forwarded_url", String),
-    Column("link_preview", JSON),
+    Column("link_preview", JSONB),
 
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
     Column("updated_at", DateTime, onupdate=func.now()),

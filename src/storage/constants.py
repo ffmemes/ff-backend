@@ -13,3 +13,9 @@ class MemeSourceType(str, Enum):
     REDDIT = "reddit"
 
     # TODO: add memes uploaded by users
+
+
+class MemeSourceStatus(str, Enum):
+    IN_MODERATION = "in_moderation"
+    PARSING_ENABLED = "parsing_enabled"
+    PARSING_DISABLED = "parsing_disabled"
