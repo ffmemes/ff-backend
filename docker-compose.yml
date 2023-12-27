@@ -16,6 +16,20 @@ services:
     depends_on:
       - app_db
 
+  app_prefect:
+    container_name: prefect_worker
+    image: app_image
+    env_file:
+      - .env
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: prefect worker start -p "all"
+    volumes:
+      - ./:/src
+    depends_on:
+      - app_db
+
   app_db:
     container_name: app_db
     hostname: app_db
