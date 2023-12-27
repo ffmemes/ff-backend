@@ -32,7 +32,7 @@ def upgrade() -> None:
     sa.Column('parsed_at', sa.DateTime(), nullable=True),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['language_code'], ['language.code'], name=op.f('meme_source_language_code_fkey'), ondelete='SET_NULL'),
+    sa.ForeignKeyConstraint(['language_code'], ['language.code'], name=op.f('meme_source_language_code_fkey'), ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id', name=op.f('meme_source_pkey'))
     )
     op.create_table('meme_raw_telegram',

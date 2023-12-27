@@ -46,7 +46,7 @@ meme_source = Table(
 
     Column("status", String, nullable=False),  # in_moderation, parsing_enabled, parsing_disabled
 
-    Column("language_code", ForeignKey("language.code", ondelete="SET_NULL")),  # nullable=False ?
+    Column("language_code", ForeignKey("language.code", ondelete="SET NULL")),  # nullable=False ?
 
     Column("parsed_at", DateTime),
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
