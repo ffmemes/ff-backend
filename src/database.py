@@ -13,6 +13,7 @@ from sqlalchemy import (
     Update,
     Identity,
     ForeignKey,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -20,6 +21,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from src.config import settings
 from src.constants import DB_NAMING_CONVENTION
+from src.storage.constants import MEME_SOURCE_POST_UNIQUE_CONSTRAINT
 
 DATABASE_URL = str(settings.DATABASE_URL)
 engine = create_async_engine(DATABASE_URL)
@@ -52,8 +54,8 @@ meme_source = Table(
 )
 
 
-parsed_memes_telegram = Table(
-    "parsed_memes_telegram",
+meme_raw_telegram = Table(
+    "meme_raw_telegram",
     metadata,
     Column("id", Integer, Identity(), primary_key=True),
     Column("meme_source_id", ForeignKey("meme_source.id", ondelete="CASCADE"), nullable=False),
@@ -74,6 +76,8 @@ parsed_memes_telegram = Table(
 
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
     Column("updated_at", DateTime, onupdate=func.now()),
+
+    UniqueConstraint("meme_source_id", "post_id", name=MEME_SOURCE_POST_UNIQUE_CONSTRAINT),
 )
 
 
