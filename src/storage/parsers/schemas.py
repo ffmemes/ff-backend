@@ -6,7 +6,7 @@ from src.models import CustomModel
 class TgChannelPostParsingResult(CustomModel):
     post_id: int
     url: str
-    content: str  # post text
+    content: str | None = None  # post text
     media: list[dict] | None = None
     views: int
     date: datetime
