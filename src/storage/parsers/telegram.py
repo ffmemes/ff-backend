@@ -26,18 +26,11 @@ def parse_tg_channel(
     except StopIteration:
         pass
 
-    # for post in posts:
-    #     post["forwarded_url"] = post.pop("forwardedUrl")
-    #     post["link_preview"] = post.pop("linkPreview")
-    #     post["out_links"] = post.pop("outlinks")
-    #     post["post_id"] = int(post["url"].split("/")[-1])
-    #     post["views"] = post["views"][0] if post["views"] else 0
-
     return [
         TgChannelPostParsingResult(
             post_id=int(post["url"].split("/")[-1]),
             url=post["url"],
-            date=post["date"],
+            date=post["date"].replace(tzinfo=None),
             content=post["content"],
             media=post["media"],
             mentions=post["mentions"],

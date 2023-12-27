@@ -23,7 +23,7 @@ async def insert_parsed_posts_from_telegram(
     telegram_posts: list[TgChannelPostParsingResult],
 ) -> None:
     posts = [
-        post.model_dump() | {"meme_source_id": meme_source_id}
+        post.model_dump(exclude_none=True) | {"meme_source_id": meme_source_id}
         for post in telegram_posts
     ]
     insert_statement = insert(meme_raw_telegram).values(posts)
@@ -31,8 +31,6 @@ async def insert_parsed_posts_from_telegram(
         constraint=MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
         set_={
             "views": insert_statement.excluded.views,
-            "content": insert_statement.excluded.content,
-            "media": insert_statement.excluded.media,
             "updated_at": datetime.utcnow(),
         },
     )
