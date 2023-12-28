@@ -24,7 +24,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: prefect worker start -p "all"
+    command: prefect worker start -p "all" -n "local"
     volumes:
       - ./:/src
     depends_on:
