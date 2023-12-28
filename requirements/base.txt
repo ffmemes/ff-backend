@@ -20,3 +20,5 @@ beautifulsoup4==4.12.*
 lxml==4.9.*
 filelock==3.13.*
 requests==2.31.*
+
+python-telegram-bot==20.7
