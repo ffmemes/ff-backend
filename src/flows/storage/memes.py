@@ -4,6 +4,7 @@ from prefect import flow, task, get_run_logger
 from src.storage.service import (
     etl_memes_from_raw_telegram_posts,
     get_unloaded_tg_memes,
+    update_meme,
 )
 
 from src.storage.upload import (
@@ -11,16 +12,23 @@ from src.storage.upload import (
     upload_meme_content_to_tg,
 )
 
+from src.storage.ads import text_is_adverisement
+from src.storage.constants import MemeStatus
+
 
 @task
-async def upload_memes_to_telegram(unloaded_memes: list[dict[str, Any]]) -> None:
+async def upload_memes_to_telegram(unloaded_memes: list[dict[str, Any]]) -> list[dict[str, Any]]:
     logger = get_run_logger()
     logger.info(f"Received {len(unloaded_memes)} memes to upload to Telegram.")
 
+    memes = []
     for unloaded_meme in unloaded_memes:
         # TODO: proper try except
         meme_content = await download_meme_content_file(unloaded_meme["url"])
-        await upload_meme_content_to_tg(unloaded_meme["id"], unloaded_meme["type"], meme_content)
+        meme = await upload_meme_content_to_tg(unloaded_meme["id"], unloaded_meme["type"], meme_content)
+        memes.append(meme)
+
+    return memes
 
 
 @flow(
@@ -36,4 +44,9 @@ async def tg_meme_pipeline() -> None:
 
     logger.info(f"Getting unloaded memes to upload to Telegram.")
     unloaded_memes = await get_unloaded_tg_memes()
-    await upload_memes_to_telegram(unloaded_memes)
+    memes = await upload_memes_to_telegram(unloaded_memes)
+
+    logger.info(f"Checking {len(memes)} memes for ads.")
+    for meme in memes:
+        if text_is_adverisement(meme["caption"]):
+            await update_meme(meme["id"], status=MemeStatus.AD)

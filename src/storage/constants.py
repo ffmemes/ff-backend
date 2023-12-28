@@ -30,6 +30,7 @@ class MemeStatus(str, Enum):
     CREATED = "created"
     OK = "ok"
     DUPLICATE = "duplicate"
+    AD = "ad"
     # TODO: more statuses?
     # IN_MODERATION = "in_moderation"
 

@@ -1,8 +1,7 @@
 from prefect.deployments import Deployment
 from prefect.server.schemas.schedules import CronSchedule
 
-from src.flows.parsers.telegram import parse_telegram_sources
-# from src.flows.parsers.vk import parse_vk_source
+from src.flows.parsers.tg import parse_telegram_sources
 
 
 deployment_tg = Deployment.build_from_flow(
