@@ -6,8 +6,8 @@ from src.storage.service import (
     get_telegram_sources_to_parse,
     insert_parsed_posts_from_telegram,
     update_meme_source,
-    etl_memes_from_raw_telegram_posts,
 )
+from src.flows.storage.memes import tg_meme_pipeline
 
 
 @flow(
@@ -35,5 +35,4 @@ async def parse_telegram_sources(
         await update_meme_source(meme_source_id=tg_source["id"], parsed_at=datetime.utcnow())
 
     
-    # TODO: @task or @flow for prefect?
-    await etl_memes_from_raw_telegram_posts()
+    await tg_meme_pipeline()

@@ -33,6 +33,7 @@ async def insert_parsed_posts_from_telegram(
     insert_posts_query = insert_statement.on_conflict_do_update(
         constraint=MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
         set_={
+            "media": insert_statement.excluded.media,
             "views": insert_statement.excluded.views,
             "updated_at": datetime.utcnow(),
         },
@@ -90,3 +91,23 @@ async def update_meme(meme_id: int, **kwargs) -> dict[str, Any] | None:
         .returning(meme)
     )
     return await fetch_one(update_query)
+
+
+async def get_unloaded_tg_memes() -> list[dict[str, Any]]:
+    "Returns only MemeType.IMAGE memes"
+    select_query = f"""
+        SELECT 
+            meme.id,
+            '{MemeType.IMAGE}' AS type,
+            meme_raw_telegram.media->0->>'url' content_url
+        FROM meme
+        INNER JOIN meme_source 
+            ON meme_source.id = meme.meme_source_id
+            AND meme_source.type = '{MemeSourceType.TELEGRAM.value}'
+        INNER JOIN meme_raw_telegram
+            ON meme_raw_telegram.post_id = meme.raw_meme_id
+            AND meme_raw_telegram.meme_source_id = meme.meme_source_id
+        WHERE 1=1
+            AND meme.telegram_file_id IS NULL;
+    """
+    return await fetch_all(select_query)
