@@ -21,7 +21,10 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from src.config import settings
 from src.constants import DB_NAMING_CONVENTION
-from src.storage.constants import MEME_SOURCE_POST_UNIQUE_CONSTRAINT
+from src.storage.constants import (
+    MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
+    MEME_SOURCE_RAW_MEME_UNIQUE_CONSTRAINT,
+)
 
 DATABASE_URL = str(settings.DATABASE_URL)
 engine = create_async_engine(DATABASE_URL)
@@ -34,6 +37,8 @@ language = Table(
     metadata,
     Column("code", String, primary_key=True),
     Column("emoji", String, nullable=False),
+
+    # TODO: flag: show in language selector UI or not
 )
 
 
@@ -78,6 +83,29 @@ meme_raw_telegram = Table(
     Column("updated_at", DateTime, onupdate=func.now()),
 
     UniqueConstraint("meme_source_id", "post_id", name=MEME_SOURCE_POST_UNIQUE_CONSTRAINT),
+)
+
+
+meme = Table(
+    "meme",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("meme_source_id", ForeignKey("meme_source.id", ondelete="CASCADE"), nullable=False),
+    Column("raw_meme_id", Integer, nullable=False, index=True),
+    Column("status", String, nullable=False),
+
+    Column("type", String, nullable=False),
+    Column("telegram_file_id", String),
+    Column("caption", String),
+    Column("language_code", ForeignKey("language.code", ondelete="SET NULL")),
+
+    Column("ocr_result", JSONB),
+    Column("duplicate_of", ForeignKey("meme.id", ondelete="SET NULL")),
+
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime, onupdate=func.now()),
+
+    UniqueConstraint("meme_source_id", "raw_meme_id", name=MEME_SOURCE_RAW_MEME_UNIQUE_CONSTRAINT),
 )
 
 

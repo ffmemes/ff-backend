@@ -1,3 +1,4 @@
+from pydantic import Field
 from datetime import datetime
 
 from src.models import CustomModel
@@ -10,3 +11,9 @@ class MemeData(CustomModel):
     meme_type: MemeType
     file_id: str
     caption: str | None
+
+
+class OcrResult(CustomModel):
+    model: str
+    result: dict
+    calculated_at: datetime = Field(default_factory=datetime.utcnow)

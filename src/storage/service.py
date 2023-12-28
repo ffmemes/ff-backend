@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
     language,
+    meme,
     meme_source,
     meme_raw_telegram,
     execute, fetch_one, fetch_all,
@@ -55,5 +56,37 @@ async def update_meme_source(meme_source_id: int, **kwargs) -> dict[str, Any] | 
         .where(meme_source.c.id == meme_source_id)
         .values(**kwargs)
         .returning(meme_source)
+    )
+    return await fetch_one(update_query)
+
+
+async def etl_memes_from_raw_telegram_posts() -> None:
+    # TODO: do in one SQL query
+    select_query = (
+        select(meme_raw_telegram)
+    )
+    raw_posts = await fetch_all(select_query)
+
+    memes = [
+        {
+            "meme_source_id": post["meme_source_id"],
+            "post_id": post["id"],
+            "caption": post["content"],
+        }
+        for post in raw_posts
+    ]
+    insert_statement = insert(meme).values(memes)
+    insert_memes_query = insert_statement.on_conflict_do_nothing()
+
+    await execute(insert_memes_query)
+
+
+
+async def update_meme(meme_id: int, **kwargs) -> dict[str, Any] | None:
+    update_query = (
+        meme.update()
+        .where(meme.c.id == meme_id)
+        .values(**kwargs)
+        .returning(meme)
     )
     return await fetch_one(update_query)
