@@ -1,7 +1,6 @@
-import uuid
 from typing import Any
 from datetime import datetime
-from sqlalchemy import select, func, nulls_first
+from sqlalchemy import select, nulls_first
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
