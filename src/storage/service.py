@@ -16,6 +16,8 @@ from src.storage.constants import (
     MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
     MemeSourceType,
     MemeSourceStatus,
+    MemeType,
+    MemeStatus,
 )
 
 
@@ -60,26 +62,24 @@ async def update_meme_source(meme_source_id: int, **kwargs) -> dict[str, Any] | 
     return await fetch_one(update_query)
 
 
+# TODO: separate file for ETL scripts?
 async def etl_memes_from_raw_telegram_posts() -> None:
-    # TODO: do in one SQL query
-    select_query = (
-        select(meme_raw_telegram)
-    )
-    raw_posts = await fetch_all(select_query)
-
-    memes = [
-        {
-            "meme_source_id": post["meme_source_id"],
-            "post_id": post["id"],
-            "caption": post["content"],
-        }
-        for post in raw_posts
-    ]
-    insert_statement = insert(meme).values(memes)
-    insert_memes_query = insert_statement.on_conflict_do_nothing()
-
-    await execute(insert_memes_query)
-
+    insert_query = f"""
+        INSERT INTO meme (meme_source_id, raw_meme_id, caption, status, type, language_code)
+        SELECT 
+            meme_source_id,
+            post_id AS raw_meme_id, 
+            content AS caption,
+            '{MemeStatus.CREATED.value}' AS status,
+            '{MemeType.IMAGE.value}' AS type,
+            meme_source.language_code AS language_code
+        FROM meme_raw_telegram
+        LEFT JOIN meme_source
+            ON meme_source.id = meme_raw_telegram.meme_source_id
+        WHERE JSONB_ARRAY_LENGTH(media) = 1  -- only images
+        ON CONFLICT DO NOTHING;
+    """
+    await execute(insert_query)
 
 
 async def update_meme(meme_id: int, **kwargs) -> dict[str, Any] | None:
