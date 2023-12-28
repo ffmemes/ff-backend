@@ -31,6 +31,7 @@ class MemeStatus(str, Enum):
     OK = "ok"
     DUPLICATE = "duplicate"
     AD = "ad"
+    BROKEN_CONTENT_LINK = "broken_content_link"
     # TODO: more statuses?
     # IN_MODERATION = "in_moderation"
 

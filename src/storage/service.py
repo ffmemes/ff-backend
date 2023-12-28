@@ -1,6 +1,6 @@
 from typing import Any
 from datetime import datetime
-from sqlalchemy import select, nulls_first
+from sqlalchemy import select, nulls_first, text
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
@@ -76,10 +76,10 @@ async def etl_memes_from_raw_telegram_posts() -> None:
         FROM meme_raw_telegram
         LEFT JOIN meme_source
             ON meme_source.id = meme_raw_telegram.meme_source_id
-        WHERE JSONB_ARRAY_LENGTH(media) = 1  -- only images
-        ON CONFLICT DO NOTHING;
+        WHERE JSONB_ARRAY_LENGTH(media) = 1
+        ON CONFLICT DO NOTHING
     """
-    await execute(insert_query)
+    await execute(text(insert_query))
 
 
 async def update_meme(meme_id: int, **kwargs) -> dict[str, Any] | None:
@@ -109,4 +109,4 @@ async def get_unloaded_tg_memes() -> list[dict[str, Any]]:
         WHERE 1=1
             AND meme.telegram_file_id IS NULL;
     """
-    return await fetch_all(select_query)
+    return await fetch_all(text(select_query))

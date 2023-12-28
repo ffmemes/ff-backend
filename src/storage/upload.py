@@ -11,7 +11,7 @@ from src.storage.service import update_meme
 async def download_meme_content_file(
     url: AnyHttpUrl,
 ):
-    with httpx.Client() as client:
+    async with httpx.AsyncClient(timeout=10.0) as client:
         response = await client.get(url)
         response.raise_for_status()
         return response.content

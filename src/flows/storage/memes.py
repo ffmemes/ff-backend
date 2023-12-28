@@ -1,3 +1,4 @@
+import httpx
 from typing import Any
 from prefect import flow, task, get_run_logger
 
@@ -16,16 +17,25 @@ from src.storage.ads import text_is_adverisement
 from src.storage.constants import MemeStatus
 
 
-@task
+@flow
 async def upload_memes_to_telegram(unloaded_memes: list[dict[str, Any]]) -> list[dict[str, Any]]:
     logger = get_run_logger()
     logger.info(f"Received {len(unloaded_memes)} memes to upload to Telegram.")
 
     memes = []
     for unloaded_meme in unloaded_memes:
-        # TODO: proper try except
-        meme_content = await download_meme_content_file(unloaded_meme["url"])
+        
+        try:
+            meme_original_content = await download_meme_content_file(unloaded_meme["content_url"])
+        except httpx.HTTPStatusError:
+            logger.info(f"Meme {unloaded_meme['id']} content is not available to download.")
+            await update_meme(unloaded_meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK)
+            continue
+
+        meme_content = meme_original_content  # TODO: add watermark with our logo
+
         meme = await upload_meme_content_to_tg(unloaded_meme["id"], unloaded_meme["type"], meme_content)
+        meme["__original_content"] = meme_original_content
         memes.append(meme)
 
     return memes
@@ -50,3 +60,5 @@ async def tg_meme_pipeline() -> None:
     for meme in memes:
         if text_is_adverisement(meme["caption"]):
             await update_meme(meme["id"], status=MemeStatus.AD)
+
+    
