@@ -10,6 +10,8 @@ from src import redis
 from src.tgbot import bot
 from src.config import app_configs, settings
 
+from src.tgbot.router import router as tgbot_router
+
 
 @asynccontextmanager
 async def lifespan(_application: FastAPI) -> AsyncGenerator:
@@ -53,3 +55,6 @@ if settings.ENVIRONMENT.is_deployed:
 @app.get("/healthcheck", include_in_schema=False)
 async def healthcheck() -> dict[str, str]:
     return {"status": "ok"}
+
+
+app.include_router(tgbot_router, prefix="/tgbot", tags=["Telegram Bot"])

@@ -1,12 +1,10 @@
 from fastapi import (
     APIRouter, 
+    BackgroundTasks,
     status,
 )
 
 from src.tgbot.bot import process_event
-from src.tgbot.service import get_all_messages
-from src.tgbot.schemas import TgbotMessage
-
 from src.tgbot.dependencies import validate_webhook_secret
 
 router = APIRouter()
@@ -20,12 +18,20 @@ router = APIRouter()
 )
 async def tgbot_webhook_events(
     payload: dict,
+    worker: BackgroundTasks,
 ) -> dict:
     print("PAYLOAD:", payload)
-    await process_event(payload)
+    worker.add_task(process_event, payload)
 
-    # TODO: explore what we can do here
-    # e.g. remove buttons with callback 
+    # remove buttons with callback 
+    if "callback_query" in payload:
+        return {
+            "method": "editMessageReplyMarkup",
+            "chat_id": payload["callback_query"]["message"]["chat"]["id"],
+            "message_id": payload["callback_query"]["message"]["message_id"],
+            # "reply_markup":  # TODO: remove only callback buttons
+        }
+
     return {
         "ok:": True,
     }
