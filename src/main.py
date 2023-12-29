@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
 from src import redis
+from src.tgbot import bot
 from src.config import app_configs, settings
 
 
@@ -17,6 +18,11 @@ async def lifespan(_application: FastAPI) -> AsyncGenerator:
         str(settings.REDIS_URL), max_connections=10, decode_responses=True
     )
     redis.redis_client = aioredis.Redis(connection_pool=pool)
+
+    is_webhook = settings.ENVIRONMENT.is_deployed
+    bot.application = bot.setup_application(is_webhook)
+    if is_webhook:
+        await bot.setup_webhook(bot.application)
 
     yield
 

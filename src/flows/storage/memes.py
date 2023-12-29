@@ -13,7 +13,7 @@ from src.storage.upload import (
     upload_meme_content_to_tg,
 )
 
-from src.storage.ads import text_is_adverisement
+from src.storage.ads import text_is_adverisement, filter_caption
 from src.storage.constants import MemeStatus
 
 
@@ -60,5 +60,9 @@ async def tg_meme_pipeline() -> None:
     for meme in memes:
         if text_is_adverisement(meme["caption"]):
             await update_meme(meme["id"], status=MemeStatus.AD)
+
+        new_caption = filter_caption(meme["caption"])
+        if new_caption != meme["caption"]:
+            await update_meme(meme["id"], caption=new_caption)
 
     

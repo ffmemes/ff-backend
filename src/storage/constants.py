@@ -35,3 +35,10 @@ class MemeStatus(str, Enum):
     # TODO: more statuses?
     # IN_MODERATION = "in_moderation"
 
+
+class Language(str, Enum):
+    RU = "ru"
+    EN = "en"
+
+
+SUPPORTED_LANGUAGES = [Language.RU, Language.EN]

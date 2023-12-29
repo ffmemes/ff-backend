@@ -2,6 +2,7 @@ from typing import Any
 
 from sqlalchemy import (
     CursorResult,
+    Boolean,
     Column,
     DateTime,
     Insert,
@@ -14,6 +15,7 @@ from sqlalchemy import (
     Identity,
     ForeignKey,
     UniqueConstraint,
+    BigInteger,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -107,6 +109,76 @@ meme = Table(
 
     UniqueConstraint("meme_source_id", "raw_meme_id", name=MEME_SOURCE_RAW_MEME_UNIQUE_CONSTRAINT),
 )
+
+
+user_tg = Table(
+    "user_tg",
+    metadata,
+    Column("id", BigInteger, primary_key=True),
+    Column("username", String),
+    Column("first_name", String, nullable=False),
+    Column("last_name", String),
+    Column("is_premium", Boolean),
+    Column("language_code", String),  # IETF language tag from telegram
+    Column("deep_link", String),
+
+    # Column("first_chat_id", BigInteger, nullable=False),  # chat_id where user first appeared
+
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime, onupdate=func.now()),
+)
+
+
+user = Table(
+    "user",
+    metadata,
+    Column("id", BigInteger, primary_key=True),
+    Column("type", String, nullable=False),  # super_user, moderator, 
+
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+    Column("last_active_at", DateTime, onupdate=func.now()),
+    Column("blocked_bot_at", DateTime),
+)
+
+
+user_language = Table(
+    "user_language",
+    metadata,
+    Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), primary_key=True),
+    Column("language_code", ForeignKey("language.code", ondelete="CASCADE"), primary_key=True),
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+)
+
+
+# reaction = Table(
+#     "reaction",
+#     metadata,
+#     Column("id", Integer, Identity(), primary_key=True),
+#     Column("text", String, nullable=False),
+# )
+
+
+# user_meme_reaction = Table(
+#     "user_meme_reaction",
+#     metadata,
+#     Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
+#     Column("meme_id", ForeignKey("meme.id", ondelete="CASCADE"), nullable=False),
+#     Column("reaction_id", ForeignKey("reaction.id", ondelete="CASCADE")),
+#     Column("recommended_by", String, nullable=False),
+#     Column("sent_at", DateTime, server_default=func.now(), nullable=False),
+#     Column("reacted_at", DateTime),
+# )
+
+
+# event = Table(
+#     "event",
+#     metadata,
+#     Column("id", Integer, Identity(), primary_key=True),
+#     Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
+#     Column("type", String, nullable=False),  # meme_sent, achievement, broadcast, poll
+#     Column("object_id", JSONB),
+#     Column("created_at", DateTime, server_default=func.now(), nullable=False),
+# )
 
 
 async def fetch_one(select_query: Select | Insert | Update) -> dict[str, Any] | None:

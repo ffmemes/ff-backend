@@ -30,6 +30,20 @@ services:
     depends_on:
       - app_db
 
+  app_tgbot_polling:
+    container_name: app_tgbot_polling
+    image: app_image
+    env_file:
+      - .env
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python ./start-polling.py
+    volumes:
+      - ./:/src
+    depends_on:
+      - app_db
+
   app_db:
     container_name: app_db
     hostname: app_db
