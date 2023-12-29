@@ -3,6 +3,7 @@ from telegram.ext import (
     CallbackQueryHandler, 
     CommandHandler, 
     CommandHandler,
+    MessageHandler,
     filters,
 )
 from telegram import (
@@ -10,13 +11,25 @@ from telegram import (
 )
 
 from src.config import settings
-from src.tgbot.handlers.start import handle_start
+from src.tgbot.handlers import start, upload, broken
 
 application: Application = None  # type: ignore
 
 
 def add_handlers(application: Application) -> None:
-    application.add_handler(CommandHandler("start", handle_start))
+    application.add_handler(CommandHandler("start", start.handle_start, filters=filters.ChatType.PRIVATE))
+
+    application.add_handler(MessageHandler(
+        filters=filters.ChatType.PRIVATE & filters.FORWARDED & filters.ATTACHMENT,
+        callback=upload.handle_forward
+    ))
+
+    application.add_handler(MessageHandler(
+        filters=filters.ChatType.PRIVATE & filters.ATTACHMENT,
+        callback=upload.handle_message
+    ))
+
+    application.add_handler(CallbackQueryHandler(broken.handle_broken_callback_query, pattern="^"))
 
 
 async def process_event(payload: dict) -> None:
@@ -29,10 +42,10 @@ async def process_event(payload: dict) -> None:
 
 
 async def setup_webhook(application: Application) -> None:
-    await application.initialize()
     await application.bot.set_webhook(
         "https://" + settings.SITE_DOMAIN + "/tgbot/webhook",
         secret_token=settings.TELEGRAM_BOT_WEBHOOK_SECRET,
+        allowed_updates=Update.ALL_TYPES,
     )
     await application.start()
 

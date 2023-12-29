@@ -88,6 +88,13 @@ meme_raw_telegram = Table(
 )
 
 
+# meme_raw_upload = Table(
+#     "meme_raw_upload",
+#     metadata,
+# TODO: columns TBD, probably also JSONBs to store all raw data
+# )
+
+
 meme = Table(
     "meme",
     metadata,
