@@ -1,6 +1,7 @@
 from fastapi import (
     APIRouter, 
     BackgroundTasks,
+    Depends,
     status,
 )
 
@@ -12,7 +13,7 @@ router = APIRouter()
 
 @router.post(
     "/webhook",
-    dependencies=[validate_webhook_secret],
+    dependencies=[Depends(validate_webhook_secret)],
     status_code=status.HTTP_200_OK,
     include_in_schema=False,
 )
