@@ -23,8 +23,8 @@ async def lifespan(_application: FastAPI) -> AsyncGenerator:
 
     is_webhook = settings.ENVIRONMENT.is_deployed
     bot.application = bot.setup_application(is_webhook)
-    if is_webhook:
-        await bot.setup_webhook(bot.application)
+    # if is_webhook:  # all gunicorn workers will call this and hit rate limit
+    #     await bot.setup_webhook(bot.application)
 
     yield
 
