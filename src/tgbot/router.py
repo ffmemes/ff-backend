@@ -7,6 +7,7 @@ from fastapi import (
 
 from src.tgbot.bot import process_event
 from src.tgbot.dependencies import validate_webhook_secret
+from src.tgbot.utils import remove_buttons_with_callback
 
 router = APIRouter()
 
@@ -26,11 +27,12 @@ async def tgbot_webhook_events(
 
     # remove buttons with callback 
     if "callback_query" in payload:
+        cbqm = payload["callback_query"]["message"]
         return {
             "method": "editMessageReplyMarkup",
-            "chat_id": payload["callback_query"]["message"]["chat"]["id"],
-            "message_id": payload["callback_query"]["message"]["message_id"],
-            # "reply_markup":  # TODO: remove only callback buttons
+            "chat_id": cbqm["chat"]["id"],
+            "message_id": cbqm["message_id"],
+            "reply_markup": remove_buttons_with_callback(cbqm["reply_markup"])
         }
 
     return {
