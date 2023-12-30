@@ -20,7 +20,7 @@ async def parse_vk_sources(
 ) -> None:
     logger = get_run_logger()
     vk_sources = await get_vk_sources_to_parse(limit=sources_batch_size)
-    logger.info(f"Received {len(vk_sources)} tg sources to scrape.")
+    logger.info(f"Received {len(vk_sources)} vk sources to scrape.")
 
     for vk_source in vk_sources:
         vk = VkGroupScraper(vk_source["url"])
