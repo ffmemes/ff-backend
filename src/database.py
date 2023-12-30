@@ -157,24 +157,16 @@ user_language = Table(
 )
 
 
-# reaction = Table(
-#     "reaction",
-#     metadata,
-#     Column("id", Integer, Identity(), primary_key=True),
-#     Column("text", String, nullable=False),
-# )
-
-
-# user_meme_reaction = Table(
-#     "user_meme_reaction",
-#     metadata,
-#     Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
-#     Column("meme_id", ForeignKey("meme.id", ondelete="CASCADE"), nullable=False),
-#     Column("reaction_id", ForeignKey("reaction.id", ondelete="CASCADE")),
-#     Column("recommended_by", String, nullable=False),
-#     Column("sent_at", DateTime, server_default=func.now(), nullable=False),
-#     Column("reacted_at", DateTime),
-# )
+user_meme_reaction = Table(
+    "user_meme_reaction",
+    metadata,
+    Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), primary_key=True),
+    Column("meme_id", ForeignKey("meme.id", ondelete="CASCADE"), primary_key=True),
+    Column("recommended_by", String, nullable=False),
+    Column("sent_at", DateTime, server_default=func.now(), nullable=False),
+    Column("reaction_id", Integer),
+    Column("reacted_at", DateTime),
+)
 
 
 # event = Table(

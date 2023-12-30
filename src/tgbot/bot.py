@@ -11,13 +11,22 @@ from telegram import (
 )
 
 from src.config import settings
-from src.tgbot.handlers import start, upload, broken
+from src.tgbot.handlers import start, upload, broken, reaction, alerts
+from src.tgbot.constants import (
+    MEME_BUTTON_CALLBACK_DATA_REGEXP, 
+    MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA,
+)
 
 application: Application = None  # type: ignore
 
 
 def add_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("start", start.handle_start, filters=filters.ChatType.PRIVATE))
+
+    application.add_handler(CallbackQueryHandler(
+        reaction.handle_reaction,
+        pattern=MEME_BUTTON_CALLBACK_DATA_REGEXP,
+    ))
 
     application.add_handler(MessageHandler(
         filters=filters.ChatType.PRIVATE & filters.FORWARDED & filters.ATTACHMENT,
@@ -30,6 +39,7 @@ def add_handlers(application: Application) -> None:
     ))
 
     application.add_handler(CallbackQueryHandler(broken.handle_broken_callback_query, pattern="^"))
+    application.add_handler(CallbackQueryHandler(alerts.handle_empty_meme_queue_alert, pattern=MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA))
 
 
 async def process_event(payload: dict) -> None:

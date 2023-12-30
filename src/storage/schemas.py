@@ -7,8 +7,8 @@ from src.storage.constants import MemeType
 
 # minimal data to send a meme
 class MemeData(CustomModel):
-    meme_id: int
-    meme_type: MemeType
+    id: int
+    type: MemeType
     file_id: str
     caption: str | None
 

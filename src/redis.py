@@ -29,3 +29,23 @@ async def get_by_key(key: str) -> Optional[str]:
 
 async def delete_by_key(key: str) -> None:
     return await redis_client.delete(key)
+
+
+def get_meme_queue_key(user_id: int) -> str:
+    return f"meme_queue:{user_id}"
+
+
+async def get_all_memes_in_queue_by_key(key: str) -> set[str]:
+    return await redis_client.smembers(key)
+
+
+async def pop_meme_from_queue_by_key(key: str) -> str | None:
+    return await redis_client.spop(key)
+
+
+async def get_meme_queue_length_by_key(key: str) -> int:
+    return await redis_client.scard(key)
+
+
+async def add_memes_to_queue_by_key(key: str, memes: list[str]) -> int:
+    return await redis_client.sadd(key, *memes)
