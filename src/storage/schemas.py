@@ -30,7 +30,5 @@ class MemeUserUpload(CustomModel):
     mentions: list[str] | None = None # mentioned usernames
     hashtags: list[str] | None = None
     forwarded: dict | None = None
-
-    image: list[dict] | None = None
-    video: list[dict] | None = None
+    media: list[dict] | None = None
 
