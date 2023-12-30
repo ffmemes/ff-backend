@@ -62,7 +62,7 @@ class TelegramChannelScraper(Scraper):
             req = await self._request(next_page_url, headers=self._headers)
             r = await req.aread()
             if req.status_code != 200:
-                raise ScraperException(f'Got status code {r.status_code}')
+                raise ScraperException(f'Got status code {req.status_code}')
             soup = bs4.BeautifulSoup(r.decode('utf-8'), 'lxml')
         raw_posts = reversed(raw_posts)
         if num_of_posts:
