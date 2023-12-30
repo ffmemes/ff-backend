@@ -1,7 +1,7 @@
 from prefect import flow, get_run_logger
 from datetime import datetime
 
-from src.storage.parsers import tg
+from src.storage.parsers.tg import TelegramChannelScraper
 from src.storage.service import (
     get_telegram_sources_to_parse,
     insert_parsed_posts_from_telegram,
@@ -16,8 +16,8 @@ from src.flows.storage.memes import tg_meme_pipeline
     version="0.1.0"
 )
 async def parse_telegram_sources(
-    sources_batch_size=10,
-    nposts=10,
+        sources_batch_size=10,
+        nposts=10,
 ) -> None:
     logger = get_run_logger()
     tg_sources = await get_telegram_sources_to_parse(limit=sources_batch_size)
@@ -26,13 +26,13 @@ async def parse_telegram_sources(
     for tg_source in tg_sources:
         tg_username = tg_source["url"].split("/")[-1]  # is it ok?
 
-        # TODO: make scrapper async
-        posts = tg.parse_tg_channel(tg_username, num_of_posts=nposts)
+        tg = TelegramChannelScraper(tg_username)
+
+        posts = await tg.get_items(nposts)
         logger.info(f"Received {len(posts)} posts from @{tg_username}")
 
         await insert_parsed_posts_from_telegram(tg_source["id"], posts)
 
         await update_meme_source(meme_source_id=tg_source["id"], parsed_at=datetime.utcnow())
 
-    
     await tg_meme_pipeline()
