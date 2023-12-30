@@ -102,9 +102,7 @@ meme_raw_upload = Table(
     Column("mentions", JSONB),
     Column("hashtags", JSONB),
     Column("forwarded", JSONB),
-
-    Column("image", JSONB),
-    Column("video", JSONB),
+    Column("media", JSONB),
 
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
     Column("updated_at", DateTime, onupdate=func.now())
