@@ -33,7 +33,6 @@ engine = create_async_engine(DATABASE_URL)
 
 metadata = MetaData(naming_convention=DB_NAMING_CONVENTION)
 
-
 language = Table(
     "language",
     metadata,
@@ -42,7 +41,6 @@ language = Table(
 
     # TODO: flag: show in language selector UI or not
 )
-
 
 meme_source = Table(
     "meme_source",
@@ -59,7 +57,6 @@ meme_source = Table(
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
     Column("updated_at", DateTime, onupdate=func.now()),
 )
-
 
 meme_raw_telegram = Table(
     "meme_raw_telegram",
@@ -87,13 +84,27 @@ meme_raw_telegram = Table(
     UniqueConstraint("meme_source_id", "post_id", name=MEME_SOURCE_POST_UNIQUE_CONSTRAINT),
 )
 
+meme_raw_upload = Table(
+    "meme_raw_upload",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("message_id", Integer, nullable=False),
+    Column("chat", JSONB, nullable=False),
 
-# meme_raw_upload = Table(
-#     "meme_raw_upload",
-#     metadata,
-# TODO: columns TBD, probably also JSONBs to store all raw data
-# )
+    Column("content", String),
+    Column("date", DateTime, nullable=False),
 
+    Column("out_links", JSONB),
+    Column("mentions", JSONB),
+    Column("hashtags", JSONB),
+    Column("forwarded", JSONB),
+
+    Column("image", JSONB),
+    Column("video", JSONB),
+
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime, onupdate=func.now())
+)
 
 meme = Table(
     "meme",
@@ -117,7 +128,6 @@ meme = Table(
     UniqueConstraint("meme_source_id", "raw_meme_id", name=MEME_SOURCE_RAW_MEME_UNIQUE_CONSTRAINT),
 )
 
-
 user_tg = Table(
     "user_tg",
     metadata,
@@ -135,7 +145,6 @@ user_tg = Table(
     Column("updated_at", DateTime, onupdate=func.now()),
 )
 
-
 user = Table(
     "user",
     metadata,
@@ -146,7 +155,6 @@ user = Table(
     Column("last_active_at", DateTime, onupdate=func.now()),
     Column("blocked_bot_at", DateTime),
 )
-
 
 user_language = Table(
     "user_language",
