@@ -16,8 +16,8 @@ from src.flows.storage.memes import tg_meme_pipeline
     version="0.1.0"
 )
 async def parse_telegram_sources(
-        sources_batch_size=10,
-        nposts=10,
+    sources_batch_size=10,
+    nposts=10,
 ) -> None:
     logger = get_run_logger()
     tg_sources = await get_telegram_sources_to_parse(limit=sources_batch_size)
