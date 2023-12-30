@@ -10,7 +10,7 @@ from src.database import (
     meme_raw_telegram,
     execute, fetch_one, fetch_all,
 )
-from src.storage.parsers.schemas import TgChannelPostParsingResult
+from src.storage.parsers.schemas import TgChannelPostParsingResult, VkGroupPostParsingResult
 from src.storage.constants import (
     MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
     MemeSourceType,
@@ -41,10 +41,45 @@ async def insert_parsed_posts_from_telegram(
     await execute(insert_posts_query)
 
 
+async def insert_parsed_posts_from_vk(
+    meme_source_id: int,
+    vk_posts: list[VkGroupPostParsingResult],
+) -> None:
+    posts = [
+        post.model_dump(exclude_none=True) | {"meme_source_id": meme_source_id}
+        for post in vk_posts
+    ]
+    insert_statement = insert(meme_raw_telegram).values(posts)
+    insert_posts_query = insert_statement.on_conflict_do_update(
+        constraint=MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
+        set_={
+            "media": insert_statement.excluded.media,
+            "views": insert_statement.excluded.views,
+            "likes": insert_statement.excluded.likes,
+            "reposts": insert_statement.excluded.reposts,
+            "comments": insert_statement.excluded.comments,
+            "updated_at": datetime.utcnow(),
+        },
+    )
+
+    await execute(insert_posts_query)
+
+
 async def get_telegram_sources_to_parse(limit=10) -> list[dict[str, Any]]:
     select_query = (
         select(meme_source)
         .where(meme_source.c.type == MemeSourceType.TELEGRAM)
+        .where(meme_source.c.status == MemeSourceStatus.PARSING_ENABLED)
+        .order_by(nulls_first(meme_source.c.parsed_at))
+        .limit(limit)
+    )
+    return await fetch_all(select_query)
+
+
+async def get_vk_sources_to_parse(limit=10) -> list[dict[str, Any]]:
+    select_query = (
+        select(meme_source)
+        .where(meme_source.c.type == MemeSourceType.VK)
         .where(meme_source.c.status == MemeSourceStatus.PARSING_ENABLED)
         .order_by(nulls_first(meme_source.c.parsed_at))
         .limit(limit)

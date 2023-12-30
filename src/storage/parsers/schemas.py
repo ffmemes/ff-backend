@@ -18,3 +18,14 @@ class TgChannelPostParsingResult(CustomModel):
     link_preview: dict | None = None
     out_links: list[str] | None = None
 
+
+class VkGroupPostParsingResult(CustomModel):
+    post_id: str
+    url: str
+    content: str | None = None  # post text
+    media: list[str]
+    date: datetime
+    views: int
+    likes: int
+    reposts: int
+    comments: int

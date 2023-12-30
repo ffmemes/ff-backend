@@ -26,6 +26,8 @@ class Config(BaseSettings):
     TELEGRAM_BOT_WEBHOOK_SECRET: str | None = None
     MEME_STORAGE_TELEGRAM_CHAT_ID: str | None = None
 
+    VK_TOKEN: str | None = None
+
     # @model_validator(mode="after")
     # def validate_sentry_non_local(self) -> "Config":
     #     if self.ENVIRONMENT.is_deployed and not self.SENTRY_DSN:
