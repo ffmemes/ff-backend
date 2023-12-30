@@ -17,6 +17,7 @@ sentry-sdk==1.39.*
 prefect==2.14.*
 beautifulsoup4==4.12.*
 lxml==4.9.*
+requests==2.31.*
 
 python-telegram-bot==20.7
 
