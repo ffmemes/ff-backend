@@ -15,6 +15,7 @@ from src.storage.upload import (
 
 from src.storage.ads import text_is_adverisement, filter_caption
 from src.storage.constants import MemeStatus
+from src.storage.watermark import add_watermark
 
 
 @flow
@@ -32,7 +33,7 @@ async def upload_memes_to_telegram(unloaded_memes: list[dict[str, Any]]) -> list
             await update_meme(unloaded_meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK)
             continue
 
-        meme_content = meme_original_content  # TODO: add watermark with our logo
+        meme_content = add_watermark(meme_original_content)
 
         meme = await upload_meme_content_to_tg(unloaded_meme["id"], unloaded_meme["type"], meme_content)
         meme["__original_content"] = meme_original_content

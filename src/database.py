@@ -69,8 +69,8 @@ meme_raw_telegram = Table(
     Column("post_id", Integer, nullable=False),
 
     Column("url", String, nullable=False),
-    Column("content", String, nullable=False),
     Column("date", DateTime, nullable=False),
+    Column("content", String),
 
     Column("out_links", JSONB),
     Column("mentions", JSONB),

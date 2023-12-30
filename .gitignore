@@ -137,3 +137,4 @@ node_modules/
 backup.dump
 backup.dump.gz
 .vscode
+.python_history
