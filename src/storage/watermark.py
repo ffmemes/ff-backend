@@ -64,7 +64,6 @@ def draw_corner_watermark(
         corners = calculate_corners(img_w=base.size[0], img_h=base.size[1], text_bbox=text_bbox, margin=margin)
         text_position = random.choice(corners)
         # text_position = choice(calculate_corners(img_w=base.size[0], img_h=base.size[1], text_bbox=text_bbox, margin=margin))
-        text_position = calculate_corners(img_w=base.size[0], img_h=base.size[1], text_bbox=text_bbox, margin=margin)
         # average brightness of pixel check and switch between black/white
         base_brightness = sum(base.getpixel(text_position)[:3]) / 3
         text_colour = select_wm_colour(base_brightness)
