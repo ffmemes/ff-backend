@@ -71,7 +71,7 @@ def draw_corner_watermark(
         outline_colour = (0, 0, 0, 255) if text_colour == (255, 255, 255, 255) else (255, 255, 255, 255)
         draw_text_with_outline(d, text_position, text, fnt, text_colour, outline_colour)
         # overlay image of each other
-        image = Image.alpha_composite(base, txt)
+        image = Image.alpha_composite(base, txt).convert('RGB')
 
         # convert back to bytes
         buff = BytesIO()
