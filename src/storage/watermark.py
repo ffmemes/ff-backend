@@ -45,8 +45,8 @@ def draw_corner_watermark(
     image_content: bytes,
     text: str,
     text_size: int = 14,
-    margin: int = 24):
-
+    margin: int = 24
+) -> BytesIO:
 # def draw_corner_watermark(image_content: bytes, text: str, text_size: int):
     image_bytes = BytesIO(image_content)
 
@@ -71,9 +71,15 @@ def draw_corner_watermark(
         outline_colour = (0, 0, 0, 255) if text_colour == (255, 255, 255, 255) else (255, 255, 255, 255)
         draw_text_with_outline(d, text_position, text, fnt, text_colour, outline_colour)
         # overlay image of each other
-        out = Image.alpha_composite(base, txt)
+        image = Image.alpha_composite(base, txt)
 
-        return out
+        # convert back to bytes
+        buff = BytesIO()
+        buff.name = 'image.jpeg'
+        image.save(buff, 'JPEG')
+        buff.seek(0)
+
+        return buff
 
 
 # TODO: async?
