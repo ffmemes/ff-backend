@@ -1,4 +1,5 @@
-from random import choice
+# from random import choice
+import random
 from io import BytesIO
 
 from PIL import Image, ImageDraw, ImageFont
@@ -41,25 +42,29 @@ def calculate_corners(img_w, img_h, text_bbox, margin) -> list:
     return corners
 
 def draw_corner_watermark(
-                        image_content: bytes,
-                        text: str,
-                        text_size: int=14,
-                        margin: int=24):
-            
+    image_content: bytes,
+    text: str,
+    text_size: int = 14,
+    margin: int = 24):
+
 # def draw_corner_watermark(image_content: bytes, text: str, text_size: int):
     image_bytes = BytesIO(image_content)
 
     with Image.open(image_bytes).convert("RGBA") as base:
         txt = Image.new("RGBA", base.size, (255, 255, 255, 0))
-        try:
-            fnt = ImageFont.truetype('Arial.ttf', text_size)
-        except IOError:
-            fnt = ImageFont.load_default()
+        # try:
+        #     fnt = ImageFont.truetype('Arial.ttf', text_size)
+        # except IOError:
+        #     fnt = ImageFont.load_default()
+        fnt = ImageFont.load_default()
         d = ImageDraw.Draw(txt)
         # calculate size of textbox
         text_bbox = d.textbbox((0, 0), text, font=fnt)
         # choose a random corner for the text
-        text_position = choice(calculate_corners(img_w=base.size[0], img_h=base.size[1], text_bbox=text_bbox, margin=margin))
+        corners = calculate_corners(img_w=base.size[0], img_h=base.size[1], text_bbox=text_bbox, margin=margin)
+        text_position = random.choice(corners)
+        # text_position = choice(calculate_corners(img_w=base.size[0], img_h=base.size[1], text_bbox=text_bbox, margin=margin))
+        text_position = calculate_corners(img_w=base.size[0], img_h=base.size[1], text_bbox=text_bbox, margin=margin)
         # average brightness of pixel check and switch between black/white
         base_brightness = sum(base.getpixel(text_position)[:3]) / 3
         text_colour = select_wm_colour(base_brightness)
