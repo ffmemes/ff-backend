@@ -45,12 +45,11 @@ class TelegramChannelScraper(Scraper):
         total_posts = int(soup.find('a', attrs={'class': 'tgme_widget_message_date'}, href=True)['href'].split('/')[-1])
         raw_posts = []
         if num_of_posts:
-            total_posts = num_of_posts
+            total_posts = num_of_posts  # get only nedded posts, not all
         for _ in range(total_posts // 10):
             raw_posts.extend(soup.find_all('div', attrs={'class': 'tgme_widget_message', 'data-post': True}))
             page_link = soup.find('a', attrs={'class': 'tme_messages_more', 'data-before': True})
             if not page_link:
-                # some pages are missing a "tme_messages_more" tag, causing early termination
                 if '=' not in next_page_url:
                     next_page_url = soup.find('link', attrs={'rel': 'canonical'}, href=True)['href']
                 next_post_index = int(next_page_url.split('=')[-1]) - 20
@@ -62,7 +61,8 @@ class TelegramChannelScraper(Scraper):
             req = await self._request(next_page_url, headers=self._headers)
             r = await req.aread()
             if req.status_code != 200:
-                raise ScraperException(f'Got status code {req.status_code}')
+                logger.fatal(f"Got status code {req.status_code}. Got {len(raw_posts)} out of {total_posts}.")
+                break
             soup = bs4.BeautifulSoup(r.decode('utf-8'), 'lxml')
         raw_posts = reversed(raw_posts)
         if num_of_posts:
