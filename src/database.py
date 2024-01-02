@@ -24,8 +24,9 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from src.config import settings
 from src.constants import DB_NAMING_CONVENTION
 from src.storage.constants import (
-    MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
-    MEME_SOURCE_RAW_MEME_UNIQUE_CONSTRAINT,
+    MEME_RAW_TELEGRAM_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
+    MEME_RAW_VK_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
+    MEME_MEME_SOURCE_RAW_MEME_UNIQUE_CONSTRAINT,
 )
 
 DATABASE_URL = str(settings.DATABASE_URL)
@@ -84,7 +85,7 @@ meme_raw_telegram = Table(
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
     Column("updated_at", DateTime, onupdate=func.now()),
 
-    UniqueConstraint("meme_source_id", "post_id", name=MEME_SOURCE_POST_UNIQUE_CONSTRAINT),
+    UniqueConstraint("meme_source_id", "post_id", name=MEME_RAW_TELEGRAM_MEME_SOURCE_POST_UNIQUE_CONSTRAINT),
 )
 
 
@@ -108,7 +109,7 @@ meme_raw_vk = Table(
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
     Column("updated_at", DateTime, onupdate=func.now()),
 
-    UniqueConstraint("meme_source_id", "post_id", name=MEME_SOURCE_POST_UNIQUE_CONSTRAINT),
+    UniqueConstraint("meme_source_id", "post_id", name=MEME_RAW_VK_MEME_SOURCE_POST_UNIQUE_CONSTRAINT),
 )
 
 
@@ -138,7 +139,7 @@ meme = Table(
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
     Column("updated_at", DateTime, onupdate=func.now()),
 
-    UniqueConstraint("meme_source_id", "raw_meme_id", name=MEME_SOURCE_RAW_MEME_UNIQUE_CONSTRAINT),
+    UniqueConstraint("meme_source_id", "raw_meme_id", name=MEME_MEME_SOURCE_RAW_MEME_UNIQUE_CONSTRAINT),
 )
 
 

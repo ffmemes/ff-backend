@@ -8,15 +8,17 @@ from src.database import (
     meme,
     meme_source,
     meme_raw_telegram,
+    meme_raw_vk,
     execute, fetch_one, fetch_all,
 )
 from src.storage.parsers.schemas import TgChannelPostParsingResult, VkGroupPostParsingResult
 from src.storage.constants import (
-    MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
     MemeSourceType,
     MemeSourceStatus,
     MemeType,
     MemeStatus,
+    MEME_RAW_TELEGRAM_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
+    MEME_RAW_VK_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
 )
 
 
@@ -30,7 +32,7 @@ async def insert_parsed_posts_from_telegram(
     ]
     insert_statement = insert(meme_raw_telegram).values(posts)
     insert_posts_query = insert_statement.on_conflict_do_update(
-        constraint=MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
+        constraint=MEME_RAW_TELEGRAM_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
         set_={
             "media": insert_statement.excluded.media,
             "views": insert_statement.excluded.views,
@@ -49,9 +51,9 @@ async def insert_parsed_posts_from_vk(
         post.model_dump(exclude_none=True) | {"meme_source_id": meme_source_id}
         for post in vk_posts
     ]
-    insert_statement = insert(meme_raw_telegram).values(posts)
+    insert_statement = insert(meme_raw_vk).values(posts)
     insert_posts_query = insert_statement.on_conflict_do_update(
-        constraint=MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
+        constraint=MEME_RAW_VK_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
         set_={
             "media": insert_statement.excluded.media,
             "views": insert_statement.excluded.views,
@@ -103,7 +105,7 @@ async def etl_memes_from_raw_telegram_posts() -> None:
         INSERT INTO meme (meme_source_id, raw_meme_id, caption, status, type, language_code)
         SELECT 
             meme_source_id,
-            post_id AS raw_meme_id, 
+            meme_raw_telegram.id AS raw_meme_id, 
             content AS caption,
             '{MemeStatus.CREATED.value}' AS status,
             '{MemeType.IMAGE.value}' AS type,
@@ -111,6 +113,27 @@ async def etl_memes_from_raw_telegram_posts() -> None:
         FROM meme_raw_telegram
         LEFT JOIN meme_source
             ON meme_source.id = meme_raw_telegram.meme_source_id
+        WHERE JSONB_ARRAY_LENGTH(media) = 1
+        ON CONFLICT DO NOTHING
+    """
+    await execute(text(insert_query))
+    # TODO: if a meme content failed to be uploaded to tg
+    # then its status will be BROKEN_CONTENT_LINK forewer now.
+
+
+async def etl_memes_from_raw_vk_posts() -> None:
+    insert_query = f"""
+        INSERT INTO meme (meme_source_id, raw_meme_id, caption, status, type, language_code)
+        SELECT 
+            meme_source_id,
+            meme_raw_vk.id AS raw_meme_id, 
+            content AS caption,
+            '{MemeStatus.CREATED.value}' AS status,
+            '{MemeType.IMAGE.value}' AS type,
+            meme_source.language_code AS language_code
+        FROM meme_raw_vk
+        LEFT JOIN meme_source
+            ON meme_source.id = meme_raw_vk.meme_source_id
         WHERE JSONB_ARRAY_LENGTH(media) = 1
         ON CONFLICT DO NOTHING
     """
@@ -139,8 +162,28 @@ async def get_unloaded_tg_memes() -> list[dict[str, Any]]:
             ON meme_source.id = meme.meme_source_id
             AND meme_source.type = '{MemeSourceType.TELEGRAM.value}'
         INNER JOIN meme_raw_telegram
-            ON meme_raw_telegram.post_id = meme.raw_meme_id
+            ON meme_raw_telegram.id = meme.raw_meme_id
             AND meme_raw_telegram.meme_source_id = meme.meme_source_id
+        WHERE 1=1
+            AND meme.telegram_file_id IS NULL;
+    """
+    return await fetch_all(text(select_query))
+
+
+async def get_unloaded_vk_memes() -> list[dict[str, Any]]:
+    "Returns only MemeType.IMAGE memes"
+    select_query = f"""
+        SELECT 
+            meme.id,
+            '{MemeType.IMAGE}' AS type,
+            meme_raw_vk.media->>0 content_url
+        FROM meme
+        INNER JOIN meme_source 
+            ON meme_source.id = meme.meme_source_id
+            AND meme_source.type = '{MemeSourceType.VK.value}'
+        INNER JOIN meme_raw_vk
+            ON meme_raw_vk.id = meme.raw_meme_id
+            AND meme_raw_vk.meme_source_id = meme.meme_source_id
         WHERE 1=1
             AND meme.telegram_file_id IS NULL;
     """

@@ -28,7 +28,7 @@ class VkGroupScraper(Scraper):
         self.VK_TOKEN = settings.VK_TOKEN
         self.base_url = "https://api.vk.com/method/wall.get?access_token={vk_token}&v={v}&domain={domain}&count=100&offset={offset}"
 
-    async def get_items(self, num_of_posts: Optional[int] = None):
+    async def get_items(self, num_of_posts: Optional[int] = None) -> list[VkGroupPostParsingResult]:
         logger.info(f"Going to parse VK: {self.source_link}")
         vk_source = _extract_username_from_url(self.source_link)
         self.vk_source_link = "https://vk.com/%s" % vk_source
@@ -51,7 +51,10 @@ class VkGroupScraper(Scraper):
             await asyncio.sleep(3)  # to not to DDOS Telegram
         posts = posts[:num_of_posts]
         for post in posts:
-            results.append(await self.get_post_details(post))
+            post_details = await self.get_post_details(post)
+            if post_details:
+                results.append(post_details)
+
         return results
 
     async def _get_vk_wall(self, vk_source: str, offset: int = 0) -> Optional[dict]:
@@ -71,16 +74,18 @@ class VkGroupScraper(Scraper):
         r = await req.aread()
         return json.loads(r.decode('utf-8'))
 
-    async def get_post_details(self, post: dict):
+    async def get_post_details(self, post: dict) -> VkGroupPostParsingResult | None:
         if post["marked_as_ads"] or "attachments" not in post:
             # ignoring ads & text-only publications
             return
         if set(["photo"]) != set(post["attachments"][i]['type'] for i in range(len(post["attachments"]))):
             # work only with photos for now
             return
-        images = get_best_img(post)
+        
         if post["text"] and len(post["text"]) >= 200:
             return
+        
+        images = get_best_img(post)
         return VkGroupPostParsingResult(
             post_id=f'{post["from_id"]}_{post["id"]}',
             content=post["text"],
@@ -99,9 +104,10 @@ def _extract_username_from_url(vk_source: str) -> str:
 
 
 def get_best_img(post: dict) -> list[str]:
-    return [sorted(
-        i["photo"]["sizes"], key=lambda x: -x["width"]
-    )[0]["url"] for i in post["attachments"]]
+    return [
+        sorted(i["photo"]["sizes"], key=lambda x: -x["width"])[0]["url"] 
+        for i in post["attachments"]
+    ]
 
 
 def get_post_link(post: dict, vk_source_link: str) -> str:

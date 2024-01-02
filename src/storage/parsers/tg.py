@@ -36,7 +36,10 @@ class TelegramChannelScraper(Scraper):
         r = await req.aread()
         return req, bs4.BeautifulSoup(r.decode('utf-8'), 'lxml')
 
-    async def get_items(self, num_of_posts: Optional[int] = None):
+    async def get_items(
+        self, 
+        num_of_posts: Optional[int] = None
+    ) -> list[TgChannelPostParsingResult]:
         r, soup = await self._initial_page()
         if '/s/' not in str(r.url):
             logger.warning('No public post list for this user')
@@ -77,7 +80,7 @@ class TelegramChannelScraper(Scraper):
                 posts.append(await self.get_post_details(post))
         return posts
 
-    async def get_post_details(self, post):
+    async def get_post_details(self, post) -> TgChannelPostParsingResult:
         post_date_obj = (
             post
             .find('div', class_='tgme_widget_message_footer')
@@ -117,9 +120,12 @@ class TelegramChannelScraper(Scraper):
             content = None
 
         for link in post.find_all('a'):
-            if any(x in link.parent.attrs.get('class', []) for x in
-                   ('tgme_widget_message_user', 'tgme_widget_message_author')):
+            if any(
+                x in link.parent.attrs.get('class', []) 
+                for x in ('tgme_widget_message_user', 'tgme_widget_message_author')
+            ):
                 continue
+
             if link['href'] == raw_url or link['href'] == url:
                 style = link.attrs.get('style', '')
                 if style != '':
@@ -127,21 +133,28 @@ class TelegramChannelScraper(Scraper):
                     imge_urls = [{"url": i} for i in imge_urls]
                     media.extend(imge_urls)
                     continue
+
             if _SINGLE_MEDIA_LINK_PATTERN.match(link['href']):
                 style = link.attrs.get('style', '')
                 imge_urls = _STYLE_MEDIA_URL_PATTERN.findall(style)
                 imge_urls = [{"url": i} for i in imge_urls]
                 media.extend(imge_urls)
                 continue
+
             if link.text.startswith('@'):
                 mentions.append(link.text.strip('@'))
                 continue
+
             if link.text.startswith('#'):
                 hashtags.append(link.text.strip('#'))
                 continue
+
             href = urllib.parse.urljoin(self.base_url, link['href'])
+
             if (href not in outlinks) and (href != raw_url) and (href != forwarded_url):
                 outlinks.append(href)
+
+
         for videoplayer in post.find_all('a', {'class': 'tgme_widget_message_video_player'}):
             itag = videoplayer.find('i')
             if itag is None:
@@ -152,6 +165,7 @@ class TelegramChannelScraper(Scraper):
                 video_thumbnail_url = _STYLE_MEDIA_URL_PATTERN.findall(style)[0]
                 video_tag = videoplayer.find('video')
                 video_url = None if video_tag is None else video_tag['src']
+
             video_data = {
                 'thumbnailUrl': video_thumbnail_url,
                 'url': video_url,
@@ -159,6 +173,7 @@ class TelegramChannelScraper(Scraper):
             time_tag = videoplayer.find('time')
             if time_tag is not None:
                 video_data['duration'] = _duration_str_to_seconds(videoplayer.find('time').text)
+
             media.append(video_data)
 
         link_preview = {}
@@ -182,10 +197,6 @@ class TelegramChannelScraper(Scraper):
         views_span = post.find('span', class_='tgme_widget_message_views')
         views = 0 if views_span is None else _parse_num(views_span.text)
 
-        outlinks = outlinks if outlinks else None
-        media = media if media else None
-        mentions = mentions if mentions else None
-        hashtags = hashtags if hashtags else None
         return TgChannelPostParsingResult(
             post_id=int(url.split("/")[-1]),
             url=url,

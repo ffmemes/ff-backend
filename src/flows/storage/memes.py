@@ -1,10 +1,13 @@
 import httpx
+import asyncio
 from typing import Any
-from prefect import flow, task, get_run_logger
+from prefect import flow, get_run_logger
 
 from src.storage.service import (
     etl_memes_from_raw_telegram_posts,
+    etl_memes_from_raw_vk_posts,
     get_unloaded_tg_memes,
+    get_unloaded_vk_memes,
     update_meme,
 )
 
@@ -39,6 +42,8 @@ async def upload_memes_to_telegram(unloaded_memes: list[dict[str, Any]]) -> list
         meme["__original_content"] = meme_original_content
         memes.append(meme)
 
+        await asyncio.sleep(1)
+
     return memes
 
 
@@ -66,4 +71,29 @@ async def tg_meme_pipeline() -> None:
         if new_caption != meme["caption"]:
             await update_meme(meme["id"], caption=new_caption)
 
-    
+
+@flow(
+    name="Memes from VK Pipeline",
+    description="Process raw memes parsed from VK",
+    version="0.1.0"
+)
+async def vk_meme_pipeline() -> None:
+    logger = get_run_logger()
+
+    logger.info(f"ETLing memes from 'meme_raw_vk' table.")
+    await etl_memes_from_raw_vk_posts()
+
+    logger.info(f"Getting unloaded memes to upload to Telegram.")
+    unloaded_memes = await get_unloaded_vk_memes()
+    memes = await upload_memes_to_telegram(unloaded_memes)
+
+    logger.info(f"Checking {len(memes)} memes for ads.")
+    for meme in memes:
+        if text_is_adverisement(meme["caption"]):
+            await update_meme(meme["id"], status=MemeStatus.AD)
+
+        new_caption = filter_caption(meme["caption"])
+        if new_caption != meme["caption"]:
+            await update_meme(meme["id"], caption=new_caption)
+
+

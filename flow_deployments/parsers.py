@@ -18,9 +18,10 @@ deployment_tg.apply()
 
 deployment_vk = Deployment.build_from_flow(
     flow=parse_vk_sources,
-    name="parse_vk_source",
+    name="Parse VK Sources",
     version="0.1.0",
     work_pool_name="all",
+    schedule=(CronSchedule(cron="10 */3 * * *", timezone="Europe/London")),
 )
 
 deployment_vk.apply()

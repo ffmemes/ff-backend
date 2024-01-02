@@ -8,6 +8,7 @@ from src.storage.service import (
     update_meme_source,
 )
 
+from src.flows.storage.memes import vk_meme_pipeline
 
 @flow(
     name="Parse VK Groups",
@@ -31,3 +32,5 @@ async def parse_vk_sources(
         await insert_parsed_posts_from_vk(vk_source["id"], posts)
 
         await update_meme_source(meme_source_id=vk_source["id"], parsed_at=datetime.utcnow())
+
+    await vk_meme_pipeline()
