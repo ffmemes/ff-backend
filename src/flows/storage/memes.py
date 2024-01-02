@@ -31,14 +31,18 @@ async def upload_memes_to_telegram(unloaded_memes: list[dict[str, Any]]) -> list
         
         try:
             meme_original_content = await download_meme_content_file(unloaded_meme["content_url"])
-        except httpx.HTTPStatusError:
-            logger.info(f"Meme {unloaded_meme['id']} content is not available to download.")
+        except Exception as e:
+            logger.info(f"Meme {unloaded_meme['id']} content is not available to download, reason: {e}.")
             await update_meme(unloaded_meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK)
             continue
 
         meme_content = add_watermark(meme_original_content)
 
         meme = await upload_meme_content_to_tg(unloaded_meme["id"], unloaded_meme["type"], meme_content)
+        if meme is None:
+            logger.info(f"Meme {unloaded_meme['id']} was not uploaded to Telegram, skipping.")
+            continue
+
         meme["__original_content"] = meme_original_content
         memes.append(meme)
 
@@ -95,5 +99,3 @@ async def vk_meme_pipeline() -> None:
         new_caption = filter_caption(meme["caption"])
         if new_caption != meme["caption"]:
             await update_meme(meme["id"], caption=new_caption)
-
-

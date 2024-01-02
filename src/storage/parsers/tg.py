@@ -8,6 +8,7 @@ import bs4
 
 from src.storage.parsers.base import Scraper, ScraperException
 from src.storage.parsers.schemas import TgChannelPostParsingResult
+from src.storage.parsers.constants import USER_AGENT
 
 logger = logging.getLogger(__name__)
 _SINGLE_MEDIA_LINK_PATTERN = re.compile(r'^https://t\.me/[^/]+/\d+\?single$')
@@ -26,7 +27,8 @@ class TelegramChannelScraper(Scraper):
         super().__init__(**kwargs)
         self._name = tg_username
         self._headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36'}
+            'User-Agent': USER_AGENT,
+        }
         self.base_url = 'https://t.me'
 
     async def _initial_page(self):

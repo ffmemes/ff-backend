@@ -27,7 +27,7 @@ async def parse_vk_sources(
         vk = VkGroupScraper(vk_source["url"])
 
         posts = await vk.get_items(nposts)
-        logger.info(f"Received {len(posts)} posts from {vk_source}")
+        logger.info(f"""Received {len(posts)} posts from {vk_source["url"]}""")
 
         await insert_parsed_posts_from_vk(vk_source["id"], posts)
 
