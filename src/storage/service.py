@@ -150,6 +150,27 @@ async def update_meme(meme_id: int, **kwargs) -> dict[str, Any] | None:
     return await fetch_one(update_query)
 
 
+async def get_pending_memes() -> list[dict[str, Any]]:
+    select_query = (
+        select(meme)
+        .where(meme.c.status == MemeStatus.CREATED)
+        .order_by(nulls_first(meme.c.created_at))
+    )
+    return await fetch_all(select_query)
+
+
+async def get_memes_to_ocr(limit=100):
+    select_query = (
+        select(meme)
+        .where(meme.c.status == MemeStatus.CREATED)
+        .where(meme.c.type == MemeType.IMAGE)
+        .where(meme.c.ocr_result.is_(None))
+        .order_by(nulls_first(meme.c.created_at))
+        .limit(limit)
+    )
+    return await fetch_all(select_query)
+
+
 async def get_unloaded_tg_memes() -> list[dict[str, Any]]:
     "Returns only MemeType.IMAGE memes"
     select_query = f"""
@@ -188,3 +209,19 @@ async def get_unloaded_vk_memes() -> list[dict[str, Any]]:
             AND meme.telegram_file_id IS NULL;
     """
     return await fetch_all(text(select_query))
+
+
+async def update_meme_status_of_ready_memes() -> None:
+    """ Changes the status of memes to 'ok' if they are ready to be published. """
+    update_query = f"""
+        UPDATE meme
+        SET status = '{MemeStatus.OK.value}'
+        WHERE 1=1
+            AND status = '{MemeStatus.CREATED.value}'
+            AND (
+                type = '{MemeType.IMAGE.value}' AND ocr_result IS NOT NULL 
+                OR type != '{MemeType.IMAGE.value}'
+            ) 
+            AND telegram_file_id IS NOT NULL
+    """
+    await execute(text(update_query))

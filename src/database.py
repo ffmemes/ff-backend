@@ -128,7 +128,7 @@ meme = Table(
     Column("raw_meme_id", Integer, nullable=False, index=True),
     Column("status", String, nullable=False),
 
-    Column("type", String, nullable=False),
+    Column("type", String, nullable=False),  # TODO: index=True
     Column("telegram_file_id", String),
     Column("caption", String),
     Column("language_code", ForeignKey("language.code", ondelete="SET NULL")),

@@ -8,6 +8,9 @@ from src.storage.service import (
     etl_memes_from_raw_vk_posts,
     get_unloaded_tg_memes,
     get_unloaded_vk_memes,
+    get_pending_memes,
+    get_memes_to_ocr,
+    update_meme_status_of_ready_memes,
     update_meme,
 )
 
@@ -16,7 +19,7 @@ from src.storage.upload import (
     upload_meme_content_to_tg,
 )
 
-from src.storage.ads import text_is_adverisement, filter_caption
+from src.storage import ocr, ads
 from src.storage.constants import MemeStatus
 from src.storage.watermark import add_watermark
 
@@ -66,14 +69,10 @@ async def tg_meme_pipeline() -> None:
     unloaded_memes = await get_unloaded_tg_memes()
     memes = await upload_memes_to_telegram(unloaded_memes)
 
-    logger.info(f"Checking {len(memes)} memes for ads.")
-    for meme in memes:
-        if text_is_adverisement(meme["caption"]):
-            await update_meme(meme["id"], status=MemeStatus.AD)
+    await ocr_meme_content(memes)
 
-        new_caption = filter_caption(meme["caption"])
-        if new_caption != meme["caption"]:
-            await update_meme(meme["id"], caption=new_caption)
+    # next step of a pipeline
+    await check_captions_of_pending_memes()
 
 
 @flow(
@@ -91,11 +90,41 @@ async def vk_meme_pipeline() -> None:
     unloaded_memes = await get_unloaded_vk_memes()
     memes = await upload_memes_to_telegram(unloaded_memes)
 
-    logger.info(f"Checking {len(memes)} memes for ads.")
-    for meme in memes:
-        if text_is_adverisement(meme["caption"]):
-            await update_meme(meme["id"], status=MemeStatus.AD)
+    await ocr_meme_content(memes)
 
-        new_caption = filter_caption(meme["caption"])
+    # next step of a pipeline
+    await check_captions_of_pending_memes()
+
+
+# I don't want to create a @flow because I already loaded 
+# meme file content to RAM and I don't want to load it again
+async def ocr_meme_content(memes_with_content):
+    logger = get_run_logger()
+    logger.info(f"Going to OCR {len(memes_with_content)} pending memes.")
+
+    for meme in memes_with_content:
+        if meme["type"] != "image":
+            continue
+
+        # INFO: obtained '__original_content' during uploading to tg
+        result = await ocr.ocr_meme_content(meme["__original_content"])
+        if result:
+            await update_meme(meme["id"], ocr_result=result)
+
+
+@flow
+async def check_captions_of_pending_memes():
+    logger = get_run_logger()
+    memes = await get_pending_memes()
+    logger.info(f"Checking captions of {len(memes)} pending memes for ads.")
+
+    for meme in memes:
+        if ads.text_is_adverisement(meme["caption"]):
+            await update_meme(meme["id"], status=MemeStatus.AD)
+            continue
+
+        new_caption = ads.filter_caption(meme["caption"])
         if new_caption != meme["caption"]:
             await update_meme(meme["id"], caption=new_caption)
+
+    await update_meme_status_of_ready_memes()
