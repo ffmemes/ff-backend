@@ -88,6 +88,30 @@ meme_raw_telegram = Table(
 )
 
 
+meme_raw_vk = Table(
+    "meme_raw_vk",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("meme_source_id", ForeignKey("meme_source.id", ondelete="CASCADE"), nullable=False),
+    Column("post_id", String, nullable=False),
+
+    Column("url", String, nullable=False),
+    Column("content", String),
+    Column("date", DateTime, nullable=False),
+
+    Column("media", JSONB),
+    Column("views", Integer, nullable=False),
+    Column("likes", Integer, nullable=False),
+    Column("reposts", Integer, nullable=False),
+    Column("comments", Integer, nullable=False),
+
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime, onupdate=func.now()),
+
+    UniqueConstraint("meme_source_id", "post_id", name=MEME_SOURCE_POST_UNIQUE_CONSTRAINT),
+)
+
+
 # meme_raw_upload = Table(
 #     "meme_raw_upload",
 #     metadata,
