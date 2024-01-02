@@ -78,15 +78,27 @@ class TelegramChannelScraper(Scraper):
         return posts
 
     async def get_post_details(self, post):
-        post_date = post.find('div', class_='tgme_widget_message_footer').find('a',
-                                                                               class_='tgme_widget_message_date')
-        raw_url = post_date['href']
-        if not raw_url.startswith(self.base_url) or sum(x == '/' for x in raw_url) != 4 or raw_url.rsplit('/', 1)[
-            1].strip('0123456789') != '':
+        post_date_obj = (
+            post
+            .find('div', class_='tgme_widget_message_footer')
+            .find('a', class_='tgme_widget_message_date')
+        )
+
+        raw_url = post_date_obj['href']
+        if (
+            not raw_url.startswith(self.base_url) 
+            or sum(x == '/' for x in raw_url) != 4 
+            or raw_url.rsplit('/', 1)[1].strip('0123456789') != ''
+        ):
             logger.warning(f'Possibly incorrect URL: {raw_url!r}')
-        url = raw_url.replace('//t.me/', '//t.me/s/')
+
         post_date = datetime.datetime.strptime(
-            post_date.find('time', datetime=True)['datetime'].replace('-', '', 2).replace(':', ''), '%Y%m%dT%H%M%S%z')
+            post_date_obj.find('time', datetime=True)['datetime'].replace('-', '', 2).replace(':', ''), 
+            '%Y%m%dT%H%M%S%z'
+        ).replace(tzinfo=None)
+        
+        url = raw_url.replace('//t.me/', '//t.me/s/')    
+
         media = []
         outlinks = []
         mentions = []
