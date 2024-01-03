@@ -19,7 +19,8 @@ from src.storage.upload import (
     upload_meme_content_to_tg,
 )
 
-from src.storage import ocr, ads
+from src.storage import ads
+from src.storage.ocr.mystic import ocr_content
 from src.storage.constants import MemeStatus
 from src.storage.watermark import add_watermark
 
@@ -107,7 +108,7 @@ async def ocr_meme_content(memes_with_content):
             continue
 
         # INFO: obtained '__original_content' during uploading to tg
-        result = await ocr.ocr_meme_content(meme["__original_content"])
+        result = await ocr_content(meme["__original_content"])
         if result:
             await update_meme(meme["id"], ocr_result=result)
 
