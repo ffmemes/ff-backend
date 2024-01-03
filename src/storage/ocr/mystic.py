@@ -1,6 +1,6 @@
 import uuid
 import httpx
-import logging
+from typing import Any
 
 from src.config import settings
 from src.storage.schemas import OcrResult
@@ -31,21 +31,22 @@ async def load_file_to_mystic(file_content: bytes) -> str:
         return response.json()["path"]
     
 
-async def ocr_url_with_mystic(
-    content_url: str,
+async def ocr_mystic_file_path(
+    mystic_file_path: str,
+    pipeline_id: str = PIPELINE_ID,
     language: str = "Russian",
-) -> OcrResult:
-    async with httpx.AsyncClient(timeout=20.0) as client:
+) -> dict[str, Any]:
+    async with httpx.AsyncClient() as client:
         response = await client.post(
             url,
             json={
-                "pipeline_id_or_pointer": PIPELINE_ID,
+                "pipeline_id_or_pointer": pipeline_id,
                 "async_run": False,
                 "input_data": [
                     {
                         "type": "file",
                         "value": "",
-                        "file_path": content_url,
+                        "file_path": mystic_file_path,
                     },
                     {
                         "type": "string",
@@ -56,19 +57,21 @@ async def ocr_url_with_mystic(
             headers=headers,
         )
         response.raise_for_status()
-        return OcrResult(
-            model=f"mystic:{PIPELINE_ID}",
-            result=response.json(),
-        )
+        return response.json()
 
 
 async def ocr_content(
     content: bytes,  # ??
 ) -> OcrResult:
-    file_path = await load_file_to_mystic(content)
-    logging.info(f"Loaded file to mystic: {file_path}")
+    mystic_file_path = await load_file_to_mystic(content)
+    ocr_result = await ocr_mystic_file_path(mystic_file_path)
+    print(f"OCR result from Mystic: {ocr_result}")
 
-    ocr_result = await ocr_url_with_mystic(file_path)
-    logging.info(f"OCR result from Mystic: {ocr_result}")
-    print(ocr_result)
-    return ocr_result
+    rows = ocr_result["result"]["outputs"][0]["value"]
+    full_text = "\n".join([r[1] for r in rows])
+
+    return OcrResult(
+        model=f"mystic:{PIPELINE_ID}",
+        text=full_text,  # TODO: parse from ocr_result
+        raw_result=ocr_result,
+    )

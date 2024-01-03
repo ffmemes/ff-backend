@@ -14,6 +14,7 @@ class MemeData(CustomModel):
 
 
 class OcrResult(CustomModel):
+    text: str
     model: str
-    result: dict
+    raw_result: dict
     calculated_at: datetime = Field(default_factory=datetime.utcnow)

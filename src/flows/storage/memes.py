@@ -1,4 +1,3 @@
-import httpx
 import asyncio
 from typing import Any
 from prefect import flow, get_run_logger
@@ -32,7 +31,6 @@ async def upload_memes_to_telegram(unloaded_memes: list[dict[str, Any]]) -> list
 
     memes = []
     for unloaded_meme in unloaded_memes:
-        
         try:
             meme_original_content = await download_meme_content_file(unloaded_meme["content_url"])
         except Exception as e:
@@ -43,14 +41,13 @@ async def upload_memes_to_telegram(unloaded_memes: list[dict[str, Any]]) -> list
         meme_content = add_watermark(meme_original_content)
 
         meme = await upload_meme_content_to_tg(unloaded_meme["id"], unloaded_meme["type"], meme_content)
+        await asyncio.sleep(2)  # flood control
         if meme is None:
             logger.info(f"Meme {unloaded_meme['id']} was not uploaded to Telegram, skipping.")
             continue
 
         meme["__original_content"] = meme_original_content
         memes.append(meme)
-
-        await asyncio.sleep(1)
 
     return memes
 
@@ -110,7 +107,7 @@ async def ocr_meme_content(memes_with_content):
         # INFO: obtained '__original_content' during uploading to tg
         result = await ocr_content(meme["__original_content"])
         if result:
-            await update_meme(meme["id"], ocr_result=result)
+            await update_meme(meme["id"], ocr_result=result.model_dump(mode='json'))
 
 
 @flow
