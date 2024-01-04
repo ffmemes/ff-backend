@@ -50,11 +50,13 @@ meme_source = Table(
     metadata,
     Column("id", Integer, Identity(), primary_key=True),
     Column("type", String, nullable=False),
-    Column("url", String, nullable=False),
+    Column("url", String, nullable=False, unique=True),
 
     Column("status", String, nullable=False),  # in_moderation, parsing_enabled, parsing_disabled
 
-    Column("language_code", ForeignKey("language.code", ondelete="SET NULL")),  # nullable=False ?
+    Column("language_code", ForeignKey("language.code", ondelete="SET NULL")),
+
+    Column("added_by", ForeignKey("user.id", ondelete="SET NULL")),
 
     Column("parsed_at", DateTime),
     Column("created_at", DateTime, server_default=func.now(), nullable=False),

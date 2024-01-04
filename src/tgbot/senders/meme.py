@@ -6,7 +6,7 @@ from src.tgbot import bot
 from src.storage.constants import MemeType
 from src.storage.schemas import MemeData
 
-from src.tgbot.senders.keyboards import get_meme_keyboard
+from src.tgbot.senders.keyboards import meme_reaction_keyboard
 
 
 async def send_meme(user_id: int, meme: MemeData) -> Message:
@@ -18,7 +18,7 @@ async def send_meme(user_id: int, meme: MemeData) -> Message:
             chat_id=user_id, 
             photo=meme.file_id,
             caption=meme.caption,
-            reply_markup=get_meme_keyboard(meme.id),
+            reply_markup=meme_reaction_keyboard(meme.id),
         )
 
     elif meme.type == MemeType.VIDEO:
@@ -26,7 +26,7 @@ async def send_meme(user_id: int, meme: MemeData) -> Message:
             chat_id=user_id, 
             video=meme.file_id,
             caption=meme.caption,
-            reply_markup=get_meme_keyboard(meme.id),
+            reply_markup=meme_reaction_keyboard(meme.id),
         )
 
     elif meme.type == MemeType.ANIMATION:
@@ -34,7 +34,7 @@ async def send_meme(user_id: int, meme: MemeData) -> Message:
             chat_id=user_id, 
             animation=meme.file_id,
             caption=meme.caption,
-            reply_markup=get_meme_keyboard(meme.id),
+            reply_markup=meme_reaction_keyboard(meme.id),
         )
 
     else:

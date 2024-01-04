@@ -54,6 +54,51 @@ async def save_user(
     await execute(insert_statement)
 
 
+async def get_user_by_id(
+    id: int,
+) -> dict[str, Any] | None:
+    select_statement = select(user).where(user.c.id == id)
+    return await fetch_one(select_statement)
+
+
+async def get_meme_source_by_id(
+    id: int,
+) -> dict[str, Any] | None:
+    select_statement = select(meme_source).where(meme_source.c.id == id)
+    return await fetch_one(select_statement)
+
+
+async def get_or_create_meme_source(
+    url: str,
+    **kwargs,
+) -> dict[str, Any] | None:
+    insert_statement = (
+        insert(meme_source)
+        .values({"url": url, **kwargs})
+        .on_conflict_do_update(
+            index_elements=(meme_source.c.url,),
+            set_={"updated_at": datetime.utcnow()},
+        )
+        .returning(meme_source)
+    )
+
+    return await fetch_one(insert_statement)
+
+
+async def update_meme_source(
+    id: int,
+    **kwargs,
+) -> dict[str, Any] | None:
+    update_statement = (
+        meme_source.update()
+        .where(meme_source.c.id == id)
+        .values({"updated_at": datetime.utcnow(), **kwargs})
+        .returning(meme_source)
+    )
+
+    return await fetch_one(update_statement)
+
+
 async def add_user_language(
     user_id: int,
     language_code: Language,
@@ -69,7 +114,7 @@ async def add_user_language(
     await execute(insert_language_query)
 
 
-async def def_user_language(
+async def del_user_language(
     user_id: int,
     language_code: Language,
 ) -> None:

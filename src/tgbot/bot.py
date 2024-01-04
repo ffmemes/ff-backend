@@ -2,7 +2,6 @@ from telegram.ext import (
     Application, 
     CallbackQueryHandler, 
     CommandHandler, 
-    CommandHandler,
     MessageHandler,
     filters,
 )
@@ -12,16 +11,23 @@ from telegram import (
 
 from src.config import settings
 from src.tgbot.handlers import start, upload, broken, reaction, alerts
+from src.tgbot.handlers.moderator import meme_source
 from src.tgbot.constants import (
     MEME_BUTTON_CALLBACK_DATA_REGEXP, 
     MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA,
+    MEME_SOURCE_SET_LANG_REGEXP,
+    MEME_SOURCE_SET_STATUS_REGEXP,
 )
 
 application: Application = None  # type: ignore
 
 
 def add_handlers(application: Application) -> None:
-    application.add_handler(CommandHandler("start", start.handle_start, filters=filters.ChatType.PRIVATE))
+    application.add_handler(CommandHandler(
+        "start", 
+        start.handle_start,
+        filters=filters.ChatType.PRIVATE,
+    ))
 
     application.add_handler(CallbackQueryHandler(
         reaction.handle_reaction,
@@ -38,8 +44,31 @@ def add_handlers(application: Application) -> None:
         callback=upload.handle_message
     ))
 
+
+    # meme source management
+    application.add_handler(MessageHandler(
+        filters=filters.ChatType.PRIVATE & filters.Regex("^(https://t.me|https://vk.com)"),
+        callback=meme_source.handle_meme_source_link,
+    ))
+
+    application.add_handler(CallbackQueryHandler(
+        meme_source.handle_meme_source_language_selection, 
+        pattern=MEME_SOURCE_SET_LANG_REGEXP
+    ))
+
+    application.add_handler(CallbackQueryHandler(
+        alerts.handle_empty_meme_queue_alert, 
+        pattern=MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA
+    ))
+
+    application.add_handler(CallbackQueryHandler(
+        meme_source.handle_meme_source_change_status, 
+        pattern=MEME_SOURCE_SET_STATUS_REGEXP,
+    ))
+
+
+    # handle all old & broken callback queries
     application.add_handler(CallbackQueryHandler(broken.handle_broken_callback_query, pattern="^"))
-    application.add_handler(CallbackQueryHandler(alerts.handle_empty_meme_queue_alert, pattern=MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA))
 
 
 async def process_event(payload: dict) -> None:
