@@ -16,6 +16,7 @@ from src.tgbot.senders.keyboards import (
 
 from src.storage.constants import MemeSourceType, MemeSourceStatus
 from src.tgbot.constants import UserType
+from src.tgbot.logs import log
 
 
 async def handle_meme_source_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -51,6 +52,8 @@ async def handle_meme_source_language_selection(
         await update.callback_query.answer("Meme source not found")
         return
     
+    await log(f"ℹ️ MemeSource ({meme_source_id}): set_lang={lang_code} (by {update.effective_user.id})")
+    
     await update.callback_query.answer(f"Meme source lang is {lang_code} now")  
     await meme_source_admin_pipeline(meme_source, update.effective_user.id, context.bot)
 
@@ -70,6 +73,8 @@ async def handle_meme_source_change_status(
     if meme_source is None:
         await update.callback_query.answer(f"Meme source {meme_source_id} not found")
         return
+    
+    await log(f"ℹ️ MemeSource ({meme_source_id}): set_status={status} (by {update.effective_user.id})")
     
     await update.callback_query.answer(f"Meme source status is {status} now")  
     await meme_source_admin_pipeline(meme_source, update.effective_user.id, context.bot)
@@ -92,6 +97,8 @@ async def meme_source_admin_pipeline(
     bot: Bot,
 ) -> None:
     if meme_source["language_code"] is None:
+        # TODO: create a func to edit / delete / send new message 
+        # for a nicer UX
         await bot.send_message(
             chat_id=user_id,
             text=f"""{_get_meme_source_info(meme_source)}\nPlease select a language for {meme_source["url"]}""",
