@@ -4,6 +4,10 @@ import asyncio
 from src import redis
 from src.storage.schemas import MemeData
 
+from src.recommendations.service import (
+    get_unseen_memes
+)
+
 
 async def get_next_meme_for_user(user_id: int) -> MemeData | None:
     queue_key = redis.get_meme_queue_key(user_id)
@@ -11,7 +15,7 @@ async def get_next_meme_for_user(user_id: int) -> MemeData | None:
 
     asyncio.create_task(check_queue(user_id))    
     if meme_data:
-        return MemeData(**orjson.loads(meme_data))
+        return MemeData(**meme_data)
     
     return None
 
@@ -32,12 +36,19 @@ async def check_queue(user_id: int):
 
 async def generate_recommendations(user_id, limit=10):
     queue_key = redis.get_meme_queue_key(user_id)
-    memes_in_queue_data = await redis.get_all_memes_in_queue_by_key()
+    memes_in_queue_data = await redis.get_all_memes_in_queue_by_key(queue_key)
     memes_in_queue = [orjson.loads(meme) for meme in memes_in_queue_data]
     meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
+    # TODO: exclude these ids
 
-    candidates = []  # N memes with ML features
-    # get meme_ids from queue to remove these ids from candidates
+    candidates = await get_unseen_memes(
+        user_id, 
+        limit=limit, 
+        exclude_meme_ids=meme_ids_in_queue
+    )
+
+    await redis.add_memes_to_queue_by_key(queue_key, candidates)
+
     # inference ML api 
     # select the best LIMIT memes -> save them to queue
     pass

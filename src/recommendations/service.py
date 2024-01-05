@@ -20,13 +20,11 @@ async def create_user_meme_reaction(
     user_id: int,
     meme_id: int,
     recommended_by: str,
-    telegram_message_id: int,
 ) -> None:
     insert_query = insert(user_meme_reaction).values(
         user_id=user_id,
         meme_id=meme_id,
         recommended_by=recommended_by,
-        telegram_message_id=telegram_message_id,
     )
     await execute(insert_query)
 
@@ -43,7 +41,32 @@ async def update_user_meme_reaction(
         .where(user_meme_reaction.c.reaction_id.is_(None))  # not sure abot that
         .values(reaction_id=reaction_id, reacted_at=datetime.utcnow())
     )
-    res = await fetch_one(update_query)
-    reaction_is_new = res is not None  # because I added filter reaction_id IS NULL
+    res = await execute(update_query)
+    reaction_is_new = res.rowcount > 0
     return reaction_is_new  # I can filter double clicks
+
+
+# test handler
+async def get_unseen_memes(
+    user_id: int,
+    limit: int = 10,
+    exclude_meme_ids: list[int] = [],
+) -> list[dict[str, Any]]:
+    exclude = f"AND M.id NOT IN {tuple(exclude_meme_ids)}" if exclude_meme_ids else ""
+    query = f"""
+        SELECT 
+            id, type, telegram_file_id, caption,
+            'test' as recommended_by
+        FROM meme M 
+        LEFT JOIN user_meme_reaction R 
+            ON R.meme_id = M.id
+            AND R.user_id = {user_id}
+        WHERE 1=1
+            AND M.status = 'ok'
+            AND R.meme_id IS NULL
+            {exclude}
+        LIMIT {limit}
+    """
+    res = await fetch_all(text(query))
+    return res
 

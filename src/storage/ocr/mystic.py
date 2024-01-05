@@ -21,7 +21,7 @@ async def load_file_to_mystic(file_content: bytes) -> str:
     file_name = f"{uuid.uuid4()}.jpg"
     files = { "pfile": (file_name, file_content, "image/jpeg") }
 
-    async with httpx.AsyncClient(timeout=20.0) as client:
+    async with httpx.AsyncClient() as client:
         response = await client.post(
             "https://www.mystic.ai/v3/pipeline_files",
             files=files,

@@ -29,7 +29,6 @@ async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         meme_id=int(meme_id),
         reaction_id=int(reaction_id),
     )
-
     if not reaction_is_new:
         # TODO: remove this debug logging
         logging.info(f"User {user_id} already reacted to meme {meme_id}")

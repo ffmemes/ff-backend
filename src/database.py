@@ -219,6 +219,6 @@ async def fetch_all(select_query: Select | Insert | Update) -> list[dict[str, An
         return [r._asdict() for r in cursor.all()]
 
 
-async def execute(select_query: Insert | Update) -> None:
+async def execute(select_query: Insert | Update) -> CursorResult:
     async with engine.begin() as conn:
-        await conn.execute(select_query)
+        return await conn.execute(select_query)

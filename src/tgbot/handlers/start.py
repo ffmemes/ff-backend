@@ -11,8 +11,14 @@ from src.tgbot.service import (
     add_user_language,
 )
 
-from src.storage.constants import SUPPORTED_LANGUAGES
+from src.tgbot.senders.meme import send_meme
+from src.tgbot.senders.alerts import send_queue_preparing_alert
 from src.tgbot.constants import DEFAULT_USER_LANGUAGE, UserType
+from src.storage.constants import SUPPORTED_LANGUAGES
+from src.recommendations.meme_queue import (
+    check_queue,
+    get_next_meme_for_user,
+)
 
 
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -30,10 +36,9 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         deep_link=deep_link,
     )
 
-    await save_user(
+    user = await save_user(
         id=user_id,
         type=UserType.USER,
-        blocked_bot_at=None,
     )
 
     if language_code is None:
@@ -46,5 +51,17 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         logging.info(f"User(id={user_id}) has unsupported language_code={language_code}. Set default={DEFAULT_USER_LANGUAGE}.")
 
     
-    await update.effective_user.send_message("Hi! You just joined our waitlist. Stay tuned!")
-        
+    if user["type"] == UserType.USER:
+        await update.effective_user.send_message("Hi! You just joined our waitlist. Stay tuned!")
+        return
+
+    #TODO: generate onboarding / cold-start memes
+    await check_queue(user_id)
+    meme_to_send = await get_next_meme_for_user(user_id)
+    if meme_to_send:
+        await send_meme(user_id, meme_to_send)
+        return
+    
+    await send_queue_preparing_alert(user_id)
+
+    

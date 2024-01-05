@@ -1,3 +1,4 @@
+import orjson
 from datetime import timedelta
 from typing import Optional
 
@@ -35,17 +36,20 @@ def get_meme_queue_key(user_id: int) -> str:
     return f"meme_queue:{user_id}"
 
 
-async def get_all_memes_in_queue_by_key(key: str) -> set[str]:
-    return await redis_client.smembers(key)
+async def get_all_memes_in_queue_by_key(key: str) -> set[dict]:
+    memes = await redis_client.smembers(key)
+    return {orjson.loads(meme) for meme in memes}
 
 
-async def pop_meme_from_queue_by_key(key: str) -> str | None:
-    return await redis_client.spop(key)
+async def pop_meme_from_queue_by_key(key: str) -> dict | None:
+    meme = await redis_client.spop(key)
+    return orjson.loads(meme) if meme else None
 
 
 async def get_meme_queue_length_by_key(key: str) -> int:
     return await redis_client.scard(key)
 
 
-async def add_memes_to_queue_by_key(key: str, memes: list[str]) -> int:
-    return await redis_client.sadd(key, *memes)
+async def add_memes_to_queue_by_key(key: str, memes: list[dict]) -> int:
+    jsoned_memes = [orjson.dumps(meme) for meme in memes]
+    return await redis_client.sadd(key, *jsoned_memes)

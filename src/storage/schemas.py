@@ -9,8 +9,9 @@ from src.storage.constants import MemeType
 class MemeData(CustomModel):
     id: int
     type: MemeType
-    file_id: str
+    telegram_file_id: str
     caption: str | None
+    recommended_by: str
 
 
 class OcrResult(CustomModel):

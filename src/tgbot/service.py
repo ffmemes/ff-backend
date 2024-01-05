@@ -49,9 +49,10 @@ async def save_user(
                 "blocked_bot_at": None,
             },
         )
+        .returning(user)
     )
 
-    await execute(insert_statement)
+    return await fetch_one(insert_statement)
 
 
 async def get_user_by_id(
