@@ -20,6 +20,10 @@ class Reaction(int, Enum):
     LIKE = 1
     DISLIKE = 2
 
+    @property
+    def is_positive(self) -> bool:
+        return self in (self.LIKE,)
+
 
 
 MEME_BUTTON_CALLBACK_DATA_PATTERN = "r:{meme_id}:{reaction_id}"

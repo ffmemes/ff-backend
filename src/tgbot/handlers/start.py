@@ -11,14 +11,14 @@ from src.tgbot.service import (
     add_user_language,
 )
 
-from src.tgbot.senders.meme import send_meme
-from src.tgbot.senders.alerts import send_queue_preparing_alert
-from src.tgbot.constants import DEFAULT_USER_LANGUAGE, UserType
-from src.storage.constants import SUPPORTED_LANGUAGES
-from src.recommendations.meme_queue import (
-    check_queue,
-    get_next_meme_for_user,
+from src.tgbot.senders.next_message import next_message
+from src.tgbot.constants import (
+    DEFAULT_USER_LANGUAGE, 
+    UserType,
+    Reaction,
 )
+from src.storage.constants import SUPPORTED_LANGUAGES
+from src.recommendations.meme_queue import check_queue
 
 
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -57,11 +57,10 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     #TODO: generate onboarding / cold-start memes
     await check_queue(user_id)
-    meme_to_send = await get_next_meme_for_user(user_id)
-    if meme_to_send:
-        await send_meme(user_id, meme_to_send)
-        return
-    
-    await send_queue_preparing_alert(user_id)
+    return await next_message(
+        user_id, 
+        prev_update=update,
+        prev_reaction_id=None,
+    )
 
     

@@ -52,10 +52,10 @@ async def get_unseen_memes(
     limit: int = 10,
     exclude_meme_ids: list[int] = [],
 ) -> list[dict[str, Any]]:
-    exclude = f"AND M.id NOT IN {tuple(exclude_meme_ids)}" if exclude_meme_ids else ""
+    exclude = f"AND M.id NOT IN {tuple(exclude_meme_ids)}" if len(exclude_meme_ids) else ""
     query = f"""
         SELECT 
-            id, type, telegram_file_id, caption,
+            M.id, M.type, M.telegram_file_id, M.caption,
             'test' as recommended_by
         FROM meme M 
         LEFT JOIN user_meme_reaction R 

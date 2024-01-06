@@ -16,8 +16,9 @@ from src.tgbot.service import (
     add_user_language,
 )
 
-from src.recommendations.meme_queue import get_next_meme_for_user, has_memes_in_queue
-from src.tgbot.senders.meme import send_meme
+from src.tgbot.constants import Reaction
+from src.recommendations.meme_queue import has_memes_in_queue
+from src.tgbot.senders.next_message import next_message
 from src.tgbot.senders.keyboards import queue_empty_alert_keyboard
 from src.tgbot.constants import LOADING_EMOJIS
 
@@ -25,9 +26,7 @@ from src.tgbot.constants import LOADING_EMOJIS
 async def handle_empty_meme_queue_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     if await has_memes_in_queue(user_id):
-        meme_to_send = await get_next_meme_for_user(user_id)
-        if meme_to_send:
-            return await send_meme(user_id, meme_to_send)
+        return await next_message(user_id, Reaction.DISLIKE, update)
     
     emoji = random.choice(LOADING_EMOJIS)
     await update.message.edit_reply_markup(

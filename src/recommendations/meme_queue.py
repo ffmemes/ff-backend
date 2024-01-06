@@ -1,4 +1,3 @@
-import orjson
 import asyncio
 
 from src import redis
@@ -36,8 +35,7 @@ async def check_queue(user_id: int):
 
 async def generate_recommendations(user_id, limit=10):
     queue_key = redis.get_meme_queue_key(user_id)
-    memes_in_queue_data = await redis.get_all_memes_in_queue_by_key(queue_key)
-    memes_in_queue = [orjson.loads(meme) for meme in memes_in_queue_data]
+    memes_in_queue = await redis.get_all_memes_in_queue_by_key(queue_key)
     meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
     # TODO: exclude these ids
 
