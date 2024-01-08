@@ -62,16 +62,12 @@ async def next_message(
         return await send_queue_preparing_alert(user_id)
     
     send_new_message = prev_reaction_id is None or Reaction(prev_reaction_id).is_positive
-    print("send_new_message:", send_new_message)
-    print("prev_update:", prev_update)
-    print("prev_update_can_be_edited_with_media(prev_update): ", prev_update_can_be_edited_with_media(prev_update))
     if not send_new_message and prev_update_can_be_edited_with_media(prev_update):
         msg = await prev_update.callback_query.message.edit_media(
             media=get_input_media(meme),
             reply_markup=meme_reaction_keyboard(meme.id),
         )
     else:
-        print("sending new message with meme")
         msg = await send_new_message_with_meme(user_id, meme)
 
     await create_user_meme_reaction(user_id, meme.id, meme.recommended_by)

@@ -130,7 +130,7 @@ meme = Table(
     Column("raw_meme_id", Integer, nullable=False, index=True),
     Column("status", String, nullable=False),
 
-    Column("type", String, nullable=False),  # TODO: index=True
+    Column("type", String, nullable=False, index=True),
     Column("telegram_file_id", String),
     Column("caption", String),
     Column("language_code", ForeignKey("language.code", ondelete="SET NULL")),
@@ -196,6 +196,7 @@ user_meme_reaction = Table(
 )
 
 
+# TODO: log events, achievements, broadcasts
 # event = Table(
 #     "event",
 #     metadata,
@@ -205,6 +206,32 @@ user_meme_reaction = Table(
 #     Column("object_id", JSONB),
 #     Column("created_at", DateTime, server_default=func.now(), nullable=False),
 # )
+
+
+user_stats = Table(
+    "user_stats",
+    metadata,
+    Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), primary_key=True),
+    Column("nlikes", Integer, nullable=False, server_default="0"),
+    Column("ndislikes", Integer, nullable=False, server_default="0"),
+    Column("nmemes_sent", Integer, nullable=False, server_default="0"),
+    Column("nsessions", Integer, nullable=False, server_default="0"),
+    Column("active_days_count", Integer, nullable=False, server_default="0"),
+
+    Column("updated_at", DateTime, server_default=func.now(), nullable=False, onupdate=func.now()),
+)
+
+
+user_meme_source_stats = Table(
+    "user_meme_source_stats",
+    metadata,
+    Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), primary_key=True),
+    Column("meme_source_id", ForeignKey("meme_source.id", ondelete="CASCADE"), primary_key=True),
+    Column("nlikes", Integer, nullable=False, server_default="0"),
+    Column("ndislikes", Integer, nullable=False, server_default="0"),
+    
+    Column("updated_at", DateTime, server_default=func.now(), nullable=False, onupdate=func.now()),
+)
 
 
 async def fetch_one(select_query: Select | Insert | Update) -> dict[str, Any] | None:

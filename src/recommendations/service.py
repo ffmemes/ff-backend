@@ -21,10 +21,18 @@ async def create_user_meme_reaction(
     meme_id: int,
     recommended_by: str,
 ) -> None:
-    insert_query = insert(user_meme_reaction).values(
-        user_id=user_id,
-        meme_id=meme_id,
-        recommended_by=recommended_by,
+    insert_query = (
+        insert(user_meme_reaction)
+        .values(
+            user_id=user_id,
+            meme_id=meme_id,
+            recommended_by=recommended_by,
+        ).on_conflict_do_nothing(
+            index_elements=(
+                user_meme_reaction.c.user_id,
+                user_meme_reaction.c.meme_id
+            )
+        )
     )
     await execute(insert_query)
 
@@ -61,6 +69,9 @@ async def get_unseen_memes(
         LEFT JOIN user_meme_reaction R 
             ON R.meme_id = M.id
             AND R.user_id = {user_id}
+        INNER JOIN user_language L
+            ON L.user_id = {user_id}
+            AND L.language_code = M.language_code
         WHERE 1=1
             AND M.status = 'ok'
             AND R.meme_id IS NULL
