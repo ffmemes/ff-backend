@@ -102,7 +102,15 @@ async def update_meme_source(meme_source_id: int, **kwargs) -> dict[str, Any] | 
 # TODO: separate file for ETL scripts?
 async def etl_memes_from_raw_telegram_posts() -> None:
     insert_query = f"""
-        INSERT INTO meme (meme_source_id, raw_meme_id, caption, status, type, language_code)
+        INSERT INTO meme (
+            meme_source_id, 
+            raw_meme_id, 
+            caption, 
+            status, 
+            type, 
+            language_code,
+            published_at
+        )
         SELECT 
             meme_source_id,
             meme_raw_telegram.id AS raw_meme_id, 
@@ -110,6 +118,7 @@ async def etl_memes_from_raw_telegram_posts() -> None:
             '{MemeStatus.CREATED.value}' AS status,
             '{MemeType.IMAGE.value}' AS type,
             meme_source.language_code AS language_code
+            date AS published_at
         FROM meme_raw_telegram
         LEFT JOIN meme_source
             ON meme_source.id = meme_raw_telegram.meme_source_id
@@ -123,14 +132,23 @@ async def etl_memes_from_raw_telegram_posts() -> None:
 
 async def etl_memes_from_raw_vk_posts() -> None:
     insert_query = f"""
-        INSERT INTO meme (meme_source_id, raw_meme_id, caption, status, type, language_code)
+        INSERT INTO meme (
+            meme_source_id, 
+            raw_meme_id, 
+            caption, 
+            status, 
+            type, 
+            language_code,
+            published_at
+        )
         SELECT 
             meme_source_id,
             meme_raw_vk.id AS raw_meme_id, 
             content AS caption,
             '{MemeStatus.CREATED.value}' AS status,
             '{MemeType.IMAGE.value}' AS type,
-            meme_source.language_code AS language_code
+            meme_source.language_code AS language_code,
+            date AS published_at
         FROM meme_raw_vk
         LEFT JOIN meme_source
             ON meme_source.id = meme_raw_vk.meme_source_id

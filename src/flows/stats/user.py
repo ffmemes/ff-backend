@@ -1,13 +1,11 @@
-from prefect import flow, get_run_logger
+from prefect import flow
 
-from src.stats.user import service
+from src.stats import user
 
 
 @flow(
     name="Calculate user_stats",
-    version="0.1.0"
 )
 async def calculate_user_stats(
 ) -> None:
-    logger = get_run_logger()
-    await service.calculate_user_stats()
+    await user.calculate_user_stats()

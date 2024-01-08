@@ -1,5 +1,5 @@
-from prefect import flow, get_run_logger
 from datetime import datetime
+from prefect import flow, get_run_logger
 
 from src.storage.parsers.tg import TelegramChannelScraper
 from src.storage.service import (
@@ -13,7 +13,6 @@ from src.flows.storage.memes import tg_meme_pipeline
 @flow(
     name="Parse Telegram Channels",
     description="Flow for parsing telegram channels to get posts",
-    version="0.1.0"
 )
 async def parse_telegram_sources(
     sources_batch_size=10,

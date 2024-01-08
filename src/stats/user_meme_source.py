@@ -1,16 +1,6 @@
-from typing import Any
-from datetime import datetime
-from sqlalchemy import select, nulls_first, text
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import text
 
-from src.database import (
-    language,
-    meme,
-    meme_source,
-    meme_raw_telegram,
-    meme_raw_vk,
-    execute, fetch_one, fetch_all,
-)
+from src.database import execute
 
 
 async def calculate_user_meme_source_stats() -> None:

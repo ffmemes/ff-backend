@@ -12,7 +12,7 @@ deployment_user_stats = Deployment.build_from_flow(
     name="Calculate user_stats",
     version="0.1.0",
     work_pool_name=settings.ENVIRONMENT,
-    schedule=(CronSchedule(cron="15,45 * * * *", timezone="Europe/London")),
+    schedule=(CronSchedule(cron="0,15,30,45 * * * *", timezone="Europe/London")),
 )
 
 deployment_user_stats.apply()
@@ -23,7 +23,7 @@ deployment_user_meme_source_stats = Deployment.build_from_flow(
     name="Calculate user_meme_source_stats",
     version="0.1.0",
     work_pool_name=settings.ENVIRONMENT,
-    schedule=(CronSchedule(cron="13,43 * * * *", timezone="Europe/London")),
+    schedule=(CronSchedule(cron="13,33,43,53 * * * *", timezone="Europe/London")),
 )
 
 deployment_user_meme_source_stats.apply()

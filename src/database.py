@@ -138,6 +138,7 @@ meme = Table(
     Column("ocr_result", JSONB),
     Column("duplicate_of", ForeignKey("meme.id", ondelete="SET NULL")),
 
+    Column("published_at", DateTime, nullable=False),
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
     Column("updated_at", DateTime, onupdate=func.now()),
 
@@ -230,6 +231,19 @@ user_meme_source_stats = Table(
     Column("nlikes", Integer, nullable=False, server_default="0"),
     Column("ndislikes", Integer, nullable=False, server_default="0"),
     
+    Column("updated_at", DateTime, server_default=func.now(), nullable=False, onupdate=func.now()),
+)
+
+
+user_stats = Table(
+    "meme_stats",
+    metadata,
+    Column("meme_id", ForeignKey("meme.id", ondelete="CASCADE"), primary_key=True),
+    Column("nlikes", Integer, nullable=False, server_default="0"),
+    Column("ndislikes", Integer, nullable=False, server_default="0"),
+    Column("nmemes_sent", Integer, nullable=False, server_default="0"),
+    Column("age_days", Integer, nullable=False, server_default="0"),
+
     Column("updated_at", DateTime, server_default=func.now(), nullable=False, onupdate=func.now()),
 )
 

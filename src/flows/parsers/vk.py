@@ -1,5 +1,5 @@
-from prefect import flow, get_run_logger
 from datetime import datetime
+from prefect import flow, get_run_logger
 
 from src.storage.parsers.vk import VkGroupScraper
 from src.storage.service import (
@@ -13,7 +13,6 @@ from src.flows.storage.memes import vk_meme_pipeline
 @flow(
     name="Parse VK Groups",
     description="Flow for parsing vk groups to get posts",
-    version="0.1.0"
 )
 async def parse_vk_sources(
     sources_batch_size=10,

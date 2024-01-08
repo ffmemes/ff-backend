@@ -1,13 +1,11 @@
-from prefect import flow, get_run_logger
+from prefect import flow
 
-from src.stats.user_meme_source import service
+from src.stats import user_meme_source
 
 
 @flow(
     name="Calculate user_meme_source_stats",
-    version="0.1.0"
 )
 async def calculate_user_meme_source_stats(
 ) -> None:
-    logger = get_run_logger()
-    await service.calculate_user_meme_source_stats()
+    await user_meme_source.calculate_user_meme_source_stats()
