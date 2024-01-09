@@ -27,7 +27,7 @@ async def insert_parsed_posts_from_telegram(
     telegram_posts: list[TgChannelPostParsingResult],
 ) -> None:
     posts = [
-        post.model_dump(exclude_none=True) | {"meme_source_id": meme_source_id}
+        post.model_dump() | {"meme_source_id": meme_source_id}
         for post in telegram_posts
     ]
     insert_statement = insert(meme_raw_telegram).values(posts)
@@ -48,7 +48,7 @@ async def insert_parsed_posts_from_vk(
     vk_posts: list[VkGroupPostParsingResult],
 ) -> None:
     posts = [
-        post.model_dump(exclude_none=True) | {"meme_source_id": meme_source_id}
+        post.model_dump() | {"meme_source_id": meme_source_id}
         for post in vk_posts
     ]
     insert_statement = insert(meme_raw_vk).values(posts)

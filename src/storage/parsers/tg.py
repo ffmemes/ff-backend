@@ -26,9 +26,7 @@ class TelegramChannelScraper(Scraper):
     def __init__(self, tg_username: str, **kwargs):
         super().__init__(**kwargs)
         self._name = tg_username
-        self._headers = {
-            'User-Agent': USER_AGENT,
-        }
+        self._headers = {'User-Agent': USER_AGENT}
         self.base_url = 'https://t.me'
 
     async def _initial_page(self):
