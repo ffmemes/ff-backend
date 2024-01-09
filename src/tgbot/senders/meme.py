@@ -16,61 +16,51 @@ from src.tgbot.senders.keyboards import meme_reaction_keyboard
 from src.recommendations.service import create_user_meme_reaction
 
 
-# TODO: remove MemeData serialization for less CPU load?
-async def send_meme(
-    user_id: int, 
-    meme: MemeData, 
-    prev_update: Update | None = None
-) -> Message:
-    # IDEA: add link to our bot?
-    # IDEA: don't use captions at all
-
+def get_input_media(meme: MemeData) -> InputMediaPhoto | InputMediaVideo | InputMediaAnimation:
     if meme.type == MemeType.IMAGE:
-        media = InputMediaPhoto(
+        return InputMediaPhoto(
             media=meme.telegram_file_id,
             caption=meme.caption,
         )
-        # msg = await bot.application.bot.send_photo(
-        #     chat_id=user_id, 
-        #     photo=meme.telegram_file_id,
-        #     caption=meme.caption,
-        #     reply_markup=meme_reaction_keyboard(meme.id),
-        # )
-
     elif meme.type == MemeType.VIDEO:
-        media = InputMediaVideo(
+        return InputMediaVideo(
             media=meme.telegram_file_id,
             caption=meme.caption,
-        )
-        # msg = await bot.application.bot.send_video(
-        #     chat_id=user_id, 
-        #     video=meme.telegram_file_id,
-        #     caption=meme.caption,
-        #     reply_markup=meme_reaction_keyboard(meme.id),
-        # )
-
+        ) 
     elif meme.type == MemeType.ANIMATION:
-        media = InputMediaAnimation(
+        return InputMediaAnimation(
             media=meme.telegram_file_id,
             caption=meme.caption,
         )
-        # msg = await bot.application.bot.send_video(
-        #     chat_id=user_id, 
-        #     animation=meme.telegram_file_id,
-        #     caption=meme.caption,
-        #     reply_markup=meme_reaction_keyboard(meme.id),
-        # )
-
     else:
         raise NotImplementedError(f"Can't send meme. Unknown meme type: {meme.type}")
-    
-    if prev_update.callback_query is not None:
-        msg = await prev_update.callback_query.message.edit_media(
-            media=media,
+
+
+async def send_new_message_with_meme(
+    user_id: int,
+    meme: MemeData,
+) -> Message:
+    if meme.type == MemeType.IMAGE:        
+        return await bot.application.bot.send_photo(
+            chat_id=user_id, 
+            photo=meme.telegram_file_id,
+            caption=meme.caption,
+            reply_markup=meme_reaction_keyboard(meme.id),
+        )
+    elif meme.type == MemeType.VIDEO: 
+        return await bot.application.bot.send_video(
+            chat_id=user_id, 
+            video=meme.telegram_file_id,
+            caption=meme.caption,
+            reply_markup=meme_reaction_keyboard(meme.id),
+        )
+    elif meme.type == MemeType.ANIMATION:
+        return await bot.application.bot.send_video(
+            chat_id=user_id, 
+            animation=meme.telegram_file_id,
+            caption=meme.caption,
             reply_markup=meme_reaction_keyboard(meme.id),
         )
     
-    await create_user_meme_reaction(user_id, meme.id, meme.recommended_by)
-    
-    return msg
-
+    else:
+        raise NotImplementedError(f"Can't send meme. Unknown meme type: {meme.type}")
