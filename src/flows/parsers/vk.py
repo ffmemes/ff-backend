@@ -28,7 +28,8 @@ async def parse_vk_sources(
         posts = await vk.get_items(nposts)
         logger.info(f"""Received {len(posts)} posts from {vk_source["url"]}""")
 
-        await insert_parsed_posts_from_vk(vk_source["id"], posts)
+        if len(posts) > 0:
+            await insert_parsed_posts_from_vk(vk_source["id"], posts)
 
         await update_meme_source(meme_source_id=vk_source["id"], parsed_at=datetime.utcnow())
 

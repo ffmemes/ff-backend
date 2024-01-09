@@ -29,8 +29,8 @@ async def parse_telegram_sources(
 
         posts = await tg.get_items(nposts)
         logger.info(f"Received {len(posts)} posts from @{tg_username}")
-
-        await insert_parsed_posts_from_telegram(tg_source["id"], posts)
+        if len(posts) > 0:
+            await insert_parsed_posts_from_telegram(tg_source["id"], posts)
 
         await update_meme_source(meme_source_id=tg_source["id"], parsed_at=datetime.utcnow())
 
