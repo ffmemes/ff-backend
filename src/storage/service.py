@@ -1,6 +1,6 @@
 from typing import Any
 from datetime import datetime
-from sqlalchemy import select, nulls_first, text
+from sqlalchemy import select, nulls_first, text, or_
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
@@ -172,6 +172,8 @@ async def get_pending_memes() -> list[dict[str, Any]]:
     select_query = (
         select(meme)
         .where(meme.c.status == MemeStatus.CREATED)
+        .where(meme.c.telegram_file_id.is_not(None))
+        .where(meme.c.ocr_result.is_not(None))
         .order_by(nulls_first(meme.c.created_at))
     )
     return await fetch_all(select_query)
@@ -181,9 +183,9 @@ async def get_memes_to_ocr(limit=100):
     select_query = (
         select(meme)
         .where(meme.c.status == MemeStatus.CREATED)
-        .where(meme.c.type == MemeType.IMAGE)
-        .where(meme.c.telegram_file_id.is_not(None))
-        .where(meme.c.ocr_result.is_(None))
+        .where(meme.c.type == MemeType.IMAGE)  # OCR only images
+        .where(meme.c.telegram_file_id.is_not(None))  # uploaded to tg
+        .where(meme.c.ocr_result.is_(None))  # not OCR'ed
         .order_by(nulls_first(meme.c.created_at))
         .limit(limit)
     )
@@ -230,17 +232,19 @@ async def get_unloaded_vk_memes() -> list[dict[str, Any]]:
     return await fetch_all(text(select_query))
 
 
-async def update_meme_status_of_ready_memes() -> None:
+async def update_meme_status_of_ready_memes() -> list[dict[str, Any]]:
     """ Changes the status of memes to 'ok' if they are ready to be published. """
-    update_query = f"""
-        UPDATE meme
-        SET status = '{MemeStatus.OK.value}'
-        WHERE 1=1
-            AND status = '{MemeStatus.CREATED.value}'
-            AND (
-                type = '{MemeType.IMAGE.value}' AND ocr_result IS NOT NULL 
-                OR type != '{MemeType.IMAGE.value}'
-            ) 
-            AND telegram_file_id IS NOT NULL
-    """
-    await execute(text(update_query))
+    update_query = (
+        meme.update()
+        .where(meme.c.status == MemeStatus.CREATED)
+        .where(meme.c.telegram_file_id.is_not(None))
+        .where(or_(
+            meme.c.ocr_result.is_not(None),
+            meme.c.type != MemeType.IMAGE,
+        ))
+        .where(meme.c.duplicate_of.is_(None))
+        .values(status=MemeStatus.OK)
+        .returning(meme)
+    )
+    return await fetch_all(update_query)
+

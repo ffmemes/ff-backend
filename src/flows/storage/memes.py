@@ -25,6 +25,22 @@ from src.storage.constants import MemeStatus
 from src.storage.watermark import add_watermark
 
 
+async def ocr_meme_content(meme_id: int, content: bytes):
+    result = await ocr_content(content)
+    if result:
+        await update_meme(meme_id, ocr_result=result.model_dump(mode='json'))
+
+
+async def analyse_meme_caption(meme_id: int, caption: str | None):
+    if ads.text_is_adverisement(caption):
+        await update_meme(meme_id, status=MemeStatus.AD)
+        return
+
+    new_caption = ads.filter_caption(caption)
+    if new_caption != caption:
+        await update_meme(meme_id, caption=new_caption)
+
+
 @flow
 async def upload_memes_to_telegram(unloaded_memes: list[dict[str, Any]]) -> list[dict[str, Any]]:
     logger = get_run_logger()
@@ -52,7 +68,7 @@ async def upload_memes_to_telegram(unloaded_memes: list[dict[str, Any]]) -> list
             logger.info(f"Meme {unloaded_meme['id']} was not uploaded to Telegram, skipping.")
             continue
 
-        meme["__original_content"] = meme_original_content
+        meme["__original_content"] = meme_original_content  # HACK: to save original content for OCR
         memes.append(meme)
 
     return memes
@@ -73,10 +89,11 @@ async def tg_meme_pipeline() -> None:
     unloaded_memes = await get_unloaded_tg_memes()
     memes = await upload_memes_to_telegram(unloaded_memes)
 
-    await ocr_meme_content(memes)
+    for meme in memes:
+        await ocr_meme_content(meme["id"], meme["__original_content"])
 
     # next step of a pipeline
-    await check_captions_of_pending_memes()
+    await final_meme_pipeline()
 
 
 @flow(
@@ -94,58 +111,35 @@ async def vk_meme_pipeline() -> None:
     unloaded_memes = await get_unloaded_vk_memes()
     memes = await upload_memes_to_telegram(unloaded_memes)
 
-    await ocr_meme_content(memes)
+    for meme in memes:
+        await ocr_meme_content(meme["id"], meme["__original_content"])
 
     # next step of a pipeline
-    await check_captions_of_pending_memes()
+    await final_meme_pipeline()
 
 
-# I don't want to create a @flow because I already loaded 
-# meme file content to RAM and I don't want to load it again
-async def ocr_meme_content(memes_with_content):
+
+@flow(name="Final Memes Pipeline")
+async def final_meme_pipeline() -> None:
     logger = get_run_logger()
-    logger.info(f"Going to OCR {len(memes_with_content)} pending memes.")
 
-    for meme in memes_with_content:
-        if meme["type"] != "image":
-            continue
-
-        # INFO: obtained '__original_content' during uploading to tg
-        result = await ocr_content(meme["__original_content"])
-        if result:
-            await update_meme(meme["id"], ocr_result=result.model_dump(mode='json'))
-
-
-@flow
-async def check_captions_of_pending_memes():
-    logger = get_run_logger()
     memes = await get_pending_memes()
-    logger.info(f"Checking captions of {len(memes)} pending memes for ads.")
+    logger.info(f"Final meme pipeline has {len(memes)} pending memes.")
 
     for meme in memes:
-        if ads.text_is_adverisement(meme["caption"]):
-            await update_meme(meme["id"], status=MemeStatus.AD)
-            continue
+        await analyse_meme_caption(meme["id"], meme["caption"])
 
-        new_caption = ads.filter_caption(meme["caption"])
-        if new_caption != meme["caption"]:
-            await update_meme(meme["id"], caption=new_caption)
-
+    # next step of a pipeline
     await update_meme_status_of_ready_memes()
 
 
 @flow
-async def ocr_uploaded_memes(limit=10):
+async def ocr_uploaded_memes(limit=100):
     logger = get_run_logger()
-    logger.info(f"Getting {limit} memes to OCR.")
-
     memes = await get_memes_to_ocr(limit=limit)
     logger.info(f"Going to OCR {len(memes)} memes.")
 
     for meme in memes:
         meme_content = await download_meme_content_from_tg(meme["telegram_file_id"])
-        result = await ocr_content(meme_content)
-        if result:
-            await update_meme(meme["id"], ocr_result=result.model_dump(mode='json'))
-
+        await ocr_meme_content(meme["id"], meme_content)
         await asyncio.sleep(2)  # flood control

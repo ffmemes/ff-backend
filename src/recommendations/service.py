@@ -60,7 +60,14 @@ async def get_unseen_memes(
     limit: int = 10,
     exclude_meme_ids: list[int] = [],
 ) -> list[dict[str, Any]]:
-    exclude = f"AND M.id NOT IN {tuple(exclude_meme_ids)}" if len(exclude_meme_ids) else ""
+    # exclude memes which are already in queue
+    if len(exclude_meme_ids) > 1:
+        exclude = f"AND M.id NOT IN {tuple(exclude_meme_ids)}"
+    elif len(exclude_meme_ids) == 1:
+        exclude = f"AND M.id != {exclude_meme_ids[0]}"
+    else:
+        exclude = ""
+
     query = f"""
         SELECT 
             M.id, M.type, M.telegram_file_id, M.caption,
