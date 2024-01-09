@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 from prefect import flow, get_run_logger
 
@@ -33,5 +34,6 @@ async def parse_telegram_sources(
             await insert_parsed_posts_from_telegram(tg_source["id"], posts)
 
         await update_meme_source(meme_source_id=tg_source["id"], parsed_at=datetime.utcnow())
+        await asyncio.sleep(5)
 
     await tg_meme_pipeline()

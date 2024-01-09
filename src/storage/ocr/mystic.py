@@ -62,9 +62,13 @@ async def ocr_mystic_file_path(
 
 async def ocr_content(
     content: bytes,  # ??
-) -> OcrResult:
-    mystic_file_path = await load_file_to_mystic(content)
-    ocr_result = await ocr_mystic_file_path(mystic_file_path)
+) -> OcrResult | None:
+    try:
+        mystic_file_path = await load_file_to_mystic(content)
+        ocr_result = await ocr_mystic_file_path(mystic_file_path)
+    except Exception as e:
+        print(f"Mystic OCR error: {e}")
+        return None
     print(f"OCR result from Mystic: {ocr_result}")
 
     rows = ocr_result["result"]["outputs"][0]["value"]

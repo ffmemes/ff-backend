@@ -117,7 +117,7 @@ async def etl_memes_from_raw_telegram_posts() -> None:
             content AS caption,
             '{MemeStatus.CREATED.value}' AS status,
             '{MemeType.IMAGE.value}' AS type,
-            meme_source.language_code AS language_code
+            meme_source.language_code AS language_code,
             date AS published_at
         FROM meme_raw_telegram
         LEFT JOIN meme_source
