@@ -5,7 +5,7 @@ from src.database import execute
 
 async def calculate_meme_stats() -> None:
     insert_query = f"""
-        INSERT INTO user_stats (
+        INSERT INTO meme_stats (
             meme_id, 
             nlikes, 
             ndislikes, 
