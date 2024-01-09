@@ -34,7 +34,7 @@ def prev_update_can_be_edited_with_media(prev_update: Update) -> bool:
 async def next_message(
     user_id: int,
     prev_update: Update,
-    prev_reaction_id: int | None,
+    prev_reaction_id: int | None = None,
 ) -> Message:
     # TODO: achievements
     meme = await get_next_meme_for_user(user_id)

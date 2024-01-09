@@ -1,4 +1,4 @@
-from telegram import Update, Bot
+from telegram import Update, Message
 from telegram.ext import (
     ContextTypes, 
 )
@@ -13,6 +13,7 @@ from src.tgbot.senders.keyboards import (
     meme_source_language_selection_keyboard, 
     meme_source_change_status_keyboard,
 )
+from src.tgbot.senders.utils import send_or_edit
 
 from src.storage.constants import MemeSourceType, MemeSourceStatus
 from src.tgbot.constants import UserType
@@ -41,7 +42,7 @@ async def handle_meme_source_link(update: Update, context: ContextTypes.DEFAULT_
         added_by=update.effective_user.id,
     )
 
-    await meme_source_admin_pipeline(meme_source, update.effective_user.id, context.bot)
+    await meme_source_admin_pipeline(meme_source, update.effective_user.id, update)
     
 
 async def handle_meme_source_language_selection(
@@ -58,7 +59,7 @@ async def handle_meme_source_language_selection(
     await log(f"ℹ️ MemeSource ({meme_source_id}): set_lang={lang_code} (by {update.effective_user.id})")
     
     await update.callback_query.answer(f"Meme source lang is {lang_code} now")  
-    await meme_source_admin_pipeline(meme_source, update.effective_user.id, context.bot)
+    await meme_source_admin_pipeline(meme_source, update.effective_user.id, update)
 
 
 async def handle_meme_source_change_status(
@@ -80,7 +81,7 @@ async def handle_meme_source_change_status(
     await log(f"ℹ️ MemeSource ({meme_source_id}): set_status={status} (by {update.effective_user.id})")
     
     await update.callback_query.answer(f"Meme source status is {status} now")  
-    await meme_source_admin_pipeline(meme_source, update.effective_user.id, context.bot)
+    await meme_source_admin_pipeline(meme_source, update.effective_user.id, update)
 
     if status == MemeSourceStatus.PARSING_ENABLED:  # trigger parsing
         # TODO: async
@@ -96,32 +97,26 @@ id: {meme_source["id"]}
 url: {meme_source["url"]}
 type: {meme_source["type"]}
 language: {meme_source["language_code"]}
-status: {meme_source["status"]}
 added by: {meme_source["added_by"]}
+<b>status</b>: {meme_source["status"]}
     """
 
 
 async def meme_source_admin_pipeline(
     meme_source: dict,
     user_id: int,
-    bot: Bot,
-) -> None:
+    update: Update,
+) -> Message:
     if meme_source["language_code"] is None:
-        # TODO: create a func to edit / delete / send new message 
-        # for a nicer UX
-        await bot.send_message(
-            chat_id=user_id,
+        return await send_or_edit(
+            update, 
             text=f"""{_get_meme_source_info(meme_source)}\nPlease select a language for {meme_source["url"]}""",
             reply_markup=meme_source_language_selection_keyboard(meme_source_id=meme_source["id"]),
-            disable_web_page_preview=True,
         )
-        return
-
-    await bot.send_message(
-        chat_id=user_id,
+    
+    return await send_or_edit(
+        update, 
         text=_get_meme_source_info(meme_source),
-        disable_web_page_preview=True,
-        reply_markup=meme_source_change_status_keyboard(meme_source["id"])
+        reply_markup=meme_source_change_status_keyboard(meme_source["id"]),
     )
-
-    # TODO: buttons to change status
+    
