@@ -44,7 +44,9 @@ async def generate_recommendations(user_id, limit=10):
         limit=limit, 
         exclude_meme_ids=meme_ids_in_queue
     )
-
+    if len(candidates) == 0:
+        return 
+    
     await redis.add_memes_to_queue_by_key(queue_key, candidates)
 
     # inference ML api 
