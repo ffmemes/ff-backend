@@ -9,10 +9,11 @@ from src.recommendations.service import (
 
 
 async def get_next_meme_for_user(user_id: int) -> MemeData | None:
+    asyncio.create_task(check_queue(user_id))
+
     queue_key = redis.get_meme_queue_key(user_id)
     meme_data = await redis.pop_meme_from_queue_by_key(queue_key)
-
-    asyncio.create_task(check_queue(user_id))    
+    
     if meme_data:
         return MemeData(**meme_data)
     
@@ -37,13 +38,14 @@ async def generate_recommendations(user_id, limit=10):
     queue_key = redis.get_meme_queue_key(user_id)
     memes_in_queue = await redis.get_all_memes_in_queue_by_key(queue_key)
     meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
-    # TODO: exclude these ids
 
+    print("exclude_meme_ids: ", meme_ids_in_queue)
     candidates = await get_unseen_memes(
         user_id, 
         limit=limit, 
         exclude_meme_ids=meme_ids_in_queue
     )
+    print("candidates: ", [c["id"] for c in candidates])
     if len(candidates) == 0:
         return 
     

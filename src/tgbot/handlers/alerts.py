@@ -2,18 +2,10 @@
     Handle old callback queries from old bot version
 """
 
-
 import random
 from telegram import Update
 from telegram.ext import (
     ContextTypes, 
-)
-
-
-from src.tgbot.service import (
-    save_tg_user,
-    save_user,
-    add_user_language,
 )
 
 from src.tgbot.constants import Reaction
@@ -29,6 +21,6 @@ async def handle_empty_meme_queue_alert(update: Update, context: ContextTypes.DE
         return await next_message(user_id, Reaction.DISLIKE, update)
     
     emoji = random.choice(LOADING_EMOJIS)
-    await update.message.edit_reply_markup(
+    await update.callback_query.message.edit_reply_markup(
         reply_markup=queue_empty_alert_keyboard(emoji),
     )

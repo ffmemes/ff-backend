@@ -11,6 +11,26 @@ from src.storage.service import (
 
 from src.flows.storage.memes import vk_meme_pipeline
 
+
+@flow(name="Parse VK Source")
+async def parse_vk_source(
+    meme_source_id: int,
+    meme_source_url: str,
+    nposts: int = 10,
+) -> None:
+    logger = get_run_logger()
+
+    vk = VkGroupScraper(meme_source_url)
+    posts = await vk.get_items(nposts)
+
+    logger.info(f"Received {len(posts)} posts from {meme_source_url}")
+    if len(posts) > 0:
+        await insert_parsed_posts_from_vk(meme_source_id, posts)
+
+    await update_meme_source(meme_source_id=meme_source_id, parsed_at=datetime.utcnow())
+    await asyncio.sleep(5)
+
+
 @flow(
     name="Parse VK Groups",
     description="Flow for parsing vk groups to get posts",
@@ -24,15 +44,6 @@ async def parse_vk_sources(
     logger.info(f"Received {len(vk_sources)} vk sources to scrape.")
 
     for vk_source in vk_sources:
-        vk = VkGroupScraper(vk_source["url"])
-
-        posts = await vk.get_items(nposts)
-        logger.info(f"""Received {len(posts)} posts from {vk_source["url"]}""")
-
-        if len(posts) > 0:
-            await insert_parsed_posts_from_vk(vk_source["id"], posts)
-
-        await update_meme_source(meme_source_id=vk_source["id"], parsed_at=datetime.utcnow())
-        await asyncio.sleep(5)
+        await parse_vk_source(vk_source["id"], vk_source["url"], nposts=nposts)
 
     await vk_meme_pipeline()

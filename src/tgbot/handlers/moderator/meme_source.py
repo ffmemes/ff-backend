@@ -18,6 +18,9 @@ from src.storage.constants import MemeSourceType, MemeSourceStatus
 from src.tgbot.constants import UserType
 from src.tgbot.logs import log
 
+from src.flows.parsers.tg import parse_telegram_source
+from src.flows.parsers.vk import parse_vk_source
+
 
 async def handle_meme_source_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # TODO: check that a user is moderator
@@ -78,6 +81,13 @@ async def handle_meme_source_change_status(
     
     await update.callback_query.answer(f"Meme source status is {status} now")  
     await meme_source_admin_pipeline(meme_source, update.effective_user.id, context.bot)
+
+    if status == MemeSourceStatus.PARSING_ENABLED:  # trigger parsing
+        # TODO: async
+        if meme_source["type"] == MemeSourceType.VK:
+            await parse_vk_source(meme_source_id, meme_source["url"])
+        elif meme_source["type"] == MemeSourceType.TELEGRAM:
+            await parse_telegram_source(meme_source_id, meme_source["url"])
 
 
 def _get_meme_source_info(meme_source: dict) -> str:
