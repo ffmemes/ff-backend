@@ -1,4 +1,3 @@
-# from random import choice
 import random
 from io import BytesIO
 
@@ -42,20 +41,19 @@ def calculate_corners(img_w, img_h, text_bbox, margin) -> list:
     return corners
 
 def draw_corner_watermark(
-    image_content: bytes,
+    image_bytes: BytesIO,
     text: str,
     text_size: int = 14,
     margin: int = 24
-) -> BytesIO:
-# def draw_corner_watermark(image_content: bytes, text: str, text_size: int):
-    image_bytes = BytesIO(image_content)
-
+) -> Image:
     with Image.open(image_bytes).convert("RGBA") as base:
         txt = Image.new("RGBA", base.size, (255, 255, 255, 0))
+        
         # try:
         #     fnt = ImageFont.truetype('Arial.ttf', text_size)
         # except IOError:
         #     fnt = ImageFont.load_default()
+
         fnt = ImageFont.load_default()
         d = ImageDraw.Draw(txt)
         # calculate size of textbox
@@ -71,22 +69,27 @@ def draw_corner_watermark(
         outline_colour = (0, 0, 0, 255) if text_colour == (255, 255, 255, 255) else (255, 255, 255, 255)
         draw_text_with_outline(d, text_position, text, fnt, text_colour, outline_colour)
         # overlay image of each other
-        image = Image.alpha_composite(base, txt).convert('RGB')
-
-        # convert back to bytes
-        buff = BytesIO()
-        buff.name = 'image.jpeg'
-        image.save(buff, 'JPEG')
-        buff.seek(0)
-
-        return buff
+        return Image.alpha_composite(base, txt).convert('RGB')
 
 
 # TODO: async?
-def add_watermark(image_content: bytes):
-    return draw_corner_watermark(
-        image_content,
-        text='@ffmemesbot',
-        text_size=18,
-        margin=20
-    )
+def add_watermark(image_content: bytes) -> BytesIO | None:
+    image_bytes = BytesIO(image_content)
+
+    try:
+        image = draw_corner_watermark(
+            image_bytes,
+            text='@ffmemesbot',
+            text_size=18,
+            margin=20
+        )
+    except Exception as e:
+        print(f'Error while adding watermark: {e}')
+        return None
+
+    buff = BytesIO()
+    buff.name = 'image.jpeg'
+    image.save(buff, 'JPEG')
+    buff.seek(0)
+
+    return buff

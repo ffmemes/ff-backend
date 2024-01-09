@@ -16,6 +16,7 @@ from src.storage.service import (
 from src.storage.upload import (
     download_meme_content_file, 
     upload_meme_content_to_tg,
+    download_meme_content_from_tg,
 )
 
 from src.storage import ads
@@ -32,13 +33,18 @@ async def upload_memes_to_telegram(unloaded_memes: list[dict[str, Any]]) -> list
     memes = []
     for unloaded_meme in unloaded_memes:
         try:
+            logger.info(f"Downloading meme {unloaded_meme['id']} content file.")
             meme_original_content = await download_meme_content_file(unloaded_meme["content_url"])
         except Exception as e:
             logger.info(f"Meme {unloaded_meme['id']} content is not available to download, reason: {e}.")
             await update_meme(unloaded_meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK)
             continue
-
+        
+        logger.info(f"Adding watermark to meme {unloaded_meme['id']}.")
         meme_content = add_watermark(meme_original_content)
+        if meme_content is None:
+            logger.info(f"Meme {unloaded_meme['id']} was not watermarked, skipping.")
+            continue
 
         meme = await upload_meme_content_to_tg(unloaded_meme["id"], unloaded_meme["type"], meme_content)
         await asyncio.sleep(2)  # flood control
@@ -126,3 +132,20 @@ async def check_captions_of_pending_memes():
             await update_meme(meme["id"], caption=new_caption)
 
     await update_meme_status_of_ready_memes()
+
+
+@flow
+async def ocr_uploaded_memes(limit=10):
+    logger = get_run_logger()
+    logger.info(f"Getting {limit} memes to OCR.")
+
+    memes = await get_memes_to_ocr(limit=limit)
+    logger.info(f"Going to OCR {len(memes)} memes.")
+
+    for meme in memes:
+        meme_content = await download_meme_content_from_tg(meme["telegram_file_id"])
+        result = await ocr_content(meme_content)
+        if result:
+            await update_meme(meme["id"], ocr_result=result.model_dump(mode='json'))
+
+        await asyncio.sleep(2)  # flood control

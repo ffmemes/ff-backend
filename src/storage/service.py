@@ -182,6 +182,7 @@ async def get_memes_to_ocr(limit=100):
         select(meme)
         .where(meme.c.status == MemeStatus.CREATED)
         .where(meme.c.type == MemeType.IMAGE)
+        .where(meme.c.telegram_file_id.is_not(None))
         .where(meme.c.ocr_result.is_(None))
         .order_by(nulls_first(meme.c.created_at))
         .limit(limit)

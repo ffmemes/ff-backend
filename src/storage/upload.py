@@ -19,6 +19,15 @@ async def download_meme_content_file(
         )
         response.raise_for_status()
         return response.content
+    
+
+async def download_meme_content_from_tg(
+    file_id: str,
+) -> bytes:
+    bot = telegram.Bot(token=settings.TELEGRAM_BOT_TOKEN)
+    file = await bot.get_file(file_id)
+    file_bytearray = await file.download_as_bytearray()
+    return bytes(file_bytearray)
 
 
 async def upload_meme_content_to_tg(
