@@ -28,6 +28,7 @@ def prev_update_can_be_edited_with_media(prev_update: Update) -> bool:
     if prev_update.callback_query.message.effective_attachment is None:
         return False  # message without media
     
+    # FIXME: sometimes message is too old and can't be edited.
     return True  # message from our bot & has media to be replaced
 
 
