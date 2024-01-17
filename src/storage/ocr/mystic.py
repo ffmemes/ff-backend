@@ -69,9 +69,14 @@ async def ocr_content(
     except Exception as e:
         print(f"Mystic OCR error: {e}")
         return None
+    
     print(f"OCR result from Mystic: {ocr_result}")
+    result = ocr_result["result"]
+    if result is None:
+        print(f"Mystic OCR returned no result: {ocr_result}.")
+        return None
 
-    rows = ocr_result["result"]["outputs"][0]["value"]
+    rows = result["outputs"][0]["value"]
     full_text = "\n".join([r[1] for r in rows])
 
     return OcrResult(

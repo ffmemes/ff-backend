@@ -77,7 +77,8 @@ async def upload_memes_to_telegram(unloaded_memes: list[dict[str, Any]]) -> list
 @flow(
     name="Memes from Telegram Pipeline",
     description="Process raw memes parsed from Telegram",
-    version="0.1.0"
+    version="0.1.0",
+    log_prints=True,
 )
 async def tg_meme_pipeline() -> None:
     logger = get_run_logger()
