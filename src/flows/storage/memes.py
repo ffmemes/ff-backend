@@ -11,6 +11,7 @@ from src.storage.service import (
     get_memes_to_ocr,
     update_meme_status_of_ready_memes,
     update_meme,
+    find_meme_duplicate,
 )
 
 from src.storage.upload import (
@@ -129,6 +130,12 @@ async def final_meme_pipeline() -> None:
 
     for meme in memes:
         await analyse_meme_caption(meme["id"], meme["caption"])
+
+        # TODO: check if we have meme with a same content in db
+        duplicate_meme_id = await find_meme_duplicate()
+        if duplicate_meme_id:
+            await update_meme(meme["id"], status=MemeStatus.DUPLICATE, duplicate_of=duplicate_meme_id)
+            continue
 
     # next step of a pipeline
     await update_meme_status_of_ready_memes()
