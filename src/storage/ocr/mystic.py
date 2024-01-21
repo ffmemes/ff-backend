@@ -5,14 +5,9 @@ from typing import Any
 from src.config import settings
 from src.storage.schemas import OcrResult
 
-# URL for the API endpoint
-url = 'https://www.mystic.ai/v4/runs'
-
-
-headers = {
+HEADERS = {
     "accept": "application/json",
     "authorization": f"Bearer {settings.MYSTIC_TOKEN}",
-    "content-type": "application/json"
 }
 
 PIPELINE_ID = "uriel/easyocr-r:v31"
@@ -24,14 +19,14 @@ async def load_file_to_mystic(file_content: bytes) -> str:
 
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            "https://www.mystic.ai/v3/pipeline_files",
+            "https://www.mystic.ai/v4/files",
             files=files,
-            headers=headers,
+            headers=HEADERS,
         )
         response.raise_for_status()
         # Concatenating as v4 just returns starting with /pipeline_files
-        # path = "https://storage.mystic.ai/" + response.json()["path"]
-        return response.json()["path"]
+        path = "https://storage.mystic.ai/" + response.json()["path"]
+        return path
 
 
 async def ocr_mystic_file_path(
@@ -41,7 +36,7 @@ async def ocr_mystic_file_path(
 ) -> dict[str, Any]:
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            url,
+            "https://www.mystic.ai/v4/runs",
             json={
                 "pipeline": pipeline_id,
                 # Removed as not required now
@@ -57,14 +52,14 @@ async def ocr_mystic_file_path(
                     }
                 ]
             },
-            headers=headers,
+            headers=HEADERS,
         )
         response.raise_for_status()
         return response.json()
 
 
 async def ocr_content(
-    content: bytes,  # ??
+    content: bytes,
 ) -> OcrResult | None:
     try:
         mystic_file_path = await load_file_to_mystic(content)
@@ -74,12 +69,11 @@ async def ocr_content(
         return None
 
     print(f"OCR result from Mystic: {ocr_result}")
-    result = ocr_result["result"]
-    if result is None:
+    if ocr_result is None:
         print(f"Mystic OCR returned no result: {ocr_result}.")
         return None
 
-    rows = result["outputs"][0]["value"]
+    rows = ocr_result["outputs"][0]["value"]
     full_text = "\n".join([r[1] for r in rows])
 
     return OcrResult(
