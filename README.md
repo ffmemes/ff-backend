@@ -38,10 +38,10 @@ Don't forget to fill in local `.env` file all envs you need.
 
 ### Test specific python functions
 
-After `docker-compose up -d --build` use this to run a python shell inside the Docker environment. Then import your Python function and test it as you want.
+After `docker-compose up -d --build` use this to run a python shell inside the Docker environment. Then import your Python function and test it as you want. Note that ipython can run async functions without asyncio.run(...).
 
 ``` shell
-docker compose exec app python
+docker compose exec app ipython
 ```
 
 ### Linters
