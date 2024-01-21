@@ -2,6 +2,7 @@ from src import redis
 from src.storage.schemas import MemeData
 
 from src.recommendations.candidates import sorted_by_user_source_lr_meme_lr_meme_age
+from src.recommendations.cold_start import get_best_memes_from_each_source
 
 
 async def get_next_meme_for_user(user_id: int) -> MemeData | None:
@@ -28,18 +29,33 @@ async def check_queue(user_id: int):
         await generate_recommendations(user_id)
 
 
-async def generate_recommendations(user_id, limit=10):
+async def generate_cold_start_recommendations(user_id, limit=10):
     queue_key = redis.get_meme_queue_key(user_id)
     memes_in_queue = await redis.get_all_memes_in_queue_by_key(queue_key)
     meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
 
-    print("exclude_meme_ids: ", meme_ids_in_queue)
-    candidates = await sorted_by_user_source_lr_meme_lr_meme_age(
+    candidates = await get_best_memes_from_each_source(
         user_id, 
         limit=limit, 
         exclude_meme_ids=meme_ids_in_queue
     )
     print("candidates: ", [c["id"] for c in candidates])
+    if len(candidates) == 0:
+        return 
+    
+    await redis.add_memes_to_queue_by_key(queue_key, candidates)
+
+
+async def generate_recommendations(user_id, limit=10):
+    queue_key = redis.get_meme_queue_key(user_id)
+    memes_in_queue = await redis.get_all_memes_in_queue_by_key(queue_key)
+    meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
+
+    candidates = await sorted_by_user_source_lr_meme_lr_meme_age(
+        user_id, 
+        limit=limit, 
+        exclude_meme_ids=meme_ids_in_queue
+    )
     if len(candidates) == 0:
         return 
     
