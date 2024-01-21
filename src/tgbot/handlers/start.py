@@ -4,7 +4,6 @@ from telegram.ext import (
     ContextTypes, 
 )
 
-
 from src.tgbot.service import (
     save_tg_user,
     save_user,
@@ -15,7 +14,6 @@ from src.tgbot.senders.next_message import next_message
 from src.tgbot.constants import (
     DEFAULT_USER_LANGUAGE, 
     UserType,
-    Reaction,
 )
 from src.storage.constants import SUPPORTED_LANGUAGES
 from src.recommendations.meme_queue import check_queue

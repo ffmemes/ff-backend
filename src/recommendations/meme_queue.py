@@ -1,5 +1,3 @@
-import asyncio
-
 from src import redis
 from src.storage.schemas import MemeData
 
@@ -7,8 +5,6 @@ from src.recommendations.candidates import sorted_by_user_source_lr_meme_lr_meme
 
 
 async def get_next_meme_for_user(user_id: int) -> MemeData | None:
-    asyncio.create_task(check_queue(user_id))
-
     queue_key = redis.get_meme_queue_key(user_id)
     meme_data = await redis.pop_meme_from_queue_by_key(queue_key)
     
