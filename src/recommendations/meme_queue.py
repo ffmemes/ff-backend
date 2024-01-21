@@ -3,9 +3,7 @@ import asyncio
 from src import redis
 from src.storage.schemas import MemeData
 
-from src.recommendations.service import (
-    get_unseen_memes
-)
+from src.recommendations.candidates import sorted_by_user_source_lr_meme_lr_meme_age
 
 
 async def get_next_meme_for_user(user_id: int) -> MemeData | None:
@@ -40,7 +38,7 @@ async def generate_recommendations(user_id, limit=10):
     meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
 
     print("exclude_meme_ids: ", meme_ids_in_queue)
-    candidates = await get_unseen_memes(
+    candidates = await sorted_by_user_source_lr_meme_lr_meme_age(
         user_id, 
         limit=limit, 
         exclude_meme_ids=meme_ids_in_queue

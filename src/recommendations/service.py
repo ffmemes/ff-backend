@@ -15,6 +15,8 @@ from src.database import (
     execute, fetch_one, fetch_all,
 )
 
+from src.recommendations.utils import exclude_meme_ids_sql_filter
+
 
 async def create_user_meme_reaction(
     user_id: int,
@@ -54,20 +56,12 @@ async def update_user_meme_reaction(
     return reaction_is_new  # I can filter double clicks
 
 
-# test handler
+# test handler, will be removed
 async def get_unseen_memes(
     user_id: int,
     limit: int = 10,
     exclude_meme_ids: list[int] = [],
 ) -> list[dict[str, Any]]:
-    # exclude memes which are already in queue
-    if len(exclude_meme_ids) > 1:
-        exclude = f"AND M.id NOT IN {tuple(exclude_meme_ids)}"
-    elif len(exclude_meme_ids) == 1:
-        exclude = f"AND M.id != {exclude_meme_ids[0]}"
-    else:
-        exclude = ""
-
     query = f"""
         SELECT 
             M.id, M.type, M.telegram_file_id, M.caption,
@@ -82,7 +76,7 @@ async def get_unseen_memes(
         WHERE 1=1
             AND M.status = 'ok'
             AND R.meme_id IS NULL
-            {exclude}
+            {exclude_meme_ids_sql_filter(exclude_meme_ids)}
         LIMIT {limit}
     """
     res = await fetch_all(text(query))
