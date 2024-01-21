@@ -24,13 +24,13 @@ async def load_file_to_mystic(file_content: bytes) -> str:
 
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            "https://www.mystic.ai/v4/files",
+            "https://www.mystic.ai/v3/pipeline_files",
             files=files,
             headers=headers,
         )
         response.raise_for_status()
         # Concatenating as v4 just returns starting with /pipeline_files
-        path = "https://storage.mystic.ai/" + response.json()["path"]
+        # path = "https://storage.mystic.ai/" + response.json()["path"]
         return response.json()["path"]
 
 
