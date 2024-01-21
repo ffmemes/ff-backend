@@ -1,9 +1,9 @@
 STOP_WORDS = [
-    "читать далее", "теперь в телеграм"
+    "читать далее", "теперь в телеграм", "t.me/",
 ]
 
 MENTION_WORDS = [
-    "@", "http",
+    "@", "http", "t.me/"
 ]
 
 def text_is_adverisement(original_text: str | None) -> bool:
