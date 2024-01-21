@@ -11,8 +11,9 @@ async def get_best_memes_from_each_source(
     exclude_meme_ids: list[int] = [],
 ) -> list[dict[str, Any]]:
     query = f"""
-        
-        SELECT *
+        SELECT 
+            M.id, M.type, M.telegram_file_id, M.caption,
+            'cold_start' as recommended_by
         FROM (
             SELECT DISTINCT ON (M.meme_source_id)
                 M.id, M.type, M.telegram_file_id, M.caption,
@@ -40,7 +41,7 @@ async def get_best_memes_from_each_source(
                 AND R.meme_id IS NULL
                 {exclude_meme_ids_sql_filter(exclude_meme_ids)}
             ORDER BY M.meme_source_id, score
-        ) memes
+        ) M
         ORDER BY score DESC
         LIMIT {limit}
     """
