@@ -1,6 +1,7 @@
 
 from telegram import (
-    Message, 
+    Message,
+    ParseMode, 
     Update, 
     InputMediaPhoto, 
     InputMediaVideo, 
@@ -40,26 +41,30 @@ async def send_new_message_with_meme(
     user_id: int,
     meme: MemeData,
 ) -> Message:
+    meme_caption_with_referral_link = f'{meme.caption}\n\n<a href="https://t.me/ffmemesbot?start=s_{user_id}_{meme.id}">FastFoodMemes</a>'
     if meme.type == MemeType.IMAGE:        
         return await bot.application.bot.send_photo(
             chat_id=user_id, 
             photo=meme.telegram_file_id,
-            caption=meme.caption,
+            caption=meme_caption_with_referral_link,
             reply_markup=meme_reaction_keyboard(meme.id),
+            parse_mode=ParseMode.HTML,
         )
     elif meme.type == MemeType.VIDEO: 
         return await bot.application.bot.send_video(
             chat_id=user_id, 
             video=meme.telegram_file_id,
-            caption=meme.caption,
+            caption=meme_caption_with_referral_link,
             reply_markup=meme_reaction_keyboard(meme.id),
+            parse_mode=ParseMode.HTML,
         )
     elif meme.type == MemeType.ANIMATION:
         return await bot.application.bot.send_video(
             chat_id=user_id, 
             animation=meme.telegram_file_id,
-            caption=meme.caption,
+            caption=meme_caption_with_referral_link,
             reply_markup=meme_reaction_keyboard(meme.id),
+            parse_mode=ParseMode.HTML,
         )
     
     else:
