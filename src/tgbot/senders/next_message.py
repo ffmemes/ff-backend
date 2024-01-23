@@ -1,9 +1,9 @@
 import asyncio
 from telegram import (
     Message,
-    ParseMode,
     Update,
 )
+from telegram.constants import ParseMode
 
 from src.tgbot.constants import Reaction
 from src.tgbot.senders.keyboards import meme_reaction_keyboard

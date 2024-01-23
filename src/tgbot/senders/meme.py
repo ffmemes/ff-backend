@@ -1,12 +1,11 @@
 
 from telegram import (
     Message,
-    ParseMode, 
-    Update, 
     InputMediaPhoto, 
     InputMediaVideo, 
     InputMediaAnimation,
 )
+from telegram.constants import ParseMode
 
 from src.tgbot import bot
 
