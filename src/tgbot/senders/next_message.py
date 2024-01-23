@@ -40,12 +40,15 @@ async def next_message(
         prev_reaction_id is None or Reaction(prev_reaction_id).is_positive
     )
     if not send_new_message and prev_update_can_be_edited_with_media(prev_update):
-        meme_caption_with_referral_link = f'{meme.caption}\n\n<a href="https://t.me/ffmemesbot?start=s_{user_id}_{meme.id}">FastFoodMemes</a>'
         msg = await prev_update.callback_query.message.edit_media(
-            caption=meme_caption_with_referral_link,
             media=get_input_media(meme),
             reply_markup=meme_reaction_keyboard(meme.id),
+        )
+        meme_caption_with_referral_link = (f"{meme.caption}\n\n" if meme.caption else "") + f'<a href="https://t.me/ffmemesbot?start=s_{user_id}_{meme.id}">FastFoodMemes</a>'
+        await msg.edit_caption(
+            caption=meme_caption_with_referral_link,
             parse_mode=ParseMode.HTML,
+            reply_markup=meme_reaction_keyboard(meme.id),
         )
     else:
         msg = await send_new_message_with_meme(user_id, meme)

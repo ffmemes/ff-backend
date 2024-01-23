@@ -40,7 +40,7 @@ async def send_new_message_with_meme(
     user_id: int,
     meme: MemeData,
 ) -> Message:
-    meme_caption_with_referral_link = f'{meme.caption}\n\n<a href="https://t.me/ffmemesbot?start=s_{user_id}_{meme.id}">FastFoodMemes</a>'
+    meme_caption_with_referral_link = (f"{meme.caption}\n\n" if meme.caption else "") + f'<a href="https://t.me/ffmemesbot?start=s_{user_id}_{meme.id}">FastFoodMemes</a>'
     if meme.type == MemeType.IMAGE:        
         return await bot.application.bot.send_photo(
             chat_id=user_id, 
