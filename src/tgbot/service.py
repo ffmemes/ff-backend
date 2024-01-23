@@ -18,20 +18,13 @@ async def save_tg_user(
     id: int,
     **kwargs,
 ) -> None:
-    update_dict_if_user_already_created = {
-        "username": kwargs["username"],
-        "first_name": kwargs["first_name"],
-        "last_name": kwargs["last_name"],
-        "is_premium": kwargs["is_premium"],
-        "language_code": kwargs["language_code"],
-        "updated_at": datetime.utcnow(),
-    }
     insert_statement = (
         insert(user_tg)
         .values({"id": id, **kwargs})
         .on_conflict_do_update(
             index_elements=(user_tg.c.id,),
-            set_=update_dict_if_user_already_created,
+            set_={"updated_at": datetime.utcnow()},
+            # do we need to update more fields if a user already exists?
         )
     )
 

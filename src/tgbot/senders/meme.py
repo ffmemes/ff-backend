@@ -13,6 +13,7 @@ from src.storage.schemas import MemeData
 
 from src.tgbot.senders.keyboards import meme_reaction_keyboard
 from src.recommendations.service import create_user_meme_reaction
+from src.tgbot.senders.utils import get_meme_caption
 
 
 def get_input_media(
@@ -41,11 +42,7 @@ async def send_new_message_with_meme(
     user_id: int,
     meme: MemeData,
 ) -> Message:
-    bot_username = bot.application.bot.username
-    meme_caption_with_referral_link = (
-        (f"{meme.caption}\n\n" if meme.caption else "")
-        + f'<a href="https://t.me/{bot_username}?start=s_{user_id}_{meme.id}">FastFoodMemes</a>'
-    )
+    meme_caption_with_referral_link = get_meme_caption(meme, user_id)
     if meme.type == MemeType.IMAGE:
         return await bot.application.bot.send_photo(
             chat_id=user_id,
@@ -70,7 +67,6 @@ async def send_new_message_with_meme(
             reply_markup=meme_reaction_keyboard(meme.id),
             parse_mode=ParseMode.HTML,
         )
-
     else:
         raise NotImplementedError(f"Can't send meme. Unknown meme type: {meme.type}")
 
@@ -80,17 +76,13 @@ async def edit_last_message_with_meme(
     meme_id: int,
     meme: MemeData,
 ):
-    bot_username = bot.application.bot.username
-    meme_caption_with_referral_link = (
-        (f"{meme.caption}\n\n" if meme.caption else "")
-        + f'<a href="https://t.me/{bot_username}?start=s_{user_id}_{meme.id}">FastFoodMemes</a>'
-    )
     await bot.application.bot.edit_message_media(
         chat_id=user_id,
         message_id=meme_id,
         media=get_input_media(meme),
         reply_markup=meme_reaction_keyboard(meme.id),
     )
+    meme_caption_with_referral_link = get_meme_caption(meme, user_id)
     await bot.application.bot.edit_message_caption(
         chat_id=user_id,
         message_id=meme_id,
