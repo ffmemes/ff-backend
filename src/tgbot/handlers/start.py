@@ -56,7 +56,7 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     #TODO: generate onboarding / cold-start memes
     await generate_cold_start_recommendations(user_id)
     return await next_message(
-        user_id, 
+        user_id,
         prev_update=update,
         prev_reaction_id=None,
     )

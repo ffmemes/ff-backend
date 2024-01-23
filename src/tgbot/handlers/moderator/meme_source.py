@@ -31,7 +31,7 @@ async def handle_meme_source_link(update: Update, context: ContextTypes.DEFAULT_
         meme_source_type = MemeSourceType.TELEGRAM
     elif "https://vk.com/" in url:
         meme_source_type = MemeSourceType.VK
-    else:  
+    else:
         await update.message.reply_text("Unsupported meme source")
         return 
     
