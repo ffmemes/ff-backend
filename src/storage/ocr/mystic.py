@@ -5,16 +5,12 @@ from typing import Any
 from src.config import settings
 from src.storage.schemas import OcrResult
 
-# URL for the API endpoint
-url = 'https://www.mystic.ai/v3/runs'
-
-
-headers = {
+HEADERS = {
     "accept": "application/json",
-    "authorization": f"Bearer {settings.MYSTIC_TOKEN}"
+    "authorization": f"Bearer {settings.MYSTIC_TOKEN}",
 }
 
-PIPELINE_ID = "uriel/easyocr-r:v30"
+PIPELINE_ID = "uriel/easyocr-r:v31"
 
 
 async def load_file_to_mystic(file_content: bytes) -> str:
@@ -23,29 +19,31 @@ async def load_file_to_mystic(file_content: bytes) -> str:
 
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            "https://www.mystic.ai/v3/pipeline_files",
+            "https://www.mystic.ai/v4/files",
             files=files,
-            headers=headers,
+            headers=HEADERS,
         )
         response.raise_for_status()
-        return response.json()["path"]
-    
+        # Concatenating as v4 just returns starting with /pipeline_files
+        path = "https://storage.mystic.ai/" + response.json()["path"]
+        return path
+
 
 async def ocr_mystic_file_path(
     mystic_file_path: str,
     pipeline_id: str = PIPELINE_ID,
-    language: str = "Russian",
+    language: str = "ru",
 ) -> dict[str, Any]:
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            url,
+            "https://www.mystic.ai/v4/runs",
             json={
-                "pipeline_id_or_pointer": pipeline_id,
-                "async_run": False,
-                "input_data": [
+                "pipeline": pipeline_id,
+                # Removed as not required now
+                # "async_run": False,
+                "inputs": [
                     {
                         "type": "file",
-                        "value": "",
                         "file_path": mystic_file_path,
                     },
                     {
@@ -54,14 +52,14 @@ async def ocr_mystic_file_path(
                     }
                 ]
             },
-            headers=headers,
+            headers=HEADERS,
         )
         response.raise_for_status()
         return response.json()
 
 
 async def ocr_content(
-    content: bytes,  # ??
+    content: bytes,
 ) -> OcrResult | None:
     try:
         mystic_file_path = await load_file_to_mystic(content)
@@ -69,9 +67,13 @@ async def ocr_content(
     except Exception as e:
         print(f"Mystic OCR error: {e}")
         return None
-    print(f"OCR result from Mystic: {ocr_result}")
 
-    rows = ocr_result["result"]["outputs"][0]["value"]
+    print(f"OCR result from Mystic: {ocr_result}")
+    if ocr_result is None:
+        print(f"Mystic OCR returned no result: {ocr_result}.")
+        return None
+
+    rows = ocr_result["outputs"][0]["value"]
     full_text = "\n".join([r[1] for r in rows])
 
     return OcrResult(

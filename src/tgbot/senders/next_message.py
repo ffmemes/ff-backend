@@ -1,22 +1,16 @@
+import asyncio
 from telegram import (
     Message, 
     Update, 
-    InputMediaPhoto, 
-    InputMediaVideo, 
-    InputMediaAnimation,
 )
 
-from src.storage.schemas import MemeData
-from src.storage.constants import MemeType
-
-from src.tgbot import bot
 from src.tgbot.constants import Reaction
 from src.tgbot.senders.keyboards import meme_reaction_keyboard
 from src.tgbot.senders.alerts import send_queue_preparing_alert
 from src.tgbot.senders.meme import send_new_message_with_meme, get_input_media
 from src.recommendations.service import create_user_meme_reaction
 from src.recommendations.meme_queue import (
-    get_next_meme_for_user,
+    get_next_meme_for_user, check_queue
 )
 
 
@@ -40,6 +34,7 @@ async def next_message(
     # TODO: achievements
     meme = await get_next_meme_for_user(user_id)
     if not meme:
+        asyncio.create_task(check_queue(user_id))
         # TODO: also edit / delete
         return await send_queue_preparing_alert(user_id)
     
@@ -53,5 +48,6 @@ async def next_message(
         msg = await send_new_message_with_meme(user_id, meme)
 
     await create_user_meme_reaction(user_id, meme.id, meme.recommended_by)
+    asyncio.create_task(check_queue(user_id))
     return msg
 
