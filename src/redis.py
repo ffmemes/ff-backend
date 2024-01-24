@@ -38,7 +38,6 @@ def get_meme_queue_key(user_id: int) -> str:
 
 async def get_all_memes_in_queue_by_key(key: str) -> list[dict]:
     memes = await redis_client.smembers(key)
-    print("memes: ", memes)
     return [orjson.loads(meme) for meme in memes]
 
 
