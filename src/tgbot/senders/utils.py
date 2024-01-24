@@ -3,7 +3,6 @@ from random import choice
 from telegram import Update, Message
 from telegram.constants import ParseMode
 
-from src.storage.schemas import MemeData
 from src.tgbot import bot
 
 
@@ -27,12 +26,8 @@ def get_referral_link(user_id: int, meme_id: int) -> str:
     return f"https://t.me/{bot.application.bot.username}?start=s_{user_id}_{meme_id}"
 
 
-def get_meme_caption(meme: MemeData, user_id: int) -> str:
-    """ Adds referral link to meme caption """
-    referral_html = f"""{get_random_emoji()} <a href="{get_referral_link(user_id, meme.id)}">Fast Food Memes</a>"""
-    if meme.caption:
-        return f"{meme.caption}\n\n{referral_html}"
-    return referral_html
+def get_referral_html(user_id: int, meme_id: int) -> str:
+    return f"""{get_random_emoji()} <i><a href="{get_referral_link(user_id, meme_id)}">Fast Food Memes</a></i>"""
 
 
 async def send_or_edit(

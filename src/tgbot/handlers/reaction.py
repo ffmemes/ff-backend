@@ -10,6 +10,7 @@ from telegram.ext import (
 )
 
 from src.tgbot.senders.next_message import next_message
+from src.tgbot.user_info import update_user_info_counters
 from src.recommendations.service import (
     update_user_meme_reaction,
 )
@@ -21,6 +22,8 @@ async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     logging.info(
         f"🛜 reaction: user_id={user_id}, meme_id={meme_id}, reaction_id={reaction_id}"
     )
+
+    await update_user_info_counters(user_id)
 
     asyncio.create_task(
         update_user_meme_reaction(

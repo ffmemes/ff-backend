@@ -2,18 +2,9 @@
     Handle old callback queries from old bot version
 """
 
-
-import logging
 from telegram import Update
 from telegram.ext import (
     ContextTypes, 
-)
-
-
-from src.tgbot.service import (
-    save_tg_user,
-    save_user,
-    add_user_language,
 )
 
 

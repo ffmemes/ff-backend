@@ -17,6 +17,7 @@ from src.tgbot.constants import (
 )
 from src.storage.constants import SUPPORTED_LANGUAGES
 from src.recommendations.meme_queue import generate_cold_start_recommendations
+from src.tgbot.user_info import get_user_info
 
 
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -34,9 +35,14 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         deep_link=deep_link,
     )
 
+    if deep_link and deep_link.startswith("s_"):  # invited
+        user_type = UserType.USER
+    else:
+        user_type = UserType.WAITLIST
+
     user = await save_user(
         id=user_id,
-        type=UserType.USER,
+        type=user_type,
     )
 
     if language_code is None:
@@ -49,9 +55,9 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         logging.info(f"User(id={user_id}) has unsupported language_code={language_code}. Set default={DEFAULT_USER_LANGUAGE}.")
 
     
-    # if user["type"] == UserType.USER:
-    #     await update.effective_user.send_message("Hi! You just joined our waitlist. Stay tuned!")
-    #     return
+    if user["type"] == UserType.WAITLIST:
+        await update.effective_user.send_message("Hi! You just joined our waitlist. Stay tuned!")
+        return
 
     #TODO: generate onboarding / cold-start memes
     await generate_cold_start_recommendations(user_id)

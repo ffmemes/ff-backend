@@ -5,7 +5,8 @@ from src.storage.constants import Language
 DEFAULT_USER_LANGUAGE = Language.EN
 
 
-class UserType(str, Enum):    
+class UserType(str, Enum):   
+    WAITLIST = "waitlist" 
     USER = "user"
     ACTIVE_USER = "active_user"
     SUPER_USER = "super_user"
