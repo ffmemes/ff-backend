@@ -2,6 +2,7 @@ from typing import Any
 from datetime import datetime
 from sqlalchemy import select, nulls_first, text
 from sqlalchemy.dialects.postgresql import insert
+import logging
 
 from src.database import (
     language,
@@ -12,7 +13,9 @@ from src.database import (
     user_language,
     meme_raw_telegram,
     user_meme_reaction,
-    execute, fetch_one, fetch_all,
+    execute,
+    fetch_one,
+    fetch_all,
 )
 
 from src.recommendations.utils import exclude_meme_ids_sql_filter
@@ -29,11 +32,9 @@ async def create_user_meme_reaction(
             user_id=user_id,
             meme_id=meme_id,
             recommended_by=recommended_by,
-        ).on_conflict_do_nothing(
-            index_elements=(
-                user_meme_reaction.c.user_id,
-                user_meme_reaction.c.meme_id
-            )
+        )
+        .on_conflict_do_nothing(
+            index_elements=(user_meme_reaction.c.user_id, user_meme_reaction.c.meme_id)
         )
     )
     await execute(insert_query)
@@ -53,6 +54,8 @@ async def update_user_meme_reaction(
     )
     res = await execute(update_query)
     reaction_is_new = res.rowcount > 0
+    if not reaction_is_new:
+        logging.warning(f"User {user_id} already reacted to meme {meme_id}!")
     return reaction_is_new  # I can filter double clicks
 
 
@@ -81,4 +84,3 @@ async def get_unseen_memes(
     """
     res = await fetch_all(text(query))
     return res
-
