@@ -1,19 +1,15 @@
 from typing import Any
 from datetime import datetime
-from sqlalchemy import select, nulls_first, text
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
-    language,
-    meme,
     meme_source,
     user,
     user_tg,
     user_language,
-    meme_raw_telegram,
     execute,
     fetch_one,
-    fetch_all,
 )
 
 from src.storage.constants import Language
