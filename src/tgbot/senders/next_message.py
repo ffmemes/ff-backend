@@ -43,5 +43,4 @@ async def next_message(
         msg = await send_new_message_with_meme(user_id, meme)
 
     await create_user_meme_reaction(user_id, meme.id, meme.recommended_by)
-    asyncio.create_task(check_queue(user_id))
     return msg
