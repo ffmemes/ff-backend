@@ -14,3 +14,8 @@ def remove_buttons_with_callback(reply_markup: dict) -> dict:
 
     reply_markup["inline_keyboard"] = new_keyboard
     return reply_markup
+
+
+# TODO: make User schema
+def format_user_to_str(user_id: int, username: str | None) -> str:
+    return f"@{username}" if username else f"#{user_id}"

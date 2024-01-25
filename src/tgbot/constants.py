@@ -15,6 +15,7 @@ class UserType(str, Enum):
     BLOCKED_BOT = "blocked_bot"
 
     MODERATOR = "moderator"
+    ADMIN = "admin"
 
 
 class Reaction(int, Enum):

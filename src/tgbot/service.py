@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import insert
 from src.database import meme_source, user, user_tg, user_language, execute, fetch_one
 
 from src.storage.constants import Language
+from sqlalchemy import func
 
 
 async def save_tg_user(
@@ -46,6 +47,20 @@ async def save_user(
     return await fetch_one(insert_statement)
 
 
+async def update_user(
+    id: int,
+    **kwargs,
+) -> None:
+    update_statement = (
+        user.update()
+        .where(user.c.id == id)
+        .values(kwargs)
+        .returning(user)
+    )
+
+    return await fetch_one(update_statement)
+
+
 async def get_user_by_id(
     id: int,
 ) -> dict[str, Any] | None:
@@ -53,11 +68,23 @@ async def get_user_by_id(
     return await fetch_one(select_statement)
 
 
+async def get_tg_user_by_id(
+    id: int,
+) -> dict[str, Any] | None:
+    select_statement = select(user_tg).where(user_tg.c.id == id)
+    return await fetch_one(select_statement)
+
+
 async def get_user_by_username(
     username: str,
 ) -> dict[str, Any] | None:
-    """Slower version of `get_user_by_id`, since username column doesn't have an index. Shouldn't be used often"""
-    select_statement = select(user).where(user.c.username == username)
+    """Slower version of `get_user_by_id`, since it requires a join. Shouldn't be used often"""
+    # select user.id from user_tg join user on user_tg.id = user.id where user_tg.username = 'username';
+    select_statement = (
+        select(user)
+        .select_from(user_tg.join(user, user_tg.c.id == user.c.id))
+        .where(func.lower(user_tg.c.username) == username.lower())
+    )
     return await fetch_one(select_statement)
 
 
@@ -130,7 +157,7 @@ async def del_user_language(
 async def get_user_info(
     user_id: int,
 ) -> dict[str, Any] | None:
-    # TODO: calculate memes_watched_today inside user_stats               
+    # TODO: calculate memes_watched_today inside user_stats
     query = f"""
         WITH MEMES_WATCHED_TODAY AS (
             SELECT user_id, COUNT(*) memes_watched_today
@@ -153,7 +180,6 @@ async def get_user_info(
     """
 
     return await fetch_one(text(query))
-
 
 
 # async def sync_user_language(
