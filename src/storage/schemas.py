@@ -5,12 +5,15 @@ from src.models import CustomModel
 from src.storage.constants import MemeType
 
 
-# minimal data to send a meme
-class MemeData(CustomModel):
+class BasicMemeData(CustomModel):
     id: int
     type: MemeType
     telegram_file_id: str
     caption: str | None
+
+
+# minimal data to send a meme
+class MemeData(BasicMemeData):
     recommended_by: str
 
 

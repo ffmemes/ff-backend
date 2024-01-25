@@ -12,7 +12,7 @@ from telegram import (
 from src.config import settings
 from src.tgbot.handlers import start, upload, broken, reaction, alerts
 from src.tgbot.handlers.moderator import meme_source
-from src.tgbot.handlers.admin import add_moderator
+from src.tgbot.handlers.admin import add_moderator, get_meme
 from src.tgbot.constants import (
     MEME_BUTTON_CALLBACK_DATA_REGEXP, 
     MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA,
@@ -72,6 +72,11 @@ def add_handlers(application: Application) -> None:
     application.add_handler(CommandHandler(
         "add_mod",
         add_moderator.handle_add_moderator,
+        filters=filters.ChatType.PRIVATE,
+    ))
+    application.add_handler(CommandHandler(
+        "get_meme",
+        get_meme.handle_get_meme,
         filters=filters.ChatType.PRIVATE,
     ))
 

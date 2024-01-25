@@ -3,7 +3,15 @@ from datetime import datetime
 from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
 
-from src.database import meme_source, user, user_tg, user_language, execute, fetch_one
+from src.database import (
+    meme_source,
+    user,
+    user_tg,
+    user_language,
+    meme,
+    execute,
+    fetch_one,
+)
 
 from src.storage.constants import Language
 from sqlalchemy import func
@@ -52,10 +60,7 @@ async def update_user(
     **kwargs,
 ) -> None:
     update_statement = (
-        user.update()
-        .where(user.c.id == id)
-        .values(kwargs)
-        .returning(user)
+        user.update().where(user.c.id == id).values(kwargs).returning(user)
     )
 
     return await fetch_one(update_statement)
@@ -92,6 +97,13 @@ async def get_meme_source_by_id(
     id: int,
 ) -> dict[str, Any] | None:
     select_statement = select(meme_source).where(meme_source.c.id == id)
+    return await fetch_one(select_statement)
+
+
+async def get_meme_by_id(
+    id: int,
+) -> dict[str, Any] | None:
+    select_statement = select(meme).where(meme.c.id == id)
     return await fetch_one(select_statement)
 
 

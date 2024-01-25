@@ -11,7 +11,7 @@ from src.tgbot.senders.keyboards import meme_reaction_keyboard
 from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
 
 from src.storage.constants import MemeType
-from src.storage.schemas import MemeData
+from src.storage.schemas import BasicMemeData, MemeData
 
 
 def get_input_media(
@@ -38,7 +38,7 @@ def get_input_media(
 
 async def send_new_message_with_meme(
     user_id: int,
-    meme: MemeData,
+    meme: BasicMemeData,
 ) -> Message:
     caption = await get_meme_caption_for_user_id(meme, user_id)
     if meme.type == MemeType.IMAGE:
