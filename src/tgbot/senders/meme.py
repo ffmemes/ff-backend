@@ -7,13 +7,11 @@ from telegram import (
 from telegram.constants import ParseMode
 
 from src.tgbot import bot
+from src.tgbot.senders.keyboards import meme_reaction_keyboard
+from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
 
 from src.storage.constants import MemeType
 from src.storage.schemas import MemeData
-
-from src.tgbot.senders.keyboards import meme_reaction_keyboard
-from src.recommendations.service import create_user_meme_reaction
-from src.tgbot.senders.utils import get_meme_caption
 
 
 def get_input_media(
@@ -42,12 +40,12 @@ async def send_new_message_with_meme(
     user_id: int,
     meme: MemeData,
 ) -> Message:
-    meme_caption_with_referral_link = get_meme_caption(meme, user_id)
+    caption = await get_meme_caption_for_user_id(meme, user_id)
     if meme.type == MemeType.IMAGE:
         return await bot.application.bot.send_photo(
             chat_id=user_id,
             photo=meme.telegram_file_id,
-            caption=meme_caption_with_referral_link,
+            caption=caption,
             reply_markup=meme_reaction_keyboard(meme.id),
             parse_mode=ParseMode.HTML,
         )
@@ -55,7 +53,7 @@ async def send_new_message_with_meme(
         return await bot.application.bot.send_video(
             chat_id=user_id,
             video=meme.telegram_file_id,
-            caption=meme_caption_with_referral_link,
+            caption=caption,
             reply_markup=meme_reaction_keyboard(meme.id),
             parse_mode=ParseMode.HTML,
         )
@@ -63,7 +61,7 @@ async def send_new_message_with_meme(
         return await bot.application.bot.send_video(
             chat_id=user_id,
             animation=meme.telegram_file_id,
-            caption=meme_caption_with_referral_link,
+            caption=caption,
             reply_markup=meme_reaction_keyboard(meme.id),
             parse_mode=ParseMode.HTML,
         )
@@ -82,11 +80,16 @@ async def edit_last_message_with_meme(
         media=get_input_media(meme),
         reply_markup=meme_reaction_keyboard(meme.id),
     )
-    meme_caption_with_referral_link = get_meme_caption(meme, user_id)
+
+    # INFO: current TG BOT API doesn't support media + caption edit 
+    # in 1 API call. Also edit_message_media clears caption.
+    # So we need to make 2 API calls...
+    
+    caption = await get_meme_caption_for_user_id(meme, user_id)
     await bot.application.bot.edit_message_caption(
         chat_id=user_id,
         message_id=meme_id,
-        caption=meme_caption_with_referral_link,
+        caption=caption,
         parse_mode=ParseMode.HTML,
         reply_markup=meme_reaction_keyboard(meme.id),
     )

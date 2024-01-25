@@ -1,6 +1,6 @@
 from typing import Any
 from datetime import datetime
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import meme_source, user, user_tg, user_language, execute, fetch_one
@@ -125,6 +125,35 @@ async def del_user_language(
     )
 
     await execute(delete_language_query)
+
+
+async def get_user_info(
+    user_id: int,
+) -> dict[str, Any] | None:
+    # TODO: calculate memes_watched_today inside user_stats               
+    query = f"""
+        WITH MEMES_WATCHED_TODAY AS (
+            SELECT user_id, COUNT(*) memes_watched_today
+            FROM user_meme_reaction
+            WHERE user_id = {user_id}
+            AND reacted_at >= DATE(NOW())
+            GROUP BY 1
+        )
+
+        SELECT 
+            type, 
+            COALESCE(nmemes_sent, 0) nmemes_sent, 
+	        COALESCE(memes_watched_today, 0) memes_watched_today
+        FROM "user" AS U
+        LEFT JOIN user_stats US 
+            ON US.user_id = U.id
+        LEFT JOIN MEMES_WATCHED_TODAY
+            ON MEMES_WATCHED_TODAY.user_id = U.id
+        WHERE U.id = {user_id};
+    """
+
+    return await fetch_one(text(query))
+
 
 
 # async def sync_user_language(

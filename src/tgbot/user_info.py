@@ -1,0 +1,36 @@
+"""
+    Cache user info in redis
+"""
+
+from src import redis
+from src.tgbot import service
+
+
+async def get_cached_user_info(user_id: int) -> dict | None:
+    key = redis.get_user_info_key(user_id)
+    user_info = await redis.get_user_info_by_key(key)
+    if user_info is None:
+        return None
+
+    return user_info
+
+
+async def cache_user_info(user_id: int, user_info: dict):
+    key = redis.get_user_info_key(user_id)
+    await redis.set_user_info_by_key(key, user_info)
+
+
+async def get_user_info(user_id: int) -> dict:
+    user_info = await get_cached_user_info(user_id)
+    if user_info is None:
+        user_info = await service.get_user_info(user_id)
+        await cache_user_info(user_id, user_info)
+
+    return user_info
+
+
+async def update_user_info_counters(user_id: int):
+    user_info = await get_user_info(user_id)
+    user_info["nmemes_sent"] += 1
+    user_info["memes_watched_today"] += 1
+    await cache_user_info(user_id, user_info)
