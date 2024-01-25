@@ -3,13 +3,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
-from src.database import (
-    meme_source,
-    user,
-    user_tg,
-    user_language,
-    execute, fetch_one
-)
+from src.database import meme_source, user, user_tg, user_language, execute, fetch_one
 
 from src.storage.constants import Language
 
@@ -56,6 +50,14 @@ async def get_user_by_id(
     id: int,
 ) -> dict[str, Any] | None:
     select_statement = select(user).where(user.c.id == id)
+    return await fetch_one(select_statement)
+
+
+async def get_user_by_username(
+    username: str,
+) -> dict[str, Any] | None:
+    """Slower version of `get_user_by_id`, since username column doesn't have an index. Shouldn't be used often"""
+    select_statement = select(user).where(user.c.username == username)
     return await fetch_one(select_statement)
 
 
