@@ -1,4 +1,5 @@
 from telegram import (
+    Bot,
     Message,
     InputMediaPhoto,
     InputMediaVideo,
@@ -6,12 +7,15 @@ from telegram import (
 )
 from telegram.constants import ParseMode
 
-from src.tgbot import bot
+from src.config import settings
+
 from src.tgbot.senders.keyboards import meme_reaction_keyboard
 from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
 
 from src.storage.constants import MemeType
 from src.storage.schemas import MemeData
+
+bot = Bot(settings.TELEGRAM_BOT_TOKEN)
 
 
 def get_input_media(
@@ -42,7 +46,7 @@ async def send_new_message_with_meme(
 ) -> Message:
     caption = await get_meme_caption_for_user_id(meme, user_id)
     if meme.type == MemeType.IMAGE:
-        return await bot.application.bot.send_photo(
+        return await bot.send_photo(
             chat_id=user_id,
             photo=meme.telegram_file_id,
             caption=caption,
@@ -50,7 +54,7 @@ async def send_new_message_with_meme(
             parse_mode=ParseMode.HTML,
         )
     elif meme.type == MemeType.VIDEO:
-        return await bot.application.bot.send_video(
+        return await bot.send_video(
             chat_id=user_id,
             video=meme.telegram_file_id,
             caption=caption,
@@ -58,7 +62,7 @@ async def send_new_message_with_meme(
             parse_mode=ParseMode.HTML,
         )
     elif meme.type == MemeType.ANIMATION:
-        return await bot.application.bot.send_video(
+        return await bot.send_video(
             chat_id=user_id,
             animation=meme.telegram_file_id,
             caption=caption,
@@ -74,7 +78,7 @@ async def edit_last_message_with_meme(
     meme_id: int,
     meme: MemeData,
 ):
-    await bot.application.bot.edit_message_media(
+    await bot.edit_message_media(
         chat_id=user_id,
         message_id=meme_id,
         media=get_input_media(meme),
@@ -86,7 +90,7 @@ async def edit_last_message_with_meme(
     # So we need to make 2 API calls...
     
     caption = await get_meme_caption_for_user_id(meme, user_id)
-    await bot.application.bot.edit_message_caption(
+    await bot.edit_message_caption(
         chat_id=user_id,
         message_id=meme_id,
         caption=caption,

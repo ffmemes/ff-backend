@@ -23,6 +23,7 @@ class Config(BaseSettings):
     APP_VERSION: str = "1"
 
     TELEGRAM_BOT_TOKEN: str | None = None
+    TELEGRAM_BOT_USERNAME: str | None = None
     TELEGRAM_BOT_WEBHOOK_SECRET: str | None = None
     MEME_STORAGE_TELEGRAM_CHAT_ID: str | None = None
     ADMIN_LOGS_CHAT_ID: str | None = None

@@ -3,7 +3,7 @@ from random import choice
 from telegram import Update, Message
 from telegram.constants import ParseMode
 
-from src.tgbot import bot
+from src.config import settings
 
 
 def get_random_emoji() -> str:
@@ -23,7 +23,7 @@ def get_random_emoji() -> str:
 
 
 def get_referral_link(user_id: int, meme_id: int) -> str:
-    return f"https://t.me/{bot.application.bot.username}?start=s_{user_id}_{meme_id}"
+    return f"https://t.me/{settings.TELEGRAM_BOT_USERNAME}?start=s_{user_id}_{meme_id}"
 
 
 def get_referral_html(user_id: int, meme_id: int) -> str:
