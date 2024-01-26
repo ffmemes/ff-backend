@@ -52,7 +52,8 @@ async def get_meme_queue_length_by_key(key: str) -> int:
 
 async def add_memes_to_queue_by_key(key: str, memes: list[dict]) -> int:
     jsoned_memes = [orjson.dumps(meme) for meme in memes]
-    return await redis_client.sadd(key, *jsoned_memes, ex=60 * 60 * 1)  # 1h cache
+    # TODO: add ttl, probably using redis transactions
+    return await redis_client.sadd(key, *jsoned_memes)
 
 
 def get_user_info_key(user_id: int) -> str:
