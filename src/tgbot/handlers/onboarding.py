@@ -26,9 +26,9 @@ async def onboarding_flow(update: Update):
     m =await m.edit_text("2️⃣")
     await asyncio.sleep(2)
     m = await m.edit_text("1️⃣")
-    await asyncio.sleep(2.5)
+    await asyncio.sleep(2)
     m = await m.edit_text("💣")
-    await asyncio.sleep(3)
+    await asyncio.sleep(2.5)
     await m.delete()
 
     return await next_message(
