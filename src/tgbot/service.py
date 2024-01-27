@@ -129,25 +129,43 @@ async def get_user_info(
     user_id: int,
 ) -> dict[str, Any] | None:
     # TODO: calculate memes_watched_today inside user_stats               
+    # TODO: not sure about logic behind interface_lang
     query = f"""
         WITH MEMES_WATCHED_TODAY AS (
             SELECT user_id, COUNT(*) memes_watched_today
             FROM user_meme_reaction
-            WHERE user_id = {user_id}
-            AND reacted_at >= DATE(NOW())
+            WHERE 1=1
+                AND reacted_at >= DATE(NOW())
+                AND user_id = {user_id}
             GROUP BY 1
+        ),
+        USER_INTERFACE_LANG AS (
+            SELECT DISTINCT ON (user_tg.id)
+                id, 
+                COALESCE(
+                    user_language.language_code, 
+                    user_tg.language_code
+                ) interface_lang
+            FROM user_tg
+            LEFT JOIN user_language
+                ON user_language.user_id = user_tg.id
+                AND user_language.language_code != 'en'
+            WHERE user_tg.id = {user_id}
         )
 
         SELECT 
             type, 
             COALESCE(nmemes_sent, 0) nmemes_sent, 
-	        COALESCE(memes_watched_today, 0) memes_watched_today
+            COALESCE(memes_watched_today, 0) memes_watched_today, 
+            UIL.interface_lang
         FROM "user" AS U
         LEFT JOIN user_stats US 
             ON US.user_id = U.id
+        LEFT JOIN USER_INTERFACE_LANG UIL
+            ON UIL.id = U.id
         LEFT JOIN MEMES_WATCHED_TODAY
             ON MEMES_WATCHED_TODAY.user_id = U.id
-        WHERE U.id = {user_id};
+        WHERE U.id = {user_id}
     """
 
     return await fetch_one(text(query))

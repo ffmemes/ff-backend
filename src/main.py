@@ -6,7 +6,7 @@ import sentry_sdk
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
-from src import redis
+from src import redis, localizer
 from src.tgbot import bot
 from src.config import app_configs, settings
 
@@ -20,6 +20,8 @@ async def lifespan(_application: FastAPI) -> AsyncGenerator:
         str(settings.REDIS_URL), max_connections=10, decode_responses=True
     )
     redis.redis_client = aioredis.Redis(connection_pool=pool)
+
+    localizer.localizations = localizer.load()
 
     bot.application = bot.setup_application(settings.ENVIRONMENT.is_deployed)
     await bot.application.initialize()

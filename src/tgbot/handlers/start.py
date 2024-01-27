@@ -1,9 +1,9 @@
 import logging
 from telegram import Update
-from telegram.ext import (
-    ContextTypes, 
-)
+from telegram.ext import ContextTypes
+from telegram.constants import ParseMode
 
+from src import localizer
 from src.tgbot.service import (
     save_tg_user,
     save_user,
@@ -17,7 +17,6 @@ from src.tgbot.constants import (
 )
 from src.storage.constants import SUPPORTED_LANGUAGES
 from src.recommendations.meme_queue import generate_cold_start_recommendations
-from src.tgbot.user_info import get_user_info
 
 
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -54,9 +53,11 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await add_user_language(user_id, DEFAULT_USER_LANGUAGE)
         logging.info(f"User(id={user_id}) has unsupported language_code={language_code}. Set default={DEFAULT_USER_LANGUAGE}.")
 
-    
     if user["type"] == UserType.WAITLIST:
-        await update.effective_user.send_message("Hi! You just joined our waitlist. Stay tuned!")
+        await update.effective_user.send_message(
+            localizer.t("onboarding_joined_waitlist", language_code),
+            parse_mode=ParseMode.HTML,
+        )
         return
 
     #TODO: generate onboarding / cold-start memes
