@@ -8,6 +8,7 @@ from src.recommendations.service import get_user_reactions
 
 from src.tgbot import logs
 
+
 async def get_next_meme_for_user(user_id: int) -> MemeData | None:
     queue_key = redis.get_meme_queue_key(user_id)
     meme_data = await redis.pop_meme_from_queue_by_key(queue_key)
