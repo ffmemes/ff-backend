@@ -69,7 +69,7 @@ async def ocr_content(
         return None
 
     print(f"OCR result from Mystic: {ocr_result}")
-    if ocr_result is None:
+    if ocr_result is None or ocr_result["outputs"] is None:
         print(f"Mystic OCR returned no result: {ocr_result}.")
         return None
 
