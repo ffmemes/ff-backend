@@ -36,14 +36,14 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         deep_link=deep_link,
     )
 
-    if deep_link and deep_link.startswith("s_"):  # invited
-        user_type = UserType.USER
-    else:
-        user_type = UserType.WAITLIST
+    # if deep_link and deep_link.startswith("s_"):  # invited
+    #     user_type = UserType.USER
+    # else:
+    #     user_type = UserType.WAITLIST
 
     user = await save_user(
         id=user_id,
-        type=user_type,
+        type=UserType.USER,
     )
 
     if language_code is None:
@@ -55,12 +55,12 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await add_user_language(user_id, DEFAULT_USER_LANGUAGE)
         logging.info(f"User(id={user_id}) has unsupported language_code={language_code}. Set default={DEFAULT_USER_LANGUAGE}.")
 
-    if user["type"] == UserType.WAITLIST:
-        await update.effective_user.send_message(
-            localizer.t("onboarding_joined_waitlist", language_code),
-            parse_mode=ParseMode.HTML,
-        )
-        return
+    # if user["type"] == UserType.WAITLIST:
+    #     await update.effective_user.send_message(
+    #         localizer.t("onboarding_joined_waitlist", language_code),
+    #         parse_mode=ParseMode.HTML,
+    #     )
+    #     return
     
     recently_joined = user["created_at"] > datetime.utcnow() - timedelta(minutes=60)
     if recently_joined:
