@@ -12,6 +12,7 @@ from telegram import (
 from src.config import settings
 from src.tgbot.handlers import start, upload, broken, reaction, alerts
 from src.tgbot.handlers.moderator import meme_source
+from src.tgbot.handlers.error import send_stacktrace_to_tg_chat
 from src.tgbot.constants import (
     MEME_BUTTON_CALLBACK_DATA_REGEXP, 
     MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA,
@@ -65,6 +66,8 @@ def add_handlers(application: Application) -> None:
         meme_source.handle_meme_source_change_status, 
         pattern=MEME_SOURCE_SET_STATUS_REGEXP,
     ))
+
+    application.add_error_handler(send_stacktrace_to_tg_chat)
 
 
     # handle all old & broken callback queries

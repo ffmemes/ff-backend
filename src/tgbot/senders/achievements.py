@@ -21,7 +21,7 @@ async def send_achievement_if_needed(user_id: int) -> None:
     if user_info["nmemes_sent"] == 100:
         await bot.application.bot.send_message(
             chat_id=user_id,
-            text=localizer.l("achievement_100_meme_sent", user_info["interface_lang"]),
+            text=localizer.t("achievement_100_meme_sent", user_info["interface_lang"]),
             parse_mode=ParseMode.HTML,
         )
         await asyncio.sleep(3)
