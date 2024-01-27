@@ -1,4 +1,6 @@
 import logging
+from datetime import datetime, timedelta
+
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
@@ -16,7 +18,7 @@ from src.tgbot.constants import (
     UserType,
 )
 from src.storage.constants import SUPPORTED_LANGUAGES
-from src.recommendations.meme_queue import generate_cold_start_recommendations
+from src.tgbot.handlers.onboarding import onboarding_flow
 
 
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -59,9 +61,11 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             parse_mode=ParseMode.HTML,
         )
         return
+    
+    recently_joined = user["created_at"] > datetime.utcnow() - timedelta(minutes=60)
+    if recently_joined:
+        return await onboarding_flow(update)
 
-    #TODO: generate onboarding / cold-start memes
-    await generate_cold_start_recommendations(user_id)
     return await next_message(
         user_id,
         prev_update=update,

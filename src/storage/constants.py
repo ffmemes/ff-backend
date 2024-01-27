@@ -41,6 +41,7 @@ class MemeStatus(str, Enum):
 class Language(str, Enum):
     RU = "ru"
     EN = "en"
+    UK = "uk"
 
 
 SUPPORTED_LANGUAGES = [Language.RU, Language.EN]
