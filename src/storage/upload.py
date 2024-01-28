@@ -11,12 +11,15 @@ from src.storage.parsers.constants import USER_AGENT
 
 async def download_meme_content_file(
     url: AnyHttpUrl,
-):
+) -> bytes | None:
     async with httpx.AsyncClient(timeout=10.0) as client:
         response = await client.get(
             url,
             headers={"User-Agent": USER_AGENT},
         )
+        if response.status_code == 404:
+            return None
+        
         response.raise_for_status()
         return response.content
     
