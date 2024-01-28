@@ -44,4 +44,6 @@ class Language(str, Enum):
     UK = "uk"
 
 
-SUPPORTED_LANGUAGES = [Language.RU, Language.EN]
+SUPPORTED_LANGUAGES = [
+    Language.RU, Language.EN, Language.UK,
+]

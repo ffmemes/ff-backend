@@ -180,16 +180,24 @@ async def get_pending_memes() -> list[dict[str, Any]]:
 
 
 async def get_memes_to_ocr(limit=100):
-    select_query = (
-        select(meme)
-        .where(meme.c.status == MemeStatus.CREATED)
-        .where(meme.c.type == MemeType.IMAGE)  # OCR only images
-        .where(meme.c.telegram_file_id.is_not(None))  # uploaded to tg
-        .where(meme.c.ocr_result.is_(None))  # not OCR'ed
-        .order_by(nulls_first(meme.c.created_at))
-        .limit(limit)
-    )
-    return await fetch_all(select_query)
+    select_query = """
+        SELECT 
+            M.*, 
+            COALESCE(MRV.media->>0, MRT.media->0->>'url') content_url
+        FROM meme M
+        INNER JOIN meme_source MS
+            ON MS.id = M.meme_source_id
+        LEFT JOIN meme_raw_vk MRV
+            ON MRV.id = M.raw_meme_id AND MS.type = 'vk'
+        LEFT JOIN meme_raw_telegram MRT
+            ON MRT.id = M.raw_meme_id AND MS.type = 'telegram'
+        WHERE 1=1
+        	AND M.ocr_result IS NULL
+            AND M.status != 'broken_content_link'
+            AND M.type = 'image'
+        ORDER BY M.created_at
+    """
+    return await fetch_all(text(select_query))
 
 
 async def get_unloaded_tg_memes() -> list[dict[str, Any]]:

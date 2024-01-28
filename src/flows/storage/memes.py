@@ -17,7 +17,6 @@ from src.storage.service import (
 from src.storage.upload import (
     download_meme_content_file, 
     upload_meme_content_to_tg,
-    download_meme_content_from_tg,
 )
 
 from src.storage import ads
@@ -148,6 +147,6 @@ async def ocr_uploaded_memes(limit=100):
     logger.info(f"Going to OCR {len(memes)} memes.")
 
     for meme in memes:
-        meme_content = await download_meme_content_from_tg(meme["telegram_file_id"])
+        meme_content = await download_meme_content_file(meme["content_url"])
         await ocr_meme_content(meme["id"], meme_content)
         await asyncio.sleep(2)  # flood control

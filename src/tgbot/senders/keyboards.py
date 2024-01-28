@@ -11,7 +11,6 @@ from src.tgbot.constants import (
 )
 
 from src.storage.constants import (
-    Language, 
     SUPPORTED_LANGUAGES, 
     MemeSourceStatus,
 )
