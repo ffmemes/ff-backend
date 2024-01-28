@@ -51,7 +51,7 @@ async def upload_memes_to_telegram(unloaded_memes: list[dict[str, Any]]) -> list
         logger.info(f"Downloading meme {unloaded_meme['id']} content file.")
         meme_original_content = await download_meme_content_file(unloaded_meme["content_url"])
         if meme_original_content is None:
-            logger.info(f"Meme {unloaded_meme['id']} content is not available to download, reason: {e}.")
+            logger.info(f"Meme {unloaded_meme['id']} content is not available to download.")
             await update_meme(unloaded_meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK)
             continue
         
@@ -152,7 +152,7 @@ async def ocr_uploaded_memes(limit=100):
     for meme in memes:
         meme_original_content = await download_meme_content_file(meme["content_url"])
         if meme_original_content is None:
-            logger.info(f"Meme {meme['id']} content is not available to download, reason: {e}.")
+            logger.info(f"Meme {meme['id']} content is not available to download.")
             await update_meme(meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK)
             continue
 

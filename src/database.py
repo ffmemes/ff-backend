@@ -35,16 +35,6 @@ engine = create_async_engine(DATABASE_URL)
 metadata = MetaData(naming_convention=DB_NAMING_CONVENTION)
 
 
-language = Table(
-    "language",
-    metadata,
-    Column("code", String, primary_key=True),
-    Column("emoji", String, nullable=False),
-
-    # TODO: flag: show in language selector UI or not
-)
-
-
 meme_source = Table(
     "meme_source",
     metadata,
@@ -54,7 +44,7 @@ meme_source = Table(
 
     Column("status", String, nullable=False),  # in_moderation, parsing_enabled, parsing_disabled
 
-    Column("language_code", ForeignKey("language.code", ondelete="SET NULL")),
+    Column("language_code", String, index=True),
 
     Column("added_by", ForeignKey("user.id", ondelete="SET NULL")),
 
@@ -133,7 +123,7 @@ meme = Table(
     Column("type", String, nullable=False, index=True),
     Column("telegram_file_id", String),
     Column("caption", String),
-    Column("language_code", ForeignKey("language.code", ondelete="SET NULL")),
+    Column("language_code", String, index=True),
 
     Column("ocr_result", JSONB),
     Column("duplicate_of", ForeignKey("meme.id", ondelete="SET NULL")),
@@ -180,7 +170,7 @@ user_language = Table(
     "user_language",
     metadata,
     Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), primary_key=True),
-    Column("language_code", ForeignKey("language.code", ondelete="CASCADE"), primary_key=True),
+    Column("language_code", String, primary_key=True),
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
 )
 
