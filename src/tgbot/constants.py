@@ -15,6 +15,11 @@ class UserType(str, Enum):
     BLOCKED_BOT = "blocked_bot"
 
     MODERATOR = "moderator"
+    ADMIN = "admin"
+
+    @property
+    def is_moderator(self) -> bool:
+        return self in (self.MODERATOR, self.ADMIN)
 
 
 class Reaction(int, Enum):
