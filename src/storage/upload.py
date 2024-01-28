@@ -4,7 +4,7 @@ from typing import Any
 from pydantic import AnyHttpUrl
 
 from src.config import settings
-from src.storage.constants import MemeType
+from src.storage.constants import MemeType, MemeStatus
 from src.storage.service import update_meme
 from src.storage.parsers.constants import USER_AGENT
 
@@ -51,6 +51,8 @@ async def upload_meme_content_to_tg(
         meme = await update_meme(
             meme_id=meme_id,
             telegram_file_id=msg.photo[-1].file_id,
+            # change status to fix possible BROKEN_CONTENT_LINK
+            status=MemeStatus.CREATED,  # or add new status "Uploaded?"
         )
     
     if meme_type == MemeType.VIDEO:
