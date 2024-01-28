@@ -232,8 +232,8 @@ user_stats = Table(
     Column("nlikes", Integer, nullable=False, server_default="0"),
     Column("ndislikes", Integer, nullable=False, server_default="0"),
     Column("nmemes_sent", Integer, nullable=False, server_default="0"),
-    Column("age_days", Integer, nullable=False, server_default="0"),
-
+    Column("age_days", Integer, nullable=False, server_default="99999"),
+    Column("raw_impr_rank", Integer, nullable=False, server_default="99999"),
     Column("updated_at", DateTime, server_default=func.now(), nullable=False, onupdate=func.now()),
 )
 
