@@ -1,17 +1,12 @@
-from typing import Any
 from datetime import datetime
+from typing import Any
+
 from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
 
-from src.database import (
-    meme_source,
-    user,
-    user_tg,
-    user_language,
-    execute, fetch_one
-)
-
+from src.database import execute, fetch_one, meme_source, user, user_language, user_tg
 from src.storage.constants import Language
+from src.tgbot.constants import UserType
 
 
 async def save_tg_user(
@@ -128,7 +123,7 @@ async def del_user_language(
 async def get_user_info(
     user_id: int,
 ) -> dict[str, Any] | None:
-    # TODO: calculate memes_watched_today inside user_stats               
+    # TODO: calculate memes_watched_today inside user_stats
     # TODO: not sure about logic behind interface_lang
     query = f"""
         WITH MEMES_WATCHED_TODAY AS (
@@ -141,9 +136,9 @@ async def get_user_info(
         ),
         USER_INTERFACE_LANG AS (
             SELECT DISTINCT ON (user_tg.id)
-                id, 
+                id,
                 COALESCE(
-                    user_language.language_code, 
+                    user_language.language_code,
                     user_tg.language_code
                 ) interface_lang
             FROM user_tg
@@ -153,13 +148,13 @@ async def get_user_info(
             WHERE user_tg.id = {user_id}
         )
 
-        SELECT 
-            type, 
-            COALESCE(nmemes_sent, 0) nmemes_sent, 
-            COALESCE(memes_watched_today, 0) memes_watched_today, 
+        SELECT
+            type,
+            COALESCE(nmemes_sent, 0) nmemes_sent,
+            COALESCE(memes_watched_today, 0) memes_watched_today,
             UIL.interface_lang
         FROM "user" AS U
-        LEFT JOIN user_stats US 
+        LEFT JOIN user_stats US
             ON US.user_id = U.id
         LEFT JOIN USER_INTERFACE_LANG UIL
             ON UIL.id = U.id
@@ -171,6 +166,16 @@ async def get_user_info(
     return await fetch_one(text(query))
 
 
+async def update_user_blocked_bot(
+    user_id: int,
+) -> None:
+    update_statement = (
+        user.update()
+        .where(user.c.id == user_id)
+        .values({"blocked_bot_at": datetime.utcnow(), "type": UserType.BLOCKED_BOT})
+    )
+
+    await execute(update_statement)
 
 # async def sync_user_language(
 #     user_id: int,
