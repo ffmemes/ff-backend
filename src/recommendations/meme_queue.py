@@ -56,7 +56,6 @@ async def generate_cold_start_recommendations(user_id, limit=10):
         limit=limit, 
         exclude_meme_ids=meme_ids_in_queue
     )
-    print("candidates: ", [c["id"] for c in candidates])
     if len(candidates) == 0:
         return 
     
