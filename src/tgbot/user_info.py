@@ -26,6 +26,8 @@ async def get_user_info(user_id: int) -> defaultdict:
     if user_info is None:
         user_info = await service.get_user_info(user_id)
         await cache_user_info(user_id, user_info)
+        if user_info is None:
+            raise Exception(f"Can't get_user_info({user_id}). Probably no data in db.")
 
     return defaultdict(lambda: None, **user_info)
 

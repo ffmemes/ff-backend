@@ -15,21 +15,27 @@ async def send_stacktrace_to_tg_chat(update: Update, context: ContextTypes.DEFAU
     tb_list = traceback.format_exception(
         None, context.error, context.error.__traceback__
     )
-    tb_string = "".join(tb_list)
+    tb_string = html.escape("".join(tb_list))
+
+    # cut first lines to fit tg msg len limit
+    if len(tb_string) > 4000:
+        tb_string = tb_string[-4000:]
+
     message = (
         f"An exception was raised while handling an update\n"
-        f"<pre>{html.escape(tb_string)}</pre>"
+        f"<pre>{tb_string}</pre>"
     )
 
     await context.bot.send_message(
         text="""
-😔 Something broke inside the bot. It is still early beta
+😔 Something broke inside the bot. It is still early beta.
 We already received all the details.
 Wait for 2 minutes and press /start.
+
+👩🏻‍💻👨‍💻🧑🏻‍💻
         """,
         chat_id=user_id,
     )
 
-    error_text_to_send = f"⚠️⚠️⚠️ for #{user_id}:\n{message}"[:4040]
+    error_text_to_send = f"⚠️⚠️⚠️ for #{user_id}:\n{message}"
     return await log(error_text_to_send)
-
