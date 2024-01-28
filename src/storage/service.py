@@ -112,11 +112,12 @@ async def etl_memes_from_raw_telegram_posts() -> None:
             published_at
         )
         SELECT 
+            DISTINCT ON (COALESCE(forwarded_url, random()::text))
             meme_source_id,
             meme_raw_telegram.id AS raw_meme_id, 
             content AS caption,
-            '{MemeStatus.CREATED.value}' AS status,
-            '{MemeType.IMAGE.value}' AS type,
+            'created' AS status,
+            'image' AS type,
             meme_source.language_code AS language_code,
             date AS published_at
         FROM meme_raw_telegram
