@@ -4,7 +4,6 @@ from sqlalchemy import select, nulls_first, text, or_
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
-    language,
     meme,
     meme_source,
     meme_raw_telegram,
