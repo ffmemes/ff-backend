@@ -14,7 +14,11 @@ def text_is_adverisement(original_text: str | None) -> bool:
     for word in STOP_WORDS:
         if word in text:
             return True
-        
+    
+    # memes usually have short captions
+    if len(text) > 200:
+        return True
+
     return False
 
 
