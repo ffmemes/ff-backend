@@ -6,7 +6,6 @@ from sqlalchemy.dialects.postgresql import insert
 
 from src.database import execute, fetch_one, meme_source, user, user_language, user_tg
 from src.storage.constants import Language
-from src.tgbot.constants import UserType
 
 
 async def save_tg_user(
@@ -166,16 +165,14 @@ async def get_user_info(
     return await fetch_one(text(query))
 
 
-async def update_user_blocked_bot(
-    user_id: int,
-) -> None:
-    update_statement = (
+async def update_user(user_id: int, **kwargs) -> dict[str, Any] | None:
+    update_query = (
         user.update()
         .where(user.c.id == user_id)
-        .values({"blocked_bot_at": datetime.utcnow(), "type": UserType.BLOCKED_BOT})
+        .values(**kwargs)
+        .returning(user)
     )
-
-    await execute(update_statement)
+    return await fetch_one(update_query)
 
 # async def sync_user_language(
 #     user_id: int,
