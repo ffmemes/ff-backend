@@ -6,10 +6,9 @@ import sentry_sdk
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
-from src import redis, localizer
-from src.tgbot import bot
+from src import localizer, redis
 from src.config import app_configs, settings
-
+from src.tgbot import bot
 from src.tgbot.router import router as tgbot_router
 
 
