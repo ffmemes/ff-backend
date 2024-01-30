@@ -1,7 +1,9 @@
+from pathlib import Path
 import random
 from io import BytesIO
 
 from PIL import Image, ImageDraw, ImageFont
+
 
 def draw_text_with_outline(draw, position, text, font, text_colour, outline_colour):
     x, y = position
@@ -40,22 +42,37 @@ def calculate_corners(img_w, img_h, text_bbox, margin) -> list:
 
     return corners
 
+def check_font_size(text, font_path, image, width_ratio):
+    breakpoint = width_ratio * image.size[0]
+    fontsize = 20
+    learning_rate = 5
+    font = ImageFont.truetype(font_path, fontsize)
+    while True:
+        if font.getlength(text) < breakpoint:
+            fontsize += learning_rate
+        else:
+            learning_rate = learning_rate // 2
+            fontsize -= learning_rate
+        font = ImageFont.truetype(font_path, fontsize)
+        if learning_rate <= 1:
+            break
+    return font
+
 def draw_corner_watermark(
     image_bytes: BytesIO,
     text: str,
-    text_size: int = 14,
+    font_family: str = "Gidole-Regular.ttf",
     margin: int = 24
 ) -> Image:
     with Image.open(image_bytes).convert("RGBA") as base:
         txt = Image.new("RGBA", base.size, (255, 255, 255, 0))
         
-        # try:
-        #     fnt = ImageFont.truetype('Arial.ttf', text_size)
-        # except IOError:
-        #     fnt = ImageFont.load_default()
-
-        fnt = ImageFont.load_default()
         d = ImageDraw.Draw(txt)
+
+        width_ratio = .15  # Portion of the image the text width should be (between 0 and 1)
+        font_path = str(Path(Path.home(), "src", "fonts", font_family))
+        fnt = check_font_size(text, font_path, base, width_ratio)
+        # fnt = ImageFont.load_default()
         # calculate size of textbox
         text_bbox = d.textbbox((0, 0), text, font=fnt)
         # choose a random corner for the text
@@ -88,8 +105,18 @@ def add_watermark(image_content: bytes) -> BytesIO | None:
         return None
 
     buff = BytesIO()
-    buff.name = 'image.jpeg'
+    buff.name = 'image_x.jpeg'
     image.save(buff, 'JPEG')
     buff.seek(0)
 
-    return buff
+    return buff#image
+
+# if __name__ == '__main__':
+    
+#     # image_path = Path(Path.home(), "src", "test1.jpeg")  # Adjust the path if necessary
+#     image_path = Path(Path.home(), "src", "test1.jpeg")  # Adjust the path if necessary
+#     with open(image_path, 'rb') as image_file:
+#         image_bytes = image_file.read()
+#     watermarked_image = add_watermark(image_bytes)
+#     watermarked_image.save('/src/image_3x.jpg')
+   
