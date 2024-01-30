@@ -38,7 +38,7 @@ async def sorted_by_user_source_lr_meme_lr_meme_age(
         ORDER BY 1
             * COALESCE((UMSS.nlikes + 1) / (UMSS.ndislikes + 1), 0.5)
             * COALESCE((MS.nlikes + 1) / (MS.ndislikes + 1), 0.5)
-            * COALESCE(MS.raw_impr_rank, 99999)
+            * COALESCE(MS.raw_impr_rank * (-1), -99999)
             * COALESCE(age_days * (-1), 0.1)
 		
         LIMIT {limit}
