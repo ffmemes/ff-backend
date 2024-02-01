@@ -10,7 +10,7 @@ from telegram.ext import (
     ContextTypes,
 )
 
-from src.storage.schemas import BasicMemeData
+from src.storage.schemas import MemeData
 from src.tgbot.constants import UserType
 from src.tgbot.senders.meme import send_album_with_memes
 from src.tgbot.service import get_meme_by_id, get_user_by_id
@@ -40,5 +40,5 @@ async def handle_get_meme(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     memes_data = await asyncio.gather(*[get_meme_by_id(meme_id) for meme_id in meme_ids])
-    memes = [BasicMemeData(**meme) for meme in memes_data if meme is not None]
+    memes = [MemeData(**meme) for meme in memes_data if meme is not None]
     await send_album_with_memes(update.effective_user.id, memes)

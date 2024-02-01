@@ -11,7 +11,7 @@ from telegram.constants import ParseMode
 
 from src.config import settings
 from src.storage.constants import MemeType
-from src.storage.schemas import BasicMemeData, MemeData
+from src.storage.schemas import MemeData
 from src.tgbot.senders.keyboards import meme_reaction_keyboard
 from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
 
@@ -42,7 +42,7 @@ def get_input_media(
 
 async def send_album_with_memes(
     user_id: int,
-    memes: list[BasicMemeData],
+    memes: list[MemeData],
 ) -> Tuple[Message]:
     media = []
     for meme in memes:
@@ -71,7 +71,7 @@ async def send_album_with_memes(
 
 async def send_new_message_with_meme(
     user_id: int,
-    meme: BasicMemeData,
+    meme: MemeData,
 ) -> Message:
     caption = await get_meme_caption_for_user_id(meme, user_id)
     if meme.type == MemeType.IMAGE:
