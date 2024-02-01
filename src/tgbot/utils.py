@@ -1,3 +1,6 @@
+from src.tgbot.schemas import UserTg
+
+
 def remove_buttons_with_callback(reply_markup: dict) -> dict:
     original_keyboard = reply_markup["inline_keyboard"]
 
@@ -16,6 +19,5 @@ def remove_buttons_with_callback(reply_markup: dict) -> dict:
     return reply_markup
 
 
-# TODO: make User schema
-def format_user_to_str(user_id: int, username: str | None) -> str:
-    return f"@{username}" if username else f"#{user_id}"
+def tg_user_repr(tg_user: UserTg) -> str:
+    return f"@{tg_user.username}" if tg_user.username else f"#{tg_user.id}"
