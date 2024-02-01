@@ -1,26 +1,19 @@
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-import redis.asyncio as aioredis
 import sentry_sdk
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
 from src import redis
-from src.tgbot import bot
 from src.config import app_configs, settings
-
+from src.tgbot import bot
 from src.tgbot.router import router as tgbot_router
 
 
 @asynccontextmanager
 async def lifespan(_application: FastAPI) -> AsyncGenerator:
     # Startup
-    pool = aioredis.ConnectionPool.from_url(
-        str(settings.REDIS_URL), max_connections=10, decode_responses=True
-    )
-    redis.redis_client = aioredis.Redis(connection_pool=pool)
-
     bot.application = bot.setup_application(settings.ENVIRONMENT.is_deployed)
     await bot.application.initialize()
     # if is_webhook:  # all gunicorn workers will call this and hit rate limit
@@ -31,7 +24,7 @@ async def lifespan(_application: FastAPI) -> AsyncGenerator:
     if settings.ENVIRONMENT.is_testing:
         return
     # Shutdown
-    await pool.disconnect()
+    await redis.pool.disconnect()
 
 
 app = FastAPI(**app_configs, lifespan=lifespan)

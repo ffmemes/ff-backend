@@ -22,7 +22,6 @@ async def tgbot_webhook_events(
     payload: dict,
     worker: BackgroundTasks,
 ) -> dict:
-    print("PAYLOAD:", payload)
     worker.add_task(process_event, payload)
 
     # remove buttons with callback 

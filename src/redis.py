@@ -1,12 +1,15 @@
 import orjson
-from datetime import timedelta
 from typing import Optional
+from datetime import timedelta
+import redis.asyncio as aioredis
 
-from redis.asyncio import Redis
-
+from src.config import settings
 from src.models import CustomModel
 
-redis_client: Redis = None  # type: ignore
+pool = aioredis.ConnectionPool.from_url(
+    str(settings.REDIS_URL), max_connections=10, decode_responses=True
+)
+redis_client = aioredis.Redis(connection_pool=pool)
 
 
 class RedisData(CustomModel):
@@ -52,6 +55,7 @@ async def get_meme_queue_length_by_key(key: str) -> int:
 
 async def add_memes_to_queue_by_key(key: str, memes: list[dict]) -> int:
     jsoned_memes = [orjson.dumps(meme) for meme in memes]
+    # TODO: add ttl, probably using redis transactions
     return await redis_client.sadd(key, *jsoned_memes)
 
 

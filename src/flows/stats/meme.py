@@ -8,4 +8,6 @@ from src.stats import meme
 )
 async def calculate_meme_stats(
 ) -> None:
-    await meme.calculate_meme_stats()
+    await meme.calculate_meme_reactions_stats()
+
+    await meme.calculate_meme_raw_impressions_stats()

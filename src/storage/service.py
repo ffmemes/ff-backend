@@ -4,7 +4,6 @@ from sqlalchemy import select, nulls_first, text, or_
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
-    language,
     meme,
     meme_source,
     meme_raw_telegram,
@@ -112,11 +111,15 @@ async def etl_memes_from_raw_telegram_posts() -> None:
             published_at
         )
         SELECT 
+            DISTINCT ON (COALESCE(forwarded_url, random()::text))
             meme_source_id,
             meme_raw_telegram.id AS raw_meme_id, 
             content AS caption,
-            '{MemeStatus.CREATED.value}' AS status,
-            '{MemeType.IMAGE.value}' AS type,
+            'created' AS status,
+            CASE 
+                WHEN media->0->>'duration' IS NOT NULL THEN 'video'
+                ELSE 'image'
+            END AS type,
             meme_source.language_code AS language_code,
             date AS published_at
         FROM meme_raw_telegram
@@ -180,34 +183,47 @@ async def get_pending_memes() -> list[dict[str, Any]]:
 
 
 async def get_memes_to_ocr(limit=100):
-    select_query = (
-        select(meme)
-        .where(meme.c.status == MemeStatus.CREATED)
-        .where(meme.c.type == MemeType.IMAGE)  # OCR only images
-        .where(meme.c.telegram_file_id.is_not(None))  # uploaded to tg
-        .where(meme.c.ocr_result.is_(None))  # not OCR'ed
-        .order_by(nulls_first(meme.c.created_at))
-        .limit(limit)
-    )
-    return await fetch_all(select_query)
+    select_query = """
+        SELECT 
+            M.*, 
+            COALESCE(MRV.media->>0, MRT.media->0->>'url') content_url
+        FROM meme M
+        INNER JOIN meme_source MS
+            ON MS.id = M.meme_source_id
+        LEFT JOIN meme_raw_vk MRV
+            ON MRV.id = M.raw_meme_id AND MS.type = 'vk'
+        LEFT JOIN meme_raw_telegram MRT
+            ON MRT.id = M.raw_meme_id AND MS.type = 'telegram'
+        WHERE 1=1
+        	AND M.ocr_result IS NULL
+            AND M.status != 'broken_content_link'
+            AND M.type = 'image'
+        ORDER BY M.created_at
+    """
+    return await fetch_all(text(select_query))
 
 
 async def get_unloaded_tg_memes() -> list[dict[str, Any]]:
-    "Returns only MemeType.IMAGE memes"
+    """ Returns only MemeType.IMAGE memes """
     select_query = f"""
         SELECT 
             meme.id,
-            '{MemeType.IMAGE}' AS type,
-            meme_raw_telegram.media->0->>'url' content_url
+            meme.type,
+            MRT.media->0->>'url' content_url
         FROM meme
         INNER JOIN meme_source 
             ON meme_source.id = meme.meme_source_id
-            AND meme_source.type = '{MemeSourceType.TELEGRAM.value}'
-        INNER JOIN meme_raw_telegram
-            ON meme_raw_telegram.id = meme.raw_meme_id
-            AND meme_raw_telegram.meme_source_id = meme.meme_source_id
+            AND meme_source.type = 'telegram'
+        INNER JOIN meme_raw_telegram MRT
+            ON MRT.id = meme.raw_meme_id
+            AND MRT.meme_source_id = meme.meme_source_id
         WHERE 1=1
-            AND meme.telegram_file_id IS NULL;
+            AND (
+                meme.telegram_file_id IS NULL 
+                OR meme.status = 'broken_content_link'
+            )
+            AND MRT.media->0->>'url' IS NOT NULL
+            AND MRT.updated_at >= NOW() - INTERVAL '24 hours'
     """
     return await fetch_all(text(select_query))
 

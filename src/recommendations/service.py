@@ -1,20 +1,12 @@
 from typing import Any
 from datetime import datetime
-from sqlalchemy import select, nulls_first, text
+from sqlalchemy import select, text, exists
 from sqlalchemy.dialects.postgresql import insert
 import logging
 
 from src.database import (
-    language,
-    meme,
-    meme_source,
-    user,
-    user_tg,
-    user_language,
-    meme_raw_telegram,
     user_meme_reaction,
     execute,
-    fetch_one,
     fetch_all,
 )
 
@@ -84,3 +76,24 @@ async def get_unseen_memes(
     """
     res = await fetch_all(text(query))
     return res
+
+
+async def get_user_reactions(
+    user_id: int,
+) -> list[dict[str, Any]]:
+    select_statement = select(user_meme_reaction).where(user_meme_reaction.c.user_id == user_id)
+    return await fetch_all(select_statement)
+
+
+async def user_meme_reaction_exists(
+    user_id: int,
+    meme_id: int,
+) -> bool:
+    exists_statement = (
+        exists(user_meme_reaction)
+        .where(user_meme_reaction.c.user_id == user_id)
+        .where(user_meme_reaction.c.meme_id == meme_id)
+        .select()
+    )
+    res = await execute(exists_statement)
+    return res.scalar()

@@ -4,15 +4,32 @@ from src.storage.schemas import MemeData
 from src.recommendations.candidates import sorted_by_user_source_lr_meme_lr_meme_age
 from src.recommendations.cold_start import get_best_memes_from_each_source
 
+from src.recommendations.service import get_user_reactions
+
+from src.tgbot import logs
+
 
 async def get_next_meme_for_user(user_id: int) -> MemeData | None:
     queue_key = redis.get_meme_queue_key(user_id)
     meme_data = await redis.pop_meme_from_queue_by_key(queue_key)
+
+    if not meme_data:
+        return None
     
-    if meme_data:
-        return MemeData(**meme_data)
-    
-    return None
+    # debug
+    reactions = await get_user_reactions(user_id)
+    received_meme_ids = set(int(r["meme_id"]) for r in reactions)
+
+    if int(meme_data["id"]) in received_meme_ids:
+        await logs.log(f"user_id={user_id} will receive meme_id={meme_data['id']} again!")
+
+    queued_memes = await redis.get_all_memes_in_queue_by_key(queue_key)
+    queued_meme_ids = set(int(meme["id"]) for meme in queued_memes)
+
+    if queued_meme_ids & received_meme_ids:
+        await logs.log(f"user_id={user_id} has received memes in queue: {queued_meme_ids & received_meme_ids}!")
+
+    return MemeData(**meme_data)
 
 
 async def has_memes_in_queue(user_id: int) -> bool:
@@ -25,8 +42,8 @@ async def check_queue(user_id: int):
     queue_key = redis.get_meme_queue_key(user_id)
     queue_length = await redis.get_meme_queue_length_by_key(queue_key)
 
-    if queue_length <= 3:
-        await generate_recommendations(user_id)
+    if queue_length <= 4:
+        await generate_recommendations(user_id, limit=10)
 
 
 async def generate_cold_start_recommendations(user_id, limit=10):
@@ -39,7 +56,6 @@ async def generate_cold_start_recommendations(user_id, limit=10):
         limit=limit, 
         exclude_meme_ids=meme_ids_in_queue
     )
-    print("candidates: ", [c["id"] for c in candidates])
     if len(candidates) == 0:
         return 
     

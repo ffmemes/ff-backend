@@ -1,23 +1,21 @@
 import logging
-from telegram import Update
-from telegram.ext import (
-    ContextTypes, 
-)
+from datetime import datetime, timedelta
 
+from telegram import Update
+from telegram.ext import ContextTypes
+from telegram.constants import ParseMode
+
+from src import localizer
 from src.tgbot.service import (
     save_tg_user,
     save_user,
-    add_user_language,
 )
 
 from src.tgbot.senders.next_message import next_message
-from src.tgbot.constants import (
-    DEFAULT_USER_LANGUAGE, 
-    UserType,
-)
-from src.storage.constants import SUPPORTED_LANGUAGES
-from src.recommendations.meme_queue import generate_cold_start_recommendations
-from src.tgbot.user_info import get_user_info
+from src.tgbot.constants import UserType
+from src.tgbot.handlers.onboarding import onboarding_flow
+from src.tgbot.handlers.language import init_user_languages_from_tg_language_code
+from src.tgbot.handlers.deep_link import handle_deep_link_used
 
 
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -35,32 +33,30 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         deep_link=deep_link,
     )
 
-    if deep_link and deep_link.startswith("s_"):  # invited
-        user_type = UserType.USER
-    else:
-        user_type = UserType.WAITLIST
+    # if deep_link and deep_link.startswith("s_"):  # invited
+    #     user_type = UserType.USER
+    # else:
+    #     user_type = UserType.WAITLIST
 
     user = await save_user(
         id=user_id,
-        type=user_type,
+        type=UserType.USER,
     )
+    await init_user_languages_from_tg_language_code(user_id, language_code)
 
-    if language_code is None:
-        language_code = DEFAULT_USER_LANGUAGE
+    await handle_deep_link_used(user_id, deep_link)  # TODO:
 
-    if language_code in SUPPORTED_LANGUAGES:
-        await add_user_language(user_id, language_code)
-    else:
-        await add_user_language(user_id, DEFAULT_USER_LANGUAGE)
-        logging.info(f"User(id={user_id}) has unsupported language_code={language_code}. Set default={DEFAULT_USER_LANGUAGE}.")
-
+    # if user["type"] == UserType.WAITLIST:
+    #     await update.effective_user.send_message(
+    #         localizer.t("onboarding_joined_waitlist", language_code),
+    #         parse_mode=ParseMode.HTML,
+    #     )
+    #     return
     
-    if user["type"] == UserType.WAITLIST:
-        await update.effective_user.send_message("Hi! You just joined our waitlist. Stay tuned!")
-        return
+    recently_joined = user["created_at"] > datetime.utcnow() - timedelta(minutes=60)
+    if recently_joined:
+        return await onboarding_flow(update)
 
-    #TODO: generate onboarding / cold-start memes
-    await generate_cold_start_recommendations(user_id)
     return await next_message(
         user_id,
         prev_update=update,

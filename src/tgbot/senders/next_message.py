@@ -8,7 +8,7 @@ from src.tgbot.constants import Reaction
 from src.tgbot.senders.alerts import send_queue_preparing_alert
 from src.tgbot.senders.meme import edit_last_message_with_meme, send_new_message_with_meme
 from src.tgbot.senders.achievements import send_achievement_if_needed
-from src.recommendations.service import create_user_meme_reaction
+from src.recommendations.service import create_user_meme_reaction, user_meme_reaction_exists
 from src.recommendations.meme_queue import get_next_meme_for_user, check_queue
 
 
@@ -32,11 +32,16 @@ async def next_message(
 
     await send_achievement_if_needed(user_id)
     
-    meme = await get_next_meme_for_user(user_id)
-    if not meme:
-        asyncio.create_task(check_queue(user_id))
-        # TODO: also edit / delete
-        return await send_queue_preparing_alert(user_id)
+    while True:
+        meme = await get_next_meme_for_user(user_id)
+        if not meme:
+            asyncio.create_task(check_queue(user_id))
+            # TODO: also edit / delete
+            return await send_queue_preparing_alert(user_id)
+        
+        exists = await user_meme_reaction_exists(user_id, meme.id)
+        if not exists:  # this meme wasn't sent yet
+            break
 
     send_new_message = (
         prev_reaction_id is None or Reaction(prev_reaction_id).is_positive
