@@ -31,14 +31,22 @@ async def ocr_meme_content(meme_id: int, content: bytes):
         await update_meme(meme_id, ocr_result=result.model_dump(mode='json'))
 
 
-async def analyse_meme_caption(meme_id: int, caption: str | None):
-    if ads.text_is_adverisement(caption):
-        await update_meme(meme_id, status=MemeStatus.AD)
+async def analyse_meme_caption(meme: dict[str, Any]) -> None:
+    if meme["caption"] is None:
+        return
+    
+    if ads.text_is_adverisement(meme["caption"]):
+        await update_meme(meme["id"], status=MemeStatus.AD)
         return
 
-    new_caption = ads.filter_caption(caption)
-    if new_caption != caption:
-        await update_meme(meme_id, caption=new_caption)
+    new_caption = ads.filter_caption(meme["caption"])
+    if new_caption != meme["caption"]:
+        await update_meme(meme["id"], caption=new_caption)
+
+    if meme["language_code"] == "en":
+        if len(set(meme["caption"]) & set("йцукенгшщзхъёфывапролджэячсмитьбю")) > 0:
+            await update_meme(meme["id"], language_code="ru")
+            return
 
 
 @flow
@@ -130,7 +138,7 @@ async def final_meme_pipeline() -> None:
     logger.info(f"Final meme pipeline has {len(memes)} pending memes.")
 
     for meme in memes:
-        await analyse_meme_caption(meme["id"], meme["caption"])
+        await analyse_meme_caption(meme)
 
         # TODO: check if we have meme with a same content in db
         duplicate_meme_id = await find_meme_duplicate()

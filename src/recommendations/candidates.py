@@ -35,12 +35,12 @@ async def sorted_by_user_source_lr_meme_lr_meme_age(
             AND R.meme_id IS NULL
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
 
-        ORDER BY 1
+        ORDER BY -1
             * COALESCE((UMSS.nlikes + 1) / (UMSS.ndislikes + 1), 0.5)
             * COALESCE((MS.nlikes + 1) / (MS.ndislikes + 1), 0.5)
-            * COALESCE(MS.raw_impr_rank * (-1), -99999)
-            * COALESCE(age_days * (-1), 0.1)
-		
+            * CASE WHEN MS.raw_impr_rank < 1 THEN 1 ELSE 0.5 END
+            * CASE WHEN MS.age_days < 5 THEN 1 ELSE 0.5 END
+                
         LIMIT {limit}
     """
     res = await fetch_all(text(query))
