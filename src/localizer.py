@@ -2,8 +2,6 @@ import yaml
 import logging
 from pathlib import Path
 
-localizations = {}
-
 # not sure where to put this const
 DEFAULT_LANG = "en"
 
@@ -32,3 +30,6 @@ def t(
         lang = DEFAULT_LANG
 
     return localizations[key][lang]
+
+
+localizations = load()
