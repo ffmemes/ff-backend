@@ -68,7 +68,7 @@ async def get_tg_user_by_id(
     return await fetch_one(select_statement)
 
 
-async def get_user_by_username(
+async def get_user_by_tg_username(
     username: str,
 ) -> dict[str, Any] | None:
     """Slower version of `get_user_by_id`, since it requires a join. Shouldn't be used often"""
