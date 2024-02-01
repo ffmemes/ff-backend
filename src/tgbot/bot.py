@@ -109,4 +109,9 @@ def setup_application(is_webhook: bool = False) -> Application:
 
 
 def run_polling(application: Application) -> None:
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    application.run_polling(
+        allowed_updates=Update.ALL_TYPES, 
+        timeout=60,
+        read_timeout=10,
+        connect_timeout=10,
+    )
