@@ -11,9 +11,6 @@ from telegram.ext import (
 )
 
 from src.config import settings
-from src.tgbot.handlers import start, upload, broken, reaction, alerts
-from src.tgbot.handlers.moderator import meme_source
-from src.tgbot.handlers.admin import add_moderator, get_meme
 from src.tgbot.constants import (
     MEME_BUTTON_CALLBACK_DATA_REGEXP,
     MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA,
@@ -21,6 +18,7 @@ from src.tgbot.constants import (
     MEME_SOURCE_SET_STATUS_REGEXP,
 )
 from src.tgbot.handlers import alerts, block, broken, reaction, start, upload
+from src.tgbot.handlers.admin import get_meme
 from src.tgbot.handlers.error import send_stacktrace_to_tg_chat
 from src.tgbot.handlers.moderator import meme_source
 
@@ -76,15 +74,8 @@ def add_handlers(application: Application) -> None:
 
     application.add_error_handler(send_stacktrace_to_tg_chat)
 
-
-    # admin commands
     application.add_handler(CommandHandler(
-        "add_mod",
-        add_moderator.handle_add_moderator,
-        filters=filters.ChatType.PRIVATE,
-    ))
-    application.add_handler(CommandHandler(
-        "get_meme",
+        "meme",
         get_meme.handle_get_meme,
         filters=filters.ChatType.PRIVATE,
     ))
@@ -125,7 +116,7 @@ def setup_application(is_webhook: bool = False) -> Application:
 
 def run_polling(application: Application) -> None:
     application.run_polling(
-        allowed_updates=Update.ALL_TYPES, 
+        allowed_updates=Update.ALL_TYPES,
         timeout=60,
         read_timeout=10,
         connect_timeout=10,
