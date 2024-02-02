@@ -7,6 +7,7 @@ from src.config import settings
 from src.storage.constants import MemeType, MemeStatus
 from src.storage.service import update_meme
 from src.storage.parsers.constants import USER_AGENT
+from src.tgbot.bot import bot
 
 
 async def download_meme_content_file(
@@ -27,7 +28,6 @@ async def download_meme_content_file(
 async def download_meme_content_from_tg(
     file_id: str,
 ) -> bytes:
-    bot = telegram.Bot(token=settings.TELEGRAM_BOT_TOKEN)
     file = await bot.get_file(file_id)
     file_bytearray = await file.download_as_bytearray()
     return bytes(file_bytearray)
@@ -38,7 +38,6 @@ async def upload_meme_content_to_tg(
     meme_type: MemeType,
     content: bytes,  # ??
 ) -> dict[str, Any] | None:
-    bot = telegram.Bot(token=settings.TELEGRAM_BOT_TOKEN)
     if meme_type == MemeType.IMAGE:
         try:
             msg = await bot.send_photo(

@@ -28,7 +28,7 @@ async def calculate_user_stats() -> None:
             , COUNT(*) FILTER (WHERE reaction_id = 1) nlikes
             , COUNT(*) FILTER (WHERE reaction_id = 2) ndislikes
             , COUNT(*) nmemes_sent
-            , COUNT(*) FILTER (WHERE lag > INTERVAL '2 hours') nsessions
+            , COUNT(*) FILTER (WHERE lag > INTERVAL '2 hours') + 1 nsessions
             , COUNT(DISTINCT DATE(reacted_at)) AS active_days_count
             , NOW() AS updated_at
         FROM EVENTS
@@ -39,6 +39,7 @@ async def calculate_user_stats() -> None:
             nlikes = EXCLUDED.nlikes,
             ndislikes = EXCLUDED.ndislikes,
             nsessions = EXCLUDED.nsessions,
+            nmemes_sent = EXCLUDED.nmemes_sent,
             active_days_count = EXCLUDED.active_days_count,
             updated_at = EXCLUDED.updated_at
     """

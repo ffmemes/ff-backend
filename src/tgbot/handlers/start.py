@@ -1,11 +1,8 @@
-import logging
 from datetime import datetime, timedelta
 
 from telegram import Update
 from telegram.ext import ContextTypes
-from telegram.constants import ParseMode
 
-from src import localizer
 from src.tgbot.service import (
     save_tg_user,
     save_user,
@@ -33,18 +30,14 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         deep_link=deep_link,
     )
 
-    # if deep_link and deep_link.startswith("s_"):  # invited
-    #     user_type = UserType.USER
-    # else:
-    #     user_type = UserType.WAITLIST
-
-    user = await save_user(
-        id=user_id,
-        type=UserType.USER,
-    )
+    user = await save_user(id=user_id, type=UserType.WAITLIST)
     await init_user_languages_from_tg_language_code(user_id, language_code)
 
-    await handle_deep_link_used(user_id, deep_link)  # TODO:
+    await handle_deep_link_used(
+        invited_user=user, 
+        invited_user_name=update.effective_user.name,
+        deep_link=deep_link,
+    )
 
     # if user["type"] == UserType.WAITLIST:
     #     await update.effective_user.send_message(

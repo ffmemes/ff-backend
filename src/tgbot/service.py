@@ -208,6 +208,8 @@ async def update_user(user_id: int, **kwargs) -> dict[str, Any] | None:
         .returning(user)
     )
     return await fetch_one(update_query)
+
+
 # async def sync_user_language(
 #     user_id: int,
 #     language_code: list[str],

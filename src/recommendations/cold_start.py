@@ -13,15 +13,15 @@ async def get_best_memes_from_each_source(
     query = f"""
         SELECT 
             M.id, M.type, M.telegram_file_id, M.caption,
-            'cold_start' as recommended_by
+            M.recommended_by
         FROM (
             SELECT DISTINCT ON (M.meme_source_id)
                 M.id, M.type, M.telegram_file_id, M.caption,
                 'cold_start' as recommended_by,
                 
                 1
-                    * COALESCE((MS.nlikes + 1) / (MS.ndislikes + 1), 0.5)
-                    * COALESCE(age_days * (-1), 0.1)
+                    * CASE WHEN MS.raw_impr_rank < 1 THEN 1 ELSE 0.5 END
+                    * CASE WHEN MS.age_days < 5 THEN 1 ELSE 0.5 END
                 AS score
                 
             FROM meme M 

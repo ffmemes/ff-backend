@@ -5,7 +5,7 @@ from fastapi import (
     status,
 )
 
-from src.tgbot.bot import process_event
+from src.tgbot.app import process_event
 from src.tgbot.dependencies import validate_webhook_secret
 from src.tgbot.utils import remove_buttons_with_callback
 

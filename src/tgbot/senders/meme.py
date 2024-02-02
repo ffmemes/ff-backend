@@ -9,13 +9,11 @@ from telegram import (
 )
 from telegram.constants import ParseMode
 
-from src.config import settings
+from src.tgbot.bot import bot
 from src.storage.constants import MemeType
 from src.storage.schemas import MemeData
 from src.tgbot.senders.keyboards import meme_reaction_keyboard
 from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
-
-bot = Bot(settings.TELEGRAM_BOT_TOKEN)
 
 
 def get_input_media(

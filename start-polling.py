@@ -2,7 +2,7 @@ import logging
 import redis.asyncio as aioredis
 
 from src import redis, localizer
-from src.tgbot import bot
+from src.tgbot import app
 from src.config import settings
 
 
@@ -22,5 +22,5 @@ if __name__ == "__main__":
 
     localizer.localizations = localizer.load()
 
-    bot.application = bot.setup_application(is_webhook=False)
-    bot.run_polling(bot.application)
+    app.application = app.setup_application(is_webhook=False)
+    app.run_polling(app.application)

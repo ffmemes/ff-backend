@@ -6,15 +6,17 @@ async def init_user_languages_from_tg_language_code(
     user_id: int,  
     tg_language_code: str | None
 ):
-    # TODO: refactor this
-    # the goal is to ini languages with popular language: ru or en
+    languages_to_add = set()
+
+    almost_CIS_languages = ["uk", "ru", "bg", "be", "sr", "hr", "bs", "mk", "sl", "kz", "ky", "tg", "tt", "uz"]
+    if tg_language_code in almost_CIS_languages:
+        languages_to_add.add("ru")
+    else:
+        languages_to_add.add("en")
 
     if tg_language_code is not None:
-        await add_user_language(user_id, tg_language_code)
+        languages_to_add.add(tg_language_code)
 
-
-    if tg_language_code in ["uk", "ru"]:  # slavic languages
-        await add_user_language(user_id, "ru")
-    else:
-        await add_user_language(user_id, "en")
+    for language in languages_to_add:
+        await add_user_language(user_id, language)
 
