@@ -15,7 +15,7 @@ async def get_next_meme_for_user(user_id: int) -> MemeData | None:
 
     if not meme_data:
         return None
-    
+
     # debug
     reactions = await get_user_reactions(user_id)
     received_meme_ids = set(int(r["meme_id"]) for r in reactions)
@@ -28,6 +28,7 @@ async def get_next_meme_for_user(user_id: int) -> MemeData | None:
 
     if queued_meme_ids & received_meme_ids:
         await logs.log(f"user_id={user_id} has received memes in queue: {queued_meme_ids & received_meme_ids}!")
+    # end debug
 
     return MemeData(**meme_data)
 
