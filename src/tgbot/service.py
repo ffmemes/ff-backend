@@ -1,10 +1,18 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.dialects.postgresql import insert
 
-from src.database import execute, fetch_one, meme_source, user, user_language, user_tg
+from src.database import (
+    execute,
+    fetch_one,
+    meme,
+    meme_source,
+    user,
+    user_language,
+    user_tg,
+)
 from src.storage.constants import Language
 
 
@@ -53,10 +61,37 @@ async def get_user_by_id(
     return await fetch_one(select_statement)
 
 
+async def get_tg_user_by_id(
+    id: int,
+) -> dict[str, Any] | None:
+    select_statement = select(user_tg).where(user_tg.c.id == id)
+    return await fetch_one(select_statement)
+
+
+async def get_user_by_tg_username(
+    username: str,
+) -> dict[str, Any] | None:
+    """Slower version of `get_user_by_id`, since it requires a join. Shouldn't be used often"""
+    # select user.id from user_tg join user on user_tg.id = user.id where user_tg.username = 'username';
+    select_statement = (
+        select(user)
+        .select_from(user_tg.join(user, user_tg.c.id == user.c.id))
+        .where(func.lower(user_tg.c.username) == username.lower())
+    )
+    return await fetch_one(select_statement)
+
+
 async def get_meme_source_by_id(
     id: int,
 ) -> dict[str, Any] | None:
     select_statement = select(meme_source).where(meme_source.c.id == id)
+    return await fetch_one(select_statement)
+
+
+async def get_meme_by_id(
+    id: int,
+) -> dict[str, Any] | None:
+    select_statement = select(meme).where(meme.c.id == id)
     return await fetch_one(select_statement)
 
 
@@ -173,7 +208,6 @@ async def update_user(user_id: int, **kwargs) -> dict[str, Any] | None:
         .returning(user)
     )
     return await fetch_one(update_query)
-
 # async def sync_user_language(
 #     user_id: int,
 #     language_code: list[str],
