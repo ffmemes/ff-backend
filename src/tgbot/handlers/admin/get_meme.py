@@ -48,6 +48,6 @@ async def handle_get_meme(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
         return
     elif len(memes) == 1:
-        await send_new_message_with_meme(update.effective_user.id, memes)
+        await send_new_message_with_meme(update.effective_user.id, memes[0])
     else:
         await send_album_with_memes(update.effective_user.id, memes)
