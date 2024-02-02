@@ -13,12 +13,13 @@ from telegram.ext import (
 from src.storage.schemas import MemeData
 from src.tgbot.constants import UserType
 from src.tgbot.senders.meme import send_album_with_memes, send_new_message_with_meme
-from src.tgbot.service import get_meme_by_id, get_user_by_id
+from src.tgbot.service import get_meme_by_id
+from src.tgbot.user_info import get_user_info
 
 
 async def handle_get_meme(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends you the meme by it's id"""
-    user = await get_user_by_id(update.effective_user.id)
+    user = await get_user_info(update.effective_user.id)
     if UserType(user["type"]).is_moderator is not True:
         return
 
