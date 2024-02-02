@@ -50,11 +50,13 @@ async def send_album_with_memes(
         if meme.type == MemeType.IMAGE:
             input_media = InputMediaPhoto(
                 media=meme.telegram_file_id,
+                parse_mode=ParseMode.HTML,
                 caption=caption,
             )
         elif meme.type == MemeType.VIDEO:
             input_media = InputMediaVideo(
                 media=meme.telegram_file_id,
+                parse_mode=ParseMode.HTML,
                 caption=caption,
             )
         elif meme.type == MemeType.ANIMATION:
