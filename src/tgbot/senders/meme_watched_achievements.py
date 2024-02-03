@@ -1,5 +1,3 @@
-import asyncio
-
 from telegram.constants import ParseMode
 
 from src import localizer
