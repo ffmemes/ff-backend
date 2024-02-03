@@ -13,17 +13,21 @@ from src.tgbot.bot import bot
 async def download_meme_content_file(
     url: AnyHttpUrl,
 ) -> bytes | None:
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.get(
-            url,
-            headers={"User-Agent": USER_AGENT},
-        )
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        try:
+            response = await client.get(
+                url,
+                headers={"User-Agent": USER_AGENT},
+            )
+        except httpx.ConnectTimeout:
+            return None
+
         if response.status_code == 404:
             return None
-        
+
         response.raise_for_status()
         return response.content
-    
+
 
 async def download_meme_content_from_tg(
     file_id: str,
