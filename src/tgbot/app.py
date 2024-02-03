@@ -29,7 +29,7 @@ def add_handlers(application: Application) -> None:
     application.add_handler(CommandHandler(
         "start",
         start.handle_start,
-        filters=filters.ChatType.PRIVATE,
+        filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
     ))
 
     application.add_handler(CallbackQueryHandler(
@@ -77,7 +77,7 @@ def add_handlers(application: Application) -> None:
     application.add_handler(CommandHandler(
         "meme",
         get_meme.handle_get_meme,
-        filters=filters.ChatType.PRIVATE,
+        filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE
     ))
 
     # handle all old & broken callback queries
