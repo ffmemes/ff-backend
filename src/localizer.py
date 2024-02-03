@@ -1,6 +1,7 @@
-import yaml
 import logging
 from pathlib import Path
+
+import yaml
 
 # not sure where to put this const
 DEFAULT_LANG = "en"
@@ -23,7 +24,7 @@ def load():
 
 
 def t(
-    key: str, 
+    key: str,
     lang: str | None
 ) -> str:
     if lang is None or lang not in localizations[key]:
