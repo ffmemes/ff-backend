@@ -16,9 +16,13 @@ SECONDS_TO_SLEEP_AFTER_NOTIFICATION = 3
 async def send_achievement_if_needed(user_id: int) -> None:
     user_info = await get_user_info(user_id)
     if user_info["type"] == UserType.USER and user_info["nmemes_sent"] == 1000:
+        wants_to_be_mod_text = localizer.t(
+            "ask_if_user_wants_to_be_moderator",
+            user_info["interface_lang"]
+        )
         await bot.send_message(
             chat_id=user_id,
-            text=localizer.t("ask_if_user_wants_to_be_moderator", user_info["interface_lang"]),
+            text=wants_to_be_mod_text,
             parse_mode=ParseMode.HTML,
         )
         await asyncio.sleep(SECONDS_TO_SLEEP_AFTER_NOTIFICATION)

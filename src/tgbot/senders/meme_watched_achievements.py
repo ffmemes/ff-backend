@@ -4,8 +4,13 @@ from src import localizer
 from src.tgbot.bot import bot
 
 
-async def send_meme_watched_achievement_if_needed(user_id: int, user_info: dict) -> bool:
-    """Send achievement about watching a certain amount of memes if needed and return True if sent"""
+async def send_meme_watched_achievement_if_needed(
+        user_id: int, user_info: dict
+) -> bool:
+    """Send achievement about watching a certain amount of memes if needed
+
+    returns: True if achievement was sent, False otherwise
+    """
     memes_sent_count = user_info["nmemes_sent"]
     meme_count_alerts = (100, 500, 1000, 5000, 10000, 50000, 100000)
 
