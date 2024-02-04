@@ -4,7 +4,6 @@ from prefect.server.schemas.schedules import CronSchedule
 from src.config import settings
 from src.flows.storage.memes import ocr_uploaded_memes
 
-
 deployment_ocr_uploaded_memes = Deployment.build_from_flow(
     flow=ocr_uploaded_memes,
     name="OCR Uploaded Memes",
@@ -13,4 +12,3 @@ deployment_ocr_uploaded_memes = Deployment.build_from_flow(
 )
 
 deployment_ocr_uploaded_memes.apply()
-

@@ -27,4 +27,3 @@ async def send_achievement_if_needed(user_id: int) -> None:
     is_sent = await send_meme_watched_achievement_if_needed(user_id, user_info)
     if is_sent:
         await asyncio.sleep(SECONDS_TO_SLEEP_AFTER_NOTIFICATION)
-

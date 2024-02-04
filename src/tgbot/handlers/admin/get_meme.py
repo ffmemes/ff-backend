@@ -26,8 +26,7 @@ async def handle_get_meme(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     message_split = update.message.text.split()
     if len(message_split) < 2:
         await update.message.reply_text(
-            "Please specify a <code>meme_id</code>",
-            parse_mode=ParseMode.HTML
+            "Please specify a <code>meme_id</code>", parse_mode=ParseMode.HTML
         )
         return
 
@@ -36,11 +35,13 @@ async def handle_get_meme(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     except ValueError:
         await update.message.reply_text(
             "Please specify a valid <code>meme_id</code> (a number!)",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
         return
 
-    memes_data = await asyncio.gather(*[get_meme_by_id(meme_id) for meme_id in meme_ids])
+    memes_data = await asyncio.gather(
+        *[get_meme_by_id(meme_id) for meme_id in meme_ids]
+    )
     memes = [MemeData(**meme) for meme in memes_data if meme is not None]
     if not memes:
         await update.message.reply_text(

@@ -1,30 +1,28 @@
-from telegram import Update, Message
+from telegram import Message, Update
 from telegram.ext import (
-    ContextTypes, 
+    ContextTypes,
 )
-
-from src.tgbot.service import (
-    update_meme_source, 
-    get_or_create_meme_source,
-    get_user_by_id,
-)
-
-from src.tgbot.senders.keyboards import (
-    meme_source_language_selection_keyboard, 
-    meme_source_change_status_keyboard,
-)
-from src.tgbot.senders.utils import send_or_edit
-
-from src.storage.constants import MemeSourceType, MemeSourceStatus
-from src.tgbot.constants import UserType
-from src.tgbot.logs import log
 
 from src.flows.parsers.tg import parse_telegram_source
 from src.flows.parsers.vk import parse_vk_source
+from src.storage.constants import MemeSourceStatus, MemeSourceType
+from src.tgbot.constants import UserType
+from src.tgbot.logs import log
+from src.tgbot.senders.keyboards import (
+    meme_source_change_status_keyboard,
+    meme_source_language_selection_keyboard,
+)
+from src.tgbot.senders.utils import send_or_edit
+from src.tgbot.service import (
+    get_or_create_meme_source,
+    update_meme_source,
+)
 from src.tgbot.user_info import get_user_info
 
 
-async def handle_meme_source_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def handle_meme_source_link(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
     user_info = await get_user_info(update.effective_user.id)
     if not UserType(user_info["type"]).is_moderator:
         return
@@ -36,8 +34,8 @@ async def handle_meme_source_link(update: Update, context: ContextTypes.DEFAULT_
         meme_source_type = MemeSourceType.VK
     else:
         await update.message.reply_text("Unsupported meme source")
-        return 
-    
+        return
+
     meme_source = await get_or_create_meme_source(
         url=url,
         type=meme_source_type,
@@ -46,12 +44,13 @@ async def handle_meme_source_link(update: Update, context: ContextTypes.DEFAULT_
     )
 
     await meme_source_admin_pipeline(meme_source, update)
-    
+
 
 async def handle_meme_source_language_selection(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
-    user_info = await get_user_info(update.effective_user.id)
+    user_id = update.effective_user.id
+    user_info = await get_user_info(user_id)
     if not UserType(user_info["type"]).is_moderator:
         return
 
@@ -62,36 +61,35 @@ async def handle_meme_source_language_selection(
     if meme_source is None:
         await update.callback_query.answer("Meme source not found")
         return
-    
-    await log(f"ℹ️ MemeSource ({meme_source_id}): set_lang={lang_code} (by {update.effective_user.id})")
-    
-    await update.callback_query.answer(f"Meme source lang is {lang_code} now")  
+
+    await log(f"ℹ️ MemeSource ${meme_source_id}: set_lang={lang_code} (by {user_id})")
+
+    await update.callback_query.answer(f"Meme source lang is {lang_code} now")
     await meme_source_admin_pipeline(meme_source, update)
 
 
 async def handle_meme_source_change_status(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
-    user_info = await get_user_info(update.effective_user.id)
+    user_id = update.effective_user.id
+    user_info = await get_user_info(user_id)
     if not UserType(user_info["type"]).is_moderator:
+        await update.callback_query.answer(
+            "🤷‍♀️ Only moderators can change meme source status 🤷‍♂️"
+        )
         return
-    
+
     args = update.callback_query.data.split(":")
     meme_source_id, status = int(args[1]), args[3]
-
-    user = await get_user_by_id(update.effective_user.id)
-    if user is None or user["type"] != UserType.MODERATOR:
-        await update.callback_query.answer("🤷‍♀️ Only moderators can change meme source status 🤷‍♂️")
-        return
 
     meme_source = await update_meme_source(meme_source_id, status=status)
     if meme_source is None:
         await update.callback_query.answer(f"Meme source {meme_source_id} not found")
         return
-    
-    await log(f"ℹ️ MemeSource ({meme_source_id}): set_status={status} (by {update.effective_user.id})")
-    
-    await update.callback_query.answer(f"Meme source status is {status} now")  
+
+    await log(f"ℹ️ MemeSource ${meme_source_id}: set_status={status} (by {user_id})")
+
+    await update.callback_query.answer(f"Meme source status is {status} now")
     await meme_source_admin_pipeline(meme_source, update)
 
     if status == MemeSourceStatus.PARSING_ENABLED:  # trigger parsing
@@ -117,16 +115,18 @@ async def meme_source_admin_pipeline(
     meme_source: dict,
     update: Update,
 ) -> Message:
+    ms_info = _get_meme_source_info(meme_source)
     if meme_source["language_code"] is None:
         return await send_or_edit(
-            update, 
-            text=f"""{_get_meme_source_info(meme_source)}\nPlease select a language for {meme_source["url"]}""",
-            reply_markup=meme_source_language_selection_keyboard(meme_source_id=meme_source["id"]),
+            update,
+            text=f"""{ms_info}\nPlease select a language for {meme_source["url"]}""",
+            reply_markup=meme_source_language_selection_keyboard(
+                meme_source_id=meme_source["id"]
+            ),
         )
-    
+
     return await send_or_edit(
-        update, 
-        text=_get_meme_source_info(meme_source),
+        update,
+        text=ms_info,
         reply_markup=meme_source_change_status_keyboard(meme_source["id"]),
     )
-    

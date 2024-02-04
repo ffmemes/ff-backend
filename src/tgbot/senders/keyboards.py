@@ -1,22 +1,20 @@
 from telegram import (
-    InlineKeyboardButton, 
+    InlineKeyboardButton,
     InlineKeyboardMarkup,
 )
 
+from src.storage.constants import (
+    SUPPORTED_LANGUAGES,
+    MemeSourceStatus,
+)
 from src.tgbot.constants import (
-    Reaction, 
     MEME_BUTTON_CALLBACK_DATA_PATTERN,
     MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA,
     MEME_SOURCE_SET_LANG_PATTERN,
+    Reaction,
 )
 
-from src.storage.constants import (
-    SUPPORTED_LANGUAGES, 
-    MemeSourceStatus,
-)
-
-
-# IDEA: use sometimes another emoji pair like 🤣/🤮 
+# IDEA: use sometimes another emoji pair like 🤣/🤮
 
 
 def meme_reaction_keyboard(meme_id):
@@ -42,12 +40,14 @@ def meme_reaction_keyboard(meme_id):
 
 def queue_empty_alert_keyboard(emoji: str = "⏳"):
     return InlineKeyboardMarkup(
-        [[
-            InlineKeyboardButton(
-                emoji,
-                callback_data=MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA,
-            )
-        ]]
+        [
+            [
+                InlineKeyboardButton(
+                    emoji,
+                    callback_data=MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA,
+                )
+            ]
+        ]
     )
 
 
@@ -59,7 +59,7 @@ def meme_source_language_selection_keyboard(meme_source_id: int):
                     f"{lang_code}",
                     callback_data=MEME_SOURCE_SET_LANG_PATTERN.format(
                         meme_source_id=meme_source_id, lang_code=lang_code
-                    )
+                    ),
                 )
                 for lang_code in SUPPORTED_LANGUAGES
             ]
@@ -73,7 +73,7 @@ def meme_source_change_status_keyboard(meme_source_id: int):
             [
                 InlineKeyboardButton(
                     f"➡️ {status}",
-                    callback_data=f"ms:{meme_source_id}:set_status:{status}"
+                    callback_data=f"ms:{meme_source_id}:set_status:{status}",
                 )
             ]
             for status in MemeSourceStatus

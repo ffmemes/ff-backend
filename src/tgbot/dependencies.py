@@ -1,9 +1,7 @@
-from fastapi import (
-    Depends,
-    Header
-)
-from src.exceptions import PermissionDenied
+from fastapi import Header
+
 from src.config import settings
+from src.exceptions import PermissionDenied
 
 
 async def validate_webhook_secret(

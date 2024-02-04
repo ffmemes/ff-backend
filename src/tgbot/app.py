@@ -26,62 +26,84 @@ application: Application = None  # type: ignore
 
 
 def add_handlers(application: Application) -> None:
-    application.add_handler(CommandHandler(
-        "start",
-        start.handle_start,
-        filters=filters.ChatType.PRIVATE,
-    ))
+    application.add_handler(
+        CommandHandler(
+            "start",
+            start.handle_start,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+        )
+    )
 
-    application.add_handler(CallbackQueryHandler(
-        reaction.handle_reaction,
-        pattern=MEME_BUTTON_CALLBACK_DATA_REGEXP,
-    ))
+    application.add_handler(
+        CallbackQueryHandler(
+            reaction.handle_reaction,
+            pattern=MEME_BUTTON_CALLBACK_DATA_REGEXP,
+        )
+    )
 
-    application.add_handler(MessageHandler(
-        filters=filters.ChatType.PRIVATE & filters.FORWARDED & filters.ATTACHMENT,
-        callback=upload.handle_forward
-    ))
+    application.add_handler(
+        MessageHandler(
+            filters=filters.ChatType.PRIVATE & filters.FORWARDED & filters.ATTACHMENT,
+            callback=upload.handle_forward,
+        )
+    )
 
-    application.add_handler(MessageHandler(
-        filters=filters.ChatType.PRIVATE & filters.ATTACHMENT,
-        callback=upload.handle_message
-    ))
-
+    application.add_handler(
+        MessageHandler(
+            filters=filters.ChatType.PRIVATE & filters.ATTACHMENT,
+            callback=upload.handle_message,
+        )
+    )
 
     # meme source management
-    application.add_handler(MessageHandler(
-        filters=filters.ChatType.PRIVATE & filters.Regex("^(https://t.me|https://vk.com)"),
-        callback=meme_source.handle_meme_source_link,
-    ))
+    application.add_handler(
+        MessageHandler(
+            filters=filters.ChatType.PRIVATE
+            & filters.Regex("^(https://t.me|https://vk.com)"),
+            callback=meme_source.handle_meme_source_link,
+        )
+    )
 
-    application.add_handler(CallbackQueryHandler(
-        meme_source.handle_meme_source_language_selection,
-        pattern=MEME_SOURCE_SET_LANG_REGEXP
-    ))
+    application.add_handler(
+        CallbackQueryHandler(
+            meme_source.handle_meme_source_language_selection,
+            pattern=MEME_SOURCE_SET_LANG_REGEXP,
+        )
+    )
 
-    application.add_handler(CallbackQueryHandler(
-        alerts.handle_empty_meme_queue_alert,
-        pattern=MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA
-    ))
+    application.add_handler(
+        CallbackQueryHandler(
+            alerts.handle_empty_meme_queue_alert,
+            pattern=MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA,
+        )
+    )
 
-    application.add_handler(CallbackQueryHandler(
-        meme_source.handle_meme_source_change_status,
-        pattern=MEME_SOURCE_SET_STATUS_REGEXP,
-    ))
-    application.add_handler(ChatMemberHandler(
-        block.user_blocked_bot_handler, ChatMemberHandler.MY_CHAT_MEMBER
-    ))
+    application.add_handler(
+        CallbackQueryHandler(
+            meme_source.handle_meme_source_change_status,
+            pattern=MEME_SOURCE_SET_STATUS_REGEXP,
+        )
+    )
+    application.add_handler(
+        ChatMemberHandler(
+            block.user_blocked_bot_handler, ChatMemberHandler.MY_CHAT_MEMBER
+        )
+    )
 
     application.add_error_handler(send_stacktrace_to_tg_chat)
 
-    application.add_handler(CommandHandler(
-        "meme",
-        get_meme.handle_get_meme,
-        filters=filters.ChatType.PRIVATE,
-    ))
+    application.add_handler(
+        CommandHandler(
+            "meme",
+            get_meme.handle_get_meme,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+        )
+    )
 
     # handle all old & broken callback queries
-    application.add_handler(CallbackQueryHandler(broken.handle_broken_callback_query, pattern="^"))
+    application.add_handler(
+        CallbackQueryHandler(broken.handle_broken_callback_query, pattern="^")
+    )
 
 
 async def process_event(payload: dict) -> None:

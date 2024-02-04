@@ -11,9 +11,9 @@ from src.tgbot.senders.meme import send_new_message_with_meme
 @flow
 async def broadcast_memes_to_users_active_hours_ago(hours: int = 48):
     """
-        Runs each hour:
-        1. Takes users which were active (hours, hours-1) hours ago
-        2. Sends them a best meme
+    Runs each hour:
+    1. Takes users which were active (hours, hours-1) hours ago
+    2. Sends them a best meme
     """
     logger = get_run_logger()
 
@@ -33,5 +33,3 @@ async def broadcast_memes_to_users_active_hours_ago(hours: int = 48):
         await send_new_message_with_meme(user_id, meme)
         await create_user_meme_reaction(user_id, meme.id, meme.recommended_by)
         await asyncio.sleep(0.1)  # flood control
-
-

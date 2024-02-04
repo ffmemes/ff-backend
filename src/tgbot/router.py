@@ -1,5 +1,5 @@
 from fastapi import (
-    APIRouter, 
+    APIRouter,
     BackgroundTasks,
     Depends,
     status,
@@ -24,14 +24,14 @@ async def tgbot_webhook_events(
 ) -> dict:
     worker.add_task(process_event, payload)
 
-    # remove buttons with callback 
+    # remove buttons with callback
     if "callback_query" in payload:
         cbqm = payload["callback_query"]["message"]
         return {
             "method": "editMessageReplyMarkup",
             "chat_id": cbqm["chat"]["id"],
             "message_id": cbqm["message_id"],
-            "reply_markup": remove_buttons_with_callback(cbqm["reply_markup"])
+            "reply_markup": remove_buttons_with_callback(cbqm["reply_markup"]),
         }
 
     return {

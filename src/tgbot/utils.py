@@ -13,7 +13,7 @@ def remove_buttons_with_callback(reply_markup: dict) -> dict:
 
             filtered_buttons.append(button)
 
-        new_keyboard.append(filtered_buttons)        
+        new_keyboard.append(filtered_buttons)
 
     reply_markup["inline_keyboard"] = new_keyboard
     return reply_markup

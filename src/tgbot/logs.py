@@ -1,7 +1,6 @@
-from telegram import Bot
-
 from src.config import settings
 from src.tgbot.bot import bot
+
 
 async def log(text: str) -> None:
     await bot.send_message(
