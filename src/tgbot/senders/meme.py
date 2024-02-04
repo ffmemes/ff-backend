@@ -1,7 +1,6 @@
 from typing import Tuple
 
 from telegram import (
-    Bot,
     InputMediaAnimation,
     InputMediaPhoto,
     InputMediaVideo,
@@ -9,9 +8,9 @@ from telegram import (
 )
 from telegram.constants import ParseMode
 
-from src.tgbot.bot import bot
 from src.storage.constants import MemeType
 from src.storage.schemas import MemeData
+from src.tgbot.bot import bot
 from src.tgbot.senders.keyboards import meme_reaction_keyboard
 from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
 
@@ -60,7 +59,9 @@ async def send_album_with_memes(
         elif meme.type == MemeType.ANIMATION:
             raise NotImplementedError("Can't send animation in album")
         else:
-            raise NotImplementedError(f"Can't send meme. Unknown meme type: {meme.type}")
+            raise NotImplementedError(
+                f"Can't send meme. Unknown meme type: {meme.type}"
+            )
         media.append(input_media)
 
     return await bot.send_media_group(

@@ -1,4 +1,5 @@
 from typing import Any
+
 from sqlalchemy import text
 
 from src.database import fetch_all
@@ -13,23 +14,23 @@ async def sorted_by_user_source_lr_meme_lr_meme_age(
     exclude_meme_ids: list[int] = [],
 ) -> list[dict[str, Any]]:
     query = f"""
-        SELECT 
+        SELECT
             M.id, M.type, M.telegram_file_id, M.caption,
             'sorted_by_user_source_lr_meme_lr_meme_age' as recommended_by
-        FROM meme M 
-        LEFT JOIN user_meme_reaction R 
+        FROM meme M
+        LEFT JOIN user_meme_reaction R
             ON R.meme_id = M.id
             AND R.user_id = {user_id}
         INNER JOIN user_language L
             ON L.user_id = {user_id}
             AND L.language_code = M.language_code
-			
-		LEFT JOIN user_meme_source_stats UMSS 
+
+		LEFT JOIN user_meme_source_stats UMSS
             ON UMSS.user_id = {user_id}
             AND UMSS.meme_source_id = M.meme_source_id
         LEFT JOIN meme_stats MS
             ON MS.meme_id = M.id
-			
+
         WHERE 1=1
             AND M.status = 'ok'
             AND R.meme_id IS NULL
@@ -40,9 +41,8 @@ async def sorted_by_user_source_lr_meme_lr_meme_age(
             * COALESCE((MS.nlikes + 1) / (MS.ndislikes + 1), 0.5)
             * CASE WHEN MS.raw_impr_rank < 1 THEN 1 ELSE 0.5 END
             * CASE WHEN MS.age_days < 5 THEN 1 ELSE 0.5 END
-                
+
         LIMIT {limit}
     """
     res = await fetch_all(text(query))
     return res
-

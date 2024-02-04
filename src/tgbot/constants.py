@@ -31,7 +31,6 @@ class Reaction(int, Enum):
         return self in (self.LIKE,)
 
 
-
 MEME_BUTTON_CALLBACK_DATA_PATTERN = "r:{meme_id}:{reaction_id}"
 MEME_BUTTON_CALLBACK_DATA_REGEXP = "^r:"
 
@@ -44,8 +43,28 @@ MEME_SOURCE_SET_STATUS_PATTERN = "ms:{meme_source_id}:set_status:{status}"
 MEME_SOURCE_SET_STATUS_REGEXP = r"^ms:\d+:set_status:\w+$"
 
 LOADING_EMOJIS = [
-    "🕛", "🕧", "🕐", "🕜", "🕑", "🕝",
-    "🕒", "🕞", "🕓", "🕟", "🕔", "🕠",
-    "🕕", "🕡", "🕖", "🕢", "🕗", "🕣",
-    "🕘", "🕤", "🕙", "🕥", "🕚", "🕦",
+    "🕛",
+    "🕧",
+    "🕐",
+    "🕜",
+    "🕑",
+    "🕝",
+    "🕒",
+    "🕞",
+    "🕓",
+    "🕟",
+    "🕔",
+    "🕠",
+    "🕕",
+    "🕡",
+    "🕖",
+    "🕢",
+    "🕗",
+    "🕣",
+    "🕘",
+    "🕤",
+    "🕙",
+    "🕥",
+    "🕚",
+    "🕦",
 ]

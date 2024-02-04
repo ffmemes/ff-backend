@@ -1,4 +1,5 @@
 import asyncio
+
 from telegram.constants import ParseMode
 
 from src import localizer
@@ -17,7 +18,7 @@ async def send_achievement_if_needed(user_id: int) -> None:
         )
         await asyncio.sleep(3)
         return
-    
+
     if user_info["nmemes_sent"] == 100:
         await bot.send_message(
             chat_id=user_id,
@@ -26,6 +27,3 @@ async def send_achievement_if_needed(user_id: int) -> None:
         )
         await asyncio.sleep(3)
         return
-
-    
-    
