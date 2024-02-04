@@ -5,7 +5,7 @@ from src.tgbot.bot import bot
 
 
 async def send_meme_watched_achievement_if_needed(
-        user_id: int, user_info: dict
+    user_id: int, user_info: dict
 ) -> bool:
     """Send achievement about watching a certain amount of memes if needed
 
