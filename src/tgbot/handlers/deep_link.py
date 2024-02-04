@@ -6,7 +6,7 @@ from src.tgbot.service import (
 
 
 async def handle_deep_link_used(
-    invited_user: dict, invited_user_name: str, deep_link: int
+    invited_user: dict, invited_user_name: str, deep_link: str
 ):
     """
     E.g. if user was invited, send a msg to invited about used invitation
