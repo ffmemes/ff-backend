@@ -1,6 +1,7 @@
-import orjson
-from typing import Optional
 from datetime import timedelta
+from typing import Optional
+
+import orjson
 import redis.asyncio as aioredis
 
 from src.config import settings

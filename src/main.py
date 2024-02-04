@@ -14,7 +14,9 @@ from src.tgbot.router import router as tgbot_router
 @asynccontextmanager
 async def lifespan(_application: FastAPI) -> AsyncGenerator:
     # Startup
-    tgbot_app.application = tgbot_app.setup_application(settings.ENVIRONMENT.is_deployed)
+    tgbot_app.application = tgbot_app.setup_application(
+        settings.ENVIRONMENT.is_deployed
+    )
     await tgbot_app.application.initialize()
     # if is_webhook:  # all gunicorn workers will call this and hit rate limit
     #     await bot.setup_webhook(bot.application)

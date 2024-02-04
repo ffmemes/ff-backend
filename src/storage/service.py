@@ -1,23 +1,29 @@
-from typing import Any
 from datetime import datetime
-from sqlalchemy import select, nulls_first, text, or_
+from typing import Any
+
+from sqlalchemy import nulls_first, or_, select, text
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
+    execute,
+    fetch_all,
+    fetch_one,
     meme,
-    meme_source,
     meme_raw_telegram,
     meme_raw_vk,
-    execute, fetch_one, fetch_all,
+    meme_source,
 )
-from src.storage.parsers.schemas import TgChannelPostParsingResult, VkGroupPostParsingResult
 from src.storage.constants import (
-    MemeSourceType,
-    MemeSourceStatus,
-    MemeType,
-    MemeStatus,
     MEME_RAW_TELEGRAM_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
     MEME_RAW_VK_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
+    MemeSourceStatus,
+    MemeSourceType,
+    MemeStatus,
+    MemeType,
+)
+from src.storage.parsers.schemas import (
+    TgChannelPostParsingResult,
+    VkGroupPostParsingResult,
 )
 
 
@@ -47,8 +53,7 @@ async def insert_parsed_posts_from_vk(
     vk_posts: list[VkGroupPostParsingResult],
 ) -> None:
     posts = [
-        post.model_dump() | {"meme_source_id": meme_source_id}
-        for post in vk_posts
+        post.model_dump() | {"meme_source_id": meme_source_id} for post in vk_posts
     ]
     insert_statement = insert(meme_raw_vk).values(posts)
     insert_posts_query = insert_statement.on_conflict_do_update(
@@ -100,23 +105,23 @@ async def update_meme_source(meme_source_id: int, **kwargs) -> dict[str, Any] | 
 
 # TODO: separate file for ETL scripts?
 async def etl_memes_from_raw_telegram_posts() -> None:
-    insert_query = f"""
+    insert_query = """
         INSERT INTO meme (
-            meme_source_id, 
-            raw_meme_id, 
-            caption, 
-            status, 
-            type, 
+            meme_source_id,
+            raw_meme_id,
+            caption,
+            status,
+            type,
             language_code,
             published_at
         )
-        SELECT 
+        SELECT
             DISTINCT ON (COALESCE(forwarded_url, random()::text))
             meme_source_id,
-            meme_raw_telegram.id AS raw_meme_id, 
+            meme_raw_telegram.id AS raw_meme_id,
             content AS caption,
             'created' AS status,
-            CASE 
+            CASE
                 WHEN media->0->>'duration' IS NOT NULL THEN 'video'
                 ELSE 'image'
             END AS type,
@@ -136,17 +141,17 @@ async def etl_memes_from_raw_telegram_posts() -> None:
 async def etl_memes_from_raw_vk_posts() -> None:
     insert_query = f"""
         INSERT INTO meme (
-            meme_source_id, 
-            raw_meme_id, 
-            caption, 
-            status, 
-            type, 
+            meme_source_id,
+            raw_meme_id,
+            caption,
+            status,
+            type,
             language_code,
             published_at
         )
-        SELECT 
+        SELECT
             meme_source_id,
-            meme_raw_vk.id AS raw_meme_id, 
+            meme_raw_vk.id AS raw_meme_id,
             content AS caption,
             '{MemeStatus.CREATED.value}' AS status,
             '{MemeType.IMAGE.value}' AS type,
@@ -163,10 +168,7 @@ async def etl_memes_from_raw_vk_posts() -> None:
 
 async def update_meme(meme_id: int, **kwargs) -> dict[str, Any] | None:
     update_query = (
-        meme.update()
-        .where(meme.c.id == meme_id)
-        .values(**kwargs)
-        .returning(meme)
+        meme.update().where(meme.c.id == meme_id).values(**kwargs).returning(meme)
     )
     return await fetch_one(update_query)
 
@@ -184,8 +186,8 @@ async def get_pending_memes() -> list[dict[str, Any]]:
 
 async def get_memes_to_ocr(limit=100):
     select_query = """
-        SELECT 
-            M.*, 
+        SELECT
+            M.*,
             COALESCE(MRV.media->>0, MRT.media->0->>'url') content_url
         FROM meme M
         INNER JOIN meme_source MS
@@ -195,7 +197,7 @@ async def get_memes_to_ocr(limit=100):
         LEFT JOIN meme_raw_telegram MRT
             ON MRT.id = M.raw_meme_id AND MS.type = 'telegram'
         WHERE 1=1
-        	AND M.ocr_result IS NULL
+            AND M.ocr_result IS NULL
             AND M.status != 'broken_content_link'
             AND M.type = 'image'
         ORDER BY M.created_at
@@ -204,14 +206,14 @@ async def get_memes_to_ocr(limit=100):
 
 
 async def get_unloaded_tg_memes() -> list[dict[str, Any]]:
-    """ Returns only MemeType.IMAGE memes """
-    select_query = f"""
-        SELECT 
+    """Returns only MemeType.IMAGE memes"""
+    select_query = """
+        SELECT
             meme.id,
             meme.type,
             MRT.media->0->>'url' content_url
         FROM meme
-        INNER JOIN meme_source 
+        INNER JOIN meme_source
             ON meme_source.id = meme.meme_source_id
             AND meme_source.type = 'telegram'
         INNER JOIN meme_raw_telegram MRT
@@ -219,7 +221,7 @@ async def get_unloaded_tg_memes() -> list[dict[str, Any]]:
             AND MRT.meme_source_id = meme.meme_source_id
         WHERE 1=1
             AND (
-                meme.telegram_file_id IS NULL 
+                meme.telegram_file_id IS NULL
                 OR meme.status = 'broken_content_link'
             )
             AND MRT.media->0->>'url' IS NOT NULL
@@ -231,12 +233,12 @@ async def get_unloaded_tg_memes() -> list[dict[str, Any]]:
 async def get_unloaded_vk_memes() -> list[dict[str, Any]]:
     "Returns only MemeType.IMAGE memes"
     select_query = f"""
-        SELECT 
+        SELECT
             meme.id,
             '{MemeType.IMAGE}' AS type,
             meme_raw_vk.media->>0 content_url
         FROM meme
-        INNER JOIN meme_source 
+        INNER JOIN meme_source
             ON meme_source.id = meme.meme_source_id
             AND meme_source.type = '{MemeSourceType.VK.value}'
         INNER JOIN meme_raw_vk
@@ -249,15 +251,17 @@ async def get_unloaded_vk_memes() -> list[dict[str, Any]]:
 
 
 async def update_meme_status_of_ready_memes() -> list[dict[str, Any]]:
-    """ Changes the status of memes to 'ok' if they are ready to be published. """
+    """Changes the status of memes to 'ok' if they are ready to be published."""
     update_query = (
         meme.update()
         .where(meme.c.status == MemeStatus.CREATED)
         .where(meme.c.telegram_file_id.is_not(None))
-        .where(or_(
-            meme.c.ocr_result.is_not(None),
-            meme.c.type != MemeType.IMAGE,
-        ))
+        .where(
+            or_(
+                meme.c.ocr_result.is_not(None),
+                meme.c.type != MemeType.IMAGE,
+            )
+        )
         .where(meme.c.duplicate_of.is_(None))
         .values(status=MemeStatus.OK)
         .returning(meme)
@@ -266,14 +270,13 @@ async def update_meme_status_of_ready_memes() -> list[dict[str, Any]]:
 
 
 async def find_meme_duplicate(**kwargs) -> int | None:
-    # For given meme finds a meme with the same content. 
+    # For given meme finds a meme with the same content.
     # Returns the largest meme_id of the duplicates.
     return None
 
-
     # TODO:
-    select_query = f"""
-        SELECT 
+    select_query = """
+        SELECT
             M.id
         FROM meme M
         .........

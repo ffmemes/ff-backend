@@ -1,12 +1,13 @@
+from typing import Any
+
 import httpx
 import telegram
-from typing import Any
 from pydantic import AnyHttpUrl
 
 from src.config import settings
-from src.storage.constants import MemeType, MemeStatus
-from src.storage.service import update_meme
+from src.storage.constants import MemeStatus, MemeType
 from src.storage.parsers.constants import USER_AGENT
+from src.storage.service import update_meme
 from src.tgbot.bot import bot
 
 
@@ -45,8 +46,7 @@ async def upload_meme_content_to_tg(
     if meme_type == MemeType.IMAGE:
         try:
             msg = await bot.send_photo(
-                chat_id=settings.MEME_STORAGE_TELEGRAM_CHAT_ID, 
-                photo=content
+                chat_id=settings.MEME_STORAGE_TELEGRAM_CHAT_ID, photo=content
             )
         except telegram.error.TimedOut:
             return None
@@ -57,12 +57,11 @@ async def upload_meme_content_to_tg(
             # change status to fix possible BROKEN_CONTENT_LINK
             status=MemeStatus.CREATED,  # or add new status "Uploaded?"
         )
-    
+
     if meme_type == MemeType.VIDEO:
         try:
             msg = await bot.send_video(
-                chat_id=settings.MEME_STORAGE_TELEGRAM_CHAT_ID, 
-                video=content
+                chat_id=settings.MEME_STORAGE_TELEGRAM_CHAT_ID, video=content
             )
         except telegram.error.TimedOut:
             return None
@@ -75,8 +74,7 @@ async def upload_meme_content_to_tg(
     if meme_type == MemeType.ANIMATION:
         try:
             msg = await bot.send_animation(
-                chat_id=settings.MEME_STORAGE_TELEGRAM_CHAT_ID, 
-                animation=content
+                chat_id=settings.MEME_STORAGE_TELEGRAM_CHAT_ID, animation=content
             )
         except telegram.error.TimedOut:
             return None

@@ -3,7 +3,9 @@ from src.tgbot.bot import bot
 from src.tgbot.user_info import get_user_info
 
 
-async def send_successfull_invitation_alert(invitor_user_id: int, invited_user_name: str) -> None:
+async def send_successfull_invitation_alert(
+    invitor_user_id: int, invited_user_name: str
+) -> None:
     user_info = await get_user_info(invitor_user_id)
 
     await bot.send_message(

@@ -1,13 +1,11 @@
 import asyncio
 import datetime
-import logging
 import json
-
+import logging
 from typing import Optional
 
 from src.config import settings
 from src.storage.parsers.base import Scraper, ScraperException
-
 from src.storage.parsers.schemas import VkGroupPostParsingResult
 
 logger = logging.getLogger(__name__)
@@ -19,7 +17,8 @@ class VkGroupScraper(Scraper):
     :param source_link: Vk group link
     :return: List with posts
     """
-    name = 'vk-group'
+
+    name = "vk-group"
 
     def __init__(self, source_link, **kwargs):
         super().__init__(**kwargs)
@@ -28,7 +27,9 @@ class VkGroupScraper(Scraper):
         self.VK_TOKEN = settings.VK_TOKEN
         self.base_url = "https://api.vk.com/method/wall.get?access_token={vk_token}&v={v}&domain={domain}&count=100&offset={offset}"
 
-    async def get_items(self, num_of_posts: Optional[int] = None) -> list[VkGroupPostParsingResult]:
+    async def get_items(
+        self, num_of_posts: Optional[int] = None
+    ) -> list[VkGroupPostParsingResult]:
         logger.info(f"Going to parse VK: {self.source_link}")
         vk_source = _extract_username_from_url(self.source_link)
         self.vk_source_link = "https://vk.com/%s" % vk_source
@@ -63,28 +64,27 @@ class VkGroupScraper(Scraper):
             return None
         req = await self._request(
             self.base_url.format(
-                vk_token=self.VK_TOKEN,
-                v="5.92",
-                domain=vk_source,
-                offset=offset
+                vk_token=self.VK_TOKEN, v="5.92", domain=vk_source, offset=offset
             )
         )
         if req.status_code != 200:
-            raise ScraperException(f'Got status code {req.status_code}')
+            raise ScraperException(f"Got status code {req.status_code}")
         r = await req.aread()
-        return json.loads(r.decode('utf-8'))
+        return json.loads(r.decode("utf-8"))
 
     async def get_post_details(self, post: dict) -> VkGroupPostParsingResult | None:
         if post["marked_as_ads"] or "attachments" not in post:
             # ignoring ads & text-only publications
             return
-        if set(["photo"]) != set(post["attachments"][i]['type'] for i in range(len(post["attachments"]))):
+        if set(["photo"]) != set(
+            post["attachments"][i]["type"] for i in range(len(post["attachments"]))
+        ):
             # work only with photos for now
             return
-        
+
         if post["text"] and len(post["text"]) >= 200:
             return
-        
+
         images = get_best_img(post)
         return VkGroupPostParsingResult(
             post_id=f'{post["from_id"]}_{post["id"]}',
@@ -95,17 +95,17 @@ class VkGroupScraper(Scraper):
             comments=post["comments"]["count"],
             likes=post["likes"]["count"],
             views=post["views"]["count"],
-            reposts=post["reposts"]["count"]
+            reposts=post["reposts"]["count"],
         )
 
 
 def _extract_username_from_url(vk_source: str) -> str:
-    return vk_source[vk_source.find("vk.com/") + 7:].replace("/", "")
+    return vk_source[vk_source.find("vk.com/") + 7 :].replace("/", "")
 
 
 def get_best_img(post: dict) -> list[str]:
     return [
-        sorted(i["photo"]["sizes"], key=lambda x: -x["width"])[0]["url"] 
+        sorted(i["photo"]["sizes"], key=lambda x: -x["width"])[0]["url"]
         for i in post["attachments"]
     ]
 

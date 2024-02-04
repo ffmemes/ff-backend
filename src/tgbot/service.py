@@ -71,8 +71,6 @@ async def get_tg_user_by_id(
 async def get_user_by_tg_username(
     username: str,
 ) -> dict[str, Any] | None:
-    """Slower version of `get_user_by_id`, since it requires a join. Shouldn't be used often"""
-    # select user.id from user_tg join user on user_tg.id = user.id where user_tg.username = 'username';
     select_statement = (
         select(user)
         .select_from(user_tg.join(user, user_tg.c.id == user.c.id))
@@ -202,10 +200,7 @@ async def get_user_info(
 
 async def update_user(user_id: int, **kwargs) -> dict[str, Any] | None:
     update_query = (
-        user.update()
-        .where(user.c.id == user_id)
-        .values(**kwargs)
-        .returning(user)
+        user.update().where(user.c.id == user_id).values(**kwargs).returning(user)
     )
     return await fetch_one(update_query)
 
