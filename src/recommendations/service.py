@@ -1,15 +1,15 @@
-from typing import Any
-from datetime import datetime
-from sqlalchemy import select, text, exists
-from sqlalchemy.dialects.postgresql import insert
 import logging
+from datetime import datetime
+from typing import Any
+
+from sqlalchemy import exists, select, text
+from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
-    user_meme_reaction,
     execute,
     fetch_all,
+    user_meme_reaction,
 )
-
 from src.recommendations.utils import exclude_meme_ids_sql_filter
 
 
@@ -58,11 +58,11 @@ async def get_unseen_memes(
     exclude_meme_ids: list[int] = [],
 ) -> list[dict[str, Any]]:
     query = f"""
-        SELECT 
+        SELECT
             M.id, M.type, M.telegram_file_id, M.caption,
             'test' as recommended_by
-        FROM meme M 
-        LEFT JOIN user_meme_reaction R 
+        FROM meme M
+        LEFT JOIN user_meme_reaction R
             ON R.meme_id = M.id
             AND R.user_id = {user_id}
         INNER JOIN user_language L
@@ -81,7 +81,9 @@ async def get_unseen_memes(
 async def get_user_reactions(
     user_id: int,
 ) -> list[dict[str, Any]]:
-    select_statement = select(user_meme_reaction).where(user_meme_reaction.c.user_id == user_id)
+    select_statement = select(user_meme_reaction).where(
+        user_meme_reaction.c.user_id == user_id
+    )
     return await fetch_all(select_statement)
 
 

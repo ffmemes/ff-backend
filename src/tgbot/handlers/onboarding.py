@@ -1,11 +1,12 @@
 import asyncio
+
 from telegram import Update
 from telegram.constants import ParseMode
 
 from src import localizer
-from src.tgbot.user_info import get_user_info
-from src.tgbot.senders.next_message import next_message
 from src.recommendations.meme_queue import generate_cold_start_recommendations
+from src.tgbot.senders.next_message import next_message
+from src.tgbot.user_info import get_user_info
 
 
 # not sure about the best args for that func
@@ -23,7 +24,7 @@ async def onboarding_flow(update: Update):
 
     m = await update.effective_user.send_message("3️⃣")
     await asyncio.sleep(1.5)
-    m =await m.edit_text("2️⃣")
+    m = await m.edit_text("2️⃣")
     await asyncio.sleep(2)
     m = await m.edit_text("1️⃣")
     await asyncio.sleep(2)

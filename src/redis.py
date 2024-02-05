@@ -1,12 +1,16 @@
-import orjson
 from datetime import timedelta
 from typing import Optional
 
-from redis.asyncio import Redis
+import orjson
+import redis.asyncio as aioredis
 
+from src.config import settings
 from src.models import CustomModel
 
-redis_client: Redis = None  # type: ignore
+pool = aioredis.ConnectionPool.from_url(
+    str(settings.REDIS_URL), max_connections=10, decode_responses=True
+)
+redis_client = aioredis.Redis(connection_pool=pool)
 
 
 class RedisData(CustomModel):

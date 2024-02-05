@@ -1,14 +1,15 @@
 import asyncio
 from datetime import datetime
+
 from prefect import flow, get_run_logger
 
+from src.flows.storage.memes import tg_meme_pipeline
 from src.storage.parsers.tg import TelegramChannelScraper
 from src.storage.service import (
     get_telegram_sources_to_parse,
     insert_parsed_posts_from_telegram,
     update_meme_source,
 )
-from src.flows.storage.memes import tg_meme_pipeline
 
 
 @flow(name="Parse Telegram Source")
@@ -29,7 +30,7 @@ async def parse_telegram_source(
 
     await update_meme_source(meme_source_id=meme_source_id, parsed_at=datetime.utcnow())
     await asyncio.sleep(5)
-    
+
 
 @flow(
     name="Parse Telegram Channels",

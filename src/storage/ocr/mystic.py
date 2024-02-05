@@ -1,6 +1,7 @@
 import uuid
-import httpx
 from typing import Any
+
+import httpx
 
 from src.config import settings
 from src.storage.schemas import OcrResult
@@ -15,7 +16,7 @@ PIPELINE_ID = "uriel/easyocr-r:v31"
 
 async def load_file_to_mystic(file_content: bytes) -> str:
     file_name = f"{uuid.uuid4()}.jpg"
-    files = { "pfile": (file_name, file_content, "image/jpeg") }
+    files = {"pfile": (file_name, file_content, "image/jpeg")}
 
     async with httpx.AsyncClient() as client:
         response = await client.post(
@@ -46,11 +47,8 @@ async def ocr_mystic_file_path(
                         "type": "file",
                         "file_path": mystic_file_path,
                     },
-                    {
-                        "type": "string",
-                        "value": language
-                    }
-                ]
+                    {"type": "string", "value": language},
+                ],
             },
             headers=HEADERS,
         )
@@ -73,7 +71,7 @@ async def ocr_content(
         return None
 
     rows = ocr_result["outputs"][0]["value"]
-    full_text = "\n".join([r[1] for r in rows])
+    full_text = " ".join([r[1] for r in rows])
 
     return OcrResult(
         model=f"mystic:{PIPELINE_ID}",
