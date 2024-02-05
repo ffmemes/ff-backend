@@ -1,16 +1,18 @@
-from typing import Any
 from datetime import datetime
-from sqlalchemy import select, text
+from typing import Any
+
+from sqlalchemy import func, select, text
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
+    execute,
+    fetch_one,
+    meme,
     meme_source,
     user,
-    user_tg,
     user_language,
-    execute, fetch_one
+    user_tg,
 )
-
 from src.storage.constants import Language
 
 
@@ -59,10 +61,35 @@ async def get_user_by_id(
     return await fetch_one(select_statement)
 
 
+async def get_tg_user_by_id(
+    id: int,
+) -> dict[str, Any] | None:
+    select_statement = select(user_tg).where(user_tg.c.id == id)
+    return await fetch_one(select_statement)
+
+
+async def get_user_by_tg_username(
+    username: str,
+) -> dict[str, Any] | None:
+    select_statement = (
+        select(user)
+        .select_from(user_tg.join(user, user_tg.c.id == user.c.id))
+        .where(func.lower(user_tg.c.username) == username.lower())
+    )
+    return await fetch_one(select_statement)
+
+
 async def get_meme_source_by_id(
     id: int,
 ) -> dict[str, Any] | None:
     select_statement = select(meme_source).where(meme_source.c.id == id)
+    return await fetch_one(select_statement)
+
+
+async def get_meme_by_id(
+    id: int,
+) -> dict[str, Any] | None:
+    select_statement = select(meme).where(meme.c.id == id)
     return await fetch_one(select_statement)
 
 
@@ -128,7 +155,7 @@ async def del_user_language(
 async def get_user_info(
     user_id: int,
 ) -> dict[str, Any] | None:
-    # TODO: calculate memes_watched_today inside user_stats               
+    # TODO: calculate memes_watched_today inside user_stats
     # TODO: not sure about logic behind interface_lang
     query = f"""
         WITH MEMES_WATCHED_TODAY AS (
@@ -141,9 +168,9 @@ async def get_user_info(
         ),
         USER_INTERFACE_LANG AS (
             SELECT DISTINCT ON (user_tg.id)
-                id, 
+                id,
                 COALESCE(
-                    user_language.language_code, 
+                    user_language.language_code,
                     user_tg.language_code
                 ) interface_lang
             FROM user_tg
@@ -153,13 +180,13 @@ async def get_user_info(
             WHERE user_tg.id = {user_id}
         )
 
-        SELECT 
-            type, 
-            COALESCE(nmemes_sent, 0) nmemes_sent, 
-            COALESCE(memes_watched_today, 0) memes_watched_today, 
+        SELECT
+            type,
+            COALESCE(nmemes_sent, 0) nmemes_sent,
+            COALESCE(memes_watched_today, 0) memes_watched_today,
             UIL.interface_lang
         FROM "user" AS U
-        LEFT JOIN user_stats US 
+        LEFT JOIN user_stats US
             ON US.user_id = U.id
         LEFT JOIN USER_INTERFACE_LANG UIL
             ON UIL.id = U.id
@@ -170,6 +197,12 @@ async def get_user_info(
 
     return await fetch_one(text(query))
 
+
+async def update_user(user_id: int, **kwargs) -> dict[str, Any] | None:
+    update_query = (
+        user.update().where(user.c.id == user_id).values(**kwargs).returning(user)
+    )
+    return await fetch_one(update_query)
 
 
 # async def sync_user_language(

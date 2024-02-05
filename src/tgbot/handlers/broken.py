@@ -4,9 +4,13 @@
 
 from telegram import Update
 from telegram.ext import (
-    ContextTypes, 
+    ContextTypes,
 )
 
 
-async def handle_broken_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.effective_user.send_message("The bot was updated. Please press /start to continue.")
+async def handle_broken_callback_query(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    await update.effective_user.send_message(
+        "🔄 The bot was updated. Press /start to continue."
+    )

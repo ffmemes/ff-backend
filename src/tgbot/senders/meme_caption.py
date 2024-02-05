@@ -1,7 +1,7 @@
 from src.storage.schemas import MemeData
 from src.tgbot.constants import UserType
-from src.tgbot.user_info import get_user_info
 from src.tgbot.senders.utils import get_referral_html
+from src.tgbot.user_info import get_user_info
 
 
 async def get_meme_caption_for_user_id(meme: MemeData, user_id: int) -> str:
@@ -11,7 +11,7 @@ async def get_meme_caption_for_user_id(meme: MemeData, user_id: int) -> str:
 
     caption += "\n\n" + get_referral_html(user_id, meme.id)
 
-    if user_info["type"] == UserType.MODERATOR:
-        caption += f"\nmeme #{meme.id}"
+    if UserType(user_info["type"]).is_moderator:
+        caption += f" #{meme.id}"
 
     return caption

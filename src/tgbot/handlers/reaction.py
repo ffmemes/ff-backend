@@ -3,16 +3,17 @@
 """
 
 import logging
+
 from telegram import Update
 from telegram.ext import (
     ContextTypes,
 )
 
-from src.tgbot.senders.next_message import next_message
-from src.tgbot.user_info import update_user_info_counters
 from src.recommendations.service import (
     update_user_meme_reaction,
 )
+from src.tgbot.senders.next_message import next_message
+from src.tgbot.user_info import update_user_info_counters
 
 
 async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

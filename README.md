@@ -1,31 +1,6 @@
-# FastAPI Example Project
-Some people were searching my GitHub profile for project examples after reading the article on [FastAPI best practices](https://github.com/zhanymkanov/fastapi-best-practices).
-Unfortunately, I didn't have useful public repositories, but only my old proof-of-concept projects. 
+# Fast Food Memes 
 
-Hence, I have decided to fix that and show how I start projects nowadays, after getting some real-world experience. 
-This repo is kind of a template I use when starting up new FastAPI projects:
-- some configs for production
-  - gunicorn with dynamic workers configuration (stolen from [@tiangolo](https://github.com/tiangolo))
-  - Dockerfile optimized for small size and fast builds with a non-root user
-  - JSON logs
-  - sentry for deployed envs
-- easy local development
-  - environment with configured postgres and redis
-  - script to lint code with `ruff` and `ruff format`
-  - configured pytest with `async-asgi-testclient`, `pytest-env`, `pytest-asyncio`
-- SQLAlchemy with slightly configured `alembic`
-  - async SQLAlchemy engine
-  - migrations set in easy to sort format (`YYYY-MM-DD_slug`)
-- pre-installed JWT authorization
-  - short-lived access token
-  - long-lived refresh token which is stored in http-only cookies
-  - salted password storage with `bcrypt`
-- global pydantic model with 
-  - explicit timezone setting during JSON export
-- and some other extras like global exceptions, sqlalchemy keys naming convention, shortcut scripts for alembic, etc.
-
-Current version of the template (with SQLAlchemy >2.0 & Pydantic >2.0) wasn't battle tested on production, 
-so there might be some workarounds instead of neat solutions, but overall idea of the project structure is still the same.
+➡️ https://t.me/ffmemesbot ⬅️
 
 ## Local Development
 
@@ -34,11 +9,11 @@ so there might be some workarounds instead of neat solutions, but overall idea o
 2. `docker network create ffmemes_network`
 3. `docker-compose up -d --build`
 
-Don't forget to fill in local `.env` file all envs you need.
+Don't forget to fill the local `.env` file with all envs you need.
 
-### Test specific python functions
+### Test local changes
 
-After `docker-compose up -d --build` use this to run a python shell inside the Docker environment. Then import your Python function and test it as you want. Note that ipython can run async functions without asyncio.run(...).
+Before sending a PR you must test your new code. The easiest way is to run `ipython` shell, then import the functions you may need and test them. Note that ipython can run async functions without wrapping them with `asyncio.run(...)`.
 
 ``` shell
 docker compose exec app ipython
@@ -63,6 +38,7 @@ docker compose exec app migrate
 ```shell
 docker compose exec app downgrade -1  # or -2 or base or hash of the migration
 ```
+
 ### Tests
 All tests are integrational and require DB connection. 
 
@@ -84,6 +60,7 @@ You can find all the shortcuts in `justfile` or run the following command to lis
 just --list
 ```
 Info about installation can be found [here](https://github.com/casey/just#packages).
+
 ### Backup and Restore database
 We are using `pg_dump` and `pg_restore` to backup and restore the database.
 - Backup

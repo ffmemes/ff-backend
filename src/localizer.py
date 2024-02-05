@@ -1,15 +1,14 @@
-import yaml
 import logging
 from pathlib import Path
 
-localizations = {}
+import yaml
 
 # not sure where to put this const
 DEFAULT_LANG = "en"
 
 
 def load():
-    """ Concatenates all .yml files """
+    """Concatenates all .yml files"""
 
     localizations = {}
     localization_files_dir = Path(__file__).parent.parent / "static/localization"
@@ -24,11 +23,11 @@ def load():
     return localizations
 
 
-def t(
-    key: str, 
-    lang: str | None
-) -> str:
+def t(key: str, lang: str | None) -> str:
     if lang is None or lang not in localizations[key]:
         lang = DEFAULT_LANG
 
     return localizations[key][lang]
+
+
+localizations = load()

@@ -8,7 +8,9 @@ from telegram.ext import ContextTypes
 from src.tgbot.logs import log
 
 
-async def send_stacktrace_to_tg_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def send_stacktrace_to_tg_chat(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+):
     user_id = update.effective_user.id
     logging.error("Exception while handling an update:", exc_info=context.error)
 
@@ -22,8 +24,7 @@ async def send_stacktrace_to_tg_chat(update: Update, context: ContextTypes.DEFAU
         tb_string = tb_string[-4000:]
 
     message = (
-        f"An exception was raised while handling an update\n"
-        f"<pre>{tb_string}</pre>"
+        f"An exception was raised while handling an update\n" f"<pre>{tb_string}</pre>"
     )
 
     await context.bot.send_message(

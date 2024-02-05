@@ -11,7 +11,7 @@ class TgChannelPostParsingResult(CustomModel):
     views: int
     date: datetime
 
-    mentions: list[str] | None = None # mentioned usernames
+    mentions: list[str] | None = None  # mentioned usernames
     hashtags: list[str] | None = None
     forwarded: dict | None = None
     forwarded_url: str | None = None  # url to forwarded post

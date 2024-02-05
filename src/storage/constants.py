@@ -1,7 +1,11 @@
 from enum import Enum
 
-MEME_RAW_TELEGRAM_MEME_SOURCE_POST_UNIQUE_CONSTRAINT = "meme_raw_telegram_meme_source_id_post_id_key"
-MEME_RAW_VK_MEME_SOURCE_POST_UNIQUE_CONSTRAINT = "meme_raw_vk_meme_source_id_post_id_key"
+MEME_RAW_TELEGRAM_MEME_SOURCE_POST_UNIQUE_CONSTRAINT = (
+    "meme_raw_telegram_meme_source_id_post_id_key"
+)
+MEME_RAW_VK_MEME_SOURCE_POST_UNIQUE_CONSTRAINT = (
+    "meme_raw_vk_meme_source_id_post_id_key"
+)
 MEME_MEME_SOURCE_RAW_MEME_UNIQUE_CONSTRAINT = "meme_meme_source_id_raw_meme_id_key"
 
 
@@ -33,7 +37,7 @@ class MemeStatus(str, Enum):
     DUPLICATE = "duplicate"
     AD = "ad"
     BROKEN_CONTENT_LINK = "broken_content_link"
-    
+
     # TODO: more statuses?
     # IN_MODERATION = "in_moderation"
 
@@ -45,5 +49,7 @@ class Language(str, Enum):
 
 
 SUPPORTED_LANGUAGES = [
-    Language.RU, Language.EN, Language.UK,
+    Language.RU,
+    Language.EN,
+    Language.UK,
 ]

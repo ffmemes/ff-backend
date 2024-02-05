@@ -1,25 +1,71 @@
 from random import choice
 
-from telegram import Update, Message
+from telegram import Message, Update
 from telegram.constants import ParseMode
 
 from src.config import settings
 
 
 def get_random_emoji() -> str:
-    return choice([
-        "👉", "🤖", "🤣", "🌺", "🛠️", 
-        "🐝", "🐌", "🦋", "🦧", "🦔", 
-        "🍭", "🍿", "🎭", "🎲", "🏴‍☠️",
-        "🃏", "💠", "🩵", "🔖", "🗞️", 
-        "🧾", "🎐", "🪒", "🧫", "⚗️", 
-        "🪪", "📟", "🖲️", "🛖", "🗺️", 
-        "🚤", "🦼", "🪈", "🩰", "🏊🏻‍♂️", 
-        "🤺", "🪂", "🥋", "🛼", "🥍", 
-        "🪀", "🫗", "🦪", "🧆", "🫒", 
-        "🪺", "🦩", "🦒", "🫎", "🪿", 
-        "🧤", "🧖🏻‍♂️", "🧌", "🦿", "🍄",
-    ])
+    return choice(
+        [
+            "👉",
+            "🤖",
+            "🤣",
+            "🌺",
+            "🛠️",
+            "🐝",
+            "🐌",
+            "🦋",
+            "🦧",
+            "🦔",
+            "🍭",
+            "🍿",
+            "🎭",
+            "🎲",
+            "🏴‍☠️",
+            "🃏",
+            "💠",
+            "🩵",
+            "🔖",
+            "🗞️",
+            "🧾",
+            "🎐",
+            "🪒",
+            "🧫",
+            "⚗️",
+            "🪪",
+            "📟",
+            "🖲️",
+            "🛖",
+            "🗺️",
+            "🚤",
+            "🦼",
+            "🪈",
+            "🩰",
+            "🏊🏻‍♂️",
+            "🤺",
+            "🪂",
+            "🥋",
+            "🛼",
+            "🥍",
+            "🪀",
+            "🫗",
+            "🦪",
+            "🧆",
+            "🫒",
+            "🪺",
+            "🦩",
+            "🦒",
+            "🫎",
+            "🪿",
+            "🧤",
+            "🧖🏻‍♂️",
+            "🧌",
+            "🦿",
+            "🍄",
+        ]
+    )
 
 
 def get_referral_link(user_id: int, meme_id: int) -> str:
@@ -27,7 +73,9 @@ def get_referral_link(user_id: int, meme_id: int) -> str:
 
 
 def get_referral_html(user_id: int, meme_id: int) -> str:
-    return f"""{get_random_emoji()} <i><a href="{get_referral_link(user_id, meme_id)}">Fast Food Memes</a></i>"""
+    emoji = get_random_emoji()
+    ref_link = get_referral_link(user_id, meme_id)
+    return f"""{emoji} <i><a href="{ref_link}">Fast Food Memes</a></i>"""
 
 
 async def send_or_edit(
