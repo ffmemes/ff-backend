@@ -24,7 +24,6 @@ async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         f"🛜 reaction: user_id={user_id}, meme_id={meme_id}, reaction_id={reaction_id}"
     )
 
-
     await asyncio.gather(
         await update_user_info_counters(user_id),
         update_user_meme_reaction(
@@ -33,8 +32,8 @@ async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             reaction_id=int(reaction_id),
         ),
         next_message(
-                user_id,
-                prev_update=update,
-                prev_reaction_id=int(reaction_id),
-       )
+            user_id,
+            prev_update=update,
+            prev_reaction_id=int(reaction_id),
+        ),
     )
