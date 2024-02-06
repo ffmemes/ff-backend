@@ -1,4 +1,5 @@
 import asyncio
+from string import punctuation
 from typing import Any
 
 from prefect import flow, get_run_logger
@@ -27,6 +28,8 @@ from src.storage.watermark import add_watermark
 async def ocr_meme_content(meme_id: int, content: bytes):
     result = await ocr_content(content)
     if result:
+        s = result.text.translate(str.maketrans("", "", punctuation)).lower()
+        result.text = " ".join(s.split())
         await update_meme(meme_id, ocr_result=result.model_dump(mode="json"))
 
 

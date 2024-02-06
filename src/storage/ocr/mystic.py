@@ -71,7 +71,7 @@ async def ocr_content(
         return None
 
     rows = ocr_result["outputs"][0]["value"]
-    full_text = "\n".join([r[1] for r in rows])
+    full_text = " ".join([r[1] for r in rows])
 
     return OcrResult(
         model=f"mystic:{PIPELINE_ID}",
