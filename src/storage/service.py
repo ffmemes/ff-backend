@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import nulls_first, or_, select, text, bindparam
+from sqlalchemy import bindparam, nulls_first, or_, select, text
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
@@ -283,11 +283,13 @@ async def find_meme_duplicate(meme_id: int, imagetext: str) -> int | None:
         ORDER BY M.id ASC
         LIMIT 1
     """
-    select_query = text(select_query).bindparams(bindparam('meme_id', value=meme_id), bindparam('imagetext', value=imagetext))
+    select_query = text(select_query).bindparams(
+        bindparam("meme_id", value=meme_id), bindparam("imagetext", value=imagetext)
+    )
 
     res = await fetch_one(select_query)
     if res:
-        res = min(meme_id, res['id'])
-        if meme_id != res['id']: # meme_id is not original meme_id
+        res = min(meme_id, res["id"])
+        if meme_id != res["id"]:  # meme_id is not original meme_id
             return res["id"]
     return None
