@@ -270,7 +270,7 @@ async def update_meme_status_of_ready_memes() -> list[dict[str, Any]]:
 
 
 async def find_meme_duplicate(meme_id: int, imagetext: str) -> int | None:
-    if len(imagetext) < 3: # skip all memes with less than 3 letters 
+    if len(imagetext) < 3:  # skip all memes with less than 3 letters
         return None
     select_query = """
         SELECT
