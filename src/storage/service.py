@@ -269,20 +269,21 @@ async def update_meme_status_of_ready_memes() -> list[dict[str, Any]]:
     return await fetch_all(update_query)
 
 
-async def find_meme_duplicate(**kwargs) -> int | None:
-    # For given meme finds a meme with the same content.
-    # Returns the largest meme_id of the duplicates.
-    return None
-
-    # TODO:
+async def find_meme_duplicate(meme_id: int, imagetext: str) -> int | None:
     select_query = """
         SELECT
             M.id
         FROM meme M
-        .........
-        ORDER BY M.id DESC
+        WHERE M.id != {meme_id} 
+            AND ocr_result IS NOT NULL
+            AND similarity(
+                {imagetext},
+                M.ocr_result ->> 'text'
+              ) >= 0.9
+        ORDER BY M.id ASC
         LIMIT 1
     """
+
     res = await fetch_one(text(select_query))
     if res:
         return res["id"]
