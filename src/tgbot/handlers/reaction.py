@@ -25,7 +25,7 @@ async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     )
 
     await asyncio.gather(
-        await update_user_info_counters(user_id),
+        update_user_info_counters(user_id),
         update_user_meme_reaction(
             user_id=user_id,
             meme_id=int(meme_id),
