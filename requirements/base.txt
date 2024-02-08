@@ -3,7 +3,7 @@ alembic==1.13.*
 psycopg2==2.9.*
 python-jose==3.3.*
 SQLAlchemy==2.0.23
-httpx==0.25.*
+httpx==0.26.*
 
 pydantic[email]==2.5.*
 pydantic-settings==2.1.*
@@ -21,3 +21,4 @@ lxml==4.9.*
 python-telegram-bot==20.8
 
 Pillow==10.1.*
+
