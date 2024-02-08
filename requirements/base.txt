@@ -18,6 +18,6 @@ prefect==2.14.*
 beautifulsoup4==4.12.*
 lxml==4.9.*
 
-python-telegram-bot==20.7
+python-telegram-bot==20.8
 
 Pillow==10.1.*
