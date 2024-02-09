@@ -270,18 +270,20 @@ async def update_meme_status_of_ready_memes() -> list[dict[str, Any]]:
 
 
 async def find_meme_duplicate(meme_id: int, imagetext: str) -> int | None:
-    if len(imagetext) < 3:  # skip all memes with less than 3 letters
+    if len(imagetext) <= 11:  # skip all memes with less than 11 letters
         return None
+
     select_query = """
         SELECT
             M.id
         FROM meme M
-        WHERE M.id != :meme_id
+        WHERE M.id < :meme_id
             AND ocr_result IS NOT NULL
             AND similarity(
                 :imagetext,
                 M.ocr_result ->> 'text'
               ) >= 0.9
+            AND M.status != 'duplicate'
         ORDER BY M.id ASC
         LIMIT 1
     """
@@ -291,7 +293,5 @@ async def find_meme_duplicate(meme_id: int, imagetext: str) -> int | None:
 
     res = await fetch_one(select_query)
     if res:
-        res = min(meme_id, res["id"])
-        if meme_id != res["id"]:  # meme_id is not original meme_id
-            return res["id"]
+        return res["id"]
     return None
