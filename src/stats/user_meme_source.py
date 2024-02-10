@@ -22,6 +22,7 @@ async def calculate_user_meme_source_stats() -> None:
         FROM user_meme_reaction R
         INNER JOIN meme M
             ON M.id = R.meme_id
+        WHERE reaction_id IS NOT NULL  -- only reacted
         GROUP BY 1,2
         ON CONFLICT (user_id, meme_source_id) DO
         UPDATE SET
