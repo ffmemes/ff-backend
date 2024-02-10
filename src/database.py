@@ -259,6 +259,16 @@ user_stats = Table(
     ),
 )
 
+crossposting = Table(
+    "crossposting",
+    metadata,
+    Column("channel", String, primary_key=True),
+    Column("meme_id", ForeignKey("meme.id", ondelete="CASCADE"), primary_key=True),
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+    # store stats from each source in json
+    # updated_at to track stats update
+)
+
 
 async def fetch_one(select_query: Select | Insert | Update) -> dict[str, Any] | None:
     async with engine.begin() as conn:
