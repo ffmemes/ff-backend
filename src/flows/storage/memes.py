@@ -25,8 +25,8 @@ from src.storage.upload import (
 from src.storage.watermark import add_watermark
 
 
-async def ocr_meme_content(meme_id: int, content: bytes):
-    result = await ocr_content(content)
+async def ocr_meme_content(meme_id: int, content: bytes, language: str):
+    result = await ocr_content(content, language)
     if result:
         s = result.text.translate(str.maketrans("", "", punctuation)).lower()
         result.text = " ".join(s.split())
@@ -77,7 +77,7 @@ async def upload_memes_to_telegram(
             logger.info(f"Adding watermark to meme {unloaded_meme['id']}.")
             meme_content = add_watermark(meme_original_content)
             if meme_content is None:
-                logger.info(
+                logger.warning(
                     f"Meme {unloaded_meme['id']} was not watermarked, skipping."
                 )
                 continue
@@ -91,14 +91,13 @@ async def upload_memes_to_telegram(
         )
         await asyncio.sleep(2)  # flood control
         if meme is None:
-            logger.info(
+            logger.warning(
                 f"Meme {unloaded_meme['id']} was not uploaded to Telegram, skipping."
             )
             continue
 
-        meme[
-            "__original_content"
-        ] = meme_original_content  # HACK: to save original content for OCR
+        # HACK: to save original content for OCR
+        meme["__original_content"] = meme_original_content
         memes.append(meme)
 
     return memes
@@ -121,7 +120,9 @@ async def tg_meme_pipeline() -> None:
     memes = await upload_memes_to_telegram(unloaded_memes)
 
     for meme in memes:
-        await ocr_meme_content(meme["id"], meme["__original_content"])
+        await ocr_meme_content(
+            meme["id"], meme["__original_content"], meme["language_code"]
+        )
 
     # next step of a pipeline
     await final_meme_pipeline()
@@ -143,7 +144,9 @@ async def vk_meme_pipeline() -> None:
     memes = await upload_memes_to_telegram(unloaded_memes)
 
     for meme in memes:
-        await ocr_meme_content(meme["id"], meme["__original_content"])
+        await ocr_meme_content(
+            meme["id"], meme["__original_content"], meme["language_code"]
+        )
 
     # next step of a pipeline
     await final_meme_pipeline()
@@ -190,7 +193,7 @@ async def ocr_uploaded_memes(limit=100):
             await update_meme(meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK)
             continue
 
-        await ocr_meme_content(meme["id"], meme_original_content)
+        await ocr_meme_content(meme["id"], meme_original_content, meme["language_code"])
         await asyncio.sleep(2)  # flood control
 
     # await final_meme_pipeline()

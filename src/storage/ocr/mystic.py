@@ -32,8 +32,8 @@ async def load_file_to_mystic(file_content: bytes) -> str:
 
 async def ocr_mystic_file_path(
     mystic_file_path: str,
+    language: str,
     pipeline_id: str = PIPELINE_ID,
-    language: str = "ru",
 ) -> dict[str, Any]:
     async with httpx.AsyncClient() as client:
         response = await client.post(
@@ -56,12 +56,10 @@ async def ocr_mystic_file_path(
         return response.json()
 
 
-async def ocr_content(
-    content: bytes,
-) -> OcrResult | None:
+async def ocr_content(content: bytes, language: str) -> OcrResult | None:
     try:
         mystic_file_path = await load_file_to_mystic(content)
-        ocr_result = await ocr_mystic_file_path(mystic_file_path)
+        ocr_result = await ocr_mystic_file_path(mystic_file_path, language)
     except Exception as e:
         print(f"Mystic OCR error: {e}")
         return None
