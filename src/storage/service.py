@@ -225,7 +225,7 @@ async def get_unloaded_tg_memes() -> list[dict[str, Any]]:
                 OR meme.status = 'broken_content_link'
             )
             AND MRT.media->0->>'url' IS NOT NULL
-            AND MRT.updated_at >= NOW() - INTERVAL '24 hours'
+            AND COALESCE(MRT.updated_at, MRT.created_at) >= NOW() - INTERVAL '24 hours'
     """
     return await fetch_all(text(select_query))
 
