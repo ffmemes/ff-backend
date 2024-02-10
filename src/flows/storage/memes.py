@@ -65,8 +65,8 @@ async def upload_memes_to_telegram(
             unloaded_meme["content_url"]
         )
         if meme_original_content is None:
-            logger.info(
-                f"Meme {unloaded_meme['id']} content is not available to download."
+            logger.warning(
+                f"Can't download {unloaded_meme['id']}/{unloaded_meme['type']} content"
             )
             await update_meme(
                 unloaded_meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK
@@ -116,7 +116,7 @@ async def tg_meme_pipeline() -> None:
     await etl_memes_from_raw_telegram_posts()
 
     logger.info("Getting unloaded memes to upload to Telegram.")
-    unloaded_memes = await get_unloaded_tg_memes()
+    unloaded_memes = await get_unloaded_tg_memes(limit=100)
     memes = await upload_memes_to_telegram(unloaded_memes)
 
     for meme in memes:

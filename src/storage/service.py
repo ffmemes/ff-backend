@@ -116,30 +116,37 @@ async def etl_memes_from_raw_telegram_posts() -> None:
             published_at
         )
         SELECT
-            DISTINCT ON (COALESCE(forwarded_url, random()::text))
-            meme_source_id,
-            meme_raw_telegram.id AS raw_meme_id,
-            content AS caption,
+            DISTINCT ON (COALESCE(MRT.forwarded_url, random()::text))
+            MRT.meme_source_id,
+            MRT.id AS raw_meme_id,
+            MRT.content AS caption,
             'created' AS status,
             CASE
                 WHEN media->0->>'duration' IS NOT NULL THEN 'video'
                 ELSE 'image'
             END AS type,
-            meme_source.language_code AS language_code,
-            date AS published_at
-        FROM meme_raw_telegram
-        LEFT JOIN meme_source
-            ON meme_source.id = meme_raw_telegram.meme_source_id
-        WHERE JSONB_ARRAY_LENGTH(media) = 1
-        ON CONFLICT DO NOTHING
+            MS.language_code AS language_code,
+            MRT.date AS published_at
+        FROM meme_raw_telegram MRT
+        INNER JOIN meme_source MS
+            ON MS.id = MRT.meme_source_id
+        WHERE 1=1
+            AND JSONB_ARRAY_LENGTH(MRT.media) = 1
+            AND COALESCE(MRT.updated_at, MRT.created_at) >= NOW() - INTERVAL '24 hours'
+        ON CONFLICT (meme_source_id, raw_meme_id)
+        DO UPDATE
+        SET
+            status = CASE
+                WHEN meme.status != 'broken_content_link'
+                THEN meme.status
+                ELSE 'created'
+            END
     """
     await execute(text(insert_query))
-    # TODO: if a meme content failed to be uploaded to tg
-    # then its status will be BROKEN_CONTENT_LINK forewer now.
 
 
 async def etl_memes_from_raw_vk_posts() -> None:
-    insert_query = f"""
+    insert_query = """
         INSERT INTO meme (
             meme_source_id,
             raw_meme_id,
@@ -150,18 +157,28 @@ async def etl_memes_from_raw_vk_posts() -> None:
             published_at
         )
         SELECT
-            meme_source_id,
-            meme_raw_vk.id AS raw_meme_id,
-            content AS caption,
-            '{MemeStatus.CREATED.value}' AS status,
-            '{MemeType.IMAGE.value}' AS type,
-            meme_source.language_code AS language_code,
-            date AS published_at
-        FROM meme_raw_vk
-        LEFT JOIN meme_source
-            ON meme_source.id = meme_raw_vk.meme_source_id
-        WHERE JSONB_ARRAY_LENGTH(media) = 1
-        ON CONFLICT DO NOTHING
+            MRV.meme_source_id,
+            MRV.id AS raw_meme_id,
+            MRV.content AS caption,
+            'created' AS status,
+            'image' AS type,
+            MS.language_code AS language_code,
+            MRV.date AS published_at
+        FROM meme_raw_vk AS MRV
+        LEFT JOIN meme_source AS MS
+            ON MS.id = MRV.meme_source_id
+        WHERE 1=1
+            -- only one attachment
+            AND JSONB_ARRAY_LENGTH(MRV.media) = 1
+            AND COALESCE(MRV.updated_at, MRV.created_at) >= NOW() - INTERVAL '24 hours'
+        ON CONFLICT (meme_source_id, raw_meme_id)
+        DO UPDATE
+        SET
+            status = CASE
+                WHEN meme.status != 'broken_content_link'
+                THEN meme.status
+                ELSE 'created'
+            END
     """
     await execute(text(insert_query))
 
@@ -205,9 +222,9 @@ async def get_memes_to_ocr(limit=100):
     return await fetch_all(text(select_query))
 
 
-async def get_unloaded_tg_memes() -> list[dict[str, Any]]:
+async def get_unloaded_tg_memes(limit) -> list[dict[str, Any]]:
     """Returns only MemeType.IMAGE memes"""
-    select_query = """
+    select_query = f"""
         SELECT
             meme.id,
             meme.type,
@@ -226,6 +243,7 @@ async def get_unloaded_tg_memes() -> list[dict[str, Any]]:
             )
             AND MRT.media->0->>'url' IS NOT NULL
             AND COALESCE(MRT.updated_at, MRT.created_at) >= NOW() - INTERVAL '24 hours'
+        LIMIT {limit}
     """
     return await fetch_all(text(select_query))
 

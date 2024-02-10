@@ -37,7 +37,7 @@ async def parse_telegram_source(
     description="Flow for parsing telegram channels to get posts",
 )
 async def parse_telegram_sources(
-    sources_batch_size=10,
+    sources_batch_size=20,
     nposts=10,
 ) -> None:
     logger = get_run_logger()
