@@ -160,7 +160,9 @@ async def final_meme_pipeline() -> None:
         await analyse_meme_caption(meme)
 
         # TODO: check if we have meme with a same content in db
-        duplicate_meme_id = await find_meme_duplicate()
+        duplicate_meme_id = await find_meme_duplicate(
+            meme["id"], meme["ocr_result"]["text"]
+        )
         if duplicate_meme_id:
             await update_meme(
                 meme["id"], status=MemeStatus.DUPLICATE, duplicate_of=duplicate_meme_id
