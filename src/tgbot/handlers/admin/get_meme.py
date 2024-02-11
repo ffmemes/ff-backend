@@ -43,11 +43,9 @@ async def handle_get_meme(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         *[get_meme_by_id(meme_id) for meme_id in meme_ids]
     )
     memes = [
-        MemeData(**meme) for meme in memes_data
-        if
-        meme is not None
-        and
-        meme["telegram_file_id"] is not None
+        MemeData(**meme)
+        for meme in memes_data
+        if meme is not None and meme["telegram_file_id"] is not None
     ]
     if not memes:
         await update.message.reply_text(
