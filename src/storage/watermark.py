@@ -16,6 +16,7 @@ def draw_text_with_outline(draw, position, text, font, text_colour, outline_colo
                 draw.text((x + adj, y + ops), text, font=font, fill=outline_colour)
     draw.text(position, text, font=font, fill=text_colour)
 
+
 def select_wm_colour(base_brightness) -> tuple:
     # if base_brightness > 128:
     if base_brightness > 178:
@@ -39,10 +40,11 @@ def calculate_corners(img_w, img_h, text_bbox, margin) -> list:
         (margin, margin),  # Top-left
         (img_w - text_width - margin, margin),  # Top-right
         (margin, img_h - text_height - margin),  # Bottom-left
-        (img_w - text_width - margin, img_h - text_height - margin)  # Bottom-right
+        (img_w - text_width - margin, img_h - text_height - margin),  # Bottom-right
     ]
 
     return corners
+
 
 def check_font(text, font_path, font_family, image, width_ratio):
     fontsize = image.size[0] * width_ratio // 2
@@ -57,18 +59,19 @@ def check_font(text, font_path, font_family, image, width_ratio):
 def draw_corner_watermark(
     image_bytes: BytesIO,
     text: str,
-    font_family: str = "Switzer-Variable.ttf", # "Gidole-Regular.ttf",
-    width_ratio: float = .07,
-    text_opacity: float =.7,
-    margin: int = 20
+    font_family: str = "Switzer-Variable.ttf",  # "Gidole-Regular.ttf",
+    width_ratio: float = 0.07,
+    text_opacity: float = 0.7,
+    margin: int = 20,
 ) -> Image:
-
     with Image.open(image_bytes).convert("RGBA") as base:
         txt = Image.new("RGBA", base.size, (255, 255, 255, 0))
 
         d = ImageDraw.Draw(txt)
         # ratio of text on the image
-        fonts_files_dir = Path(__file__).parent.parent.parent / "static/localization/fonts"
+        fonts_files_dir = (
+            Path(__file__).parent.parent.parent / "static/localization/fonts"
+        )
         font = check_font(text, fonts_files_dir, font_family, base, width_ratio)
         # calculate size of textbox
         text_bbox = d.textbbox((0, 0), text, font=font)
@@ -81,12 +84,18 @@ def draw_corner_watermark(
         base_brightness = sum(base.getpixel(text_position)[:3]) / 3
         text_colour = select_wm_colour(base_brightness)
         # define outline colour (opposite of text colour for contrast)
-        outline_colour = (0, 0, 0, 255) if text_colour == (255, 255, 255, 255) else (255, 255, 255, 255)
-        draw_text_with_outline(d, text_position, text, font, text_colour, outline_colour)
+        outline_colour = (
+            (0, 0, 0, 255)
+            if text_colour == (255, 255, 255, 255)
+            else (255, 255, 255, 255)
+        )
+        draw_text_with_outline(
+            d, text_position, text, font, text_colour, outline_colour
+        )
         # text opacity
-        txt.putalpha(txt.getchannel('A').point(lambda x: x * text_opacity))
+        txt.putalpha(txt.getchannel("A").point(lambda x: x * text_opacity))
         # overlay image of each other
-        return Image.alpha_composite(base, txt).convert('RGB')
+        return Image.alpha_composite(base, txt).convert("RGB")
 
 
 # TODO: async?
@@ -94,17 +103,14 @@ def add_watermark(image_content: bytes) -> BytesIO | None:
     image_bytes = BytesIO(image_content)
 
     try:
-        image = draw_corner_watermark(
-            image_bytes,
-            text='@ffmemesbot'
-        )
+        image = draw_corner_watermark(image_bytes, text="@ffmemesbot")
     except Exception as e:
-        print(f'Error while adding watermark: {e}')
+        print(f"Error while adding watermark: {e}")
         return None
 
     buff = BytesIO()
-    buff.name = 'image.jpeg'
-    image.save(buff, 'JPEG')
+    buff.name = "image.jpeg"
+    image.save(buff, "JPEG")
     buff.seek(0)
 
     return buff
