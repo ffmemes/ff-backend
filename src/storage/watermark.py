@@ -1,7 +1,8 @@
-from pathlib import Path
-import random
 import logging
+import random
 from io import BytesIO
+from pathlib import Path
+
 from PIL import Image, ImageDraw, ImageFont
 
 
@@ -11,7 +12,7 @@ def draw_text_with_outline(draw, position, text, font, text_colour, outline_colo
     for adj in range(-1, 2):
         for ops in range(-1, 2):
             # Avoid the center pixel
-            if adj != 0 or ops != 0:  
+            if adj != 0 or ops != 0:
                 draw.text((x + adj, y + ops), text, font=font, fill=outline_colour)
     draw.text(position, text, font=font, fill=text_colour)
 
@@ -23,14 +24,14 @@ def select_wm_colour(base_brightness) -> tuple:
     else:
         # White text for darker background
         text_colour = (255, 255, 255, 255)
-    
+
     return text_colour
 
 
 def calculate_corners(img_w, img_h, text_bbox, margin) -> list:
     # Estimate text size rely on font and text box
     # the (0, 0) is the starting position. return tuple (x1, y1, x2, y2)
-    
+
     text_width = text_bbox[2] - text_bbox[0]
     text_height = text_bbox[3] - text_bbox[1]
     # Choose a random corner for the text
@@ -48,7 +49,7 @@ def check_font(text, font_path, font_family, image, width_ratio):
     # static/localization/fonts/Gidole-Regular.ttf
     font_file = Path(font_path) / font_family
     font = ImageFont.truetype(str(font_file), fontsize)
-    
+
     logging.info(f"Loaded {font} font.")
     return font
 
@@ -61,10 +62,10 @@ def draw_corner_watermark(
     text_opacity: float =.7,
     margin: int = 20
 ) -> Image:
-    
+
     with Image.open(image_bytes).convert("RGBA") as base:
         txt = Image.new("RGBA", base.size, (255, 255, 255, 0))
-        
+
         d = ImageDraw.Draw(txt)
         # ratio of text on the image
         fonts_files_dir = Path(__file__).parent.parent.parent / "static/localization/fonts"
