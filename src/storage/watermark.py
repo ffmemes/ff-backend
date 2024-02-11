@@ -1,5 +1,7 @@
+import logging
 import random
 from io import BytesIO
+from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -9,7 +11,8 @@ def draw_text_with_outline(draw, position, text, font, text_colour, outline_colo
     # Draw outline
     for adj in range(-1, 2):
         for ops in range(-1, 2):
-            if adj != 0 or ops != 0:  # Avoid the center pixel
+            # Avoid the center pixel
+            if adj != 0 or ops != 0:
                 draw.text((x + adj, y + ops), text, font=font, fill=outline_colour)
     draw.text(position, text, font=font, fill=text_colour)
 
@@ -43,26 +46,41 @@ def calculate_corners(img_w, img_h, text_bbox, margin) -> list:
     return corners
 
 
+def check_font(text, font_path, font_family, image, width_ratio):
+    fontsize = image.size[0] * width_ratio // 2
+    # static/localization/fonts/Gidole-Regular.ttf
+    font_file = Path(font_path) / font_family
+    font = ImageFont.truetype(str(font_file), fontsize)
+
+    logging.info(f"Loaded {font} font.")
+    return font
+
+
 def draw_corner_watermark(
-    image_bytes: BytesIO, text: str, text_size: int = 14, margin: int = 24
+    image_bytes: BytesIO,
+    text: str,
+    font_family: str = "Switzer-Variable.ttf",  # "Gidole-Regular.ttf",
+    width_ratio: float = 0.07,
+    text_opacity: float = 0.7,
+    margin: int = 20,
 ) -> Image:
     with Image.open(image_bytes).convert("RGBA") as base:
         txt = Image.new("RGBA", base.size, (255, 255, 255, 0))
 
-        # try:
-        #     fnt = ImageFont.truetype('Arial.ttf', text_size)
-        # except IOError:
-        #     fnt = ImageFont.load_default()
-
-        fnt = ImageFont.load_default()
         d = ImageDraw.Draw(txt)
+        # ratio of text on the image
+        fonts_files_dir = (
+            Path(__file__).parent.parent.parent / "static/localization/fonts"
+        )
+        font = check_font(text, fonts_files_dir, font_family, base, width_ratio)
         # calculate size of textbox
-        text_bbox = d.textbbox((0, 0), text, font=fnt)
+        text_bbox = d.textbbox((0, 0), text, font=font)
         # choose a random corner for the text
         corners = calculate_corners(
             img_w=base.size[0], img_h=base.size[1], text_bbox=text_bbox, margin=margin
         )
         text_position = random.choice(corners)
+        # average brightness of pixel check and switch between black/white
         base_brightness = sum(base.getpixel(text_position)[:3]) / 3
         text_colour = select_wm_colour(base_brightness)
         # define outline colour (opposite of text colour for contrast)
@@ -71,7 +89,11 @@ def draw_corner_watermark(
             if text_colour == (255, 255, 255, 255)
             else (255, 255, 255, 255)
         )
-        draw_text_with_outline(d, text_position, text, fnt, text_colour, outline_colour)
+        draw_text_with_outline(
+            d, text_position, text, font, text_colour, outline_colour
+        )
+        # text opacity
+        txt.putalpha(txt.getchannel("A").point(lambda x: x * text_opacity))
         # overlay image of each other
         return Image.alpha_composite(base, txt).convert("RGB")
 
@@ -81,9 +103,7 @@ def add_watermark(image_content: bytes) -> BytesIO | None:
     image_bytes = BytesIO(image_content)
 
     try:
-        image = draw_corner_watermark(
-            image_bytes, text="@ffmemesbot", text_size=18, margin=20
-        )
+        image = draw_corner_watermark(image_bytes, text="@ffmemesbot")
     except Exception as e:
         print(f"Error while adding watermark: {e}")
         return None
