@@ -31,6 +31,12 @@ class Reaction(int, Enum):
         return self in (self.LIKE,)
 
 
+USER_SAVE_LANGUAGES_CALLBACK_DATA = "u:save_lang"
+USER_SAVE_LANGUAGES_REGEXP = r"^u:save_lang$"
+
+USER_SET_LANG_PATTERN = "u:set_lang_{on_or_off}:{lang_code}"
+USER_SET_LANG_REGEXP = r"^u:(set_lang_on|set_lang_off):[a-z]{2}$"
+
 MEME_BUTTON_CALLBACK_DATA_PATTERN = "r:{meme_id}:{reaction_id}"
 MEME_BUTTON_CALLBACK_DATA_REGEXP = "^r:"
 

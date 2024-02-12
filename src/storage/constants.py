@@ -47,6 +47,14 @@ class Language(str, Enum):
     EN = "en"
     UK = "uk"
 
+    def __init__(self, value: str):
+        emojis = {
+            "ru": "🇷🇺",
+            "en": "🇺🇸",
+            "uk": "🇬🇧",
+        }
+        self.emoji = emojis[value]
+
 
 SUPPORTED_LANGUAGES = [
     Language.RU,

@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
     execute,
+    fetch_all,
     fetch_one,
     meme,
     meme_source,
@@ -122,6 +123,15 @@ async def update_meme_source(
     )
 
     return await fetch_one(update_statement)
+
+
+async def get_user_languages(
+    user_id: int,
+) -> list[str]:
+    select_statement = select(user_language.c.language_code).where(
+        user_language.c.user_id == user_id
+    )
+    return await fetch_all(select_statement)
 
 
 async def add_user_language(
