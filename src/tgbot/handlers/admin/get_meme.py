@@ -57,4 +57,6 @@ async def handle_get_meme(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     elif len(memes) == 1:
         await send_new_message_with_meme(update.effective_user.id, memes[0])
     else:
-        await send_album_with_memes(update.effective_user.id, memes)
+        # divide memes in batches of up to 10
+        for i in range(0, len(memes), 10):
+            await send_album_with_memes(update.effective_user.id, memes[i:i + 10])
