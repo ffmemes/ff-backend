@@ -16,8 +16,10 @@ from src.tgbot.constants import (
     MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA,
     MEME_SOURCE_SET_LANG_REGEXP,
     MEME_SOURCE_SET_STATUS_REGEXP,
+    USER_SAVE_LANGUAGES_REGEXP,
+    USER_SET_LANG_REGEXP,
 )
-from src.tgbot.handlers import alerts, block, broken, reaction, start, upload
+from src.tgbot.handlers import alerts, block, broken, language, reaction, start, upload
 from src.tgbot.handlers.admin import get_meme
 from src.tgbot.handlers.error import send_stacktrace_to_tg_chat
 from src.tgbot.handlers.moderator import meme_source
@@ -84,9 +86,33 @@ def add_handlers(application: Application) -> None:
             pattern=MEME_SOURCE_SET_STATUS_REGEXP,
         )
     )
+
+    # user blocked bot handler
     application.add_handler(
         ChatMemberHandler(
             block.user_blocked_bot_handler, ChatMemberHandler.MY_CHAT_MEMBER
+        )
+    )
+
+    # language handlers
+    application.add_handler(
+        CommandHandler(
+            ("lang", "language"),
+            language.handle_language_command_or_callback,
+        )
+    )
+
+    application.add_handler(
+        CallbackQueryHandler(
+            language.handle_language_command_or_callback,
+            pattern=USER_SET_LANG_REGEXP,
+        )
+    )
+
+    application.add_handler(
+        CallbackQueryHandler(
+            language.handle_set_language_callback,
+            pattern=USER_SAVE_LANGUAGES_REGEXP,
         )
     )
 

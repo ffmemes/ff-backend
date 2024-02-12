@@ -5,13 +5,13 @@ from telegram.ext import ContextTypes
 
 from src.tgbot.constants import UserType
 from src.tgbot.handlers.deep_link import handle_deep_link_used
-from src.tgbot.handlers.language import init_user_languages_from_tg_user
 from src.tgbot.handlers.onboarding import onboarding_flow
 from src.tgbot.senders.next_message import next_message
 from src.tgbot.service import (
     save_tg_user,
     save_user,
 )
+from src.tgbot.utils import init_user_languages_from_tg_user
 
 
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
