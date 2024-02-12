@@ -27,7 +27,7 @@ async def handle_language_command_or_callback(
         )
         await update.message.reply_text(
             text=localizer.t("choose_your_language", user_info["language_code"]),
-            reply_markup=user_language_selection_keyboard(languages)
+            reply_markup=user_language_selection_keyboard(languages),
         )
         return
 
@@ -61,4 +61,3 @@ async def handle_set_language_callback(
     user_id = update.effective_user.id
     await update.callback_query.message.delete()
     await next_message(user_id, update)
-

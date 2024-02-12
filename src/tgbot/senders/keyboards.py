@@ -90,7 +90,7 @@ def meme_source_change_status_keyboard(meme_source_id: int):
 
 @cache
 def user_language_selection_keyboard(
-    enabled_langs: Tuple[Language]
+    enabled_langs: Tuple[Language],
 ) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
