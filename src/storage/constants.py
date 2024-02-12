@@ -51,7 +51,7 @@ class Language(str, Enum):
         emojis = {
             "ru": "🇷🇺",
             "en": "🇺🇸",
-            "uk": "🇬🇧",
+            "uk": "🇺🇦",
         }
         self.emoji = emojis[value]
 
