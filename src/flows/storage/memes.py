@@ -172,9 +172,7 @@ async def final_meme_pipeline() -> None:
     memes = await get_pending_memes()
     logger.info(f"Final meme pipeline has {len(memes)} pending memes.")
 
-    await asyncio.gather(
-        *[meme_final_pipeline(meme) for meme in memes]
-    )
+    await asyncio.gather(*[meme_final_pipeline(meme) for meme in memes])
 
     # next step of a pipeline
     await update_meme_status_of_ready_memes()
