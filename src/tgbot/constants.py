@@ -1,9 +1,5 @@
 from enum import Enum
 
-from src.storage.constants import Language
-
-DEFAULT_USER_LANGUAGE = Language.EN
-
 
 class UserType(str, Enum):
     WAITLIST = "waitlist"
@@ -11,7 +7,7 @@ class UserType(str, Enum):
     ACTIVE_USER = "active_user"
     SUPER_USER = "super_user"
 
-    GHOSTED = "ghosted"  # ignoring the bot
+    # GHOSTED = "ghosted"  # ignoring the bot
     BLOCKED_BOT = "blocked_bot"
 
     MODERATOR = "moderator"

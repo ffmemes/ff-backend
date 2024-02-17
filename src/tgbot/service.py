@@ -7,13 +7,13 @@ from sqlalchemy.dialects.postgresql import insert
 from src.database import (
     execute,
     fetch_one,
+    fetch_all,
     meme,
     meme_source,
     user,
     user_language,
     user_tg,
 )
-from src.storage.constants import Language
 
 
 async def save_tg_user(
@@ -34,24 +34,30 @@ async def save_tg_user(
     # do not return the same data
 
 
-async def save_user(
+async def create_user(
     id: int,
-    **kwargs,
 ) -> None:
-    insert_statement = (
-        insert(user)
-        .values({"id": id, **kwargs})
-        .on_conflict_do_update(
-            index_elements=(user.c.id,),
-            set_={
-                "last_active_at": datetime.utcnow(),
-                "blocked_bot_at": None,
-            },
-        )
-        .returning(user)
-    )
+    """
+    Creates a row in user table
+    If a user is already exist, it updates user's status (real sql below)
+    """
+    sql = f"""
+        INSERT
+        INTO "user"
+        (id, type, last_active_at)
+        VALUES ({id}, 'waitlist', NOW())
+        ON CONFLICT(id)
+        DO UPDATE SET
+            blocked_bot_at = NULL,
+            last_active_at = NOW(),
+            type = CASE
+                WHEN "user".type = 'blocked_bot' THEN 'waitlist'
+                ELSE "user".type
+            END
+        RETURNING "user".id, "user".type
+    """
 
-    return await fetch_one(insert_statement)
+    return await fetch_one(text(sql))
 
 
 async def get_user_by_id(
@@ -124,9 +130,17 @@ async def update_meme_source(
     return await fetch_one(update_statement)
 
 
+async def get_user_languages(
+    user_id: int,
+) -> set[str]:
+    select_statement = select(user_language).where(user_language.c.user_id == user_id)
+    rows = await fetch_all(select_statement)
+    return set(row["language_code"] for row in rows)
+
+
 async def add_user_language(
     user_id: int,
-    language_code: Language,
+    language_code: str,
 ) -> None:
     insert_language_query = (
         insert(user_language)
@@ -141,7 +155,7 @@ async def add_user_language(
 
 async def del_user_language(
     user_id: int,
-    language_code: Language,
+    language_code: str,
 ) -> None:
     delete_language_query = (
         user_language.delete()
@@ -167,17 +181,17 @@ async def get_user_info(
             GROUP BY 1
         ),
         USER_INTERFACE_LANG AS (
-            SELECT DISTINCT ON (user_tg.id)
-                id,
-                COALESCE(
-                    user_language.language_code,
-                    user_tg.language_code
-                ) interface_lang
-            FROM user_tg
-            LEFT JOIN user_language
-                ON user_language.user_id = user_tg.id
-                AND user_language.language_code != 'en'
-            WHERE user_tg.id = {user_id}
+            SELECT DISTINCT ON (user_id)
+                user_id,
+                language_code AS interface_lang,
+                CASE
+                    WHEN language_code = 'en' THEN 0
+                    WHEN language_code = 'ru' THEN 1
+                    ELSE 2
+                END score
+            FROM user_language UL
+            WHERE user_id = {user_id}
+            ORDER BY 1, 3 DESC
         )
 
         SELECT
@@ -189,7 +203,7 @@ async def get_user_info(
         LEFT JOIN user_stats US
             ON US.user_id = U.id
         LEFT JOIN USER_INTERFACE_LANG UIL
-            ON UIL.id = U.id
+            ON UIL.user_id = U.id
         LEFT JOIN MEMES_WATCHED_TODAY
             ON MEMES_WATCHED_TODAY.user_id = U.id
         WHERE U.id = {user_id}

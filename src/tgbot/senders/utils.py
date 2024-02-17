@@ -82,18 +82,19 @@ async def send_or_edit(
     prev_update: Update,
     text: str,
     reply_markup: dict,
+    disable_web_page_preview: bool = True,
 ) -> Message:
     if prev_update.callback_query is not None:
         return await prev_update.callback_query.message.edit_text(
             text=text,
             reply_markup=reply_markup,
             parse_mode=ParseMode.HTML,
-            disable_web_page_preview=True,
+            disable_web_page_preview=disable_web_page_preview,
         )
 
     return await prev_update.message.reply_text(
         text=text,
         reply_markup=reply_markup,
         parse_mode=ParseMode.HTML,
-        disable_web_page_preview=True,
+        disable_web_page_preview=disable_web_page_preview,
     )

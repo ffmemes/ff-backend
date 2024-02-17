@@ -17,7 +17,7 @@ from src.tgbot.constants import (
     MEME_SOURCE_SET_LANG_REGEXP,
     MEME_SOURCE_SET_STATUS_REGEXP,
 )
-from src.tgbot.handlers import alerts, block, broken, reaction, start, upload
+from src.tgbot.handlers import alerts, block, broken, reaction, start, upload, waitlist
 from src.tgbot.handlers.admin import get_meme
 from src.tgbot.handlers.error import send_stacktrace_to_tg_chat
 from src.tgbot.handlers.moderator import meme_source
@@ -34,6 +34,40 @@ def add_handlers(application: Application) -> None:
         )
     )
 
+    # waitlist flow
+    # language choose page
+    application.add_handler(
+        CallbackQueryHandler(
+            waitlist.handle_waitlist_choose_language,
+            pattern=waitlist.WAITLIST_CHOOSE_LANGUAGE_PAGE_CALLBACK_DATA,
+        )
+    )
+
+    # select language button
+    application.add_handler(
+        CallbackQueryHandler(
+            waitlist.handle_waitlist_language_button,
+            pattern=waitlist.WAITLIST_LANGUAGE_CHANGE_CALLBACK_PATTERN,
+        )
+    )
+
+    # finish language selection -> show channel sub page
+    application.add_handler(
+        CallbackQueryHandler(
+            waitlist.handle_waitlist_channel_subscription,
+            pattern=waitlist.WAITLIST_CHANNEL_SUBSCTIBTION_PAGE_CALLBACK_DATA,
+        )
+    )
+
+    # check channel subscription button
+    application.add_handler(
+        CallbackQueryHandler(
+            waitlist.handle_check_channel_subscription,
+            pattern=waitlist.WAITLIST_CHANNEL_SUBSCRIBTION_CHECK_CALLBACK_DATA,
+        )
+    )
+
+    # meme reaction
     application.add_handler(
         CallbackQueryHandler(
             reaction.handle_reaction,
@@ -41,6 +75,7 @@ def add_handlers(application: Application) -> None:
         )
     )
 
+    # meme upload by a user
     application.add_handler(
         MessageHandler(
             filters=filters.ChatType.PRIVATE & filters.FORWARDED & filters.ATTACHMENT,
@@ -84,6 +119,8 @@ def add_handlers(application: Application) -> None:
             pattern=MEME_SOURCE_SET_STATUS_REGEXP,
         )
     )
+
+    # user blocked bot handler
     application.add_handler(
         ChatMemberHandler(
             block.user_blocked_bot_handler, ChatMemberHandler.MY_CHAT_MEMBER
@@ -92,6 +129,7 @@ def add_handlers(application: Application) -> None:
 
     application.add_error_handler(send_stacktrace_to_tg_chat)
 
+    # show meme / memes by ids
     application.add_handler(
         CommandHandler(
             "meme",

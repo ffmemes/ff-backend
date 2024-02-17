@@ -46,20 +46,19 @@ def calculate_corners(img_w, img_h, text_bbox, margin) -> list:
     return corners
 
 
-def check_font(text, font_path, font_family, image, width_ratio):
+def check_font(font_path, font_family, image, width_ratio):
     fontsize = image.size[0] * width_ratio // 2
-    # static/localization/fonts/Gidole-Regular.ttf
     font_file = Path(font_path) / font_family
     font = ImageFont.truetype(str(font_file), fontsize)
 
-    logging.info(f"Loaded {font} font.")
+    logging.info(f"Loaded font from {font_file}.")
     return font
 
 
 def draw_corner_watermark(
     image_bytes: BytesIO,
     text: str,
-    font_family: str = "Switzer-Variable.ttf",  # "Gidole-Regular.ttf",
+    font_family: str = "Switzer-Variable.ttf",
     width_ratio: float = 0.07,
     text_opacity: float = 0.7,
     margin: int = 20,
@@ -69,10 +68,8 @@ def draw_corner_watermark(
 
         d = ImageDraw.Draw(txt)
         # ratio of text on the image
-        fonts_files_dir = (
-            Path(__file__).parent.parent.parent / "static/localization/fonts"
-        )
-        font = check_font(text, fonts_files_dir, font_family, base, width_ratio)
+        fonts_files_dir = Path(__file__).parent.parent.parent / "static/fonts"
+        font = check_font(fonts_files_dir, font_family, base, width_ratio)
         # calculate size of textbox
         text_bbox = d.textbbox((0, 0), text, font=font)
         # choose a random corner for the text

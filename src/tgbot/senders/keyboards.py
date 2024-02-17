@@ -4,7 +4,6 @@ from telegram import (
 )
 
 from src.storage.constants import (
-    SUPPORTED_LANGUAGES,
     MemeSourceStatus,
 )
 from src.tgbot.constants import (
@@ -61,7 +60,7 @@ def meme_source_language_selection_keyboard(meme_source_id: int):
                         meme_source_id=meme_source_id, lang_code=lang_code
                     ),
                 )
-                for lang_code in SUPPORTED_LANGUAGES
+                for lang_code in ["ru", "uk", "en", "es"]
             ]
         ]
     )
