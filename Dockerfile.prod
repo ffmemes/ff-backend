@@ -22,6 +22,4 @@ RUN useradd -m -d /src -s /bin/bash app \
 
 WORKDIR /src
 
-ENV ENVIRONMENT=PRODUCTION
-
 CMD ["./scripts/start-prod.sh"]
