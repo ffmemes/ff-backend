@@ -71,7 +71,22 @@ onboarding_invitation_successfull_alert:
     Keep sharing memes from the bot and you may be rewarded 🤫🔺💎
   ru: |-
     🎉 Твой друг {invited_user_name} только что зашел в бота.
-    Продолжай перессылать наши мемы и мб когда-нибудь зачтется 🤫🔺💎
+    Продолжай пересылать наши мемы и мб когда-нибудь зачтется 🤫🔺💎
   uk: |-
     🎉 Твій друг {invited_user_name} тільки що заходив в бота.
     Продовжуй пересилати наші меми і може колись тобі щось зачіпає 🤫🔺💎
+  es: |-
+    🎉 ¡Tu amigo {invited_user_name} acaba de unirse al bot!
+    Sigue compartiendo memes del bot y podrías ser recompensado 🤫🔺💎
+  pt: |-
+    🎉 Seu amigo {invited_user_name} acabou de entrar no bot!
+    Continue compartilhando memes do bot e você pode ser recompensado 🤫🔺💎
+  fr: |-
+    🎉 Votre ami {invited_user_name} vient de rejoindre le bot !
+    Continuez à partager des memes du bot et vous pourriez être récompensé 🤫🔺💎
+  it: |-
+    🎉 Il tuo amico {invited_user_name} è appena entrato nel bot!
+    Continua a condividere meme dal bot e potresti essere ricompensato 🤫🔺💎
+  de: |-
+    🎉 Dein Freund {invited_user_name} ist gerade dem Bot beigetreten!
+    Teile weiterhin Memes vom Bot und du wirst vielleicht belohnt 🤫 🔺 💎

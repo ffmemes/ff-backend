@@ -14,9 +14,13 @@ async def handle_deep_link_used(
     E.g. if user was invited, send a msg to invited about used invitation
     """
 
+    # TODO: log all deep link used
     if re.match(LINK_UNDER_MEME_PATTERN, deep_link):
         _, user_id, _ = deep_link.split("_")
         invitor_user_id = int(user_id)
+
+        if invitor_user_id == invited_user["id"]:
+            return
 
         invitor_user = await get_user_by_id(invitor_user_id)
         if not invitor_user:
