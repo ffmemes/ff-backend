@@ -201,7 +201,7 @@ async def handle_check_channel_subscription(
         ).format(channel_link=channel_link),
         show_alert=True,
     )
-    return handle_waitlist_channel_subscription(update, context)
+    return await handle_waitlist_channel_subscription(update, context)
 
 
 async def handle_waitlist_final(
