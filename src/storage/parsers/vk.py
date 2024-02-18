@@ -34,14 +34,15 @@ class VkGroupScraper(Scraper):
         vk_source = _extract_username_from_url(self.source_link)
         self.vk_source_link = "https://vk.com/%s" % vk_source
         r = await self._get_vk_wall(vk_source)
-        if r is None:
+        if r is None or "response" not in r:
+            logger.error(f"Can't parse vk, got response: {r}")
             return []
-        results = []
-        posts = []
+
+        posts = r["response"]["items"]
         posts_count = r["response"]["count"]
-        posts.extend(r["response"]["items"])
         if num_of_posts:
             posts_count = num_of_posts
+
         offset = 100
         while posts_count > len(posts):
             r = await self._get_vk_wall(vk_source, offset)
@@ -49,8 +50,9 @@ class VkGroupScraper(Scraper):
                 break
             posts.extend(r["response"]["items"])
             offset += 100
-            await asyncio.sleep(3)  # to not to DDOS Telegram
-        posts = posts[:num_of_posts]
+            await asyncio.sleep(5)  # to not to DDOS VK
+
+        results = []
         for post in posts:
             post_details = await self.get_post_details(post)
             if post_details:
