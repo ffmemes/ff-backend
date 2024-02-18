@@ -1,9 +1,9 @@
 import asyncio
-from telegram.error import RetryAfter
 from string import punctuation
 from typing import Any
 
 from prefect import flow, get_run_logger
+from telegram.error import RetryAfter
 
 from src.storage import ads
 from src.storage.constants import MemeStatus, MemeType
@@ -91,10 +91,11 @@ async def upload_memes_to_telegram(
                 meme_type=unloaded_meme["type"],
                 content=meme_content,
             )
-            await asyncio.sleep(2)  # flood control
         except RetryAfter as e:
             logger.warning(f"Flood control exceeded: {e}")
             await asyncio.sleep(e.retry_after)
+
+        await asyncio.sleep(3)  # flood control
 
         if meme is None:
             logger.warning(

@@ -1,6 +1,6 @@
 import telegram
+from telegram.constants import ChatMemberStatus, ParseMode
 from telegram.ext import ContextTypes
-from telegram.constants import ParseMode, ChatMemberStatus
 
 from src import localizer
 from src.tgbot.handlers.language import ALMOST_CIS_LANGUAGES
