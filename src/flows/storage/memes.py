@@ -3,7 +3,7 @@ from string import punctuation
 from typing import Any
 
 from prefect import flow, get_run_logger
-from telegram.error import RetryAfter
+from telegram.error import BadRequest, RetryAfter
 
 from src.storage import ads
 from src.storage.constants import MemeStatus, MemeType
@@ -92,6 +92,10 @@ async def upload_meme_to_telegram(
         except RetryAfter as e:
             logger.warning(f"Flood control exceeded: {e}")
             await asyncio.sleep(e.retry_after)
+        except BadRequest as e:
+            logger.warning(f"Can't upload. Telegram error: {e}")
+            await asyncio.sleep(5)
+            return None
 
         await asyncio.sleep(3)  # flood control
 
@@ -171,13 +175,14 @@ async def ocr_uploaded_memes(limit=100):
 
     for meme in memes:
         meme_original_content = await download_meme_content_file(meme["content_url"])
+        await asyncio.sleep(3)  # flood control
+
         if meme_original_content is None:
             logger.info(f"Meme {meme['id']} content is not available to download.")
             await update_meme(meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK)
             continue
 
         await ocr_meme_content(meme["id"], meme_original_content, meme["language_code"])
-        await asyncio.sleep(2)  # flood control
 
     await final_meme_pipeline()
 
