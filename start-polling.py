@@ -1,10 +1,10 @@
 import logging
+
 import redis.asyncio as aioredis
 
-from src import redis, localizer
-from src.tgbot import app
+from src import localizer, redis
 from src.config import settings
-
+from src.tgbot import app
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
