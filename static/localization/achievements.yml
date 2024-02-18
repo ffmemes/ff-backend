@@ -1,4 +1,35 @@
-achievement_100_meme_sent:
+achievement.nmemes_sent_10:
+  ru: |-
+    Кажись, ты понял, как работает бот 😉
+    Схема проста: чем честнее ты реагируешь на мемы, тем лучше они становятся.
+    Ведь у меня внутри нейроночка, которая и подбирает тебе мемы. 🤖🧠💎
+  en: |-
+    Looks like you've figured out how the bot works 😉
+    The scheme is simple: the more honestly you react to memes, the better they become.
+    After all, I have AI inside me that picks memes for you. 🤖🧠💎
+  uk: |-
+    Здається, ти зрозумів, як працює бот 😉
+    Схема проста: чим чесніше ти реагуєш на меми, тим краще вони стають.
+    Адже у мене всередині нейронка, яка і підбирає тобі меми. 🤖🧠💎
+  es: |-
+    Parece que has descubierto cómo funciona el bot 😉
+    El esquema es simple: cuanto más honestamente reacciones a los memes, mejor se vuelven.
+    Después de todo, tengo IA dentro de mí que elige memes para ti. 🤖🧠💎
+  de: |-
+    Sieht so aus, als hättest du herausgefunden, wie der Bot funktioniert 😉
+    Das Schema ist einfach: je ehrlicher du auf Memes reagierst, desto besser werden sie.
+    Immerhin habe ich KI in mir, die Memes für dich auswählt. 🤖🧠💎
+  it: |-
+    Sembra che tu abbia capito come funziona il bot 😉
+    Lo schema è semplice: più onestamente reagisci ai meme, meglio diventano.
+    Dopotutto, ho l'IA dentro di me che sceglie meme per te. 🤖🧠💎
+  fr: |-
+    On dirait que tu as compris comment fonctionne le bot 😉
+    Le schéma est simple : plus tu réagis honnêtement aux memes, mieux ils deviennent.
+    Après tout, j'ai une IA à l'intérieur de moi qui choisit des memes pour toi. 🤖🧠💎
+
+
+achievement.nmemes_sent_100:
   en: |-
     🚀 You just watched <b>100</b> memes! Watch MORE 🍔
   ru: |-
@@ -9,3 +40,11 @@ achievement_100_meme_sent:
     🚀 Du hast gerade <b>100</b> Memes gesehen! Schau dir MEHR an 🍔
   uk: |-
     🚀 Ви щойно переглянули <b>100</b> мемів! Дивіться БІЛЬШЕ 🍔
+  it: |-
+    🚀 Hai appena guardato <b>100</b> meme! Guarda di PIÙ 🍔
+  fr: |-
+    🚀 Vous venez de regarder <b>100</b> memes! Regardez PLUS 🍔
+  de: |-
+    🚀 Du hast gerade <b>100</b> Memes gesehen! Schau dir MEHR an 🍔
+  es: |-
+    🚀 ¡Acabas de ver <b>100</b> memes! ¡Mira MÁS 🍔
