@@ -52,62 +52,56 @@ async def analyse_meme_caption(meme: dict[str, Any]) -> None:
             return
 
 
-@flow
-async def upload_memes_to_telegram(
-    unloaded_memes: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
+async def add_watermark_to_meme_content(
+    meme_content: bytes, meme_type: MemeType
+) -> bytes:
+    if meme_type == MemeType.IMAGE:
+        # we can add watermark only to photos right now
+        return add_watermark(meme_content)
+    return meme_content
+
+
+async def upload_meme_to_telegram(
+    meme: dict[str, Any],
+) -> dict[str, Any] | None:
     logger = get_run_logger()
-    logger.info(f"Received {len(unloaded_memes)} memes to upload to Telegram.")
 
-    memes = []
-    for unloaded_meme in unloaded_memes:
-        logger.info(f"Downloading meme {unloaded_meme['id']} content file.")
-        meme_original_content = await download_meme_content_file(
-            unloaded_meme["content_url"]
-        )
-        if meme_original_content is None:
-            logger.warning(
-                f"Can't download {unloaded_meme['id']}/{unloaded_meme['type']} content"
-            )
-            await update_meme(
-                unloaded_meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK
-            )
-            continue
+    logger.info(f"Downloading meme {meme['id']} content file.")
+    meme_original_content = await download_meme_content_file(meme["content_url"])
+    if meme_original_content is None:
+        logger.warning(f"Can't download {meme['id']}/{meme['type']} content")
+        await update_meme(meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK)
+        return None
 
-        if unloaded_meme["type"] == MemeType.IMAGE:
-            logger.info(f"Adding watermark to meme {unloaded_meme['id']}.")
-            meme_content = add_watermark(meme_original_content)
-            if meme_content is None:
-                logger.warning(
-                    f"Meme {unloaded_meme['id']} was not watermarked, skipping."
-                )
-                continue
-        else:
-            meme_content = meme_original_content
+    watermarked_meme_content = await add_watermark_to_meme_content(
+        meme_original_content, meme["type"]
+    )
+    if watermarked_meme_content is None:
+        logger.warning(f"Can't add watermark to {meme['id']}/{meme['type']} content")
+        return None
 
+    for _ in range(3):  # attempts
         try:
             meme = await upload_meme_content_to_tg(
-                meme_id=unloaded_meme["id"],
-                meme_type=unloaded_meme["type"],
-                content=meme_content,
+                meme_id=meme["id"],
+                meme_type=meme["type"],
+                content=watermarked_meme_content,
             )
+            if meme:
+                break
         except RetryAfter as e:
             logger.warning(f"Flood control exceeded: {e}")
             await asyncio.sleep(e.retry_after)
 
         await asyncio.sleep(3)  # flood control
 
-        if meme is None:
-            logger.warning(
-                f"Meme {unloaded_meme['id']} was not uploaded to Telegram, skipping."
-            )
-            continue
+    if meme is None or meme.get("telegram_file_id") is None:
+        logger.warning(f"Meme {meme['id']} failed to upload to Telegram.")
+        return None
 
-        # HACK: to save original content for OCR
-        meme["__original_content"] = meme_original_content
-        memes.append(meme)
-
-    return memes
+    # HACK: to save original content for OCR
+    meme["__original_content"] = meme_original_content
+    return meme
 
 
 @flow(
@@ -124,9 +118,12 @@ async def tg_meme_pipeline() -> None:
 
     logger.info("Getting unloaded memes to upload to Telegram.")
     unloaded_memes = await get_unloaded_tg_memes(limit=100)
-    memes = await upload_memes_to_telegram(unloaded_memes)
+    logger.info(f"Received {len(unloaded_memes)} memes to upload to Telegram.")
+    for unloaded_meme in unloaded_memes:
+        meme = await upload_meme_to_telegram(unloaded_meme)
+        if not meme:
+            continue
 
-    for meme in memes:
         await ocr_meme_content(
             meme["id"], meme["__original_content"], meme["language_code"]
         )
@@ -148,14 +145,40 @@ async def vk_meme_pipeline() -> None:
 
     logger.info("Getting unloaded memes to upload to Telegram.")
     unloaded_memes = await get_unloaded_vk_memes(limit=100)
-    memes = await upload_memes_to_telegram(unloaded_memes)
+    logger.info(f"Received {len(unloaded_memes)} memes to upload to Telegram.")
+    for unloaded_meme in unloaded_memes:
+        meme = await upload_meme_to_telegram(unloaded_meme)
+        if not meme:
+            continue
 
-    for meme in memes:
         await ocr_meme_content(
             meme["id"], meme["__original_content"], meme["language_code"]
         )
 
     # next step of a pipeline
+    await final_meme_pipeline()
+
+
+@flow
+async def ocr_uploaded_memes(limit=100):
+    """
+    Download original meme content one more time & OCR it.
+    We can't use meme.telegram_file_id because it is already watermarked.
+    """
+    logger = get_run_logger()
+    memes = await get_memes_to_ocr(limit=limit)
+    logger.info(f"Going to OCR {len(memes)} memes.")
+
+    for meme in memes:
+        meme_original_content = await download_meme_content_file(meme["content_url"])
+        if meme_original_content is None:
+            logger.info(f"Meme {meme['id']} content is not available to download.")
+            await update_meme(meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK)
+            continue
+
+        await ocr_meme_content(meme["id"], meme_original_content, meme["language_code"])
+        await asyncio.sleep(2)  # flood control
+
     await final_meme_pipeline()
 
 
@@ -180,26 +203,3 @@ async def final_meme_pipeline() -> None:
 
     # next step of a pipeline
     await update_meme_status_of_ready_memes()
-
-
-@flow
-async def ocr_uploaded_memes(limit=100):
-    """
-    Download original meme content one more time & OCR it.
-    We can't use meme.telegram_file_id because it is already watermarked.
-    """
-    logger = get_run_logger()
-    memes = await get_memes_to_ocr(limit=limit)
-    logger.info(f"Going to OCR {len(memes)} memes.")
-
-    for meme in memes:
-        meme_original_content = await download_meme_content_file(meme["content_url"])
-        if meme_original_content is None:
-            logger.info(f"Meme {meme['id']} content is not available to download.")
-            await update_meme(meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK)
-            continue
-
-        await ocr_meme_content(meme["id"], meme_original_content, meme["language_code"])
-        await asyncio.sleep(2)  # flood control
-
-    await final_meme_pipeline()
