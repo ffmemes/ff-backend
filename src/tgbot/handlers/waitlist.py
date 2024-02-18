@@ -1,6 +1,6 @@
 import telegram
+from telegram.constants import ChatMemberStatus, ParseMode
 from telegram.ext import ContextTypes
-from telegram.constants import ParseMode, ChatMemberStatus
 
 from src import localizer
 from src.tgbot.handlers.language import ALMOST_CIS_LANGUAGES
@@ -78,25 +78,29 @@ async def handle_waitlist_choose_language(
     lang_keyboard = [
         all_lang_buttons[i : i + 2] for i in range(0, len(all_lang_buttons), 2)
     ]
-
-    await update.callback_query.message.edit_text(
-        localizer.t("waitlist.language_choose", user_info["interface_lang"]),
-        parse_mode=ParseMode.HTML,
-        reply_markup=telegram.InlineKeyboardMarkup(
-            lang_keyboard
-            + [
-                [
-                    telegram.InlineKeyboardButton(
-                        localizer.t(
-                            "waitlist.button_to_channel_subscribe",
-                            user_info["interface_lang"],
-                        ),
-                        callback_data=WAITLIST_CHANNEL_SUBSCTIBTION_PAGE_CALLBACK_DATA,
-                    )
-                ],
-            ]
-        ),
-    )
+    try:
+        await update.callback_query.message.edit_text(
+            localizer.t("waitlist.language_choose", user_info["interface_lang"]),
+            parse_mode=ParseMode.HTML,
+            reply_markup=telegram.InlineKeyboardMarkup(
+                lang_keyboard
+                + [
+                    [
+                        telegram.InlineKeyboardButton(
+                            localizer.t(
+                                "waitlist.button_to_channel_subscribe",
+                                user_info["interface_lang"],
+                            ),
+                            callback_data=WAITLIST_CHANNEL_SUBSCTIBTION_PAGE_CALLBACK_DATA,
+                        )
+                    ],
+                ]
+            ),
+        )
+    except telegram.error.BadRequest as e:
+        if e.message == "Message is not modified":
+            return
+        raise e
 
 
 async def handle_waitlist_language_button(

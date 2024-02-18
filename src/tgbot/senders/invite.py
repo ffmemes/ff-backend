@@ -11,7 +11,7 @@ async def send_successfull_invitation_alert(
     await bot.send_message(
         chat_id=invitor_user_id,
         text=localizer.t(
-            "onboarding_invitation_successfull_alert",
+            "onboarding.invitation_successfull_alert",
             user_info["interface_lang"],
         ).format(invited_user_name=invited_user_name),
     )

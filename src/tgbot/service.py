@@ -6,8 +6,8 @@ from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
     execute,
-    fetch_one,
     fetch_all,
+    fetch_one,
     meme,
     meme_source,
     user,

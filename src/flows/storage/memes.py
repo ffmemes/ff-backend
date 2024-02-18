@@ -3,6 +3,7 @@ from string import punctuation
 from typing import Any
 
 from prefect import flow, get_run_logger
+from telegram.error import RetryAfter
 
 from src.storage import ads
 from src.storage.constants import MemeStatus, MemeType
@@ -84,12 +85,18 @@ async def upload_memes_to_telegram(
         else:
             meme_content = meme_original_content
 
-        meme = await upload_meme_content_to_tg(
-            meme_id=unloaded_meme["id"],
-            meme_type=unloaded_meme["type"],
-            content=meme_content,
-        )
-        await asyncio.sleep(2)  # flood control
+        try:
+            meme = await upload_meme_content_to_tg(
+                meme_id=unloaded_meme["id"],
+                meme_type=unloaded_meme["type"],
+                content=meme_content,
+            )
+        except RetryAfter as e:
+            logger.warning(f"Flood control exceeded: {e}")
+            await asyncio.sleep(e.retry_after)
+
+        await asyncio.sleep(3)  # flood control
+
         if meme is None:
             logger.warning(
                 f"Meme {unloaded_meme['id']} was not uploaded to Telegram, skipping."
@@ -140,7 +147,7 @@ async def vk_meme_pipeline() -> None:
     await etl_memes_from_raw_vk_posts()
 
     logger.info("Getting unloaded memes to upload to Telegram.")
-    unloaded_memes = await get_unloaded_vk_memes()
+    unloaded_memes = await get_unloaded_vk_memes(limit=100)
     memes = await upload_memes_to_telegram(unloaded_memes)
 
     for meme in memes:
@@ -162,7 +169,6 @@ async def final_meme_pipeline() -> None:
     for meme in memes:
         await analyse_meme_caption(meme)
 
-        # TODO: check if we have meme with a same content in db
         duplicate_meme_id = await find_meme_duplicate(
             meme["id"], meme["ocr_result"]["text"]
         )
@@ -196,4 +202,4 @@ async def ocr_uploaded_memes(limit=100):
         await ocr_meme_content(meme["id"], meme_original_content, meme["language_code"])
         await asyncio.sleep(2)  # flood control
 
-    # await final_meme_pipeline()
+    await final_meme_pipeline()
