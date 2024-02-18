@@ -253,7 +253,7 @@ async def get_unloaded_tg_memes(limit) -> list[dict[str, Any]]:
     return await fetch_all(text(select_query))
 
 
-async def get_unloaded_vk_memes() -> list[dict[str, Any]]:
+async def get_unloaded_vk_memes(limit) -> list[dict[str, Any]]:
     "Returns only MemeType.IMAGE memes"
     select_query = f"""
         SELECT
@@ -268,7 +268,8 @@ async def get_unloaded_vk_memes() -> list[dict[str, Any]]:
             ON meme_raw_vk.id = meme.raw_meme_id
             AND meme_raw_vk.meme_source_id = meme.meme_source_id
         WHERE 1=1
-            AND meme.telegram_file_id IS NULL;
+            AND meme.telegram_file_id IS NULL
+        LIMIT {limit}
     """
     return await fetch_all(text(select_query))
 
