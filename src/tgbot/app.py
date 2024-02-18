@@ -189,7 +189,9 @@ async def setup_webhook(application: Application) -> None:
 
 
 def setup_application(is_webhook: bool = False) -> Application:
-    application_builder = Application.builder().token(settings.TELEGRAM_BOT_TOKEN)
+    application_builder = Application.builder().token(
+        settings.TELEGRAM_BOT_TOKEN
+    ).read_timeout(30)
 
     if is_webhook:
         application_builder.updater(None)
