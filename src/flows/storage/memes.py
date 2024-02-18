@@ -169,7 +169,6 @@ async def final_meme_pipeline() -> None:
     for meme in memes:
         await analyse_meme_caption(meme)
 
-        # TODO: check if we have meme with a same content in db
         duplicate_meme_id = await find_meme_duplicate(
             meme["id"], meme["ocr_result"]["text"]
         )
@@ -203,4 +202,4 @@ async def ocr_uploaded_memes(limit=100):
         await ocr_meme_content(meme["id"], meme_original_content, meme["language_code"])
         await asyncio.sleep(2)  # flood control
 
-    # await final_meme_pipeline()
+    await final_meme_pipeline()
