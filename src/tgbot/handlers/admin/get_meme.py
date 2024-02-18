@@ -43,9 +43,11 @@ async def handle_get_meme(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         *[get_meme_by_id(meme_id) for meme_id in meme_ids]
     )
     memes = [
-        MemeData(**meme)
-        for meme in memes_data
-        if meme is not None and meme["telegram_file_id"] is not None
+        MemeData(**meme) for meme in memes_data
+        if
+        meme is not None
+        and
+        meme["telegram_file_id"] is not None
     ]
     if not memes:
         await update.message.reply_text(
@@ -57,4 +59,4 @@ async def handle_get_meme(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     else:
         # divide memes in batches of up to 10
         for i in range(0, len(memes), 10):
-            await send_album_with_memes(update.effective_user.id, memes[i : i + 10])
+            await send_album_with_memes(update.effective_user.id, memes[i:i + 10])
