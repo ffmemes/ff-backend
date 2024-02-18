@@ -14,9 +14,28 @@ waitlist.start:
   uk: |-
     Привіт любителям смачних мемів 🍜
 
-    ЗАРАЗ ми готуємо 🔥 масштабне 🔥 оновлення бота та проводимо 🧌 закритий 🧌 бета тест!
+    ЗАРАЗ ми готуємо 🔥 масштабне 🔥 оновлення бота та проводимо 🧌 закритий 🧌 бета-тест!
 
-    Хочете доторкнутися до найновішого бота першими? Для цього потрібно всього лише пройти ВИПРОБУВАННЯ
+    Хочете доторкнутися до найновішого бота першими? Для цього потрібно всього лише пройти ВИПРОБУВАННЯ.
+  de: |-
+    Hallo, Meme-Liebhaber 🍜
+
+    GERADE JETZT bereiten wir 🔥 massive 🔥 Bot-Updates vor und führen 🧌 geschlossene 🧌 Beta-Tests durch!
+
+    Möchtest du der Erste sein, der den neuesten Bot berührt? Dazu müssen Sie nur die TESTS bestehen.
+  uz: |-
+    Salom, meme-dostlar 🍜
+
+    Hozir 🔥 katta 🔥 bot yangilanishini tayyorlaymiz va 🧌 yopiq 🧌 beta-testlar olib boramiz!
+
+    Eng so'nggi botga birinchi bo'lgan bo'lishni xohlaysizmi? Uchun faqat TESTLARNI o'tkazing.
+  it: |-
+    Ciao, amanti dei meme 🍜
+
+    ADESSO stiamo preparando 🔥 massicce 🔥 aggiornamenti del bot e conducendo 🧌 test beta 🧌 chiusi!
+
+    Vuoi essere il primo a toccare il bot più recente? Per farlo, devi solo superare i TEST.
+
 
 waitlist.button_to_language_choose:
   ru: |-
@@ -25,6 +44,12 @@ waitlist.button_to_language_choose:
     FIRST TRIAL
   uk: |-
     ПЕРШЕ ВИПРОБУВАННЯ
+  de: |-
+    ERSTE PRÜFUNG
+  uz: |-
+    BIRINCHI SINOV
+  it: |-
+    PRIMO TEST
 
 
 waitlist.language_choose:
@@ -40,6 +65,16 @@ waitlist.language_choose:
     ПЕРШЕ ВИПРОБУВАННЯ. Вибери, на яких мовах ти хочеш отримувати меми. Вибір поки що обмежений, але з часом мов буде більше. 
     
     Як будеш готовий - натисни на велику кнопку НАСТУПНЕ ВИПРОБУВАННЯ
+  de: |-
+    ERSTE PRÜFUNG. In welchen Sprachen möchten Sie Memes erhalten? Die Auswahl ist noch begrenzt, aber im Laufe der Zeit werden wir mehr hinzufügen, ich verspreche es.
+
+    Wenn Sie bereit sind - klicken Sie auf die große Schaltfläche NÄCHSTE PRÜFUNG
+  uz: |-
+    BIRINCHI SINOV. Meme qaysi tillarda olishni xohlaysiz? Tanlov hali cheklanadi, lekin vaqt o'tganda ko'proq til qo
+  it: |-
+    PRIMO TEST. In quali lingue vuoi ricevere meme? La scelta è ancora limitata, ma nel tempo ne aggiungeremo di più, te lo prometto.
+
+    Quando sei pronto - clicca sul grande pulsante PROSSIMO TEST
 
 
 waitlist.button_to_channel_subscribe:
@@ -49,6 +84,12 @@ waitlist.button_to_channel_subscribe:
     NEXT TRIAL
   uk: |-
     НАСТУПНЕ ВИПРОБУВАННЯ
+  de: |-
+    NÄCHSTE PRÜFUNG
+  uz: |-
+    KEYINGI SINOV
+  it: |-
+    PROSSIMO TEST
 
 
 waitlist.we_enabled_language_alert:
@@ -58,6 +99,12 @@ waitlist.we_enabled_language_alert:
     ⚠️ We enabled {language} memes for you, because we have few memes in your languages... I'll tell you when we'll add more languges to the bot 😎.
   uk: |-
     ⚠️ Ми все-таки включили {language} для тебе, тому що у нас мало мемів на мовах, які ти обрав. Я скажу тобі, коли ми додамо більше мов до бота 😎
+  de: |- 
+    ⚠️ Wir haben {language} für Sie aktiviert, weil wir nur wenige Memes in Ihren Sprachen haben... Ich werde Ihnen sagen, wenn wir mehr Sprachen zum Bot hinzufügen 😎
+  uz: |-
+    ⚠️ Biz siz uchun {language} mamlakatlarini yoqib qo'ydim, chunki bizda sizning tilingizdagi mamlakatlar kam... Biz botga ko'proq tillar qo'shishimizda xabardor qilaman 😎
+  it: |-
+    ⚠️ Abbiamo abilitato i meme in {language} per te, perché abbiamo pochi meme nelle tue lingue... Ti dirò quando aggiungeremo più lingue al bot 😎
 
 
 waitlist.channel_subscribe:
@@ -78,13 +125,37 @@ waitlist.channel_subscribe:
 
     <b>Subscribe to a channel</b> to move to the FINAL step.
   uk: |-
-    Ми спеціально не пускаємо всіх одразу в бота. Ми тюнимо систему під кожного, підбираємо кожному меми, грамотно працюємо з навантаженнями та дресируємо AI.
+    Ми спеціально не пускаємо всіх одразу в бота. Ми настроюємо систему для кожного, підбираємо меми для кожного, грамотно працюємо з навантаженнями та тренуємо AI.
 
     Тому, щоб не загубитися та бути в курсі всіх подій, підпишись на наш канал {channel_link}.
 
-    Туди кілька разів на день будуть викладатися найкращі меми за версією всіх користувачів нашого бота. Так звана, соковита годнота 😉. З кожним днем меми повинні ставати смішніше))
+    Туди кілька разів на день будуть викладатися найкращі меми за версією всіх користувачів нашого бота. Так звана, соковита годнота 😉. З кожним днем меми повинні ставати смішніші))
 
     <b>Підпишись</b>, щоб перейти до ФІНАЛЬНОГО ВИПРОБУВАННЯ.
+  de: |-
+    Wir lassen nicht jeden rein, weil wir gerade die besten Memes auswählen und AI trainieren.
+
+    Deshalb abonniere unseren Kanal {channel_link}, um über alle Neuigkeiten und Updates auf dem Laufenden zu bleiben.
+
+    Wir verwenden diesen Kanal, um die saftigsten Memes aus dem Bot zu senden. Je mehr Leute den FFmemes-Bot verwenden, desto lustiger sollten die Memes sein 😉
+
+    <b>Abonniere den Kanal</b>, um zum ENDGÜLTIGEN Schritt zu gelangen.
+  uz: |-
+    Biz har birini kirgizmaymiz, chunki biz hozir eng yaxshi mamlakatlarni tanlaymiz va AI ni o'qitamiz.
+
+    Shuning uchun, barcha yangiliklar va yangilanishlardan xabardor bo'lish uchun bizning kanalimizga {channel_link} obuna bo'ling.
+
+    Biz bu kanalni botdan eng so'nggi mamlakatlarni yuborish uchun ishlatamiz. FFmemes botini qo'llagan odamlar ko'proq mamlakatlar qo'shilsa, mamlakatlar ko'proq qiziqarli bo'lishi kerak 😉
+
+    <b>Kanalga obuna bo'ling</b>, ENDIYANIKI QADAMGA o'tish uchun.
+  it: |-
+    Non stiamo lasciando entrare tutti perché stiamo selezionando i migliori meme e addestrando l'IA.
+
+    Pertanto, iscriviti al nostro canale {channel_link} per rimanere aggiornato su tutte le novità e gli aggiornamenti.
+
+    Usiamo questo canale per inviare i meme più succosi dal bot. Più persone usano il bot FFmemes, più divertenti dovrebbero essere i meme 😉
+
+    <b>Iscriviti al canale</b> per passare al passo FINALE.
 
 
 
@@ -95,6 +166,12 @@ waitlist.check_channel_subscribtion:
     Are you subscribed?
   uk: |-
     Підписався на канал?
+  de: |-
+    Hast du abonniert?
+  uz: |-
+    Kanalga obuna bo'ldingizmi?
+  it: |-
+    Sei iscritto?
 
 
 waitlist.channel_subscribed_alert:
@@ -104,9 +181,16 @@ waitlist.channel_subscribed_alert:
     Thanks for the subscription!
   uk: |-
     Дякуємо за підписку!
+  de: |-
+    Danke für das Abonnement!
   es: |-
     Gracias por la suscripción!
+  uz: |-
+    Obuna uchun rahmat!
+  it: |-
+    Grazie per l'iscrizione!
 
+    
 waitlist.channel_not_subscribed_alert:
   ru: |-
     Все-таки надо подписаться...
@@ -114,8 +198,15 @@ waitlist.channel_not_subscribed_alert:
     You still need to subscribe...
   uk: |-
     Треба підписатися...
+  de: |-
+    Du musst dich immer noch anmelden...
   es: |-
     Todavía necesitas suscribirte...
+  uz: |-
+    Hali ham obuna bo'lishingiz kerak...
+  it: |-
+    Devi ancora iscriverti...
+
 
 waitlist.final:
   ru: |-
@@ -145,7 +236,36 @@ waitlist.final:
 
     АБО
 
-    Кожен користувач з запрошенням може видасти запрошення своєму другу. Для цього потрібно всього лише перейти за посиланням під мемом. Так що запитай у друзів, може хтось зможе поділитися)
+    Кожен користувач з запрошенням може віддати запрошення своєму другові. Для цього потрібно лише перейти за посиланням під мемом. Так що запитай у друзів, можливо, хтось зможе поділитися)
 
     🍔 до зустрічі 🍔
+  de: |-
+    👑 <b>ENDGÜLTIGE PRÜFUNG</b> 👑
 
+    Wenn Sie diesen Schritt erreicht haben, herzlichen Glückwunsch! Jetzt können Sie sicher auf Ihre Wende warten und der Bot sendet Ihnen eine Einladung...
+
+    ODER
+
+    Jeder Benutzer mit einer Einladung kann einem Freund eine Einladung geben. Sie müssen nur dem Link unter dem Meme folgen. Also fragen Sie Ihre Freunde, vielleicht hat bereits jemand eine Einladung 😉
+
+    🍔 bis bald 🍔
+  uz: |-
+    👑 <b>OXIRGI SINOV</b> 👑
+
+    Agar siz bu qadamga yetgan bo'lsangiz, tabriklaymiz! Endi siz o'zingizni navbatini sabr qilishingiz mumkin va bot sizga taklif yuboradi...
+
+    YOKI
+
+    Har bir taklif bilan foydalanuvchi taklifni do'stiga berishi mumkin. Siz faqat mamlakat ostidagi havola orqali ketishingiz kerak. Shuning uchun do'stlaringizga so'rang, shayd ki, kimdir taklifga ega bo'lgan bo'lishi mumkin 😉
+
+    🍔 ko'rishguncha 🍔
+  it: |-
+    👑 <b>TEST FINALE</b> 👑
+
+    Se sei arrivato a questo passo, congratulazioni! Ora puoi aspettare tranquillamente il tuo turno e il bot ti invierà un invito...
+
+    O
+
+    Ogni utente con un invito può dare un invito al suo amico. Devi solo seguire il link sotto il meme. Quindi chiedi ai tuoi amici, forse qualcuno ha già un invito 😉
+
+    🍔 ci vediamo 🍔
