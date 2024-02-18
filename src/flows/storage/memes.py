@@ -1,4 +1,5 @@
 import asyncio
+from telegram.error import RetryAfter
 from string import punctuation
 from typing import Any
 
@@ -84,12 +85,17 @@ async def upload_memes_to_telegram(
         else:
             meme_content = meme_original_content
 
-        meme = await upload_meme_content_to_tg(
-            meme_id=unloaded_meme["id"],
-            meme_type=unloaded_meme["type"],
-            content=meme_content,
-        )
-        await asyncio.sleep(2)  # flood control
+        try:
+            meme = await upload_meme_content_to_tg(
+                meme_id=unloaded_meme["id"],
+                meme_type=unloaded_meme["type"],
+                content=meme_content,
+            )
+            await asyncio.sleep(2)  # flood control
+        except RetryAfter as e:
+            logger.warning(f"Flood control exceeded: {e}")
+            await asyncio.sleep(e.retry_after)
+
         if meme is None:
             logger.warning(
                 f"Meme {unloaded_meme['id']} was not uploaded to Telegram, skipping."
