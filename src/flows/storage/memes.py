@@ -51,19 +51,6 @@ async def analyse_meme_caption(meme: dict[str, Any]) -> None:
             return
 
 
-async def meme_final_pipeline(meme: dict[str, Any]):
-    await analyse_meme_caption(meme)
-
-    # TODO: check if we have meme with a same content in db
-    duplicate_meme_id = await find_meme_duplicate(
-        meme["id"], meme["ocr_result"]["text"]
-    )
-    if duplicate_meme_id:
-        await update_meme(
-            meme["id"], status=MemeStatus.DUPLICATE, duplicate_of=duplicate_meme_id
-        )
-
-
 @flow
 async def upload_memes_to_telegram(
     unloaded_memes: list[dict[str, Any]],
@@ -172,7 +159,18 @@ async def final_meme_pipeline() -> None:
     memes = await get_pending_memes()
     logger.info(f"Final meme pipeline has {len(memes)} pending memes.")
 
-    await asyncio.gather(*[meme_final_pipeline(meme) for meme in memes])
+    for meme in memes:
+        await analyse_meme_caption(meme)
+
+        # TODO: check if we have meme with a same content in db
+        duplicate_meme_id = await find_meme_duplicate(
+            meme["id"], meme["ocr_result"]["text"]
+        )
+        if duplicate_meme_id:
+            await update_meme(
+                meme["id"], status=MemeStatus.DUPLICATE, duplicate_of=duplicate_meme_id
+            )
+            continue
 
     # next step of a pipeline
     await update_meme_status_of_ready_memes()

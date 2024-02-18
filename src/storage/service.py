@@ -195,12 +195,7 @@ async def get_pending_memes() -> list[dict[str, Any]]:
         select(meme)
         .where(meme.c.status == MemeStatus.CREATED)
         .where(meme.c.telegram_file_id.is_not(None))
-        .where(
-            or_(
-                meme.c.ocr_result.is_not(None),
-                meme.c.type != MemeType.IMAGE,
-            )
-        )
+        .where(meme.c.ocr_result.is_not(None))
         .order_by(nulls_first(meme.c.created_at))
     )
     return await fetch_all(select_query)
