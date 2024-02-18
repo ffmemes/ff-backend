@@ -197,14 +197,18 @@ async def final_meme_pipeline() -> None:
     for meme in memes:
         await analyse_meme_caption(meme)
 
-        duplicate_meme_id = await find_meme_duplicate(
-            meme["id"], meme["ocr_result"]["text"]
-        )
-        if duplicate_meme_id:
-            await update_meme(
-                meme["id"], status=MemeStatus.DUPLICATE, duplicate_of=duplicate_meme_id
+        # it's ok if there is no OCR result for videos
+        if meme["ocr_result"]:
+            duplicate_meme_id = await find_meme_duplicate(
+                meme["id"], meme["ocr_result"]["text"]
             )
-            continue
+            if duplicate_meme_id:
+                await update_meme(
+                    meme["id"],
+                    status=MemeStatus.DUPLICATE,
+                    duplicate_of=duplicate_meme_id,
+                )
+                continue
 
     # next step of a pipeline
     await update_meme_status_of_ready_memes()
