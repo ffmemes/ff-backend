@@ -8,7 +8,8 @@ from src.tgbot.handlers.onboarding import onboarding_flow
 from src.tgbot.handlers.waitlist import handle_waitlist_start
 from src.tgbot.logs import log
 from src.tgbot.senders.next_message import next_message
-from src.tgbot.service import create_user, get_user_info, save_tg_user
+from src.tgbot.service import create_user, save_tg_user
+from src.tgbot.user_info import update_user_info_cache
 
 
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -39,11 +40,11 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             deep_link=deep_link,
         )
 
-    user_info = await get_user_info(user_id)
+    user_info = await update_user_info_cache(user_id)
     if user_info["type"] == UserType.WAITLIST:
         return await handle_waitlist_start(update, context)
 
-    recently_joined = user_info["nmemes_sent"] <= 10
+    recently_joined = user_info["nmemes_sent"] <= 3
     if recently_joined:
         return await onboarding_flow(update)
 

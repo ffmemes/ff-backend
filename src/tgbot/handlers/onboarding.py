@@ -17,7 +17,7 @@ async def onboarding_flow(update: Update):
     # TODO: select language flow
 
     await update.effective_user.send_message(
-        localizer.t("onboarding_welcome_message", user_info["language_code"]),
+        localizer.t("onboarding.welcome_message", user_info["language_code"]),
         parse_mode=ParseMode.HTML,
     )
 
