@@ -241,7 +241,7 @@ user_meme_source_stats = Table(
 )
 
 
-user_stats = Table(
+meme_stats = Table(
     "meme_stats",
     metadata,
     Column("meme_id", ForeignKey("meme.id", ondelete="CASCADE"), primary_key=True),

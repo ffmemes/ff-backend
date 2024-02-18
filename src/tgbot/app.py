@@ -27,6 +27,7 @@ from src.tgbot.handlers import (
     upload,
     waitlist,
 )
+from src.tgbot.handlers.admin.user_info import handle_show_user_info
 from src.tgbot.handlers.admin.waitlist import handle_waitlist_invite
 from src.tgbot.handlers.moderator import get_meme, meme_source
 
@@ -152,6 +153,14 @@ def add_handlers(application: Application) -> None:
             "meme",
             get_meme.handle_get_meme,
             filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+        )
+    )
+
+    # show meme / memes by ids
+    application.add_handler(
+        MessageHandler(
+            filters=filters.ChatType.PRIVATE & filters.Regex("^(@)"),
+            callback=handle_show_user_info,
         )
     )
 

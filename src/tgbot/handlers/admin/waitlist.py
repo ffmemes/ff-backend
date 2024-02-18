@@ -1,8 +1,3 @@
-"""
-    Handle /meme <meme_id> admin/mod command
-"""
-
-
 from telegram import Update
 from telegram.ext import (
     ContextTypes,
