@@ -6,6 +6,7 @@ from src.tgbot.handlers.deep_link import handle_deep_link_used
 from src.tgbot.handlers.language import init_user_languages_from_tg_user
 from src.tgbot.handlers.onboarding import onboarding_flow
 from src.tgbot.handlers.waitlist import handle_waitlist_start
+from src.tgbot.logs import log
 from src.tgbot.senders.next_message import next_message
 from src.tgbot.service import create_user, get_user_info, save_tg_user
 
@@ -27,6 +28,9 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     user = await create_user(id=user_id)
     await init_user_languages_from_tg_user(update.effective_user)
+    await log(
+        f"👋 {update.effective_user.name}/#{user_id} started with deeplink: {deep_link}"
+    )
 
     if deep_link:
         await handle_deep_link_used(

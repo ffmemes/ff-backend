@@ -1,6 +1,7 @@
 import re
 
 from src.tgbot.constants import UserType
+from src.tgbot.logs import log
 from src.tgbot.senders.invite import send_successfull_invitation_alert
 from src.tgbot.service import get_user_by_id, update_user
 
@@ -33,3 +34,4 @@ async def handle_deep_link_used(
             await update_user(invited_user["id"], type=UserType.USER)
 
             await send_successfull_invitation_alert(invitor_user_id, invited_user_name)
+            await log(f"🤝 #{invitor_user_id} invited {invited_user_name}")
