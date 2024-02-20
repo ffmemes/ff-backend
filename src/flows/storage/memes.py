@@ -66,7 +66,6 @@ async def upload_meme_to_telegram(
 ) -> dict[str, Any] | None:
     logger = get_run_logger()
 
-
     logger.info(f"Downloading meme {meme['id']} content file.")
     meme_original_content = await download_meme_content_file(meme["content_url"])
     if meme_original_content is None:
@@ -213,4 +212,3 @@ async def final_meme_pipeline() -> None:
 
     # next step of a pipeline
     await update_meme_status_of_ready_memes()
-
