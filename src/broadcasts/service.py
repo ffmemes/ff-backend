@@ -8,9 +8,11 @@ async def get_users_which_were_active_hours_ago(hours: int) -> list[dict]:
         SELECT
             id
         FROM "user"
-        WHERE last_active_at BETWEEN
-            NOW() - INTERVAL '{hours} HOURS'
-            AND
-            NOW() - INTERVAL '{hours-1} HOURS'
+        WHERE 1=1
+            AND type NOT IN ('waitlist', 'blocked_bot')
+            AND last_active_at BETWEEN
+                NOW() - INTERVAL '{hours} HOURS'
+                AND
+                NOW() - INTERVAL '{hours-1} HOURS'
     """
     return await fetch_all(text(insert_query))
