@@ -228,7 +228,8 @@ async def get_memes_to_ocr(limit=100):
 
 
 async def get_unloaded_tg_memes(limit) -> list[dict[str, Any]]:
-    """Returns only MemeType.IMAGE memes"""
+    """Returns memes from Telegram, that have not been yet uploaded to Telegram."""
+
     select_query = f"""
         SELECT
             meme.id,
@@ -254,11 +255,12 @@ async def get_unloaded_tg_memes(limit) -> list[dict[str, Any]]:
 
 
 async def get_unloaded_vk_memes() -> list[dict[str, Any]]:
-    "Returns only MemeType.IMAGE memes"
+    """Returns memes from VK, that have not been yet uploaded to Telegram."""
+
     select_query = f"""
         SELECT
             meme.id,
-            '{MemeType.IMAGE}' AS type,
+            meme.type,
             meme_raw_vk.media->>0 content_url
         FROM meme
         INNER JOIN meme_source
