@@ -52,8 +52,8 @@ onboarding.invitation_successfull_alert:
     🎉 Твой друг {invited_user_name} только что зашел в бота.
     Продолжай пересылать наши мемы и мб когда-нибудь зачтется 🤫🔺💎
   uk: |-
-    🎉 Твій друг {invited_user_name} тільки що заходив в бота.
-    Продовжуй пересилати наші меми і може колись тобі щось зачіпає 🤫🔺💎
+    🎉 Твій друг {invited_user_name} тільки що зайшов у бота.
+    Продовжуй пересилати наші меми і, можливо, колись це буде враховано 🤫🔺💎
   es: |-
     🎉 ¡Tu amigo {invited_user_name} acaba de unirse al bot!
     Sigue compartiendo memes del bot y podrías ser recompensado 🤫🔺💎
