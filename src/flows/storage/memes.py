@@ -127,6 +127,8 @@ async def tg_meme_pipeline() -> None:
     memes = await upload_memes_to_telegram(unloaded_memes)
 
     for meme in memes:
+        if meme["type"] != MemeType.IMAGE:
+            continue
         await ocr_meme_content(
             meme["id"], meme["__original_content"], meme["language_code"]
         )
@@ -151,6 +153,8 @@ async def vk_meme_pipeline() -> None:
     memes = await upload_memes_to_telegram(unloaded_memes)
 
     for meme in memes:
+        if meme["type"] != MemeType.IMAGE:
+            continue
         await ocr_meme_content(
             meme["id"], meme["__original_content"], meme["language_code"]
         )
