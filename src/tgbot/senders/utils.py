@@ -78,10 +78,6 @@ def get_referral_html(user_id: int, meme_id: int) -> str:
     return f"""{emoji} <i><a href="{ref_link}">Fast Food Memes</a></i>"""
 
 
-def escape_html(text: str) -> str:
-    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-
 async def send_or_edit(
     prev_update: Update,
     text: str,
