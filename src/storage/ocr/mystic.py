@@ -67,9 +67,7 @@ async def ocr_content(content: bytes, language: str) -> OcrResult | None:
         return None
 
     if ocr_result is None or ocr_result["outputs"] is None:
-        logger.warning(
-            f"Mystic OCR returned no result: {ocr_result}."
-        )
+        logger.warning(f"Mystic OCR returned no result: {ocr_result}.")
         return None
 
     rows = ocr_result["outputs"][0]["value"]
