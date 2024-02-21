@@ -27,6 +27,8 @@ from src.storage.watermark import add_watermark
 
 
 async def ocr_meme_content(meme_id: int, content: bytes, language: str):
+    logger = get_run_logger()
+    logger.debug(f"OCRing meme {meme_id} content.")
     result = await ocr_content(content, language)
     if result:
         s = result.text.translate(str.maketrans("", "", punctuation)).lower()
