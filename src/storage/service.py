@@ -123,6 +123,7 @@ async def etl_memes_from_raw_telegram_posts() -> None:
             'created' AS status,
             CASE
                 WHEN media->0->>'duration' IS NOT NULL THEN 'video'
+                WHEN media->0->>'url' ~* '\\.mp4$' THEN 'animation'
                 ELSE 'image'
             END AS type,
             MS.language_code AS language_code,

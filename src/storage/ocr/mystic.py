@@ -2,6 +2,7 @@ import uuid
 from typing import Any
 
 import httpx
+from prefect import get_run_logger
 
 from src.config import settings
 from src.storage.schemas import OcrResult
@@ -57,15 +58,16 @@ async def ocr_mystic_file_path(
 
 
 async def ocr_content(content: bytes, language: str) -> OcrResult | None:
+    logger = get_run_logger()
     try:
         mystic_file_path = await load_file_to_mystic(content)
         ocr_result = await ocr_mystic_file_path(mystic_file_path, language)
     except Exception as e:
-        print(f"Mystic OCR error: {e}")
+        logger.exception(msg=f"Mystic OCR error: {e}", exc_info=e)
         return None
 
     if ocr_result is None or ocr_result["outputs"] is None:
-        print(f"Mystic OCR returned no result: {ocr_result}.")
+        logger.warning(f"Mystic OCR returned no result: {ocr_result}.")
         return None
 
     rows = ocr_result["outputs"][0]["value"]
