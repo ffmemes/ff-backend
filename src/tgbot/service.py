@@ -54,7 +54,7 @@ async def create_user(
                 WHEN "user".type = 'blocked_bot' THEN 'waitlist'
                 ELSE "user".type
             END
-        RETURNING "user".id, "user".type
+        RETURNING "user".*
     """
 
     return await fetch_one(text(sql))
