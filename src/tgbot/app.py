@@ -27,9 +27,11 @@ from src.tgbot.handlers import (
     upload,
     waitlist,
 )
-from src.tgbot.handlers.admin.allow import handle_allow_waitlist_invite
 from src.tgbot.handlers.admin.user_info import handle_show_user_info
-from src.tgbot.handlers.admin.waitlist import handle_waitlist_invite
+from src.tgbot.handlers.admin.waitlist import (
+    handle_waitlist_invite,
+    handle_waitlist_invite_before,
+)
 from src.tgbot.handlers.moderator import get_meme, meme_source
 
 application: Application = None  # type: ignore
@@ -149,8 +151,8 @@ def add_handlers(application: Application) -> None:
     )
     application.add_handler(
         CommandHandler(
-            "allow",
-            handle_allow_waitlist_invite,
+            "invite_before",
+            handle_waitlist_invite_before,
             filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
         )
     )
