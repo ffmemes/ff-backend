@@ -9,6 +9,7 @@ from telegram.ext import (
 from src import localizer
 from src.tgbot.bot import bot
 from src.tgbot.constants import UserType
+from src.tgbot.logs import log
 from src.tgbot.service import (
     get_waitlist_users_registered_before,
     update_user,
@@ -27,39 +28,37 @@ async def handle_allow_waitlist_invite(
     message_split = update.message.text.split(" ")
     if len(message_split) != 2:
         await update.message.reply_text(
-            "USAGE: /allow dd-mm-yyyy\n"
+            "USAGE: /allow yyyy-mm-dd\n"
             "Allows everyone registered before and during that day to the bot."
         )
         return
 
     date_str = message_split[1]
     try:
-        date = datetime.strptime(date_str, "%d-%m-%Y")
+        date = datetime.strptime(date_str, "%Y-%m-%d")
         # set h, m, s to 23:59:59
         date = date.replace(hour=23, minute=59, second=59)
     except ValueError:
-        await update.message.reply_text("Invalid date format. Use /allow dd-mm-yyyy")
+        await update.message.reply_text("Invalid date format. Use /allow yyyy-mm-dd")
         return
 
-    total_count = 0
     # get all users registered that day
     users = await get_waitlist_users_registered_before(date)
     await update.message.reply_text(
         f"Inviting {len(users)} users registered before and on date {date_str}."
     )
+    await log(
+        f"Inviting {len(users)} users registered before and on date {date_str}.",
+    )
     # separate the for loop in batches of 20
-    for user_batch in [users[i : i + 20] for i in range(0, len(users), 20)]:
-        tasks = []
-        for user in user_batch:
-            tasks.append(invite_user(user["id"]))
-        await asyncio.gather(*tasks)
-        total_count += len(tasks)
-
-        await update.message.reply_text(
-            f"✅ Invited {total_count}/{len(users)} users registered before {date_str}."
-            "\nSleeping for 1.5s",
-        )
-        await asyncio.sleep(1.5)
+    for i, user in enumerate(users):
+        await invite_user(user["id"])
+        await asyncio.sleep(0.1)
+        if i % 25 == 0 and i != 0:
+            await update.message.reply_text(
+                f"✅ Invited {i + 1}/{len(users)} users registered before {date_str}."
+                "\nSleeping for 1.5s",
+            )
 
 
 async def invite_user(user_id: int) -> None:
