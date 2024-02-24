@@ -19,15 +19,15 @@ async def sorted_by_user_source_lr_meme_lr_meme_age(
             'sorted_by_user_source_lr_meme_lr_meme_age' as recommended_by
         FROM meme M
         LEFT JOIN user_meme_reaction R
-            ON R.meme_id = M.id
-            AND R.user_id = {user_id}
+            ON R.user_id = {user_id}
+            AND R.meme_id = M.id
         INNER JOIN user_language L
-            ON L.user_id = {user_id}
-            AND L.language_code = M.language_code
+            ON L.language_code = M.language_code
+            AND L.user_id = {user_id}
 
 		LEFT JOIN user_meme_source_stats UMSS
-            ON UMSS.user_id = {user_id}
-            AND UMSS.meme_source_id = M.meme_source_id
+            ON UMSS.meme_source_id = M.meme_source_id
+            AND UMSS.user_id = {user_id}
         LEFT JOIN meme_stats MS
             ON MS.meme_id = M.id
 
@@ -42,6 +42,10 @@ async def sorted_by_user_source_lr_meme_lr_meme_age(
             * CASE WHEN MS.raw_impr_rank < 1 THEN 1 ELSE 0.5 END
             * CASE WHEN MS.age_days < 5 THEN 1 ELSE 0.5 END
             * CASE WHEN M.caption IS NULL THEN 1 ELSE 0.8 END
+            * CASE
+                WHEN MS.nmemes_sent <= 1 THEN 1
+                ELSE (MS.nlikes + MS.ndislikes) * 1. / MS.nmemes_sent
+            END
 
         LIMIT {limit}
     """

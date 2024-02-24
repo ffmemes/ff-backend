@@ -162,6 +162,7 @@ user = Table(
     metadata,
     Column("id", BigInteger, primary_key=True),
     Column("type", String, nullable=False),  # super_user, moderator,
+    Column("inviter_id", ForeignKey("user.id", ondelete="SET NULL")),
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
     Column("last_active_at", DateTime, onupdate=func.now()),
     Column("blocked_bot_at", DateTime),

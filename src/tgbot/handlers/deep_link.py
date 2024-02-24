@@ -21,11 +21,15 @@ async def handle_deep_link_used(
         invitor_user_id = int(user_id)
 
         if invitor_user_id == invited_user["id"]:
-            return
+            return  # clicked on own link
 
         invitor_user = await get_user_by_id(invitor_user_id)
         if not invitor_user:
             return  # user with this id doesn't exist
+
+        if not invited_user.get("inviter_id"):
+            await update_user(invited_user["id"], inviter_id=invitor_user_id)
+            # TODO: should we send to inviter alert message?
 
         if invitor_user["type"] != UserType.WAITLIST and invited_user["type"] in [
             UserType.WAITLIST,
