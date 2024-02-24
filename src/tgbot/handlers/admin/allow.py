@@ -51,7 +51,7 @@ async def handle_allow_waitlist_invite(
     for user_batch in [users[i : i + 20] for i in range(0, len(users), 20)]:
         tasks = []
         for user in user_batch:
-            tasks.append(invite_user(user["id"], user["interface_lang"]))
+            tasks.append(invite_user(user["id"]))
         await asyncio.gather(*tasks)
         total_count += len(tasks)
 
@@ -62,10 +62,10 @@ async def handle_allow_waitlist_invite(
         await asyncio.sleep(1.5)
 
 
-async def invite_user(user_id: int, user_language: str) -> None:
+async def invite_user(user_id: int) -> None:
     await update_user(user_id, type=UserType.USER)
-    await update_user_info_cache(user_id)
+    user_info = await update_user_info_cache(user_id)
     await bot.send_message(
         user_id,
-        localizer.t("onboarding.invited_by_admin", user_language),
+        localizer.t("onboarding.invited_by_admin", user_info["interface_lang"]),
     )
