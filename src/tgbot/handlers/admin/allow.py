@@ -60,6 +60,10 @@ async def handle_allow_waitlist_invite(
                 "\nSleeping for 1.5s",
             )
 
+    await update.message.reply_text(
+        f"✅ Invited {len(users)} users registered before {date_str}."
+    )
+
 
 async def invite_user(user_id: int) -> None:
     await update_user(user_id, type=UserType.USER)
