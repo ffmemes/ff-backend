@@ -30,6 +30,8 @@ STOP_WORDS = [
     "подписот",
     "подписат",
     "notcoin",
+    "канал",
+    "ссылк"
 ]
 
 MENTION_WORDS = ["@", "http", "t.me/"]

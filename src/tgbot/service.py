@@ -14,6 +14,7 @@ from src.database import (
     user_language,
     user_tg,
 )
+from src.tgbot.constants import UserType
 
 
 async def save_tg_user(
@@ -65,6 +66,16 @@ async def get_user_by_id(
 ) -> dict[str, Any] | None:
     select_statement = select(user).where(user.c.id == id)
     return await fetch_one(select_statement)
+
+
+async def get_waitlist_users_registered_before(
+    date: datetime,
+) -> list[dict[str, Any]]:
+    """Select all users that have registered before or at a certain datetime"""
+    select_statement = select(user).where(
+        user.c.created_at <= date, user.c.type == UserType.WAITLIST
+    )
+    return await fetch_all(select_statement)
 
 
 async def get_tg_user_by_id(
