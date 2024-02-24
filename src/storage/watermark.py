@@ -58,10 +58,10 @@ def check_font(font_path, font_family, image, width_ratio):
 def draw_corner_watermark(
     image_bytes: BytesIO,
     text: str,
-    font_family: str = "Switzer-Variable.ttf",
-    width_ratio: float = 0.07,
-    text_opacity: float = 0.7,
-    margin: int = 20,
+    font_family: str = "WorkSans-Medium.ttf",
+    width_ratio: float = 0.05,
+    text_opacity: float = 0.35,
+    margin: int = 5,
 ) -> Image:
     with Image.open(image_bytes).convert("RGBA") as base:
         txt = Image.new("RGBA", base.size, (255, 255, 255, 0))
