@@ -51,9 +51,8 @@ def queue_empty_alert_keyboard(emoji: str = "⏳"):
 
 
 def meme_source_language_selection_keyboard(meme_source_id: int):
-    MEME_SOURCE_LANGUGES = ["ru", "uk", "en", "es", "de", "fa", "fr", "it"]
-    per_row = 4
-    # TODO:
+    # TODO: get languages from some shared consts
+    # and split them by rows
 
     return InlineKeyboardMarkup(
         [
