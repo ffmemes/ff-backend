@@ -8,6 +8,7 @@ from telegram.error import BadRequest, RetryAfter
 from src.storage import ads
 from src.storage.constants import MemeStatus, MemeType
 from src.storage.ocr.mystic import ocr_content
+from src.storage.schemas import OcrResult
 from src.storage.service import (
     etl_memes_from_raw_telegram_posts,
     etl_memes_from_raw_vk_posts,
@@ -26,14 +27,18 @@ from src.storage.upload import (
 from src.storage.watermark import add_watermark
 
 
-async def ocr_meme_content(meme_id: int, content: bytes, language: str):
+async def ocr_meme_content(
+    meme_id: int, content: bytes, language: str, image_link: str
+) -> None:
     logger = get_run_logger()
     logger.debug(f"OCRing meme {meme_id} content.")
     result = await ocr_content(content, language)
-    if result:
+    if isinstance(result, OcrResult):
         s = result.text.translate(str.maketrans("", "", punctuation)).lower()
         result.text = " ".join(s.split())
         await update_meme(meme_id, ocr_result=result.model_dump(mode="json"))
+    else:
+        logger.warning(msg=f"OCR: {str(result)} {meme_id=} {image_link=}")
 
 
 async def analyse_meme_caption(meme: dict[str, Any]) -> None:
@@ -79,7 +84,7 @@ async def upload_meme_to_telegram(
         meme_original_content, meme["type"]
     )
     if watermarked_meme_content is None:
-        logger.warning(f"Can't add watermark to {meme['id']}/{meme['type']} content")
+        logger.warning(f"Can't add watermark to {meme['id']}/{meme['type']}" "content")
         return None
 
     for _ in range(3):  # attempts
@@ -124,14 +129,17 @@ async def tg_meme_pipeline() -> None:
 
     logger.info("Getting unloaded memes to upload to Telegram.")
     unloaded_memes = await get_unloaded_tg_memes(limit=100)
-    logger.info(f"Received {len(unloaded_memes)} memes to upload to Telegram.")
+    logger.info(f"Received {len(unloaded_memes)}" " memes to upload to Telegram.")
     for unloaded_meme in unloaded_memes:
         meme = await upload_meme_to_telegram(unloaded_meme)
         if not meme or meme["type"] != MemeType.IMAGE:
             continue
 
         await ocr_meme_content(
-            meme["id"], meme["__original_content"], meme["language_code"]
+            meme["id"],
+            meme["__original_content"],
+            meme["language_code"],
+            meme["content_url"],
         )
 
     # next step of a pipeline
@@ -151,14 +159,17 @@ async def vk_meme_pipeline() -> None:
 
     logger.info("Getting unloaded memes to upload to Telegram.")
     unloaded_memes = await get_unloaded_vk_memes(limit=100)
-    logger.info(f"Received {len(unloaded_memes)} memes to upload to Telegram.")
+    logger.info(f"Received {len(unloaded_memes)}" " memes to upload to Telegram.")
     for unloaded_meme in unloaded_memes:
         meme = await upload_meme_to_telegram(unloaded_meme)
         if not meme or meme["type"] != MemeType.IMAGE:
             continue
 
         await ocr_meme_content(
-            meme["id"], meme["__original_content"], meme["language_code"]
+            meme["id"],
+            meme["__original_content"],
+            meme["language_code"],
+            meme["content_url"],
         )
 
     # next step of a pipeline
@@ -180,11 +191,16 @@ async def ocr_uploaded_memes(limit=100):
         await asyncio.sleep(3)  # flood control
 
         if meme_original_content is None:
-            logger.info(f"Meme {meme['id']} content is not available to download.")
+            logger.info(f"Meme {meme['id']}" " content is not available to download.")
             await update_meme(meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK)
             continue
 
-        await ocr_meme_content(meme["id"], meme_original_content, meme["language_code"])
+        await ocr_meme_content(
+            meme["id"],
+            meme_original_content,
+            meme["language_code"],
+            meme["content_url"],
+        )
 
     await final_meme_pipeline()
 
