@@ -2,6 +2,7 @@ import asyncio
 from datetime import datetime
 
 from telegram import Update
+from telegram.error import Forbidden
 from telegram.ext import (
     ContextTypes,
 )
@@ -94,7 +95,11 @@ async def handle_waitlist_invite_before(
 async def invite_user(user_id: int) -> None:
     await update_user(user_id, type=UserType.USER)
     user_info = await update_user_info_cache(user_id)
-    await bot.send_message(
-        user_id,
-        localizer.t("onboarding.invited_by_admin", user_info["interface_lang"]),
-    )
+    try:
+        await bot.send_message(
+            user_id,
+            localizer.t("onboarding.invited_by_admin", user_info["interface_lang"]),
+        )
+    except Forbidden:
+        await update_user(user_id, type=UserType.BLOCKED_BOT)
+        await update_user_info_cache(user_id)

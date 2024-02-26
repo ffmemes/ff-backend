@@ -139,7 +139,9 @@ def add_handlers(application: Application) -> None:
         )
     )
 
-    application.add_error_handler(error.send_stacktrace_to_tg_chat)
+    application.add_error_handler(
+        error.send_stacktrace_to_tg_chat, block=False
+    )
 
     # admin: invite user from waitlist
     application.add_handler(
