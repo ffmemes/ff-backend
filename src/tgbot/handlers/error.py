@@ -3,9 +3,13 @@ import logging
 import traceback
 
 from telegram import Update
+from telegram.error import Forbidden
 from telegram.ext import ContextTypes
 
+from src.tgbot.constants import UserType
 from src.tgbot.logs import log
+from src.tgbot.service import update_user
+from src.tgbot.user_info import update_user_info_cache
 
 
 async def send_stacktrace_to_tg_chat(
@@ -13,6 +17,14 @@ async def send_stacktrace_to_tg_chat(
 ):
     user_id = update.effective_user.id
     logging.error("Exception while handling an update:", exc_info=context.error)
+
+    # if the error is that we can't send them a message,
+    #  then handle it as not a real error.
+    if isinstance(context.error, Forbidden):
+        await log(f"User #{user_id} blocked the bot")
+        await update_user(user_id, type=UserType.BLOCKED_BOT)
+        await update_user_info_cache(user_id)
+        return
 
     tb_list = traceback.format_exception(
         None, context.error, context.error.__traceback__

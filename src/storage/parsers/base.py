@@ -1,7 +1,7 @@
+import asyncio
 import datetime
 import logging
 import random
-import time
 
 import httpx
 
@@ -68,7 +68,7 @@ class Scraper:
             if attempt < self._retries:
                 sleep_time = 1.0 * 2**attempt  # exponential backoff
                 logger.info(f"Waiting {sleep_time:.0f} seconds")
-                time.sleep(sleep_time)
+                await asyncio.sleep(sleep_time)
         msg = f"{self._retries + 1} requests to {url} failed, giving up."
         logger.fatal(msg)
         logger.fatal(f'Errors: {", ".join(errors)}')
