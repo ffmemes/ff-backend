@@ -8,7 +8,7 @@ from src.config import settings
 from src.models import CustomModel
 
 pool = aioredis.ConnectionPool.from_url(
-    str(settings.REDIS_URL), max_connections=10, decode_responses=True
+    str(settings.REDIS_URL), max_connections=32, decode_responses=True
 )
 redis_client = aioredis.Redis(connection_pool=pool)
 
