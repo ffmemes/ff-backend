@@ -173,10 +173,11 @@ async def vk_meme_pipeline() -> None:
 
 
 @flow
-async def ocr_uploaded_memes(limit=100):
+async def ocr_uploaded_memes(limit=10):
     """
     Download original meme content one more time & OCR it.
     We can't use meme.telegram_file_id because it is already watermarked.
+    Runs each 5 mins.
     """
     logger = get_run_logger()
     memes = await get_memes_to_ocr(limit=limit)
