@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from telegram import (
     Message,
@@ -30,6 +31,16 @@ def prev_update_can_be_edited_with_media(prev_update: Update) -> bool:
     return True  # message from our bot & has media to be replaced
 
 
+# 1. Хранить какой юзер какое system message получил
+# 2. Под каждым system_message - кнопка next_{system_message_id} для логгирования
+# 3. Единая функция ответа на сообщение: редактировать или удалить.
+# 4. Ачивки не только по числу мемов: по числу лайков, по рандому
+# 5. Не нужен таймаут, так как кнопку "следующее сообщение" нажмут, когда прочитают
+# 6. Хранить словарь ссылок на разных языках
+# 7. Проверить, что ворнинги не попадаются. Будут - плохо, придется оставить доп запрос.
+# 8. Дизлайкнули старое сообщение - удалять и присылать новое сообщение
+
+
 async def next_message(
     user_id: int,
     prev_update: Update,
@@ -49,6 +60,8 @@ async def next_message(
         exists = await user_meme_reaction_exists(user_id, meme.id)
         if not exists:  # this meme wasn't sent yet
             break
+        else:
+            logging.warning(f"User {user_id} already received meme {meme.id}")
 
     send_new_message = (
         prev_reaction_id is None or Reaction(prev_reaction_id).is_positive
