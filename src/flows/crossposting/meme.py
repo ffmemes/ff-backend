@@ -8,16 +8,15 @@ from src.crossposting.service import (
     get_next_meme_for_tgchannelru,
     log_meme_sent,
 )
+from src.storage.constants import MemeStatus
 from src.storage.schemas import MemeData
+from src.storage.service import update_meme
 from src.tgbot.constants import (
     TELEGRAM_CHANNEL_EN_CHAT_ID,
     TELEGRAM_CHANNEL_RU_CHAT_ID,
 )
 from src.tgbot.senders.meme import send_new_message_with_meme
 from src.tgbot.senders.utils import get_random_emoji
-
-from src.storage.service import update_meme
-from src.storage.constants import MemeStatus
 
 
 def _get_caption_for_crossposting_meme(meme: MemeData, channel: Channel) -> str:
