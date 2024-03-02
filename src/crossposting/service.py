@@ -32,7 +32,7 @@ async def get_next_meme_for_tgchannelru():
             AND M.language_code = 'ru'
 
         ORDER BY -1
-            * COALESCE((MS.nlikes + 1) / (MS.nlikes + MS.ndislikes + 1), 0.5)
+            * COALESCE((MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1), 0.5)
             * CASE WHEN MS.raw_impr_rank < 1 THEN 1 ELSE 0.5 END
             * CASE WHEN MS.age_days < 5 THEN 1 ELSE 0.5 END
             * CASE WHEN M.caption IS NULL THEN 1 ELSE 0.8 END
