@@ -3,9 +3,9 @@ from prefect.server.schemas.schedules import CronSchedule
 
 from src.config import settings
 from src.flows.stats.meme import calculate_meme_stats
+from src.flows.stats.meme_source import calculate_meme_source_stats
 from src.flows.stats.user import calculate_user_stats
 from src.flows.stats.user_meme_source import calculate_user_meme_source_stats
-from src.flows.stats.meme_source import calculate_meme_source_stats
 
 deployment_user_stats = Deployment.build_from_flow(
     flow=calculate_user_stats,

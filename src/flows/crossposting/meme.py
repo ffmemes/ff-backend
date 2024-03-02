@@ -16,6 +16,9 @@ from src.tgbot.constants import (
 from src.tgbot.senders.meme import send_new_message_with_meme
 from src.tgbot.senders.utils import get_random_emoji
 
+from src.storage.service import update_meme
+from src.storage.constants import MemeStatus
+
 
 def _get_caption_for_crossposting_meme(meme: MemeData, channel: Channel) -> str:
     caption = escape(meme.caption, quote=False) if meme.caption else ""
@@ -43,6 +46,7 @@ async def post_meme_to_tgchannelen():
     )
 
     await log_meme_sent(next_meme.id, Channel.TG_CHANNEL_EN)
+    await update_meme(next_meme.id, status=MemeStatus.PUBLISHED)
 
 
 @flow
@@ -62,3 +66,4 @@ async def post_meme_to_tgchannelru():
     )
 
     await log_meme_sent(next_meme.id, Channel.TG_CHANNEL_RU)
+    await update_meme(next_meme.id, status=MemeStatus.PUBLISHED)
