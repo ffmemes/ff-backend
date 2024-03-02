@@ -16,12 +16,14 @@ from src.tgbot.constants import (
     MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA,
     MEME_SOURCE_SET_LANG_REGEXP,
     MEME_SOURCE_SET_STATUS_REGEXP,
+    POPUP_BUTTON_CALLBACK_DATA_REGEXP,
 )
 from src.tgbot.handlers import (
     alerts,
     block,
     broken,
     error,
+    popup,
     reaction,
     start,
     upload,
@@ -46,7 +48,7 @@ def add_handlers(application: Application) -> None:
         )
     )
 
-    # waitlist flow
+    ###########  waitlist flow
     # language choose page
     application.add_handler(
         CallbackQueryHandler(
@@ -79,11 +81,19 @@ def add_handlers(application: Application) -> None:
         )
     )
 
-    # meme reaction
+    ############## meme reaction
     application.add_handler(
         CallbackQueryHandler(
             reaction.handle_reaction,
             pattern=MEME_BUTTON_CALLBACK_DATA_REGEXP,
+        )
+    )
+
+    ############## popup reaction
+    application.add_handler(
+        CallbackQueryHandler(
+            popup.handle_popup_button,
+            pattern=POPUP_BUTTON_CALLBACK_DATA_REGEXP,
         )
     )
 

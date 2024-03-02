@@ -190,18 +190,6 @@ user_meme_reaction = Table(
 )
 
 
-# TODO: log events, achievements, broadcasts
-# event = Table(
-#     "event",
-#     metadata,
-#     Column("id", Integer, Identity(), primary_key=True),
-#     Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
-#     Column("type", String, nullable=False),  # meme_sent, achievement, broadcast, poll
-#     Column("object_id", JSONB),
-#     Column("created_at", DateTime, server_default=func.now(), nullable=False),
-# )
-
-
 user_stats = Table(
     "user_stats",
     metadata,
@@ -260,6 +248,30 @@ meme_stats = Table(
     ),
 )
 
+
+meme_source_stats = Table(
+    "meme_source_stats",
+    metadata,
+    Column(
+        "meme_source_id",
+        ForeignKey("meme_source.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("nlikes", Integer, nullable=False, server_default="0"),
+    Column("ndislikes", Integer, nullable=False, server_default="0"),
+    Column("nmemes_sent_events", Integer, nullable=False, server_default="0"),
+    Column("nmemes_parsed", Integer, nullable=False, server_default="0"),
+    Column("nmemes_sent", Integer, nullable=False, server_default="0"),
+    Column("latest_meme_age", Integer, nullable=False, server_default="0"),
+    Column(
+        "updated_at",
+        DateTime,
+        server_default=func.now(),
+        nullable=False,
+        onupdate=func.now(),
+    ),
+)
+
 crossposting = Table(
     "crossposting",
     metadata,
@@ -268,6 +280,15 @@ crossposting = Table(
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
     # store stats from each source in json
     # updated_at to track stats update
+)
+
+user_popup_logs = Table(
+    "user_popup_logs",
+    metadata,
+    Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), primary_key=True),
+    Column("popup_id", String, primary_key=True),
+    Column("sent_at", DateTime, server_default=func.now(), nullable=False),
+    Column("reacted_at", DateTime),
 )
 
 

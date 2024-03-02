@@ -42,18 +42,17 @@ async def send_album_with_memes(
 ) -> Tuple[Message]:
     media = []
     for meme in memes:
-        caption = await get_meme_caption_for_user_id(meme, user_id)
         if meme.type == MemeType.IMAGE:
             input_media = InputMediaPhoto(
                 media=meme.telegram_file_id,
                 parse_mode=ParseMode.HTML,
-                caption=caption,
+                caption=meme.caption,
             )
         elif meme.type == MemeType.VIDEO:
             input_media = InputMediaVideo(
                 media=meme.telegram_file_id,
                 parse_mode=ParseMode.HTML,
-                caption=caption,
+                caption=meme.caption,
             )
         elif meme.type == MemeType.ANIMATION:
             raise NotImplementedError("Can't send animation in album")

@@ -6,13 +6,13 @@ from telegram import (
     Update,
 )
 
-from src.recommendations.meme_queue import check_queue, get_next_meme_for_user
+from src.recommendations import meme_queue
 from src.recommendations.service import (
     create_user_meme_reaction,
     user_meme_reaction_exists,
 )
+from src.storage.schemas import MemeData
 from src.tgbot.constants import Reaction
-from src.tgbot.senders.achievements import send_achievement_if_needed
 from src.tgbot.senders.alerts import send_queue_preparing_alert
 from src.tgbot.senders.keyboards import meme_reaction_keyboard
 from src.tgbot.senders.meme import (
@@ -20,6 +20,8 @@ from src.tgbot.senders.meme import (
     send_new_message_with_meme,
 )
 from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
+from src.tgbot.senders.popups import get_popup_to_send, send_popup
+from src.tgbot.user_info import get_user_info
 
 
 def prev_update_can_be_edited_with_media(prev_update: Update) -> bool:
@@ -43,30 +45,40 @@ def prev_update_can_be_edited_with_media(prev_update: Update) -> bool:
 # 8. Дизлайкнули старое сообщение - удалять и присылать новое сообщение
 
 
+async def get_next_meme_for_user(user_id: int) -> MemeData | None:
+    while True:
+        meme = await meme_queue.get_next_meme_for_user(user_id)
+        if not meme:  # no memes in queue
+            asyncio.create_task(meme_queue.check_queue(user_id))
+            return None
+
+        exists = await user_meme_reaction_exists(user_id, meme.id)
+        if not exists:  # this meme wasn't sent yet
+            return meme
+        else:
+            logging.warning(f"User {user_id} already received meme {meme.id}")
+
+
 async def next_message(
     user_id: int,
     prev_update: Update,
     prev_reaction_id: int | None = None,
 ) -> Message:
+    user_info = await get_user_info(user_id)
     # TODO: if watched > 30 memes / day show paywall / tasks / donate
 
-    await send_achievement_if_needed(user_id)
+    popup = await get_popup_to_send(user_id, user_info)
+    if popup:
+        return await send_popup(user_id, popup)
 
-    while True:
-        meme = await get_next_meme_for_user(user_id)
-        if not meme:
-            asyncio.create_task(check_queue(user_id))
-            # TODO: also edit / delete
-            return await send_queue_preparing_alert(user_id)
-
-        exists = await user_meme_reaction_exists(user_id, meme.id)
-        if not exists:  # this meme wasn't sent yet
-            break
-        else:
-            logging.warning(f"User {user_id} already received meme {meme.id}")
+    meme = await get_next_meme_for_user(user_id)
+    if not meme:
+        asyncio.create_task(meme_queue.check_queue(user_id))
+        # TODO: also edit / delete previous message
+        return await send_queue_preparing_alert(user_id)
 
     reply_markup = meme_reaction_keyboard(meme.id)
-    meme.caption = await get_meme_caption_for_user_id(meme, user_id)
+    meme.caption = await get_meme_caption_for_user_id(meme, user_id, user_info)
 
     send_new_message = (
         prev_reaction_id is None or Reaction(prev_reaction_id).is_positive
@@ -79,5 +91,5 @@ async def next_message(
         msg = await send_new_message_with_meme(user_id, meme, reply_markup)
 
     await create_user_meme_reaction(user_id, meme.id, meme.recommended_by)
-    asyncio.create_task(check_queue(user_id))
+    asyncio.create_task(meme_queue.check_queue(user_id))
     return msg
