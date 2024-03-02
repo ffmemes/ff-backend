@@ -29,7 +29,7 @@ async def calculate_meme_source_stats() -> None:
             ON M.id = E.meme_id
         GROUP BY 1
 
-        ON CONFLICT (meme_id) DO
+        ON CONFLICT (meme_source_id) DO
         UPDATE SET
             nlikes = EXCLUDED.nlikes,
             ndislikes = EXCLUDED.ndislikes,

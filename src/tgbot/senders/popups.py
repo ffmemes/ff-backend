@@ -18,7 +18,7 @@ def _get_popup(popup_id: str, user_info: dict) -> Popup:
             [
                 [
                     InlineKeyboardButton(
-                        get_random_emoji(),
+                        get_random_emoji() * 3,
                         callback_data=POPUP_BUTTON_CALLBACK_DATA_PATTERN.format(
                             popup_id=popup_id
                         ),
@@ -47,6 +47,11 @@ async def get_popup_to_send(user_id: int, user_info: dict) -> Popup | None:
 
     if user_info["nmemes_sent"] == 100:
         popup_id = "achievement.nmemes_sent_100"
+        if not await user_popup_already_sent(user_id, popup_id):
+            return _get_popup(popup_id, user_info)
+
+    if user_info["nmemes_sent"] == 1000:
+        popup_id = "achievement.nmemes_sent_1000"
         if not await user_popup_already_sent(user_id, popup_id):
             return _get_popup(popup_id, user_info)
 
