@@ -27,6 +27,7 @@ async def handle_empty_meme_queue_alert(
         await update.callback_query.message.delete()
         return await next_message(user_id, update, prev_reaction_id=None)
 
+    # if there are still no memes in queue
     emoji = random.choice(LOADING_EMOJIS)
     await update.callback_query.message.edit_reply_markup(
         reply_markup=queue_empty_alert_keyboard(emoji),

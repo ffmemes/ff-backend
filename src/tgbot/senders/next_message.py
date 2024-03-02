@@ -14,10 +14,12 @@ from src.recommendations.service import (
 from src.tgbot.constants import Reaction
 from src.tgbot.senders.achievements import send_achievement_if_needed
 from src.tgbot.senders.alerts import send_queue_preparing_alert
+from src.tgbot.senders.keyboards import meme_reaction_keyboard
 from src.tgbot.senders.meme import (
     edit_last_message_with_meme,
     send_new_message_with_meme,
 )
+from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
 
 
 def prev_update_can_be_edited_with_media(prev_update: Update) -> bool:
@@ -63,15 +65,18 @@ async def next_message(
         else:
             logging.warning(f"User {user_id} already received meme {meme.id}")
 
+    reply_markup = meme_reaction_keyboard(meme.id)
+    meme.caption = await get_meme_caption_for_user_id(meme, user_id)
+
     send_new_message = (
         prev_reaction_id is None or Reaction(prev_reaction_id).is_positive
     )
     if not send_new_message and prev_update_can_be_edited_with_media(prev_update):
         msg = await edit_last_message_with_meme(
-            user_id, prev_update.callback_query.message.id, meme
+            user_id, prev_update.callback_query.message.id, meme, reply_markup
         )
     else:
-        msg = await send_new_message_with_meme(user_id, meme)
+        msg = await send_new_message_with_meme(user_id, meme, reply_markup)
 
     await create_user_meme_reaction(user_id, meme.id, meme.recommended_by)
     asyncio.create_task(check_queue(user_id))

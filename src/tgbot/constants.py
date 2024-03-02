@@ -64,3 +64,9 @@ LOADING_EMOJIS = [
     "🕚",
     "🕦",
 ]
+
+TELEGRAM_CHANNEL_EN_CHAT_ID = -1002120551028
+TELEGRAM_CHANNEL_EN_LINK = "https://t.me/fast_food_memes"
+
+TELEGRAM_CHANNEL_RU_CHAT_ID = -1001152876229
+TELEGRAM_CHANNEL_RU_LINK = "https://t.me/fastfoodmemes"

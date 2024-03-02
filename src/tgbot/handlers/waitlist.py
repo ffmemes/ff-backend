@@ -3,6 +3,12 @@ from telegram.constants import ChatMemberStatus, ParseMode
 from telegram.ext import ContextTypes
 
 from src import localizer
+from src.tgbot.constants import (
+    TELEGRAM_CHANNEL_EN_CHAT_ID,
+    TELEGRAM_CHANNEL_EN_LINK,
+    TELEGRAM_CHANNEL_RU_CHAT_ID,
+    TELEGRAM_CHANNEL_RU_LINK,
+)
 from src.tgbot.handlers.language import ALMOST_CIS_LANGUAGES
 from src.tgbot.service import (
     add_user_language,
@@ -24,12 +30,6 @@ WAITLIST_LANGUAGE_CHANGE_CALLBACK_PATTERN = r"^l:\w+:(add|del)"
 
 WAITLIST_CHANNEL_SUBSCTIBTION_PAGE_CALLBACK_DATA = "waitlist:channel_subscription"
 WAITLIST_CHANNEL_SUBSCRIBTION_CHECK_CALLBACK_DATA = "waitlist:subscription_check"
-
-TELEGRAM_CHANNEL_EN_CHAT_ID = -1002120551028
-TELEGRAM_CHANNEL_EN_LINK = "https://t.me/fast_food_memes"
-
-TELEGRAM_CHANNEL_RU_CHAT_ID = -1001152876229
-TELEGRAM_CHANNEL_RU_LINK = "https://t.me/fastfoodmemes"
 
 
 async def handle_waitlist_start(

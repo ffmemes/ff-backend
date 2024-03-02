@@ -5,7 +5,9 @@ from prefect import flow, get_run_logger
 from src.broadcasts.service import get_users_which_were_active_hours_ago
 from src.recommendations.meme_queue import check_queue, get_next_meme_for_user
 from src.recommendations.service import create_user_meme_reaction
+from src.tgbot.senders.keyboards import meme_reaction_keyboard
 from src.tgbot.senders.meme import send_new_message_with_meme
+from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
 
 
 @flow
@@ -30,6 +32,8 @@ async def broadcast_memes_to_users_active_hours_ago(hours: int = 48):
 
         meme = await get_next_meme_for_user(user_id)
 
-        await send_new_message_with_meme(user_id, meme)
+        reply_markup = meme_reaction_keyboard(meme.id)
+        meme.caption = await get_meme_caption_for_user_id(meme, user_id)
+        await send_new_message_with_meme(user_id, meme, reply_markup)
         await create_user_meme_reaction(user_id, meme.id, meme.recommended_by)
-        await asyncio.sleep(0.1)  # flood control
+        await asyncio.sleep(0.2)  # flood control
