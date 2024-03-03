@@ -2,13 +2,10 @@ import asyncio
 
 from telegram.constants import ParseMode
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from src import localizer
 from src.tgbot.bot import bot
 from src.tgbot.constants import UserType
 from src.tgbot.user_info import get_user_info
-from src.tgbot.service import user_popup_already_sent
-from src.tgbot.senders.utils import get_random_emoji
 
 
 async def send_achievement_if_needed(user_id: int) -> None:

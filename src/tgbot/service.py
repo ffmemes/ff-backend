@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, select, text, exists
+from sqlalchemy import exists, func, select, text
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
@@ -13,8 +13,8 @@ from src.database import (
     meme_source,
     user,
     user_language,
-    user_tg,
     user_popup_logs,
+    user_tg,
 )
 from src.tgbot.constants import UserType
 
