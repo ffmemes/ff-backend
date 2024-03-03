@@ -11,7 +11,7 @@ HEADERS = {
     "authorization": f"Bearer {settings.MYSTIC_TOKEN}",
 }
 
-PIPELINE_ID = "uriel/easyocr-r:v34"
+PIPELINE_ID = "uriel/easyocr-r:v31"
 
 
 async def load_file_to_mystic(file_content: bytes) -> str:
