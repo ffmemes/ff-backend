@@ -10,7 +10,7 @@ from src.models import CustomModel
 pool = aioredis.ConnectionPool.from_url(
     str(settings.REDIS_URL),
     max_connections=settings.REDIS_MAX_CONNECTIONS,
-    decode_responses=True
+    decode_responses=True,
 )
 redis_client = aioredis.Redis(connection_pool=pool)
 
