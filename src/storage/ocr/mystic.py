@@ -11,7 +11,7 @@ HEADERS = {
     "authorization": f"Bearer {settings.MYSTIC_TOKEN}",
 }
 
-PIPELINE_ID = "uriel/easyocr-r:v31"
+PIPELINE_ID = "uriel/easyocr-r:v35"
 
 
 async def load_file_to_mystic(file_content: bytes) -> str:
@@ -49,6 +49,7 @@ async def ocr_mystic_file_path(
                     },
                     {"type": "string", "value": language},
                 ],
+                "wait_for_resources": True,
             },
             headers=HEADERS,
         )
