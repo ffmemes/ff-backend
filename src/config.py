@@ -32,7 +32,7 @@ class Config(BaseSettings):
 
     MYSTIC_TOKEN: str | None = None
 
-    REDIS_MAX_CONNECTIONS: int | None = None
+    REDIS_MAX_CONNECTIONS: int = 128
 
     # @model_validator(mode="after")
     # def validate_sentry_non_local(self) -> "Config":
