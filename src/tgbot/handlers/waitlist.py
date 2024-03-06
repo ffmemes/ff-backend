@@ -73,34 +73,29 @@ async def handle_waitlist_choose_language(
         all_lang_buttons.append(
             telegram.InlineKeyboardButton(button_text, callback_data=callback_data)
         )
-
+    await update.callback_query.message.delete()
     # two buttons per line
     lang_keyboard = [
         all_lang_buttons[i : i + 2] for i in range(0, len(all_lang_buttons), 2)
     ]
-    try:
-        await update.callback_query.message.edit_text(
-            localizer.t("waitlist.language_choose", user_info["interface_lang"]),
-            parse_mode=ParseMode.HTML,
-            reply_markup=telegram.InlineKeyboardMarkup(
-                lang_keyboard
-                + [
-                    [
-                        telegram.InlineKeyboardButton(
-                            localizer.t(
-                                "waitlist.button_to_channel_subscribe",
-                                user_info["interface_lang"],
-                            ),
-                            callback_data=WAITLIST_CHANNEL_SUBSCTIBTION_PAGE_CALLBACK_DATA,
-                        )
-                    ],
-                ]
-            ),
-        )
-    except telegram.error.BadRequest as e:
-        if e.message == "Message is not modified":
-            return
-        raise e
+    await update.callback_query.message.reply_text(
+        localizer.t("waitlist.language_choose", user_info["interface_lang"]),
+        parse_mode=ParseMode.HTML,
+        reply_markup=telegram.InlineKeyboardMarkup(
+            lang_keyboard
+            + [
+                [
+                    telegram.InlineKeyboardButton(
+                        localizer.t(
+                            "waitlist.button_to_channel_subscribe",
+                            user_info["interface_lang"],
+                        ),
+                        callback_data=WAITLIST_CHANNEL_SUBSCTIBTION_PAGE_CALLBACK_DATA,
+                    )
+                ],
+            ]
+        ),
+    )
 
 
 async def handle_waitlist_language_button(
@@ -126,7 +121,6 @@ async def handle_waitlist_channel_subscription(
     # we need to turn them back since almost all of our memes
     # are in these languages
     # TODO: refactor this
-
     user_languages = await get_user_languages(update.effective_user.id)
     if not user_languages & {"ru", "en"}:
         enable_lang = (
@@ -147,7 +141,8 @@ async def handle_waitlist_channel_subscription(
     else:
         channel_link = TELEGRAM_CHANNEL_EN_LINK
 
-    await update.callback_query.message.edit_text(
+    await update.callback_query.message.delete()
+    await update.callback_query.message.reply_text(
         localizer.t("waitlist.channel_subscribe", user_info["interface_lang"]).format(
             channel_link=channel_link
         ),
