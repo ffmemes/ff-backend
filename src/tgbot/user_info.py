@@ -36,7 +36,7 @@ async def get_user_info(user_id: int) -> defaultdict:
     if user_info is None:
         user_info = await update_user_info_cache(user_id)
 
-    return defaultdict(lambda: None, id=user_id, **user_info)
+    return defaultdict(lambda: None, **user_info)
 
 
 async def update_user_info_counters(user_id: int):
