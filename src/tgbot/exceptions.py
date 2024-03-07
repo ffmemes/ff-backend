@@ -5,7 +5,7 @@ class BaseFFMemesException(Exception):
         super().__init__(*args if args else self.BASE_DETAIL)
 
 
-class NoUserInfoFound(BaseFFMemesException):
+class UserNotFound(BaseFFMemesException):
     DETAIL = "No user info found in database."
 
     def __init__(self, user_id: int) -> None:

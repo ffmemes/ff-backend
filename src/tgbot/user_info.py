@@ -5,7 +5,7 @@ from collections import defaultdict
 
 from src import redis
 from src.tgbot import service
-from src.tgbot.exceptions import NoUserInfoFound
+from src.tgbot.exceptions import UserNotFound
 
 
 async def get_cached_user_info(user_id: int) -> dict | None:
@@ -26,7 +26,7 @@ async def update_user_info_cache(user_id: int) -> defaultdict:
     user_info = await service.get_user_info(user_id)
     await cache_user_info(user_id, user_info)
     if user_info is None:
-        raise NoUserInfoFound(user_id)
+        raise UserNotFound(user_id)
 
     return defaultdict(lambda: None, **user_info)
 
@@ -36,7 +36,7 @@ async def get_user_info(user_id: int) -> defaultdict:
     if user_info is None:
         user_info = await update_user_info_cache(user_id)
 
-    return defaultdict(lambda: None, **user_info)
+    return defaultdict(lambda: None, id=user_id, **user_info)
 
 
 async def update_user_info_counters(user_id: int):

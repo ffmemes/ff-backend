@@ -8,6 +8,7 @@ from telegram.ext import (
     ChatMemberHandler,
     CommandHandler,
     InlineQueryHandler,
+    ChosenInlineResultHandler,
     MessageHandler,
     filters,
 )
@@ -155,6 +156,9 @@ def add_handlers(application: Application) -> None:
 
     # inline search
     application.add_handler(InlineQueryHandler(inline.search_inline))
+    application.add_handler(
+        ChosenInlineResultHandler(inline.handle_chosen_inline_result)
+    )
 
     application.add_error_handler(error.send_stacktrace_to_tg_chat, block=False)
 

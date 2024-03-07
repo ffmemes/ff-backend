@@ -74,6 +74,5 @@ TELEGRAM_CHANNEL_EN_LINK = "https://t.me/fast_food_memes"
 TELEGRAM_CHANNEL_RU_CHAT_ID = -1001152876229
 TELEGRAM_CHANNEL_RU_LINK = "https://t.me/fastfoodmemes"
 
-DAY_IN_SECONDS = 60 * 60 * 24
-INLINE_SEARCH_START_DEEPLINK = "inline_search_register"
-INLINE_SEARCH_RESULT_DEEPLINK = "inline_result"
+# if a user tries the inline search but not used the bot yet
+INLINE_SEARCH_REQUEST_DEEPLINK = "inline_search_request"

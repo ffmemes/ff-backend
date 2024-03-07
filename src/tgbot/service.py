@@ -1,3 +1,4 @@
+from sqlalchemy import bindparam, nulls_first, or_, select, text
 import logging
 from datetime import datetime
 from typing import Any, Sequence
@@ -15,8 +16,10 @@ from src.database import (
     user_language,
     user_popup_logs,
     user_tg,
+    inline_search_logs,
+    inline_search_chosen_result_logs,
 )
-from src.storage.constants import MemeType
+from src.storage.constants import MemeStatus, MemeType
 from src.tgbot.constants import UserType
 
 
@@ -145,16 +148,18 @@ async def update_meme_source(
 
 
 async def search_memes_for_inline_query(
-    query: str, user_id: int, limit: int
+    search_query: str, limit: int
 ) -> list[dict[str, Any]]:
-    # TODO: redo
-    # select 10 random "OK" memes that are images
-    select_statement = (
-        select(meme)
-        .where(meme.c.status == "ok")
-        .where(meme.c.type == MemeType.IMAGE)
-        # .order_by(func.random())
-        .limit(limit)
+    select_query = f"""
+        SELECT
+            M.*
+        FROM meme M
+        WHERE M.status = '{MemeStatus.OK}'
+        ORDER BY SIMILARITY(M.ocr_result ->> 'text',:search_query) DESC
+        LIMIT {limit};
+    """
+    select_statement = text(select_query).bindparams(
+        bindparam("search_query", value=search_query)
     )
 
     return await fetch_all(select_statement)
@@ -318,3 +323,29 @@ async def update_user_popup_log(
     if not reaction_is_new:
         logging.warning(f"User {user_id} already reacted to popup {popup_id}!")
     return reaction_is_new  # so I can filter double clicks
+
+
+async def create_inline_search_log(
+    user_id: int,
+    query: str,
+    chat_type: str | None,
+) -> None:
+    insert_query = insert(inline_search_logs).values(
+        user_id=user_id,
+        query=query,
+        chat_type=chat_type,
+    )
+    await execute(insert_query)
+
+
+async def create_inline_chosen_result_log(
+    user_id: int,
+    result_id: str,
+    query: str,
+) -> None:
+    insert_query = insert(inline_search_chosen_result_logs).values(
+        user_id=user_id,
+        result_id=result_id,
+        query=query,
+    )
+    await execute(insert_query)
