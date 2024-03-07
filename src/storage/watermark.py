@@ -1,5 +1,4 @@
 import logging
-import random
 from io import BytesIO
 from pathlib import Path
 
@@ -17,7 +16,9 @@ def draw_text_with_outline(draw, position, text, font, text_colour, outline_colo
     draw.text(position, text, font=font, fill=text_colour)
 
 
-def select_wm_colour(base_brightness) -> tuple:
+def select_wm_colour(base, text_position) -> tuple:
+    # average brightness of pixel check and switch between black/white
+    base_brightness = sum(base.getpixel(text_position)[:3]) / 3
     # if base_brightness > 128:
     if base_brightness > 178:
         # Black text for lighter background
@@ -29,47 +30,50 @@ def select_wm_colour(base_brightness) -> tuple:
     return text_colour
 
 
-# def calculate_corners(img_w, img_h, text_bbox, margin) -> list:
-
-    text_width = text_bbox[2] - text_bbox[0]
-    text_height = text_bbox[3] - text_bbox[1]
-    # Choose a random corner for the text
-    corners = [
-        (margin, margin),  # Top-left
-        (img_w - text_width - margin, margin),  # Top-right
-        (margin, img_h - text_height - margin),  # Bottom-left
-        (img_w - text_width - margin, img_h - text_height - margin),  # Bottom-right
-    ]
-
-    return corners
-
 def find_least_detailed_corner(img, text_bbox, margin):
-    gray_img = img.convert('L')  # Convert image to grayscale
-    
+    gray_img = img.convert("L")  # Convert image to grayscale
+
     img_w, img_h = img.size
     text_width = text_bbox[2] - text_bbox[0]
     text_height = text_bbox[3] - text_bbox[1]
-    
+
     corners = [
         (margin, margin, margin + text_width, margin + text_height),  # Top-left
-        (img_w - text_width - margin, margin, img_w - margin, margin + text_height),  # Top-right
-        (margin, img_h - text_height - margin, margin + text_width, img_h - margin),  # Bottom-left
-        (img_w - text_width - margin, img_h - text_height - margin, img_w - margin, img_h - margin),  # Bottom-right
+        (
+            img_w - text_width - margin,
+            margin,
+            img_w - margin,
+            margin + text_height,
+        ),  # Top-right
+        (
+            margin,
+            img_h - text_height - margin,
+            margin + text_width,
+            img_h - margin,
+        ),  # Bottom-left
+        (
+            img_w - text_width - margin,
+            img_h - text_height - margin,
+            img_w - margin,
+            img_h - margin,
+        ),  # Bottom-right
     ]
-    
-    min_detail = float('inf')
+
+    min_detail = float("inf")
     selected_corner = None
-    
+
     for corner in corners:
         sector = gray_img.crop(corner)
         stat = ImageStat.Stat(sector)
         mean = stat.mean[0]  # Mean pixel value in the sector
-        
-        if mean < min_detail:
-            min_detail = mean
+        w_border, b_border = 255, 0
+        min_diff_for_corner = min(abs(mean - w_border), abs(mean - b_border))
+
+        if min_diff_for_corner < min_detail:
+            min_detail = min_diff_for_corner
             selected_corner = corner[:2]  # Keep only the starting coordinates
-    print(selected_corner)
     return selected_corner
+
 
 def check_font(font_path, font_family, image, width_ratio):
     fontsize = image.size[0] * width_ratio // 2
@@ -90,19 +94,12 @@ def draw_corner_watermark(
 ) -> Image:
     with Image.open(image_bytes).convert("RGBA") as base:
         txt = Image.new("RGBA", base.size, (255, 255, 255, 0))
-
         d = ImageDraw.Draw(txt)
         fonts_files_dir = Path(__file__).parent.parent.parent / "static/fonts"
         font = check_font(fonts_files_dir, font_family, base, width_ratio)
         text_bbox = d.textbbox((0, 0), text, font=font)
-        # corners = calculate_corners(
-        #     img_w=base.size[0], img_h=base.size[1], text_bbox=text_bbox, margin=margin
-        # )
         text_position = find_least_detailed_corner(base, text_bbox, margin)
-        # text_position = random.choice(corners)
-        # average brightness of pixel check and switch between black/white
-        base_brightness = sum(base.getpixel(text_position)[:3]) / 3
-        text_colour = select_wm_colour(base_brightness)
+        text_colour = select_wm_colour(base, text_position)
         outline_colour = (
             (0, 0, 0, 255)
             if text_colour == (255, 255, 255, 255)
@@ -131,21 +128,20 @@ def add_watermark(image_content: bytes) -> BytesIO | None:
     # image.save(buff, "JPEG")
     buff.seek(0)
 
-    return image#buff
+    return image  # buff
 
 
 if __name__ == "__main__":
-    
     # for image_num in range(1,7):
-    image_path = Path(f"ex_6.jpg")
+    # image_path = Path(f"ex_6.jpg")
     # image_path = Path(f"new_ex1.jpg")
-    # image_path = Path(Path.home(), "ex_6.jpg")
-    with open(image_path, 'rb') as image_file:
+    image_path = Path(Path.home(), "example_1.jpg")
+    with open(image_path, "rb") as image_file:
         image_bytes = image_file.read()
     watermarked_image = add_watermark(image_bytes)
     if watermarked_image is not None:
-        watermarked_image.show()
+        # watermarked_image.show()
         # watermarked_image.save(f'image_new{image_num}.jpg')
-        # watermarked_image.save('ex_6wm.jpeg')
+        watermarked_image.save("ex_new.jpeg")
     else:
         print("Failed to add watermark. The resulting image is None.")
