@@ -7,6 +7,7 @@ from telegram.ext import (
     ChatBoostHandler,
     ChatMemberHandler,
     CommandHandler,
+    InlineQueryHandler,
     MessageHandler,
     filters,
 )
@@ -24,6 +25,7 @@ from src.tgbot.handlers import (
     block,
     broken,
     error,
+    inline,
     popup,
     reaction,
     start,
@@ -149,6 +151,11 @@ def add_handlers(application: Application) -> None:
         ChatMemberHandler(
             block.user_blocked_bot_handler, ChatMemberHandler.MY_CHAT_MEMBER
         )
+    )
+
+    # inline search
+    application.add_handler(
+        InlineQueryHandler(inline.search_inline)
     )
 
     application.add_error_handler(error.send_stacktrace_to_tg_chat, block=False)

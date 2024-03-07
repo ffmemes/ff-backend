@@ -43,9 +43,19 @@ def get_user_languages_from_language_code_and_full_name(
         languages_to_add.add(tg_language_code)
 
 
+def get_active_language_from_user_languages(user_languages: Set[str]) -> str:
+    """Returns most accurate language code for this user"""
+    return sorted(
+        user_languages,
+        key=lambda lang: 0 if lang == "en" else (1 if lang == "ru" else 2),
+        reverse=True
+    )[0]
+
+
 async def init_user_languages_from_tg_user(tg_user: User):
     languages_to_add = get_user_languages_from_language_code_and_full_name(
         tg_user.language_code, tg_user.full_name
     )
 
-    await add_user_languages(tg_user.id, languages_to_add)
+    if languages_to_add:
+        await add_user_languages(tg_user.id, languages_to_add)

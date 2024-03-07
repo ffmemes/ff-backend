@@ -16,6 +16,7 @@ from src.database import (
     user_popup_logs,
     user_tg,
 )
+from src.storage.constants import MemeType
 from src.tgbot.constants import UserType
 
 
@@ -141,6 +142,24 @@ async def update_meme_source(
     )
 
     return await fetch_one(update_statement)
+
+
+async def search_memes_for_inline_query(
+    query: str,
+    user_id: int,
+    limit: int
+) -> list[dict[str, Any]]:
+    # TODO: redo
+    # select 10 random "OK" memes that are images
+    select_statement = (
+        select(meme)
+        .where(meme.c.status == "ok")
+        .where(meme.c.type == MemeType.IMAGE)
+        # .order_by(func.random())
+        .limit(limit)
+    )
+
+    return await fetch_all(select_statement)
 
 
 async def get_user_languages(
