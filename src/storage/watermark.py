@@ -125,23 +125,7 @@ def add_watermark(image_content: bytes) -> BytesIO | None:
 
     buff = BytesIO()
     buff.name = "image.jpeg"
-    # image.save(buff, "JPEG")
+    image.save(buff, "JPEG")
     buff.seek(0)
 
-    return image  # buff
-
-
-if __name__ == "__main__":
-    # for image_num in range(1,7):
-    # image_path = Path(f"ex_6.jpg")
-    # image_path = Path(f"new_ex1.jpg")
-    image_path = Path(Path.home(), "example_1.jpg")
-    with open(image_path, "rb") as image_file:
-        image_bytes = image_file.read()
-    watermarked_image = add_watermark(image_bytes)
-    if watermarked_image is not None:
-        # watermarked_image.show()
-        # watermarked_image.save(f'image_new{image_num}.jpg')
-        watermarked_image.save("ex_new.jpeg")
-    else:
-        print("Failed to add watermark. The resulting image is None.")
+    return buff
