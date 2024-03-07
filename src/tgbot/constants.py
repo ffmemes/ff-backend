@@ -73,3 +73,6 @@ TELEGRAM_CHANNEL_EN_LINK = "https://t.me/fast_food_memes"
 
 TELEGRAM_CHANNEL_RU_CHAT_ID = -1001152876229
 TELEGRAM_CHANNEL_RU_LINK = "https://t.me/fastfoodmemes"
+
+# if a user tries the inline search but not used the bot yet
+INLINE_SEARCH_REQUEST_DEEPLINK = "inline_search_request"

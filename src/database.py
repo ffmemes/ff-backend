@@ -291,6 +291,26 @@ user_popup_logs = Table(
     Column("reacted_at", DateTime),
 )
 
+inline_search_logs = Table(
+    "inline_search_logs",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
+    Column("query", String, nullable=False),
+    Column("chat_type", String),
+    Column("searched_at", DateTime, server_default=func.now(), nullable=False),
+)
+
+inline_search_chosen_result_logs = Table(
+    "inline_search_chosen_result_logs",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("result_id", String, nullable=False),
+    Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
+    Column("query", String, nullable=False),
+    Column("chosen_at", DateTime, server_default=func.now(), nullable=False),
+)
+
 
 async def fetch_one(select_query: Select | Insert | Update) -> dict[str, Any] | None:
     async with engine.begin() as conn:
