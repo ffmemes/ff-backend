@@ -24,10 +24,10 @@ async def cache_user_info(user_id: int, user_info: dict):
 
 async def update_user_info_cache(user_id: int) -> defaultdict:
     user_info = await service.get_user_info(user_id)
-    await cache_user_info(user_id, user_info)
     if user_info is None:
         raise UserNotFound(user_id)
 
+    await cache_user_info(user_id, user_info)
     return defaultdict(lambda: None, **user_info)
 
 
@@ -36,6 +36,7 @@ async def get_user_info(user_id: int) -> defaultdict:
     if user_info is None:
         user_info = await update_user_info_cache(user_id)
 
+    user_info["id"] = user_id
     return defaultdict(lambda: None, **user_info)
 
 
