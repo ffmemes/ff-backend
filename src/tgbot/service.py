@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Any
+from typing import Any, Sequence
 
 from sqlalchemy import exists, func, select, text
 from sqlalchemy.dialects.postgresql import insert
@@ -158,6 +158,28 @@ async def add_user_language(
     insert_language_query = (
         insert(user_language)
         .values({"user_id": user_id, "language_code": language_code})
+        .on_conflict_do_nothing(
+            index_elements=(user_language.c.user_id, user_language.c.language_code)
+        )
+    )
+
+    await execute(insert_language_query)
+
+
+async def add_user_languages(
+    user_id: int,
+    language_codes: Sequence[str],
+) -> None:
+    # Prepare a list of dictionaries where each dictionary represents
+    # the values to be inserted for one row.
+    values_to_insert = [
+        {"user_id": user_id, "language_code": language_code}
+        for language_code in language_codes
+    ]
+
+    insert_language_query = (
+        insert(user_language)
+        .values(values_to_insert)
         .on_conflict_do_nothing(
             index_elements=(user_language.c.user_id, user_language.c.language_code)
         )

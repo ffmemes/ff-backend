@@ -1,6 +1,8 @@
+from typing import Set
+
 from telegram import User
 
-from src.tgbot.service import add_user_language
+from src.tgbot.service import add_user_languages
 
 RUSSIAN_ALPHABET = "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"
 ALMOST_CIS_LANGUAGES = [
@@ -23,11 +25,12 @@ ALMOST_CIS_LANGUAGES = [
 ]
 
 
-async def init_user_languages_from_tg_user(tg_user: User):
-    tg_language_code = tg_user.language_code
+def get_user_languages_from_language_code_and_full_name(
+        tg_language_code: str, tg_user_full_name: str
+) -> Set[str]:
     languages_to_add = set()
 
-    name_with_slavic_letters = len(set(tg_user.full_name) & set(RUSSIAN_ALPHABET)) > 0
+    name_with_slavic_letters = len(set(tg_user_full_name) & set(RUSSIAN_ALPHABET)) > 0
     if name_with_slavic_letters:
         languages_to_add.add("ru")
 
@@ -39,5 +42,10 @@ async def init_user_languages_from_tg_user(tg_user: User):
     if tg_language_code is not None:
         languages_to_add.add(tg_language_code)
 
-    for language in languages_to_add:
-        await add_user_language(tg_user.id, language)
+
+async def init_user_languages_from_tg_user(tg_user: User):
+    languages_to_add = get_user_languages_from_language_code_and_full_name(
+        tg_user.language_code, tg_user.full_name
+    )
+
+    await add_user_languages(tg_user.id, languages_to_add)
