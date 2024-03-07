@@ -30,6 +30,9 @@ class Reaction(int, Enum):
 MEME_BUTTON_CALLBACK_DATA_PATTERN = "r:{meme_id}:{reaction_id}"
 MEME_BUTTON_CALLBACK_DATA_REGEXP = "^r:"
 
+POPUP_BUTTON_CALLBACK_DATA_PATTERN = "p:{popup_id}"
+POPUP_BUTTON_CALLBACK_DATA_REGEXP = "^p:"
+
 MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA = "q:empty"
 
 MEME_SOURCE_SET_LANG_PATTERN = "ms:{meme_source_id}:set_lang:{lang_code}"
@@ -64,3 +67,9 @@ LOADING_EMOJIS = [
     "🕚",
     "🕦",
 ]
+
+TELEGRAM_CHANNEL_EN_CHAT_ID = -1002120551028
+TELEGRAM_CHANNEL_EN_LINK = "https://t.me/fast_food_memes"
+
+TELEGRAM_CHANNEL_RU_CHAT_ID = -1001152876229
+TELEGRAM_CHANNEL_RU_LINK = "https://t.me/fastfoodmemes"

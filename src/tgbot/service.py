@@ -1,7 +1,8 @@
+import logging
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, select, text
+from sqlalchemy import exists, func, select, text
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
@@ -12,6 +13,7 @@ from src.database import (
     meme_source,
     user,
     user_language,
+    user_popup_logs,
     user_tg,
 )
 from src.tgbot.constants import UserType
@@ -230,23 +232,50 @@ async def update_user(user_id: int, **kwargs) -> dict[str, Any] | None:
     return await fetch_one(update_query)
 
 
-# async def sync_user_language(
-#     user_id: int,
-#     language_code: list[str],
-# ) -> None:
-#     languages
-#     posts = [
-#         post.model_dump(exclude_none=True) | {"meme_source_id": meme_source_id}
-#         for post in telegram_posts
-#     ]
-#     insert_statement = insert(meme_raw_telegram).values(posts)
-#     insert_posts_query = insert_statement.on_conflict_do_update(
-#         constraint=MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
-#         set_={
-#             "media": insert_statement.excluded.media,
-#             "views": insert_statement.excluded.views,
-#             "updated_at": datetime.utcnow(),
-#         },
-#     )
+async def user_popup_already_sent(
+    user_id: int,
+    popup_id: str,
+) -> bool:
+    exists_statement = (
+        exists(user_popup_logs)
+        .where(user_popup_logs.c.user_id == user_id)
+        .where(user_popup_logs.c.popup_id == popup_id)
+        .select()
+    )
+    res = await execute(exists_statement)
+    return res.scalar()
 
-#     await execute(insert_posts_query)
+
+async def create_user_popup_log(
+    user_id: int,
+    popup_id: str,
+) -> bool:
+    insert_query = (
+        insert(user_popup_logs)
+        .values(
+            user_id=user_id,
+            popup_id=popup_id,
+        )
+        .on_conflict_do_nothing(
+            index_elements=(user_popup_logs.c.user_id, user_popup_logs.c.popup_id)
+        )
+    )
+    await execute(insert_query)
+
+
+async def update_user_popup_log(
+    user_id: int,
+    popup_id: int,
+) -> bool:
+    update_query = (
+        user_popup_logs.update()
+        .where(user_popup_logs.c.user_id == user_id)
+        .where(user_popup_logs.c.popup_id == popup_id)
+        .where(user_popup_logs.c.reacted_at.is_(None))  # not sure abot that
+        .values(reacted_at=datetime.utcnow())
+    )
+    res = await execute(update_query)
+    reaction_is_new = res.rowcount > 0
+    if not reaction_is_new:
+        logging.warning(f"User {user_id} already reacted to popup {popup_id}!")
+    return reaction_is_new  # so I can filter double clicks

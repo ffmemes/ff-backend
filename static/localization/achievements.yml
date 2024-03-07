@@ -44,7 +44,70 @@ achievement.nmemes_sent_100:
     🚀 Hai appena guardato <b>100</b> meme! Guarda di PIÙ 🍔
   fr: |-
     🚀 Vous venez de regarder <b>100</b> memes! Regardez PLUS 🍔
-  de: |-
-    🚀 Du hast gerade <b>100</b> Memes gesehen! Schau dir MEHR an 🍔
+
+
+achievement.nmemes_sent_1000:
+  en: |-
+    I don't know how to say it but this is important. You've just watched the <b>1000th</b> meme from our bot. 
+    
+    This is insane, my friend. You're a real meme lover. I'm proud of you. 
+
+    Please, don't stop. And keep sharing memes with your friends. Spread the love, spread the fun.
+
+    I love you ❤️
+  ru: |-
+    Я не знаю, как лучше выразиться, но это важно. Ты только что посмотрел <b>1000-й</b> мем от нашего бота. 
+    
+    Это просто безумие какое-то. Ты настоящий любитель мемов. Я горжусь тобой. 
+
+    Пожалуйста, не останавливайся. И продолжай делиться мемами с друзьями. Распространяй любовь, распространяй веселье.
+
+    Я тебя люблю ❤️ 
+  uk: |-
+    Я не знаю, як краще висловитися, але це важливо. Ти щойно подивився <b>1000-й</b> мем від нашого бота. 
+    
+    Це просто безумство якеось. Ти справжній любитель мемів. Я пишаюся тобою. 
+
+    Будь ласка, не зупиняйся. І продовжуй ділитися мемами з друзями. Поширюй любов, поширюй веселощі.
+
+    Я тебе люблю ❤️
   es: |-
-    🚀 ¡Acabas de ver <b>100</b> memes! ¡Mira MÁS 🍔
+    No sé cómo decirlo, pero esto es importante. Acabas de ver el <b>1000º</b> meme de nuestro bot. 
+    
+    Esto es una locura, amigo. Eres un verdadero amante de los memes. Estoy orgulloso de ti. 
+
+    Por favor, no te detengas. Y sigue compartiendo memes con tus amigos. Difunde el amor, difunde la diversión.
+
+    Te quiero ❤️
+  fa: |-
+    من نمی‌دانم چگونه بگویم اما این مهم است. شما به تازگی <b>1000</b> میم از ربات ما را تماشا کرده‌اید.
+    
+    این دیوانگی است، دوست من. شما یک عاشق واقعی میم هستید. من از شما افتخار می‌کنم.
+
+    لطفاً متوقف نشوید. و ادامه دهید و میم‌ها را با دوستان خود به اشتراک بگذارید. عشق را منتشر کنید، سرگرمی را منتشر کنید.
+
+    من عاشق تو هستم ❤️
+  ar: |- 
+    لا أعرف كيف أقولها ولكن هذا مهم. لقد شاهدت للتو الميم الـ <b>1000</b> من روبوتنا.
+    
+    هذا مجنون، يا صديقي. أنت حقًا عاشق للميم. أنا فخور بك.
+
+    من فضلك، لا تتوقف. واستمر في مشاركة الميم مع أصدقائك. انشر الحب، انشر المرح.
+
+    أنا أحبك ❤️
+  de: |-
+    Ich weiß nicht, wie ich es sagen soll, aber das ist wichtig. Du hast gerade das <b>1000.</b> Meme von unserem Bot gesehen. 
+    
+    Das ist verrückt, mein Freund. Du bist ein echter Meme-Liebhaber. Ich bin stolz auf dich. 
+
+    Bitte hör nicht auf. Und teile weiterhin Memes mit deinen Freunden. Verbreite die Liebe, verbreite den Spaß.
+
+    Ich liebe dich ❤️
+  fr: |-
+    Je ne sais pas comment le dire, mais c'est important. Vous venez de regarder le <b>1000ème</b> meme de notre bot. 
+    
+    C'est fou, mon ami. Vous êtes un vrai amateur de memes. Je suis fier de toi. 
+
+    S'il vous plaît, ne vous arrêtez pas. Et continuez à partager des memes avec vos amis. Propagez l'amour, propagez le plaisir.
+
+    Je t'aime ❤️

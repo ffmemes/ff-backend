@@ -27,9 +27,7 @@ from src.storage.upload import (
 from src.storage.watermark import add_watermark
 
 
-async def ocr_meme_content(
-    meme_id: int, content: bytes, language: str, image_link: str
-) -> None:
+async def ocr_meme_content(meme_id: int, content: bytes, language: str) -> None:
     logger = get_run_logger()
     logger.debug(f"OCRing meme {meme_id} content.")
     result = await ocr_content(content, language)
@@ -38,7 +36,7 @@ async def ocr_meme_content(
         result.text = " ".join(s.split())
         await update_meme(meme_id, ocr_result=result.model_dump(mode="json"))
     else:
-        logger.warning(msg=f"OCR: {str(result)} {meme_id=} {image_link=}")
+        logger.warning(msg=f"OCR: {str(result)} {meme_id=}")
 
 
 async def analyse_meme_caption(meme: dict[str, Any]) -> None:
@@ -139,7 +137,6 @@ async def tg_meme_pipeline() -> None:
             meme["id"],
             meme["__original_content"],
             meme["language_code"],
-            meme["content_url"],
         )
 
     # next step of a pipeline
@@ -169,7 +166,6 @@ async def vk_meme_pipeline() -> None:
             meme["id"],
             meme["__original_content"],
             meme["language_code"],
-            meme["content_url"],
         )
 
     # next step of a pipeline
@@ -177,10 +173,11 @@ async def vk_meme_pipeline() -> None:
 
 
 @flow
-async def ocr_uploaded_memes(limit=100):
+async def ocr_uploaded_memes(limit=10):
     """
     Download original meme content one more time & OCR it.
     We can't use meme.telegram_file_id because it is already watermarked.
+    Runs each 5 mins.
     """
     logger = get_run_logger()
     memes = await get_memes_to_ocr(limit=limit)
@@ -199,7 +196,6 @@ async def ocr_uploaded_memes(limit=100):
             meme["id"],
             meme_original_content,
             meme["language_code"],
-            meme["content_url"],
         )
 
     await final_meme_pipeline()

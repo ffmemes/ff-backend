@@ -38,5 +38,7 @@ class MemeStatus(str, Enum):
     AD = "ad"
     BROKEN_CONTENT_LINK = "broken_content_link"
 
+    PUBLISHED = "published"  # meme was cross-posted to a channel
+
     # TODO: more statuses?
     # IN_MODERATION = "in_moderation"
