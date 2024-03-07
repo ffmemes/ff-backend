@@ -1,0 +1,29 @@
+inline.you_need_to_register:
+  ru: |-
+    Тебе нужно зарегистрироваться, чтобы искать мемы. Нажми сюда
+  en: |-
+    You need to register to search for memes. Click here
+
+inline.enter_your_query:
+  ru: |-
+    Введи свой запрос!
+  en: |-
+    Enter your query!
+
+inline.no_results:
+  ru: |-
+    Ничего не найдено
+  en: |-
+    Nothing found
+
+inline.search_query_too_short:
+  ru: |-
+    Запрос слишком короткий
+  en: |-
+    Query is too short
+
+inline.search_query_too_long:
+  ru: |-
+    Запрос слишком длинный
+  en: |-
+    Query is too long

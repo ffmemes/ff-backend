@@ -5,6 +5,7 @@ from collections import defaultdict
 
 from src import redis
 from src.tgbot import service
+from src.tgbot.exceptions import NoUserInfoFound
 
 
 async def get_cached_user_info(user_id: int) -> dict | None:
@@ -25,7 +26,7 @@ async def update_user_info_cache(user_id: int) -> defaultdict:
     user_info = await service.get_user_info(user_id)
     await cache_user_info(user_id, user_info)
     if user_info is None:
-        raise Exception(f"Can't get_user_info({user_id}). Probably no data in db.")
+        raise NoUserInfoFound(user_id)
 
     return defaultdict(lambda: None, **user_info)
 

@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Any
+from typing import Any, Sequence
 
 from sqlalchemy import exists, func, select, text
 from sqlalchemy.dialects.postgresql import insert
@@ -16,6 +16,7 @@ from src.database import (
     user_popup_logs,
     user_tg,
 )
+from src.storage.constants import MemeType
 from src.tgbot.constants import UserType
 
 
@@ -143,6 +144,22 @@ async def update_meme_source(
     return await fetch_one(update_statement)
 
 
+async def search_memes_for_inline_query(
+    query: str, user_id: int, limit: int
+) -> list[dict[str, Any]]:
+    # TODO: redo
+    # select 10 random "OK" memes that are images
+    select_statement = (
+        select(meme)
+        .where(meme.c.status == "ok")
+        .where(meme.c.type == MemeType.IMAGE)
+        # .order_by(func.random())
+        .limit(limit)
+    )
+
+    return await fetch_all(select_statement)
+
+
 async def get_user_languages(
     user_id: int,
 ) -> set[str]:
@@ -158,6 +175,28 @@ async def add_user_language(
     insert_language_query = (
         insert(user_language)
         .values({"user_id": user_id, "language_code": language_code})
+        .on_conflict_do_nothing(
+            index_elements=(user_language.c.user_id, user_language.c.language_code)
+        )
+    )
+
+    await execute(insert_language_query)
+
+
+async def add_user_languages(
+    user_id: int,
+    language_codes: Sequence[str],
+) -> None:
+    # Prepare a list of dictionaries where each dictionary represents
+    # the values to be inserted for one row.
+    values_to_insert = [
+        {"user_id": user_id, "language_code": language_code}
+        for language_code in language_codes
+    ]
+
+    insert_language_query = (
+        insert(user_language)
+        .values(values_to_insert)
         .on_conflict_do_nothing(
             index_elements=(user_language.c.user_id, user_language.c.language_code)
         )
