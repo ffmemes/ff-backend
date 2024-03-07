@@ -154,9 +154,7 @@ def add_handlers(application: Application) -> None:
     )
 
     # inline search
-    application.add_handler(
-        InlineQueryHandler(inline.search_inline)
-    )
+    application.add_handler(InlineQueryHandler(inline.search_inline))
 
     application.add_error_handler(error.send_stacktrace_to_tg_chat, block=False)
 

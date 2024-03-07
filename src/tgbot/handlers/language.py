@@ -26,7 +26,7 @@ ALMOST_CIS_LANGUAGES = [
 
 
 def get_user_languages_from_language_code_and_full_name(
-        tg_language_code: str, tg_user_full_name: str
+    tg_language_code: str, tg_user_full_name: str
 ) -> Set[str]:
     languages_to_add = set()
 
@@ -48,7 +48,7 @@ def get_active_language_from_user_languages(user_languages: Set[str]) -> str:
     return sorted(
         user_languages,
         key=lambda lang: 0 if lang == "en" else (1 if lang == "ru" else 2),
-        reverse=True
+        reverse=True,
     )[0]
 
 

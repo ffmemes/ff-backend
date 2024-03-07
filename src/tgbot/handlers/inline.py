@@ -56,7 +56,7 @@ async def search_inline(update: Update, _: ContextTypes.DEFAULT_TYPE):
                 text=t("inline.enter_your_query", user_info["interface_lang"]),
                 start_parameter=INLINE_SEARCH_START_DEEPLINK,
             ),
-            cache_time=DAY_IN_SECONDS
+            cache_time=DAY_IN_SECONDS,
         )
         return
     elif len(query) < MIN_SEARCH_QUERY_LENGTH:

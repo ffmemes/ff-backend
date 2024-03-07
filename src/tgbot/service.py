@@ -145,9 +145,7 @@ async def update_meme_source(
 
 
 async def search_memes_for_inline_query(
-    query: str,
-    user_id: int,
-    limit: int
+    query: str, user_id: int, limit: int
 ) -> list[dict[str, Any]]:
     # TODO: redo
     # select 10 random "OK" memes that are images
