@@ -52,8 +52,9 @@ def queue_empty_alert_keyboard(emoji: str = "⏳"):
 
 def meme_source_language_selection_keyboard(meme_source_id: int):
     # TODO: get languages from some shared consts
-    # and split them by rows
-
+    languages = ["ru", "uk", "en", "es", "fr", "de", "fa"]
+    per_row = 4
+    rows = [languages[i : i + per_row] for i in range(0, len(languages), per_row)]
     return InlineKeyboardMarkup(
         [
             [
@@ -63,13 +64,17 @@ def meme_source_language_selection_keyboard(meme_source_id: int):
                         meme_source_id=meme_source_id, lang_code=lang_code
                     ),
                 )
-                for lang_code in ["ru", "uk", "en", "es", "fa"]
+                for lang_code in row
             ]
+            for row in rows
         ]
     )
 
 
-def meme_source_change_status_keyboard(meme_source_id: int):
+def meme_source_change_status_keyboard(
+    meme_source_id: int,
+    current_status: MemeSourceStatus | None = None,
+):
     return InlineKeyboardMarkup(
         [
             [
@@ -79,5 +84,6 @@ def meme_source_change_status_keyboard(meme_source_id: int):
                 )
             ]
             for status in MemeSourceStatus
+            if status != current_status
         ]
     )

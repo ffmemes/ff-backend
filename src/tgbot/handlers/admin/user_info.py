@@ -31,8 +31,9 @@ async def handle_show_user_info(
     user_stats = await get_user_stats(selected_user["id"])
 
     report = ""
-    for k, v in user_stats.items():
-        report += f"<b>{k}</b>: {v}\n"
+    if user_stats:
+        for k, v in user_stats.items():
+            report += f"<b>{k}</b>: {v}\n"
 
     await update.message.reply_text(
         f"""

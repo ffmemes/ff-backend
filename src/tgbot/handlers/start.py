@@ -29,10 +29,6 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     user = await create_user(id=user_id)
     await init_user_languages_from_tg_user(update.effective_user)
-    await log(
-        f"👋 {update.effective_user.name}/#{user_id} started with deeplink: {deep_link}"
-    )
-
     if deep_link:
         await handle_deep_link_used(
             invited_user=user,
@@ -41,6 +37,14 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
 
     user_info = await update_user_info_cache(user_id)
+
+    await log(
+        f"""
+👋 {update.effective_user.name}/#{user_id}
+type:{user_info["type"]}, ref:{deep_link}, lang:{language_code}
+    """
+    )
+
     if user_info["type"] == UserType.WAITLIST:
         return await handle_waitlist_start(update, context)
 

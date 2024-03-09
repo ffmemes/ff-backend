@@ -121,7 +121,7 @@ def add_handlers(application: Application) -> None:
     application.add_handler(
         MessageHandler(
             filters=filters.ChatType.PRIVATE
-            & filters.Regex("^(https://t.me|https://vk.com)"),
+            & filters.Regex("^(https://t.me|https://vk.com|https://www.instagram.com)"),
             callback=meme_source.handle_meme_source_link,
         )
     )

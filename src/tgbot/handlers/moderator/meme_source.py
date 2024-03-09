@@ -32,6 +32,9 @@ async def handle_meme_source_link(
         meme_source_type = MemeSourceType.TELEGRAM
     elif "https://vk.com/" in url:
         meme_source_type = MemeSourceType.VK
+    elif "https://www.instagram.com" in url:
+        meme_source_type = MemeSourceType.INSTAGRAM
+        url = url.split("?")[0]  # remove query params
     else:
         await update.message.reply_text("Unsupported meme source")
         return
@@ -128,5 +131,7 @@ async def meme_source_admin_pipeline(
     return await send_or_edit(
         update,
         text=ms_info,
-        reply_markup=meme_source_change_status_keyboard(meme_source["id"]),
+        reply_markup=meme_source_change_status_keyboard(
+            meme_source["id"], meme_source["status"]
+        ),
     )
