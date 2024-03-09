@@ -49,10 +49,21 @@ async def get_next_meme_for_tgchannelru():
 async def get_next_meme_for_tgchannelen() -> dict[str, Any]:
     query = """
         SELECT
-            M.id, M.type, M.telegram_file_id, M.caption
+            M.id
+            , M.type, M.telegram_file_id, M.caption
+
+            -- DEBUG
+        --    , MS.nlikes
+        --    , MS.ndislikes
+        --    , MS.nmemes_sent
+        --    , MSS.nlikes AS source_likes
+        --    , MSS.ndislikes AS source_dislikes
+
         FROM meme M
         LEFT JOIN meme_stats MS
             ON MS.meme_id = M.id
+        --LEFT JOIN meme_source_stats MSS
+        --	ON MSS.meme_source_id = M.meme_source_id
         LEFT JOIN crossposting CP
             ON CP.meme_id = M.id
             AND CP.channel = 'tgchannelen'
@@ -63,7 +74,7 @@ async def get_next_meme_for_tgchannelen() -> dict[str, Any]:
             AND M.language_code = 'en'
 
         ORDER BY -1
-            * COALESCE((MS.nlikes + 1) / (MS.nlikes + MS.ndislikes + 1), 0.5)
+            * COALESCE((MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1), 0.5)
             * CASE WHEN MS.raw_impr_rank < 1 THEN 1 ELSE 0.5 END
             * CASE WHEN MS.age_days < 5 THEN 1 ELSE 0.5 END
             * CASE WHEN M.caption IS NULL THEN 1 ELSE 0.8 END

@@ -1,23 +1,22 @@
-from sqlalchemy import bindparam, nulls_first, or_, select, text
 import logging
 from datetime import datetime
 from typing import Any, Sequence
 
-from sqlalchemy import exists, func, select, text
+from sqlalchemy import bindparam, exists, func, select, text
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
     execute,
     fetch_all,
     fetch_one,
+    inline_search_chosen_result_logs,
+    inline_search_logs,
     meme,
     meme_source,
     user,
     user_language,
     user_popup_logs,
     user_tg,
-    inline_search_logs,
-    inline_search_chosen_result_logs,
 )
 from src.storage.constants import MemeStatus, MemeType
 from src.tgbot.constants import UserType

@@ -1,14 +1,6 @@
-from typing import Any
-
 import httpx
-import telegram
-from pydantic import AnyHttpUrl
 
-from src.config import settings
-from src.storage.constants import MemeStatus, MemeType
 from src.storage.parsers.constants import USER_AGENT
-from src.storage.service import update_meme
-from src.tgbot.bot import bot
 
 
 async def get_user_info(

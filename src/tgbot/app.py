@@ -6,9 +6,9 @@ from telegram.ext import (
     CallbackQueryHandler,
     ChatBoostHandler,
     ChatMemberHandler,
+    ChosenInlineResultHandler,
     CommandHandler,
     InlineQueryHandler,
-    ChosenInlineResultHandler,
     MessageHandler,
     filters,
 )

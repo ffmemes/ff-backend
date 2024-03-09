@@ -37,8 +37,8 @@ async def sorted_by_user_source_lr_meme_lr_meme_age(
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
 
         ORDER BY -1
-            * COALESCE((UMSS.nlikes + 1) / (UMSS.nlikes + UMSS.ndislikes + 1), 0.5)
-            * COALESCE((MS.nlikes + 1) / (MS.nlikes + MS.ndislikes + 1), 0.5)
+            * COALESCE((UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1), 0.5)
+            * COALESCE((MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1), 0.5)
             * CASE WHEN MS.raw_impr_rank < 1 THEN 1 ELSE 0.5 END
             * CASE WHEN MS.age_days < 5 THEN 1 ELSE 0.5 END
             * CASE WHEN M.caption IS NULL THEN 1 ELSE 0.8 END
