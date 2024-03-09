@@ -10,11 +10,13 @@ from src.storage.constants import MemeStatus, MemeType
 from src.storage.ocr.mystic import ocr_content
 from src.storage.schemas import OcrResult
 from src.storage.service import (
+    etl_memes_from_raw_ig_posts,
     etl_memes_from_raw_telegram_posts,
     etl_memes_from_raw_vk_posts,
     find_meme_duplicate,
     get_memes_to_ocr,
     get_pending_memes,
+    get_unloaded_ig_memes,
     get_unloaded_tg_memes,
     get_unloaded_vk_memes,
     update_meme,
@@ -85,14 +87,15 @@ async def upload_meme_to_telegram(
         logger.warning(f"Can't add watermark to {meme['id']}/{meme['type']} content")
         return None
 
+    meme_result = None
     for _ in range(3):  # attempts
         try:
-            meme = await upload_meme_content_to_tg(
+            meme_result = await upload_meme_content_to_tg(
                 meme_id=meme["id"],
                 meme_type=meme["type"],
                 content=watermarked_meme_content,
             )
-            if meme:
+            if meme_result:
                 break
         except RetryAfter as e:
             logger.warning(f"Flood control exceeded: {e}")
@@ -104,13 +107,13 @@ async def upload_meme_to_telegram(
 
         await asyncio.sleep(3)  # flood control
 
-    if meme is None or meme.get("telegram_file_id") is None:
+    if meme_result is None or meme_result.get("telegram_file_id") is None:
         logger.warning(f"Meme {meme['id']} failed to upload to Telegram.")
         return None
 
     # HACK: to save original content for OCR
-    meme["__original_content"] = meme_original_content
-    return meme
+    meme_result["__original_content"] = meme_original_content
+    return meme_result
 
 
 @flow(
@@ -167,6 +170,37 @@ async def vk_meme_pipeline() -> None:
             meme["__original_content"],
             meme["language_code"],
         )
+
+    # next step of a pipeline
+    await final_meme_pipeline()
+
+
+@flow(
+    name="Memes from Instagram Pipeline",
+    description="Process raw memes parsed from IG",
+    version="0.1.0",
+)
+async def ig_meme_pipeline() -> None:
+    logger = get_run_logger()
+
+    logger.info("ETLing memes from 'meme_raw_vk' table.")
+    await etl_memes_from_raw_ig_posts()
+
+    logger.info("Getting unloaded memes to upload to Telegram.")
+    unloaded_memes = await get_unloaded_ig_memes(limit=100)
+    logger.info(f"Received {len(unloaded_memes)}" " memes to upload to Telegram.")
+    for unloaded_meme in unloaded_memes:
+        meme = await upload_meme_to_telegram(unloaded_meme)
+        if not meme or meme["type"] != MemeType.IMAGE:
+            continue
+
+        await ocr_meme_content(
+            meme["id"],
+            meme["__original_content"],
+            meme["language_code"],
+        )
+
+        await asyncio.sleep(3)  # flood control
 
     # next step of a pipeline
     await final_meme_pipeline()

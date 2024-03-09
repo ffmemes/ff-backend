@@ -30,6 +30,7 @@ from src.tgbot.handlers import (
     popup,
     reaction,
     start,
+    stats,
     upload,
     waitlist,
 )
@@ -175,6 +176,14 @@ def add_handlers(application: Application) -> None:
         CommandHandler(
             "invite_before",
             handle_waitlist_invite_before,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+        )
+    )
+
+    application.add_handler(
+        CommandHandler(
+            "stats",
+            stats.handle_stats,
             filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
         )
     )

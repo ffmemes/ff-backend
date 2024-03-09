@@ -6,6 +6,7 @@ from sqlalchemy import (
     Column,
     CursorResult,
     DateTime,
+    Float,
     ForeignKey,
     Identity,
     Insert,
@@ -25,6 +26,7 @@ from src.config import settings
 from src.constants import DB_NAMING_CONVENTION
 from src.storage.constants import (
     MEME_MEME_SOURCE_RAW_MEME_UNIQUE_CONSTRAINT,
+    MEME_RAW_IG_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
     MEME_RAW_TELEGRAM_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
     MEME_RAW_VK_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
 )
@@ -44,6 +46,7 @@ meme_source = Table(
     Column("status", String, nullable=False),
     Column("language_code", String, index=True),
     Column("added_by", ForeignKey("user.id", ondelete="SET NULL")),
+    Column("data", JSONB),
     Column("parsed_at", DateTime),
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
     Column("updated_at", DateTime, onupdate=func.now()),
@@ -92,8 +95,8 @@ meme_raw_vk = Table(
     ),
     Column("post_id", String, nullable=False),
     Column("url", String, nullable=False),
-    Column("content", String),
     Column("date", DateTime, nullable=False),
+    Column("content", String),
     Column("media", JSONB),
     Column("views", Integer, nullable=False),
     Column("likes", Integer, nullable=False),
@@ -103,6 +106,34 @@ meme_raw_vk = Table(
     Column("updated_at", DateTime, onupdate=func.now()),
     UniqueConstraint(
         "meme_source_id", "post_id", name=MEME_RAW_VK_MEME_SOURCE_POST_UNIQUE_CONSTRAINT
+    ),
+)
+
+meme_raw_ig = Table(
+    "meme_raw_ig",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column(
+        "meme_source_id",
+        ForeignKey("meme_source.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("post_id", String, nullable=False),
+    Column("url", String, nullable=False),
+    Column("published_at", DateTime, nullable=False),
+    Column("caption", String),  # caption
+    Column("media", JSONB),
+    Column("likes", Integer),
+    Column("views", Integer),
+    Column("comments", Integer),
+    Column("shares", Integer),
+    Column("media_type", Integer),
+    Column("video_duration", Float),
+    Column("product_type", String),
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime, onupdate=func.now()),
+    UniqueConstraint(
+        "meme_source_id", "post_id", name=MEME_RAW_IG_MEME_SOURCE_POST_UNIQUE_CONSTRAINT
     ),
 )
 

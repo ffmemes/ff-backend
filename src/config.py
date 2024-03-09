@@ -29,6 +29,7 @@ class Config(BaseSettings):
     ADMIN_LOGS_CHAT_ID: str | None = None
 
     VK_TOKEN: str | None = None
+    HIKERAPI_TOKEN: str | None = None
 
     MYSTIC_TOKEN: str | None = None
 

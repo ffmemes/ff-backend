@@ -29,3 +29,17 @@ class VkGroupPostParsingResult(CustomModel):
     likes: int
     reposts: int
     comments: int
+
+
+class IgPostParsingResult(CustomModel):
+    post_id: str
+    url: str
+    published_at: datetime
+    caption: str | None
+    media: list
+    likes: int | None
+    views: int | None
+    comments: int | None
+    shares: int | None
+    media_type: int
+    product_type: str | None
