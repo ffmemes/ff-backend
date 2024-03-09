@@ -73,7 +73,10 @@ async def handle_waitlist_choose_language(
         all_lang_buttons.append(
             telegram.InlineKeyboardButton(button_text, callback_data=callback_data)
         )
-    await update.callback_query.message.delete()
+    try:
+        await update.callback_query.message.delete()
+    except telegram.error.BadRequest:
+        pass
     # two buttons per line
     lang_keyboard = [
         all_lang_buttons[i : i + 2] for i in range(0, len(all_lang_buttons), 2)
