@@ -60,3 +60,21 @@ popup.how_invite_to_bot:
 
     Invia a un amico qualsiasi meme dal bot e chiedi di aprire quel link. Aiuta i tuoi amici a evitare la coda per entrare nel bot! ^^
   
+
+popup.inline_search:
+  ru: |-
+    Мы тут начали делать поиск по мемам, зачекай, мб пригодится на случай важных переговоров:
+
+    Начинай писать сообщение: @ffmemesbot и через пробел введи запрос. 
+    Например: @ffmemesbot котики
+  en: |-
+    You know, we also have a search! 
+    
+    Type @ffmemesbot and then your request.
+
+    Example: @ffmemesbot cats
+  uk: |-
+    Ми тут почали робити пошук по мемам, зачекай, може знадобиться на випадок важливих переговорів:
+
+    Почни писати повідомлення: @ffmemesbot і через пробіл введи запит. 
+    Наприклад: @ffmemesbot котики

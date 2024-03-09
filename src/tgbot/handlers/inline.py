@@ -1,32 +1,24 @@
-from html import escape as escape_html
-
 from telegram import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
     InlineQueryResultCachedPhoto,
     InlineQueryResultsButton,
     Update,
 )
-from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
+from telegram.ext import ContextTypes
 
+from src.config import settings
 from src.localizer import t
 from src.tgbot.constants import (
     INLINE_SEARCH_REQUEST_DEEPLINK,
 )
 from src.tgbot.exceptions import UserNotFound
-from src.tgbot.handlers.language import (
-    get_active_language_from_user_languages,
-    get_user_languages_from_language_code_and_full_name,
-)
+from src.tgbot.senders.utils import get_random_emoji
 from src.tgbot.service import (
-    search_memes_for_inline_query,
-    create_inline_search_log,
     create_inline_chosen_result_log,
+    create_inline_search_log,
+    search_memes_for_inline_query,
 )
 from src.tgbot.user_info import get_user_info
-from src.tgbot.senders.utils import get_random_emoji
-from src.config import settings
 
 MIN_SEARCH_QUERY_LENGTH = 3
 MAX_SEARCH_QUERY_LENGTH = 128
