@@ -1,5 +1,3 @@
-from typing import Set
-
 from telegram import User
 
 from src.tgbot.service import add_user_languages
@@ -25,37 +23,20 @@ ALMOST_CIS_LANGUAGES = [
 ]
 
 
-def get_user_languages_from_language_code_and_full_name(
-    tg_language_code: str, tg_user_full_name: str
-) -> Set[str]:
+async def init_user_languages_from_tg_user(tg_user: User):
     languages_to_add = set()
 
-    name_with_slavic_letters = len(set(tg_user_full_name) & set(RUSSIAN_ALPHABET)) > 0
+    name_with_slavic_letters = len(set(tg_user.full_name) & set(RUSSIAN_ALPHABET)) > 0
     if name_with_slavic_letters:
         languages_to_add.add("ru")
 
-    if tg_language_code in ALMOST_CIS_LANGUAGES:
+    # add languages ru / en since they are the most common
+    if tg_user.language_code in ALMOST_CIS_LANGUAGES:
         languages_to_add.add("ru")
     else:
         languages_to_add.add("en")
 
-    if tg_language_code is not None:
-        languages_to_add.add(tg_language_code)
+    if tg_user.language_code is not None:
+        languages_to_add.add(tg_user.language_code)
 
-
-def get_active_language_from_user_languages(user_languages: Set[str]) -> str:
-    """Returns most accurate language code for this user"""
-    return sorted(
-        user_languages,
-        key=lambda lang: 0 if lang == "en" else (1 if lang == "ru" else 2),
-        reverse=True,
-    )[0]
-
-
-async def init_user_languages_from_tg_user(tg_user: User):
-    languages_to_add = get_user_languages_from_language_code_and_full_name(
-        tg_user.language_code, tg_user.full_name
-    )
-
-    if languages_to_add:
-        await add_user_languages(tg_user.id, languages_to_add)
+    await add_user_languages(tg_user.id, languages_to_add)
