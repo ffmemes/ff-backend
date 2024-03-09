@@ -13,6 +13,7 @@ from src.database import (
     inline_search_logs,
     meme,
     meme_source,
+    meme_stats,
     user,
     user_language,
     user_popup_logs,
@@ -267,6 +268,11 @@ async def get_user_info(
     """
 
     return await fetch_one(text(query))
+
+
+async def get_meme_stats(meme_id: int) -> dict[str, Any] | None:
+    select_statement = select(meme_stats).where(meme_stats.c.meme_id == meme_id)
+    return await fetch_one(select_statement)
 
 
 async def update_user(user_id: int, **kwargs) -> dict[str, Any] | None:

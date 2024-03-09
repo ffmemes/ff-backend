@@ -13,8 +13,60 @@ from telegram.ext import (
 from src.storage.schemas import MemeData
 from src.tgbot.constants import UserType
 from src.tgbot.senders.meme import send_album_with_memes, send_new_message_with_meme
-from src.tgbot.service import get_meme_by_id
+from src.tgbot.service import get_meme_by_id, get_meme_source_by_id, get_meme_stats
 from src.tgbot.user_info import get_user_info
+
+
+async def send_meme_info(update: Update, meme_id: int):
+    meme_data = await get_meme_by_id(meme_id)
+    if meme_data is None:
+        await update.message.reply_text(f"Meme #{meme_id} not found")
+        return
+
+    if meme_data["telegram_file_id"] is None:
+        await update.message.reply_text(
+            f"""
+Meme #{meme_id} wasn't uploaded to telegram.
+Status: {meme_data['status']}
+        """
+        )
+        return
+
+    meme_source = await get_meme_source_by_id(meme_data["meme_source_id"])
+
+    info = f"""
+Meme #{meme_id}
+- source: {meme_source["url"]} / {meme_source["language_code"]}
+- status: {meme_data["status"]}
+- lang: {meme_data["language_code"]}
+- published: {meme_data["published_at"]}
+"""
+
+    if meme_data["duplicate_of"]:
+        info += f"""- duplicate of: #{meme_data["duplicate_of"]}\n"""
+
+    if meme_data["caption"]:
+        info += f"""- caption: {meme_data["caption"]}"""
+
+    meme_stats = await get_meme_stats(meme_id)
+    if meme_stats:
+        info += f"""
+Stats:
+- likes: {meme_stats['nlikes']}
+- dislikes: {meme_stats['ndislikes']}
+- sent times: {meme_stats['nmemes_sent']}
+- age days: {meme_stats['age_days']}
+- rank in source: {meme_stats['raw_impr_rank']}/4
+"""
+
+    meme_data["caption"] = info
+    meme = MemeData(**meme_data)
+    reply_markup = None  # TODO: add buttons to change status
+    return await send_new_message_with_meme(
+        update.effective_user.id,
+        meme,
+        reply_markup,
+    )
 
 
 async def handle_get_meme(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -39,6 +91,9 @@ async def handle_get_meme(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
         return
 
+    if len(meme_ids) == 1:
+        return await send_meme_info(update, meme_ids[0])
+
     memes_data = await asyncio.gather(
         *[get_meme_by_id(meme_id) for meme_id in meme_ids]
     )
@@ -47,17 +102,12 @@ async def handle_get_meme(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         for meme in memes_data
         if meme is not None and meme["telegram_file_id"] is not None
     ]
-    if not memes:
+    if len(memes) == 0:
         await update.message.reply_text(
             "Not a single meme you've provided had been found. Check your meme ids."
         )
         return
-    elif len(memes) == 1:
-        reply_markup = None  # TODO: change language / status / metadata admin keyboard
-        await send_new_message_with_meme(
-            update.effective_user.id, memes[0], reply_markup
-        )
-    else:
-        # divide memes in batches of up to 10
-        for i in range(0, len(memes), 10):
-            await send_album_with_memes(update.effective_user.id, memes[i : i + 10])
+
+    # divide memes in batches of up to 10
+    for i in range(0, len(memes), 10):
+        await send_album_with_memes(update.effective_user.id, memes[i : i + 10])
