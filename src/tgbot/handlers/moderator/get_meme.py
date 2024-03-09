@@ -36,10 +36,11 @@ Status: {meme_data['status']}
 
     info = f"""
 Meme #{meme_id}
-- source: {meme_source["url"]} / {meme_source["language_code"]}
 - status: {meme_data["status"]}
 - lang: {meme_data["language_code"]}
 - published: {meme_data["published_at"]}
+- source: #{meme_data["meme_source_id"]} / {meme_source["language_code"]}
+---- {meme_source["url"]}
 """
 
     if meme_data["duplicate_of"]:
