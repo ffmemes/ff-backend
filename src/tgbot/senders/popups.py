@@ -50,6 +50,12 @@ async def get_popup_to_send(user_id: int, user_info: dict) -> Popup | None:
         if not await user_popup_already_sent(user_id, popup_id):
             return _get_popup(popup_id, user_info)
 
+    # TODO:
+    # 1. tell about our channels with best memes
+    # 2. invite to update languages
+    # 3. send a circle video with greeting from a team member
+    # 4. tell about our github repo
+
     if user_info["nmemes_sent"] == 100:
         popup_id = "achievement.nmemes_sent_100"
         if not await user_popup_already_sent(user_id, popup_id):

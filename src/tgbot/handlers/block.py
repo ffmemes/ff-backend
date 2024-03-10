@@ -32,9 +32,13 @@ async def user_blocked_bot_handler(update: Update, context):
         for k, v in user_stats.items():
             report += f"<b>{k}</b>: {v}\n"
 
+    # TODO:
+    # 1. create a function to generate this repr
+    # 2. show all availabel languages
     message = f"""
 ⛔️ <b>BLOCKED</b> by {user_tg.name} / #{user_id}
 <b>registered</b>: {user["created_at"]}
+<b>lang</b>: {user_tg.language_code}
 {report}
     """
     await log(message)
