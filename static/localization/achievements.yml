@@ -9,3 +9,75 @@ achievement_100_meme_sent:
     🚀 Du hast gerade <b>100</b> Memes gesehen! Schau dir MEHR an 🍔
   uk: |-
     🚀 Ви щойно переглянули <b>100</b> мемів! Дивіться БІЛЬШЕ 🍔
+
+achievement_500_meme_sent:
+  en: |-
+    🚀 You've just devoured 500 memes, emerging as the Meme Gladiator! The arena echoes with your laughter. Ready for the next meme battle? 🍔
+  ru: |-
+    🚀 Ты только что поглотил 500 мемов, став Гладиатором Мемов! Арена отзывается твоим смехом. Готов к новым битвам в мемной арене? 🍔
+  es: |-
+    🚀 ¡Acabas de devorar 500 memes y te has coronado como el Gladiador de Memes! El eco de tu risa resuena en la arena. ¿Listo para la próxima batalla de memes? 🍔
+  de: |-
+    🚀 Du hast gerade 500 Memes verschlungen und bist nun der Meme-Gladiator! 🍔
+  uk: |-
+    🚀 Ти тільки що поглинув 500 мемів і став Мем Гладіатором! Арена відгукується твоїм сміхом. Готовий до наступної битви мемів? 🍔
+
+achievement_1000_meme_sent:
+  en: |-
+    🚀 Yo, champ, you just surfed through a wave of a thousand memes and didn’t sink! 🌊🏄 You’re like... a meme magnate, yeah? Scrolling like a boss, with each meme a checkpoint on your path to legendary status. Dude, you turned procrastination into an art form! 🎨👑 Keep it up, and remember: each like and share you drop is like energy for the meme universe. Let’s go for more victories, just remember to occasionally emerge from under the blanket, lest you get sucked in. Ha, onward, meme master, conquer those internets further! 🍔💥
+  ru: |-
+    🚀 Эй, чемпион, ты только что прокатился на волне из тысячи мемов и не утонул! 🌊🏄 Ты типа... мемный магнат, да? Листаешь как босс, и каждый мем – это чек-поинт на твоём пути к легендарности. Братан, ты превратил таймкиллинг в искусство! 🎨👑 Так держать, и помни: каждый твой лайк и репост – это как энергия для мемной вселенной. Пошли за новыми победами, только не забудь иногда вылезать из-под одеяла, а то засосёт. Ха, давай, мемный мастер, захватывай интернеты дальше! 🍔💥
+  es: |-
+    🚀 ¡Epa, campeón, acabas de surfear una ola de mil memes sin hundirte! 🌊🏄 Eres como... un magnate de los memes, ¿verdad? Desplazándote como un jefe, con cada meme un punto de control en tu camino hacia el estatus de leyenda. Tío, has convertido la procrastinación en una forma de arte! 🎨👑 Sigue así, y recuerda: cada like y compartida que das es como energía para el universo meme. Vamos a por más victorias, solo recuerda salir ocasionalmente de debajo de la manta, para que no te absorba. Ja, adelante, maestro de los memes, ¡conquista más internets! 🍔💥
+  de: |-
+    🚀 Hey, Champion, du hast gerade eine Welle von tausend Memes gemeistert und bist nicht untergegangen! 🌊🏄 Du bist quasi... ein Meme-Magnat, richtig? Scrollst wie ein Boss, und jedes Meme ist ein Checkpoint auf deinem Weg zur Legende. Alter, du hast das Aufschieben in eine Kunstform verwandelt! 🎨👑 Weiter so, und denk dran: Jedes Like und jeder Share von dir ist wie Energie für das Meme-Universum. Auf zu neuen Siegen, vergiss nur nicht, ab und zu unter der Decke hervorzukommen, sonst wirst du eingesogen. Ha, auf geht’s, Meme-Meister, erobere weiter die Weiten des Internets! 🍔💥
+  uk: |-
+    🚀 Ой, чемпіоне, ти щойно проїхався на хвилі з тисячі мемів і не втопився! 🌊🏄 Ти як... мемний магнат, чи не так? Пролиставши як бос, і кожен мем – це чек-поінт на твоєму шляху до легендарності. Брате, ти перетворив таймкіллинг на мистецтво! 🎨👑 Так тримати, і пам'ятай: кожен твій лайк і репост – це як енергія для мемного всесвіту. Починай нові перемоги, лише не забувай час від часу вилізати з-під ковдри, інакше засмокче. Ха, давай, мемний майстер, захоплюй інтернети далі! 🍔💥
+
+achievement_5000_meme_sent:
+  en: |-
+    "FIVE GRAND MEMES!!! What even? YOU'RE A MACHINE."
+  ru: |-
+    "ПЯТЬ КОСАРЕЙ МЕМОВ!!! Это как вообще? ТЫ МАШИНА."
+  es: |-
+    "¡CINCO MIL MEMES!!! ¿Qué demonios? ERES UNA MÁQUINA."
+  de: |-
+    "FÜNF TAUSEND MEMES!!! Was zum Teufel? DU BIST EINE MASCHINE."
+  uk: |-
+    "П'ЯТЬ ТИСЯЧ МЕМІВ!!! Це як взагалі? ТИ МАШИНА."
+
+achievement_10000_meme_sent:
+  en: |-
+    "Dude. You're a MEME-CONSUMING MACHINE. Thanks a ton for using us. You've already viewed 10,000 memes. I'M PROUD OF YOU."
+  ru: |-
+    "Чувак. Ты МАШИНА по просмотру мемов. Спасибо тебе огромное, что пользуешься нами. Ты уже посмотрел(а) 10 000 мемов. Я ГОРЖУСЬ ТОБОЙ."
+  es: |-
+    "Amigo. Eres una MÁQUINA DEVORAMEMES. Gracias mil por utilizar nuestro servicio. Ya has visto 10,000 memes. ESTOY ORGULLOSO DE TI."
+  de: |-
+    "Alter. Du bist eine MEME-VERSCHLINGENDE MASCHINE. Vielen Dank für die Nutzung unserer Dienste. Du hast bereits 10.000 Memes angesehen. ICH BIN STOLZ AUF DICH."
+  uk: |-
+    "Чувак. Ти МАШИНА з перегляду мемів. Дякую тобі величезне, що використовуєш нас. Ти вже переглянув(ла) 10 000 мемів. Я ГОРДЖУСЬ ТОБОЮ."
+
+achievement_50000_meme_sent:
+  en: |-
+    "Fifty. Thousand. Memes. That's something unimaginable... Thanks for using our bot! You're in the top 0.01% of our users in terms of activity!"
+  ru: |-
+    "Пятьдесят. Тысяч. Мемов. Это что-то невообразимое... Спасибо что пользуешься нашим ботом!) Ты в топ 0.01% наших пользователей по активности!"
+  es: |-
+    "Cincuenta. Mil. Memes. Eso es algo inimaginable... ¡Gracias por usar nuestro bot! ¡Estás en el top 0.01% de nuestros usuarios en términos de actividad!"
+  de: |-
+    "Fünfzig. Tausend. Memes. Das ist etwas Unvorstellbares... Danke, dass du unseren Bot nutzt! Du gehörst zu den Top 0,01% unserer Benutzer in Bezug auf Aktivität!"
+  uk: |-
+    "П'ятдесят. Тисяч. Мемів. Це щось неймовірне... Дякую, що використовуєш нашого бота! Ти в топ 0.01% наших користувачів за активністю!"
+
+achievement_100000_meme_sent:
+  en: |-
+    "You've viewed 10% of a million memes. If you were a machine at 10k, now you're just a rocket 🚀🚀🚀"
+  ru: |-
+    "Ты посмотрел(а) 10% от миллиона мемов. Если на 10к ты был машиной, то сейчас ты просто ракета 🚀🚀🚀"
+  es: |-
+    "Has visto el 10% de un millón de memes. Si eras una máquina a los 10k, ahora eres simplemente un cohete 🚀🚀🚀"
+  de: |-
+    "Du hast 10% von einer Million Memes angesehen. Wenn du bei 10k eine Maschine warst, bist du jetzt einfach eine Rakete 🚀🚀🚀"
+  uk: |-
+    "Ти переглянув(ла) 10% від мільйона мемів. Якщо на 10к ти був(ла) машиною, то зараз ти просто ракета 🚀🚀🚀"
