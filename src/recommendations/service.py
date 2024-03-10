@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import insert
 from src.database import (
     execute,
     fetch_all,
+    user,
     user_meme_reaction,
 )
 from src.recommendations.utils import exclude_meme_ids_sql_filter
@@ -49,6 +50,17 @@ async def update_user_meme_reaction(
     if not reaction_is_new:
         logging.warning(f"User {user_id} already reacted to meme {meme_id}!")
     return reaction_is_new  # I can filter double clicks
+
+
+async def update_user_last_active_at(
+    user_id: int,
+) -> None:
+    update_query = (
+        user.update()
+        .where(user.c.id == user_id)
+        .values(last_active_at=datetime.utcnow())
+    )
+    await execute(update_query)
 
 
 # test handler, will be removed
