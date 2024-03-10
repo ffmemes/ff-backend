@@ -218,6 +218,10 @@ async def ocr_uploaded_memes(limit=10):
     logger.info(f"Going to OCR {len(memes)} memes.")
 
     for meme in memes:
+        if meme["content_url"] is None:
+            logger.warning(f"Failed to extract #{meme['id']} content_url, skipping.")
+            continue
+
         meme_original_content = await download_meme_content_file(meme["content_url"])
         await asyncio.sleep(3)  # flood control
 

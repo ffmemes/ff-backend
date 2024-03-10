@@ -285,7 +285,11 @@ async def get_memes_to_ocr(limit=100):
     select_query = """
         SELECT
             M.*,
-            COALESCE(MRV.media->>0, MRT.media->0->>'url') content_url
+            COALESCE(
+                MRV.media->>0,
+                MRT.media->0->>'url',
+                MRI.media->0->>'url'
+            ) content_url
         FROM meme M
         INNER JOIN meme_source MS
             ON MS.id = M.meme_source_id
@@ -293,6 +297,8 @@ async def get_memes_to_ocr(limit=100):
             ON MRV.id = M.raw_meme_id AND MS.type = 'vk'
         LEFT JOIN meme_raw_telegram MRT
             ON MRT.id = M.raw_meme_id AND MS.type = 'telegram'
+        LEFT JOIN meme_raw_ig MRI
+            ON MRI.id = M.raw_meme_id AND MS.type = 'instagram'
         WHERE 1=1
             AND M.ocr_result IS NULL
             AND M.status != 'broken_content_link'
