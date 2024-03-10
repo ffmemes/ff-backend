@@ -3,27 +3,47 @@ inline.you_need_to_register:
     Тебе нужно зарегистрироваться, чтобы искать мемы. Нажми сюда
   en: |-
     You need to register to search for memes. Click here
+  uk: |-
+    Тобі необхідно зареєструватися, щоб шукати меми. Тисни сюди
+  it: |-
+    Devi registrarti per cercare i memes. Sciacca qua
 
 inline.enter_your_query:
   ru: |-
     Введи свой запрос!
   en: |-
     Enter your query!
+  uk: |-
+    Введи свій запит!
+  it: |-
+    Inserisci la tua richiesta
 
 inline.no_results:
   ru: |-
     Ничего не найдено
   en: |-
     Nothing found
+  uk: |-
+    Нічого не знайдено
+  it: |-
+    Non è trovato niente
 
 inline.search_query_too_short:
   ru: |-
     Запрос слишком короткий
   en: |-
     Query is too short
+  uk: |-
+    Запит занадто короткий
+  it: |-
+    Richiesta è troppo corta
 
 inline.search_query_too_long:
   ru: |-
     Запрос слишком длинный
   en: |-
     Query is too long
+  uk: |-
+    Запит занадто довгий
+  it: |-
+    Richiesta è troppo lunga
