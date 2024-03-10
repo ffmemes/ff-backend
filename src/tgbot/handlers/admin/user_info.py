@@ -27,6 +27,7 @@ async def handle_show_user_info(
 
     selected_user_info = await update_user_info_cache(selected_user["id"])
 
+    # TODO: create a function which creates a user info string
     await calculate_user_stats()  # regenerate user stats
     user_stats = await get_user_stats(selected_user["id"])
 
