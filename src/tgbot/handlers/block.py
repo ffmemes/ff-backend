@@ -22,6 +22,10 @@ async def user_blocked_bot_handler(update: Update, context):
         user_id, blocked_bot_at=datetime.utcnow(), type=UserType.BLOCKED_BOT
     )
 
+    if user is None:
+        # user wasn't in our db
+        return
+
     # send user info to admin log chat
     # it's useful to analyze churned users
     await calculate_user_stats()  # regenerate user stats
