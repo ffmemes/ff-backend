@@ -34,7 +34,7 @@ async def user_blocked_bot_handler(update: Update, context):
 
     message = f"""
 ⛔️ <b>BLOCKED</b> by {user_tg.name} / #{user_id}
-<b>type</b>: {user["type"]}
+<b>registered</b>: {user["created_at"]}
 {report}
     """
     await log(message)

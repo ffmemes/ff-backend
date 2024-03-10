@@ -2,8 +2,12 @@ from prefect.deployments import Deployment
 from prefect.server.schemas.schedules import CronSchedule
 
 from src.config import settings
-from src.flows.broadcasts.meme import broadcast_memes_to_users_active_hours_ago
+from src.flows.broadcasts.meme import (
+    broadcast_memes_to_recently_active_users,
+    broadcast_memes_to_users_active_hours_ago,
+)
 
+# broadcasts meme in 48 hours after last activity
 deployment_broadcast_hourly = Deployment.build_from_flow(
     flow=broadcast_memes_to_users_active_hours_ago,
     name="broadcast_memes_to_users_active_hours_ago",
@@ -12,3 +16,14 @@ deployment_broadcast_hourly = Deployment.build_from_flow(
 )
 
 deployment_broadcast_hourly.apply()
+
+
+# broadcasts meme in 15 mins after last activity
+deployment_broadcast_memes_to_recently_active_users = Deployment.build_from_flow(
+    flow=broadcast_memes_to_recently_active_users,
+    name="broadcast_memes_to_recently_active_users",
+    schedule=(CronSchedule(cron="*/15 * * * *", timezone="Europe/London")),
+    work_pool_name=settings.ENVIRONMENT,
+)
+
+deployment_broadcast_memes_to_recently_active_users.apply()

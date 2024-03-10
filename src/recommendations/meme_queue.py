@@ -64,6 +64,8 @@ async def generate_recommendations(user_id, limit=10):
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
 
+    # TODO: best meme from unseen channel
+
     if len(candidates) == 0:
         return
 
