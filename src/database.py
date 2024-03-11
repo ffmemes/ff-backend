@@ -107,11 +107,25 @@ meme_raw_vk = Table(
 )
 
 
-# meme_raw_upload = Table(
-#     "meme_raw_upload",
-#     metadata,
-# TODO: columns TBD, probably also JSONBs to store all raw data
-# )
+meme_raw_upload = Table(
+    "meme_raw_upload",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("message_id", Integer, nullable=False),
+    Column("chat", JSONB, nullable=False),
+
+    Column("content", String),
+    Column("date", DateTime, nullable=False),
+
+    Column("out_links", JSONB),
+    Column("mentions", JSONB),
+    Column("hashtags", JSONB),
+    Column("forwarded", JSONB),
+    Column("media", JSONB),
+
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime, onupdate=func.now())
+)
 
 
 meme = Table(
