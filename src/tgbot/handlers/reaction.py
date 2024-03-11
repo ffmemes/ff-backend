@@ -2,6 +2,7 @@
     Handle reactions on sent memes
 """
 
+import asyncio
 import logging
 
 from telegram import Update
@@ -23,17 +24,16 @@ async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         f"🛜 reaction: user_id={user_id}, meme_id={meme_id}, reaction_id={reaction_id}"
     )
 
-    await update_user_info_counters(user_id)
-
-    reaction_is_new = await update_user_meme_reaction(
-        user_id=user_id,
-        meme_id=int(meme_id),
-        reaction_id=int(reaction_id),
-    )
-
-    if reaction_is_new:
-        return await next_message(
+    await asyncio.gather(
+        update_user_info_counters(user_id),
+        update_user_meme_reaction(
+            user_id=user_id,
+            meme_id=int(meme_id),
+            reaction_id=int(reaction_id),
+        ),
+        next_message(
             user_id,
             prev_update=update,
             prev_reaction_id=int(reaction_id),
-        )
+        ),
+    )
