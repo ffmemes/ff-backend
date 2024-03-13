@@ -85,8 +85,8 @@ def check_font(font_path, font_family, image, width_ratio):
         font = ImageFont.truetype(str(font_file), fontsize)
         logging.info(f"Loaded font from {font_file}.")
     except IOError:
-        font = ImageFont.load_default()
-        logging.error(f"Failed to load font from {font_file}, loading default one.")
+        logging.error(f"Failed to load font from {font_file}.")
+        raise
 
     return font
 
