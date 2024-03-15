@@ -3,7 +3,11 @@ from sqlalchemy import text
 from src.database import fetch_all
 
 
-async def get_users_which_were_active_hours_ago(hours: int) -> list[dict]:
+async def get_users_active_minutes_ago(
+    from_minutes_ago: int,
+    to_minutes_ago: int,
+) -> list[dict]:
+    assert from_minutes_ago < to_minutes_ago
     insert_query = f"""
         SELECT
             id
@@ -11,23 +15,8 @@ async def get_users_which_were_active_hours_ago(hours: int) -> list[dict]:
         WHERE 1=1
             AND type NOT IN ('waitlist', 'blocked_bot')
             AND last_active_at BETWEEN
-                NOW() - INTERVAL '{hours} HOURS'
+                NOW() - INTERVAL '{to_minutes_ago} MINUTES'
                 AND
-                NOW() - INTERVAL '{hours-1} HOURS'
-    """
-    return await fetch_all(text(insert_query))
-
-
-async def get_recently_active_users() -> list[dict]:
-    insert_query = """
-        SELECT
-            id
-        FROM "user"
-        WHERE 1=1
-            AND type NOT IN ('waitlist', 'blocked_bot')
-            AND last_active_at BETWEEN
-                NOW() - INTERVAL '30 MINUTES'
-                AND
-                NOW() - INTERVAL '15 MINUTES'
+                NOW() - INTERVAL '{from_minutes_ago} MINUTES'
     """
     return await fetch_all(text(insert_query))
