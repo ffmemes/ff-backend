@@ -1,5 +1,5 @@
 import telegram
-from telegram.constants import ChatMemberStatus, ParseMode
+from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from src import localizer
@@ -16,6 +16,7 @@ from src.tgbot.service import (
     get_user_languages,
 )
 from src.tgbot.user_info import get_user_info, update_user_info_cache
+from src.tgbot.utils import check_if_user_chat_member
 
 # TODO: find a better place for these consts
 LANGUAGE_CODE_TO_TEXT = {
@@ -177,25 +178,17 @@ async def handle_check_channel_subscription(
         channel_chat_id = TELEGRAM_CHANNEL_EN_CHAT_ID
         channel_link = TELEGRAM_CHANNEL_EN_LINK
 
-    try:
-        res = await context.bot.get_chat_member(
-            chat_id=channel_chat_id, user_id=update.effective_user.id
-        )
-        if res.status in [
-            ChatMemberStatus.ADMINISTRATOR,
-            ChatMemberStatus.MEMBER,
-            ChatMemberStatus.OWNER,
-        ]:
-            await update.callback_query.answer(
-                localizer.t(
-                    "waitlist.channel_subscribed_alert", user_info["interface_lang"]
-                )
+    if await check_if_user_chat_member(
+        context.bot,
+        update.effective_user.id,
+        channel_chat_id,
+    ):
+        await update.callback_query.answer(
+            localizer.t(
+                "waitlist.channel_subscribed_alert", user_info["interface_lang"]
             )
-            return await handle_waitlist_final(update, context)
-
-    except telegram.error.BadRequest as e:
-        if e.message == "Chat not found":
-            raise Exception(f"Add bot to channel admins: {channel_link}")
+        )
+        return await handle_waitlist_final(update, context)
 
     await update.callback_query.answer(
         localizer.t(

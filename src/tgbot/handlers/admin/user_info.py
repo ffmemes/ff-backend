@@ -44,3 +44,12 @@ type: {selected_user_info["type"]}
         """,
         parse_mode=ParseMode.HTML,
     )
+
+
+async def delete_user_data(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Deletes all user data we have for testing purposes"""
+    user = await get_user_info(update.effective_user.id)
+    if user["type"] != UserType.ADMIN:
+        return
+
+    await update.message.reply_text("🚫 Not implemented yet.")

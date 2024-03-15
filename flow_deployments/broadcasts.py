@@ -13,7 +13,7 @@ from src.flows.broadcasts.meme import (
 deployment_broadcast_15m_ago = Deployment.build_from_flow(
     flow=broadcast_next_meme_to_active_15m_ago,
     name="broadcast_next_meme_to_active_15m_ago",
-    schedule=(CronSchedule(cron="3 * * * *", timezone="Europe/London")),
+    schedule=(CronSchedule(cron="*/15 * * * *", timezone="Europe/London")),
     work_pool_name=settings.ENVIRONMENT,
 )
 
