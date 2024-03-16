@@ -1,3 +1,5 @@
+import random
+import asyncio
 from html import escape
 
 from telegram import Update
@@ -12,6 +14,7 @@ from src.tgbot.logs import log
 from src.tgbot.service import get_meme_by_id
 from src.tgbot.user_info import get_user_info
 from src.tgbot.utils import check_if_user_chat_member
+from src.broadcasts.service import get_users_to_broadcast_meme_from_tgchannelru
 
 
 async def handle_forwarded_from_tgchannelru(
@@ -44,21 +47,23 @@ async def handle_forwarded_from_tgchannelru(
         return await update.message.reply_text(f"Meme not found by id: {meme_id}")
 
     meme = MemeData(**meme_data)
+    users = await get_users_to_broadcast_meme_from_tgchannelru(meme.id)
+    await log(f"Going to forward meme_id={meme.id} to {len(users)} users")
 
-    await log(f"Meme_id: {meme.id}")
-
-    users = []
-
+    users_received = 0
+    random.shuffle(users)
     for user in users:
+        user_id = user["user_id"]
         if_user_in_channel = await check_if_user_chat_member(
-            user, TELEGRAM_CHANNEL_RU_CHAT_ID
+            context.bot,
+            user_id,
+            TELEGRAM_CHANNEL_RU_CHAT_ID,
         )
         if if_user_in_channel:
-            # TODO: log user in channel
             continue  # user already in channel -> probaby watched the meme
 
-    # TODO:
-    # 0. extract meme_id from caption
-    # 1. select users with language ru
-    # 2. select users who don't follow the channel (maybe check one by one)
-    # 3. select users who didn't watch the meme
+        await update.message.forward(user_id)
+        await asyncio.sleep(0.5)
+        users_received += 1
+
+    await log(f"{users_received} users received meme_id={meme.id} from tgchannelru.")

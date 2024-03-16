@@ -18,6 +18,7 @@ from src.database import (
     user_language,
     user_popup_logs,
     user_tg,
+    user_tg_chat_membership,
 )
 from src.storage.constants import MemeStatus, MemeType
 from src.tgbot.constants import UserType
@@ -222,6 +223,25 @@ async def del_user_language(
     )
 
     await execute(delete_language_query)
+
+
+async def add_user_tg_chat_membership(
+    user_tg_id: int,
+    chat_id: int,
+) -> None:
+    insert_query = (
+        insert(user_tg_chat_membership)
+        .values({"user_tg_id": user_tg_id, "chat_id": chat_id})
+        .on_conflict_do_update(
+            index_elements=(
+                user_tg_chat_membership.c.user_tg_id,
+                user_tg_chat_membership.c.chat_id,
+            ),
+            set_={"last_seen_at": datetime.utcnow()},
+        )
+    )
+
+    await execute(insert_query)
 
 
 async def get_user_info(

@@ -9,6 +9,7 @@ from src.stats.user import calculate_user_stats
 from src.tgbot.constants import UserType
 from src.tgbot.service import get_user_by_tg_username
 from src.tgbot.user_info import get_user_info, update_user_info_cache
+from src.tgbot.handlers.admin.service import delete_user
 
 
 async def handle_show_user_info(
@@ -52,4 +53,6 @@ async def delete_user_data(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if user["type"] != UserType.ADMIN:
         return
 
-    await update.message.reply_text("🚫 Not implemented yet.")
+    # TODO: "are you sure" button + callback
+    await delete_user(update.effective_user.id)
+    await update.message.reply_text("Ciao 👋")

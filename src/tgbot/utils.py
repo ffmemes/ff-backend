@@ -1,7 +1,9 @@
+import asyncio
 import telegram
 from telegram.constants import ChatMemberStatus
 
 from src.tgbot.schemas import UserTg
+from src.tgbot.service import add_user_tg_chat_membership
 
 
 def remove_buttons_with_callback(reply_markup: dict) -> dict:
@@ -35,6 +37,7 @@ async def check_if_user_chat_member(bot: telegram.Bot, user_id: int, chat_id: in
             ChatMemberStatus.MEMBER,
             ChatMemberStatus.OWNER,
         ]:
+            asyncio.create_task(add_user_tg_chat_membership(user_id, chat_id))
             return True
     except telegram.error.BadRequest as e:
         if e.message == "Chat not found":
