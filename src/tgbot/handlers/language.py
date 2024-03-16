@@ -24,6 +24,9 @@ ALMOST_CIS_LANGUAGES = [
 
 
 async def init_user_languages_from_tg_user(tg_user: User):
+    """
+    When user press /start we add languages to user
+    """
     languages_to_add = set()
 
     name_with_slavic_letters = len(set(tg_user.full_name) & set(RUSSIAN_ALPHABET)) > 0
@@ -40,3 +43,7 @@ async def init_user_languages_from_tg_user(tg_user: User):
         languages_to_add.add(tg_user.language_code)
 
     await add_user_languages(tg_user.id, languages_to_add)
+
+
+async def handle_lang(update, context):
+    pass

@@ -1,26 +1,61 @@
-import random
 import asyncio
+import logging
+import random
 from html import escape
 
-from telegram import Update
+from telegram import Message, Update
 from telegram.constants import MessageEntityType
+from telegram.error import BadRequest, Forbidden, RetryAfter
 from telegram.ext import (
     ContextTypes,
 )
 
+from src.broadcasts.service import get_users_to_broadcast_meme_from_tgchannelru
 from src.storage.schemas import MemeData
 from src.tgbot.constants import TELEGRAM_CHANNEL_RU_CHAT_ID, UserType
 from src.tgbot.logs import log
-from src.tgbot.service import get_meme_by_id
-from src.tgbot.user_info import get_user_info
+from src.tgbot.service import get_meme_by_id, update_user
+from src.tgbot.user_info import get_user_info, update_user_info_cache
 from src.tgbot.utils import check_if_user_chat_member
-from src.broadcasts.service import get_users_to_broadcast_meme_from_tgchannelru
+
+
+async def forward_message_to_user(
+    message: Message,
+    user_id: int,
+) -> bool:
+    try:
+        await message.forward(user_id)
+        return True
+    except (BadRequest, Forbidden):
+        logging.info(
+            f"❌ Failed to forward: {user_id} blocked the bot",
+        )
+        await update_user(user_id, type=UserType.BLOCKED_BOT)
+        await update_user_info_cache(user_id)
+        return False
+    except RetryAfter as e:
+        logging.info(
+            f"❌ Failed to forward: RetryAfter: {e.retry_after}",
+        )
+        await asyncio.sleep(e.retry_after)
+        return await forward_message_to_user(message, user_id)  # is it safe?
+    except Exception as e:
+        logging.warning(
+            f"❌ Failed to forward to user_id: {e}",
+        )
+        return False
 
 
 async def handle_forwarded_from_tgchannelru(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
-    """Sends you the meme by it's id"""
+    """
+    Receives a forward from tgchannelru
+    And forwards it to all users who
+    1. don't follow the channel
+    2. hadn't seen this meme yet
+    3. set language ru
+    """
     user = await get_user_info(update.effective_user.id)
     if user["type"] != UserType.ADMIN:
         return
@@ -62,8 +97,14 @@ async def handle_forwarded_from_tgchannelru(
         if if_user_in_channel:
             continue  # user already in channel -> probaby watched the meme
 
-        await update.message.forward(user_id)
-        await asyncio.sleep(0.5)
-        users_received += 1
+        if await forward_message_to_user(update.message, user_id):
+            users_received += 1
 
-    await log(f"{users_received} users received meme_id={meme.id} from tgchannelru.")
+        if users_received % 100 == 0:
+            await log(
+                f"⏳ {users_received} users received forward with meme #{meme.id}"
+            )
+
+        await asyncio.sleep(0.5)
+
+    await log(f"✅ {users_received} users received forward with meme: #{meme.id}")

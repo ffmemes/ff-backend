@@ -29,6 +29,7 @@ from src.tgbot.handlers import (
     broken,
     error,
     inline,
+    language,
     popup,
     reaction,
     start,
@@ -38,7 +39,7 @@ from src.tgbot.handlers import (
 )
 from src.tgbot.handlers.admin.boost import handle_chat_boost
 from src.tgbot.handlers.admin.forward_channel import handle_forwarded_from_tgchannelru
-from src.tgbot.handlers.admin.user_info import handle_show_user_info, delete_user_data
+from src.tgbot.handlers.admin.user_info import delete_user_data, handle_show_user_info
 from src.tgbot.handlers.admin.waitlist import (
     handle_waitlist_invite,
     handle_waitlist_invite_before,
@@ -103,6 +104,15 @@ def add_handlers(application: Application) -> None:
         CallbackQueryHandler(
             popup.handle_popup_button,
             pattern=POPUP_BUTTON_CALLBACK_DATA_REGEXP,
+        )
+    )
+
+    ############## language settings
+    application.add_handler(
+        CommandHandler(
+            "lang",
+            language.handle_lang,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
         )
     )
 
