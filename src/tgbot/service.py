@@ -53,13 +53,14 @@ async def create_user(
         INSERT
         INTO "user"
         (id, type, last_active_at)
-        VALUES ({id}, 'waitlist', NOW())
+        VALUES ({id}, '{UserType.USER.value}', NOW())
         ON CONFLICT(id)
         DO UPDATE SET
             blocked_bot_at = NULL,
             last_active_at = NOW(),
             type = CASE
-                WHEN "user".type = 'blocked_bot' THEN 'waitlist'
+                WHEN "user".type = '{UserType.BLOCKED_BOT.value}'
+                    THEN '{UserType.USER.value}'
                 ELSE "user".type
             END
         RETURNING "user".*

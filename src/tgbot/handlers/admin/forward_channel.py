@@ -37,7 +37,7 @@ async def forward_message_to_user(
         logging.info(
             f"❌ Failed to forward: RetryAfter: {e.retry_after}",
         )
-        await asyncio.sleep(e.retry_after)
+        await asyncio.sleep(e.retry_after + 1)
         return await forward_message_to_user(message, user_id)  # is it safe?
     except Exception as e:
         logging.warning(

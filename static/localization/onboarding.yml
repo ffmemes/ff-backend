@@ -42,6 +42,84 @@ onboarding.welcome_message:
     Більше сидиш в боті - AI краще рекомендує. Все просто 🎭
 
     🤔🤔🤔🤔🤔 ТИ ГОТОВИЙ? 🤔🤔🤔🤔🤔
+  es: |-
+    🚀 <code>¡Bienvenido a Fast Food Memes!</code> 🍔
+
+    👨‍👩‍👧‍👦 Somos una comunidad de <b>100,000+</b> personas a las que les encantan los memes.
+    
+    📺 Estamos construyendo <b>una nueva forma</b>™️ de ver memes.
+
+    <i>Cómo usar:</i>
+    1. Recibirás un meme.
+    2. Pulsa los botones 👍 / 👎 para reaccionar al meme.
+    3. <b>AI</b> responderá con el siguiente meme basado en tu <b>reacción</b>.
+
+    ¿Estás listo?
+  pt-br: |-
+    🚀 <code>Bem-vindo ao Fast Food Memes!</code> 🍔
+
+    👨‍👩‍👧‍👦 Somos uma comunidade de <b>100,000+</b> pessoas que amam memes.
+    
+    📺 Estamos construindo <b>uma nova forma</b>™️ de ver memes.
+
+    <i>Como usar:</i>
+    1. Você receberá um meme.
+    2. Pressione os botões 👍 / 👎 para reagir ao meme.
+    3. <b>AI</b> responderá com o próximo meme com base na sua <b>reação</b>.
+
+    Você está pronto?
+  fr: |-
+    🚀 <code>Bienvenue sur Fast Food Memes!</code> 🍔
+
+    👨‍👩‍👧‍👦 Nous sommes une communauté de <b>100,000+</b> personnes qui adorent les memes.
+    
+    📺 Nous construisons <b>une nouvelle façon</b>™️ de regarder des memes.
+
+    <i>Comment utiliser :</i>
+    1. Vous recevrez un meme.
+    2. Appuyez sur les boutons 👍 / 👎 pour réagir au meme.
+    3. <b>AI</b> répondra avec le meme suivant en fonction de votre <b>réaction</b>.
+
+    Êtes-vous prêt?
+  it: |-
+    🚀 <code>Benvenuto su Fast Food Memes!</code> 🍔
+
+    👨‍👩‍👧‍👦 Siamo una comunità di <b>100,000+</b> persone che amano i meme.
+    
+    📺 Stiamo costruendo <b>un nuovo modo</b>™️ di guardare i meme.
+
+    <i>Come usare:</i>
+    1. Riceverai un meme.
+    2. Premi i pulsanti 👍 / 👎 per reagire al meme.
+    3. <b>AI</b> risponderà con il meme successivo in base alla tua <b>reazione</b>.
+
+    Sei pronto?
+  fa: |-
+    🚀 <code>به Fast Food Memes خوش آمدید!</code> 🍔
+
+    👨‍👩‍👧‍👦 ما یک جامعه از <b>100,000+</b> نفر هستیم که عاشق میمز هستند.
+    
+    📺 ما <b>یک روش جدید</b>™️ برای تماشای میمز ساخته‌ایم.
+
+    <i>چگونه استفاده کنید:</i>
+    1. شما یک میمز دریافت خواهید کرد.
+    2. دکمه‌های 👍 / 👎 را فشار دهید تا به میمز واکنش نشان دهید.
+    3. <b>هوش مصنوعی</b> بر اساس <b>واکنش</b> شما با میمز بعدی پاسخ خواهد داد.
+
+    آیا آماده‌اید؟
+  uz: |-
+    🚀 <code>Fast Food Memes-ga xush kelibsiz!</code> 🍔
+
+    👨‍👩‍👧‍👦 Biz <b>100,000+</b> kishi sevimli mamlakatimizni yaratdik.
+    
+    📺 Biz <b>yangi usul</b>™️da mamlakatimizni yaratdik.
+
+    <i>Qanday foydalanish:</i>
+    1. Siz mamlakatimizdan mamlakat olasiz.
+    2. 👍 / 👎 tugmalarini bosib mamlakatga reaksiya bildirishingiz mumkin.
+    3. <b>AI</b> sizning <b>reaksiyangiz</b asosida keyingi mamlakatni tanlaydi.
+
+    Tayyormisiz?
 
 
 onboarding.invitation_successfull_alert:
@@ -57,7 +135,7 @@ onboarding.invitation_successfull_alert:
   es: |-
     🎉 ¡Tu amigo {invited_user_name} acaba de unirse al bot!
     Sigue compartiendo memes del bot y podrías ser recompensado 🤫🔺💎
-  pt: |-
+  pt-br: |-
     🎉 Seu amigo {invited_user_name} acabou de entrar no bot!
     Continue compartilhando memes do bot e você pode ser recompensado 🤫🔺💎
   fr: |-
@@ -80,7 +158,7 @@ onboarding.invited_by_admin:
     💎 Привіт! Тепер і у тебе є доступ. Швидше натискай /start
   es: |-
     💎 ¡Hola! Ahora también tienes acceso. Haz clic en /start
-  pt: |-
+  pt-br: |-
     💎 Olá! Agora você também tem acesso. Clique em /start
   fr: |-
     💎 Salut! Maintenant tu as aussi accès. Clique sur /start
@@ -90,3 +168,50 @@ onboarding.invited_by_admin:
     💎 Hallo! Jetzt hast du auch Zugang. Klicke auf /start
   uz: |-
     💎 Salom! Endi sizga ham kirish berildi. /start tugmasini bosing
+
+
+onboarding.language_settings:
+  ru: |-
+    Выбери ВСЕ языки, на которых ты хочешь получать мемы
+  en: |-
+    Choose ALL languages you want to receive memes in
+  uk: |-
+    Обери ВСІ мови, на яких ти хочеш отримувати меми
+  es: |-
+    Elige TODOS los idiomas en los que quieres recibir memes
+  pt-br: |-
+    Escolha TODOS os idiomas nos quais você deseja receber memes
+  fr: |-
+    Choisissez TOUS les langues dans lesquelles vous souhaitez recevoir des memes
+  it: |-
+    Scegli TUTTE le lingue in cui desideri ricevere meme
+  de: |-
+    Wähle ALLE Sprachen aus, in denen du Memes erhalten möchtest
+  uz: |-
+    Meme olishni istagan BARCHA tillarni tanlang
+  fa: |-
+    همه زبان‌هایی که می‌خواهید میمز دریافت کنید را انتخاب کنید
+  
+
+
+onboarding.language_settings_end_button:
+  ru: |-
+    🚀 ПОГНАЛИ 🚀
+  en: |-
+    🚀 LET'S GO 🚀
+  uk: |-
+    🚀 ПОГНАЛИ 🚀
+  es: |-
+    🚀 ¡VAMOS! 🚀
+  fr: |-
+    🚀 ALLONS-Y 🚀
+  it: |-
+    🚀 ANDIAMO 🚀
+  de: |-
+    🚀 LOS GEHT'S 🚀
+  uz: |-
+    🚀 BOSHLAYMIZ 🚀
+  fa: |-
+    💎 برویم 💎
+  pt-br: |-
+    🚀 VAMOS LÁ 🚀

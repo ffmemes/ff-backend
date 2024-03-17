@@ -1,21 +1,54 @@
-service_out_of_memes:
+service.out_of_memes:
   en: |-
-    🚀 You've watched all the memes we've prepared for you! Come back tomorrow for MORE. 🍔
+    🚀 You've watched all the memes we've prepared for you! 
+    
+    Come back tomorrow for MORE or add more languages: /lang. 🍔
   ru: |-
-    🚀 Ты посмотрел все мемы, которые мы подготовили для тебя! Приходи завтра, покажем ЕЩЕ. 🍔
+    МЕМЫ НА СЕГОДНЯ ЗАКОНЧИЛИСЬ 
+    
+    Приходи завтра за новой порцией или добавь больше языков: /lang. 🍔
   uk: |-
-    🚀 Ти переглянув всі меми, які ми підготували для тебе! Приходь завтра, покажемо БІЛЬШЕ. 🍔
-  ar: |-
-    🚀 شاهدت جميع الصور المضحكة التي قمنا بتحضيرها لك! عد غدًا للمزيد. 🍔
+    МЕМИ НА СЬОГОДНІ ЗАКІНЧИЛИСЬ 
+    
+    Приходь завтра за новою порцією або додай більше мов: /lang. 🍔
   es: |-
-    🚀 ¡Has visto todos los memes que hemos preparado para ti! Vuelve mañana para MÁS. 🍔
-  pt: |-
-    🚀 Você viu todos os memes que preparamos para você! Volte amanhã para MAIS. 🍔
+    🚀 ¡Has visto todos los memes que hemos preparado para ti! 
+    
+    Vuelve mañana para MÁS o agrega más idiomas: /lang. 🍔
+  pt-br: |-
+    🚀 Você viu todos os memes que preparamos para você! 
+    
+    Volte amanhã para MAIS ou adicione mais idiomas: /lang. 🍔
   fr: |-
-    🚀 Tu as regardé tous les memes que nous avons préparés pour toi! Reviens demain pour PLUS. 🍔
-  de: |-
-    🚀 Du hast alle Memes gesehen, die wir für dich vorbereitet haben! Komm morgen wieder für MEHR. 🍔
+    🚀 Tu as vu tous les memes que nous avons préparés pour toi! 
+    
+    Reviens demain pour PLUS ou ajoute plus de langues: /lang. 🍔
   it: |-
-    🚀 Hai visto tutti i meme che abbiamo preparato per te! Torna domani per ALTRO. 🍔
-  pl: |-
-    🚀 Obejrzałeś wszystkie memy, które dla ciebie przygotowaliśmy! Wróć jutro po WIĘCEJ. 🍔
+    🚀 Hai visto tutti i meme che abbiamo preparato per te! 
+    
+    Torna domani per ALTRO o aggiungi più lingue: /lang. 🍔
+  de: |-
+    🚀 Du hast alle Memes gesehen, die wir für dich vorbereitet haben! 
+    
+    Komm morgen wieder für MEHR oder füge mehr Sprachen hinzu: /lang. 🍔
+  tr: |-
+    🚀 Senin için hazırladığımız tüm memeleri izledin! 
+    
+    YARIN DAHA FAZLASI için geri gel veya daha fazla dil ekle: /lang. 🍔
+  fa: |-
+    🚀 تمام میم‌هایی که برای شما آماده کرده‌ایم را دیده‌اید! 
+    
+    فردا برای بیشتر برگردید یا زبان‌های بیشتری اضافه کنید: /lang. 🍔
+  uz: |-
+    🚀 Siz uchun tayyorlagan barcha memlarni ko'rdingiz! 
+    
+    ERTAGI KO'PROQ uchun qayting yoki ko'proq tillar qo'shing: /lang. 🍔
+  ar: |-
+    🚀 لقد شاهدت جميع الصور النمطية التي قمنا بإعدادها لك! 
+    
+    عد غدًا للمزيد أو أضف المزيد من اللغات: /lang. 🍔
+  hi: |-
+    🚀 आपने जोक्स देख लिए हैं जो हमने आपके लिए तैयार किए हैं! 
+    
+    कल वापस आइए और अधिक देखें या अधिक भाषाएँ जोड़ें: /lang. 🍔
+  

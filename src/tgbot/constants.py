@@ -76,3 +76,7 @@ TELEGRAM_CHANNEL_RU_LINK = "https://t.me/fastfoodmemes"
 
 # if a user tries the inline search but not used the bot yet
 INLINE_SEARCH_REQUEST_DEEPLINK = "inline_search_request"
+
+# /lang
+LANG_SETTINGS_LANG_CHANGE_CALLBACK_PATTERN = r"^l:\w+:(add|del)"
+LANG_SETTINGS_END_CALLBACK_DATA = "l:end"

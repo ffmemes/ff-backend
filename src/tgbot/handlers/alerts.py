@@ -34,5 +34,5 @@ async def handle_empty_meme_queue_alert(
     )
     await log(f"user_id: {user_id} has empty meme queue.")
 
-    # Not sure if that's a good idea, a generation should be alraedy triggered.
+    # Not sure if that's a good idea, a generation should be already triggered.
     await check_queue(user_id)

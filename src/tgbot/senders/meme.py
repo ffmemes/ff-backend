@@ -8,10 +8,13 @@ from telegram import (
     Message,
 )
 from telegram.constants import ParseMode
+from telegram.error import Forbidden
 
 from src.storage.constants import MemeType
 from src.storage.schemas import MemeData
 from src.tgbot.bot import bot
+from src.tgbot.constants import UserType
+from src.tgbot.service import update_user
 
 
 def get_input_media(
@@ -73,32 +76,37 @@ async def send_new_message_with_meme(
     meme: MemeData,
     reply_markup: InlineKeyboardMarkup | None = None,
 ) -> Message:
-    if meme.type == MemeType.IMAGE:
-        return await bot.send_photo(
-            chat_id=user_id,
-            photo=meme.telegram_file_id,
-            caption=meme.caption,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.HTML,
-        )
-    elif meme.type == MemeType.VIDEO:
-        return await bot.send_video(
-            chat_id=user_id,
-            video=meme.telegram_file_id,
-            caption=meme.caption,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.HTML,
-        )
-    elif meme.type == MemeType.ANIMATION:
-        return await bot.send_video(
-            chat_id=user_id,
-            animation=meme.telegram_file_id,
-            caption=meme.caption,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.HTML,
-        )
-    else:
-        raise NotImplementedError(f"Can't send meme. Unknown meme type: {meme.type}")
+    try:
+        if meme.type == MemeType.IMAGE:
+            return await bot.send_photo(
+                chat_id=user_id,
+                photo=meme.telegram_file_id,
+                caption=meme.caption,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML,
+            )
+        elif meme.type == MemeType.VIDEO:
+            return await bot.send_video(
+                chat_id=user_id,
+                video=meme.telegram_file_id,
+                caption=meme.caption,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML,
+            )
+        elif meme.type == MemeType.ANIMATION:
+            return await bot.send_video(
+                chat_id=user_id,
+                animation=meme.telegram_file_id,
+                caption=meme.caption,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML,
+            )
+        else:
+            raise NotImplementedError(
+                f"Can't send meme. Unknown meme type: {meme.type}"
+            )
+    except Forbidden:
+        await update_user(user_id, type=UserType.BLOCKED_BOT)
 
 
 async def edit_last_message_with_meme(
