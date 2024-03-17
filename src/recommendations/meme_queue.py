@@ -4,6 +4,7 @@ from src import redis
 from src.recommendations.candidates import (
     multiply_all_scores,
     sorted_by_user_source_lr_meme_lr_meme_age,
+    top_memes_from_less_seen_sources,
 )
 from src.recommendations.cold_start import get_best_memes_from_each_source
 from src.storage.schemas import MemeData
@@ -60,8 +61,13 @@ async def generate_recommendations(user_id, limit=10):
     # randomly choose the strategy
     # TODO: proper A/B testing by users
 
-    if random.random() < 0.5:
+    r = random.random()
+    if r < 0.3:
         candidates = await sorted_by_user_source_lr_meme_lr_meme_age(
+            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+        )
+    if r < 0.6:
+        candidates = await top_memes_from_less_seen_sources(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
     else:
@@ -69,13 +75,11 @@ async def generate_recommendations(user_id, limit=10):
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
 
-    # TODO: best meme from unseen channel
-
     if len(candidates) == 0:
         return
 
-    await redis.add_memes_to_queue_by_key(queue_key, candidates)
-
+    # TODO:
     # inference ML api
     # select the best LIMIT memes -> save them to queue
-    pass
+
+    await redis.add_memes_to_queue_by_key(queue_key, candidates)
