@@ -4,7 +4,6 @@ from telegram import Update
 from telegram.constants import ParseMode
 
 from src import localizer
-from src.recommendations.meme_queue import generate_cold_start_recommendations
 from src.tgbot.senders.next_message import next_message
 from src.tgbot.user_info import update_user_info_cache
 
@@ -21,7 +20,6 @@ async def onboarding_flow(update: Update):
         parse_mode=ParseMode.HTML,
     )
 
-    await generate_cold_start_recommendations(user_id)
     await asyncio.sleep(8)
 
     m = await update.effective_user.send_message("3️⃣")

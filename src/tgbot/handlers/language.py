@@ -4,6 +4,10 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from src import localizer
+from src.recommendations.meme_queue import (
+    clear_meme_queue_for_user,
+    generate_cold_start_recommendations,
+)
 from src.tgbot.constants import (
     LANG_SETTINGS_END_CALLBACK_DATA,
 )
@@ -136,6 +140,9 @@ async def handle_language_settings_end(
     await update.callback_query.message.delete()
 
     user_info = await get_user_info(update.effective_user.id)
+
+    await clear_meme_queue_for_user(update.effective_user.id)
+    await generate_cold_start_recommendations(update.effective_user.id)
 
     # Let's turn off waitlist for now to see how it goes
     # if user_info["type"] == UserType.WAITLIST:

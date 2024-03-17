@@ -25,6 +25,11 @@ async def has_memes_in_queue(user_id: int) -> bool:
     return queue_length > 0
 
 
+async def clear_meme_queue_for_user(user_id: int) -> None:
+    queue_key = redis.get_meme_queue_key(user_id)
+    await redis.delete_by_key(queue_key)
+
+
 async def check_queue(user_id: int):
     queue_key = redis.get_meme_queue_key(user_id)
     queue_length = await redis.get_meme_queue_length_by_key(queue_key)
