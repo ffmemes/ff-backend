@@ -5,9 +5,7 @@
 import random
 
 from telegram import Update
-from telegram.ext import (
-    ContextTypes,
-)
+from telegram.ext import ContextTypes
 
 from src.recommendations.meme_queue import check_queue, has_memes_in_queue
 from src.tgbot.constants import LOADING_EMOJIS
@@ -16,8 +14,9 @@ from src.tgbot.senders.keyboards import queue_empty_alert_keyboard
 from src.tgbot.senders.next_message import next_message
 
 
+# callback_data: MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA
 async def handle_empty_meme_queue_alert(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
+    update: Update, _: ContextTypes.DEFAULT_TYPE
 ) -> None:
     emoji = random.choice(LOADING_EMOJIS)
     await update.callback_query.answer(emoji)
