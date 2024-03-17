@@ -155,19 +155,21 @@ onboarding.invited_by_admin:
   en: |-
     💎 yoo! Welcome to Fast Food Memes bot. Click ➡️ /start
   uk: |-
-    💎 Привіт! Тепер і у тебе є доступ. Швидше натискай /start
+    💎 Привіт! Тепер і у тебе є доступ. Швидше натискай ➡️ /start
   es: |-
-    💎 ¡Hola! Ahora también tienes acceso. Haz clic en /start
+    💎 ¡Hola! Ahora también tienes acceso. Haz clic en ➡️ /start
   pt-br: |-
-    💎 Olá! Agora você também tem acesso. Clique em /start
+    💎 Olá! Agora você também tem acesso. Clique em ➡️ /start
   fr: |-
-    💎 Salut! Maintenant tu as aussi accès. Clique sur /start
+    💎 Salut! Maintenant tu as aussi accès. Clique sur ➡️ /start
   it: |-
-    💎 Ciao! Ora anche tu hai accesso. Clicca su /start
+    💎 Ciao! Ora anche tu hai accesso. Clicca su ➡️ /start
   de: |-
-    💎 Hallo! Jetzt hast du auch Zugang. Klicke auf /start
+    💎 Hallo! Jetzt hast du auch Zugang. Klicke auf ➡️ /start
   uz: |-
-    💎 Salom! Endi sizga ham kirish berildi. /start tugmasini bosing
+    💎 Salom! Endi sizga ham kirish berildi. ➡️ /start tugmasini bosing
+  fa: |-
+    💎 سلام! حالا شما هم دسترسی دارید. روی ➡️ /start کلیک کنید
 
 
 onboarding.language_settings:
