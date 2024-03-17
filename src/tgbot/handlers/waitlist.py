@@ -9,7 +9,6 @@ from src.tgbot.constants import (
     TELEGRAM_CHANNEL_RU_CHAT_ID,
     TELEGRAM_CHANNEL_RU_LINK,
 )
-from src.tgbot.handlers.language import ALMOST_CIS_LANGUAGES
 from src.tgbot.service import (
     add_user_language,
     del_user_language,
@@ -128,7 +127,9 @@ async def handle_waitlist_channel_subscription(
     user_languages = await get_user_languages(update.effective_user.id)
     if not user_languages & {"ru", "en"}:
         enable_lang = (
-            "ru" if user_info["interface_lang"] in ALMOST_CIS_LANGUAGES else "en"
+            "ru"
+            if user_info["interface_lang"] in localizer.ALMOST_CIS_LANGUAGES
+            else "en"
         )
         await add_user_language(update.effective_user.id, enable_lang)
         user_info = await update_user_info_cache(update.effective_user.id)
@@ -140,7 +141,7 @@ async def handle_waitlist_channel_subscription(
         )
 
     # different channels to subscribe
-    if user_info["interface_lang"] in ALMOST_CIS_LANGUAGES:
+    if user_info["interface_lang"] in localizer.ALMOST_CIS_LANGUAGES:
         channel_link = TELEGRAM_CHANNEL_RU_LINK
     else:
         channel_link = TELEGRAM_CHANNEL_EN_LINK
@@ -171,7 +172,7 @@ async def handle_check_channel_subscription(
     update: telegram.Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
     user_info = await get_user_info(update.effective_user.id)
-    if user_info["interface_lang"] in ALMOST_CIS_LANGUAGES:
+    if user_info["interface_lang"] in localizer.ALMOST_CIS_LANGUAGES:
         channel_chat_id = TELEGRAM_CHANNEL_RU_CHAT_ID
         channel_link = TELEGRAM_CHANNEL_RU_LINK
     else:

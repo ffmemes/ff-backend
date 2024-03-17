@@ -7,7 +7,6 @@ from src import localizer
 from src.tgbot.constants import (
     LANG_SETTINGS_END_CALLBACK_DATA,
 )
-from src.tgbot.constants import UserType
 from src.tgbot.handlers.onboarding import onboarding_flow
 from src.tgbot.senders.next_message import next_message
 from src.tgbot.service import (
@@ -19,24 +18,6 @@ from src.tgbot.service import (
 from src.tgbot.user_info import get_user_info, update_user_info_cache
 
 RUSSIAN_ALPHABET = "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"
-ALMOST_CIS_LANGUAGES = [
-    "uk",
-    "ru",
-    "bg",
-    "be",
-    "sr",
-    "hr",
-    "bs",
-    "mk",
-    "sl",
-    "kz",
-    "ky",
-    "tg",
-    "tt",
-    "uz",
-    "mn",
-    "az",
-]
 
 
 SUPPORTED_MEME_LANGUAGES = {
@@ -60,7 +41,7 @@ async def init_user_languages_from_tg_user(tg_user: User):
         languages_to_add.add("ru")
 
     # add languages ru / en since they are the most common
-    if tg_user.language_code in ALMOST_CIS_LANGUAGES:
+    if tg_user.language_code in localizer.ALMOST_CIS_LANGUAGES:
         languages_to_add.add("ru")
     else:
         languages_to_add.add("en")
@@ -149,7 +130,7 @@ async def handle_language_settings_button(
 
 # callback_data: LANG_END_CALLBACK_DATA
 async def handle_language_settings_end(
-    update: telegram.Update, context: ContextTypes.DEFAULT_TYPE
+    update: telegram.Update, _: ContextTypes.DEFAULT_TYPE
 ) -> None:
     await update.callback_query.answer()
     await update.callback_query.message.delete()
