@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from typing import Any, Sequence
 
-from sqlalchemy import bindparam, exists, func, select, text
+from sqlalchemy import bindparam, exists, select, text
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
@@ -76,31 +76,10 @@ async def get_user_by_id(
     return await fetch_one(select_statement)
 
 
-async def get_waitlist_users_registered_before(
-    date: datetime,
-) -> list[dict[str, Any]]:
-    """Select all users that have registered before or at a certain datetime"""
-    select_statement = select(user).where(
-        user.c.created_at <= date, user.c.type == UserType.WAITLIST
-    )
-    return await fetch_all(select_statement)
-
-
 async def get_tg_user_by_id(
     id: int,
 ) -> dict[str, Any] | None:
     select_statement = select(user_tg).where(user_tg.c.id == id)
-    return await fetch_one(select_statement)
-
-
-async def get_user_by_tg_username(
-    username: str,
-) -> dict[str, Any] | None:
-    select_statement = (
-        select(user)
-        .select_from(user_tg.join(user, user_tg.c.id == user.c.id))
-        .where(func.lower(user_tg.c.username) == username.lower())
-    )
     return await fetch_one(select_statement)
 
 

@@ -7,8 +7,7 @@ from telegram.ext import (
 from src.stats.service import get_user_stats
 from src.stats.user import calculate_user_stats
 from src.tgbot.constants import UserType
-from src.tgbot.handlers.admin.service import delete_user
-from src.tgbot.service import get_user_by_tg_username
+from src.tgbot.handlers.admin.service import delete_user, get_user_by_tg_username
 from src.tgbot.user_info import get_user_info, update_user_info_cache
 
 
