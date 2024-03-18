@@ -40,7 +40,7 @@ async def check_queue(user_id: int):
         await generate_recommendations(user_id, limit=10)
 
 
-async def generate_cold_start_recommendations(user_id, limit=20):
+async def generate_cold_start_recommendations(user_id, limit=10):
     queue_key = redis.get_meme_queue_key(user_id)
     memes_in_queue = await redis.get_all_memes_in_queue_by_key(queue_key)
     meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
