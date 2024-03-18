@@ -196,6 +196,10 @@ async def like_spread_and_recent_memes(
         INNER JOIN meme_stats MS
             ON MS.meme_id = M.id
 
+        INNER JOIN user_language L
+            ON L.user_id = {user_id}
+            AND L.language_code = M.language_code
+
         LEFT JOIN user_meme_reaction R
                 ON R.meme_id = M.id
                 AND R.user_id = {user_id}
@@ -209,7 +213,7 @@ async def like_spread_and_recent_memes(
             AND age_days < 30
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
         ORDER BY -1
-            * (MS.nlikes - MS.ndislikes) / (MS.nmemes_sent + 1)
+            * (MS.nlikes - MS.ndislikes) / (MS.nmemes_sent + 1.)
             * CASE WHEN MS.age_days < 30 THEN 1 ELSE 0.5 END
         LIMIT {limit}
     """
