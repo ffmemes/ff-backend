@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from typing import Any, Sequence
 
-from sqlalchemy import bindparam, exists, func, select, text
+from sqlalchemy import bindparam, exists, select, text
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
@@ -18,6 +18,7 @@ from src.database import (
     user_language,
     user_popup_logs,
     user_tg,
+    user_tg_chat_membership,
 )
 from src.storage.constants import MemeStatus, MemeType
 from src.tgbot.constants import UserType
@@ -52,13 +53,14 @@ async def create_user(
         INSERT
         INTO "user"
         (id, type, last_active_at)
-        VALUES ({id}, 'waitlist', NOW())
+        VALUES ({id}, '{UserType.USER.value}', NOW())
         ON CONFLICT(id)
         DO UPDATE SET
             blocked_bot_at = NULL,
             last_active_at = NOW(),
             type = CASE
-                WHEN "user".type = 'blocked_bot' THEN 'waitlist'
+                WHEN "user".type = '{UserType.BLOCKED_BOT.value}'
+                    THEN '{UserType.USER.value}'
                 ELSE "user".type
             END
         RETURNING "user".*
@@ -74,31 +76,10 @@ async def get_user_by_id(
     return await fetch_one(select_statement)
 
 
-async def get_waitlist_users_registered_before(
-    date: datetime,
-) -> list[dict[str, Any]]:
-    """Select all users that have registered before or at a certain datetime"""
-    select_statement = select(user).where(
-        user.c.created_at <= date, user.c.type == UserType.WAITLIST
-    )
-    return await fetch_all(select_statement)
-
-
 async def get_tg_user_by_id(
     id: int,
 ) -> dict[str, Any] | None:
     select_statement = select(user_tg).where(user_tg.c.id == id)
-    return await fetch_one(select_statement)
-
-
-async def get_user_by_tg_username(
-    username: str,
-) -> dict[str, Any] | None:
-    select_statement = (
-        select(user)
-        .select_from(user_tg.join(user, user_tg.c.id == user.c.id))
-        .where(func.lower(user_tg.c.username) == username.lower())
-    )
     return await fetch_one(select_statement)
 
 
@@ -222,6 +203,25 @@ async def del_user_language(
     )
 
     await execute(delete_language_query)
+
+
+async def add_user_tg_chat_membership(
+    user_tg_id: int,
+    chat_id: int,
+) -> None:
+    insert_query = (
+        insert(user_tg_chat_membership)
+        .values({"user_tg_id": user_tg_id, "chat_id": chat_id})
+        .on_conflict_do_update(
+            index_elements=(
+                user_tg_chat_membership.c.user_tg_id,
+                user_tg_chat_membership.c.chat_id,
+            ),
+            set_={"last_seen_at": datetime.utcnow()},
+        )
+    )
+
+    await execute(insert_query)
 
 
 async def get_user_info(

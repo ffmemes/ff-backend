@@ -78,3 +78,93 @@ popup.inline_search:
 
     Почни писати повідомлення: @ffmemesbot і через пробіл введи запит. 
     Наприклад: @ffmemesbot котики
+
+
+popup.github_repo:
+  ru: |-
+    👩🏻‍💻 А сейчас информация для айтишников. 🧑🏻‍💻
+
+    Весь код бота открыт и доступен на GitHub. Все любознательные приглашаются посмотреть и поставить звездочку. 🌟 
+
+    🔗 <i>github.com/ffmemes/ff-backend</i>
+  en: |-
+    👩🏻‍💻 For Software devs & IT lovers 🧑🏻‍💻
+
+    @ffmemesbot's code is open sourced. Everyone is welcome to take a look and give us a star. 🌟 
+
+    🔗 <i>github.com/ffmemes/ff-backend</i>
+  uk: |-
+    👩🏻‍💻 А зараз інформація для айтішників. 🧑🏻‍💻
+
+    Весь код бота відкритий і доступний на GitHub. Всі цікаві запрошуються подивитися і поставити зірочку. 🌟 
+
+    🔗 <i>github.com/ffmemes/ff-backend</i>
+  es: |-
+    👩🏻‍💻 Para desarrolladores de software y amantes de la tecnología 🧑🏻‍💻
+
+    El código de @ffmemesbot es de código abierto. Todos son bienvenidos a echar un vistazo y darnos una estrella. 🌟 
+
+    🔗 <i>github.com/ffmemes/ff-backend</i>
+  pt-br: |-
+    👩🏻‍💻 Para desenvolvedores de software e amantes de tecnologia 🧑🏻‍💻
+
+    O código do @ffmemesbot é de código aberto. Todos são bem-vindos para dar uma olhada e nos dar uma estrela. 🌟 
+
+    🔗 <i>github.com/ffmemes/ff-backend</i>
+  ar: |-
+    👩🏻‍💻 لمطوري البرمجيات وعشاق التكنولوجيا 🧑🏻‍💻
+
+    كود @ffmemesbot مفتوح المصدر. الجميع مرحب به لإلقاء نظرة وإعطائنا نجمة. 🌟 
+
+    🔗 <i>github.com/ffmemes/ff-backend</i>
+  de: |-
+    👩🏻‍💻 Für Softwareentwickler und Technikliebhaber 🧑🏻‍💻
+
+    Der Code von @ffmemesbot ist Open Source. Jeder ist herzlich eingeladen, einen Blick darauf zu werfen und uns einen Stern zu geben. 🌟 
+
+    🔗 <i>github.com/ffmemes/ff-backend</i>
+  fr: |-
+    👩🏻‍💻 Pour les développeurs de logiciels et les amateurs de technologie 🧑🏻‍💻
+
+    Le code de @ffmemesbot est open source. Tout le monde est invité à jeter un œil et à nous donner une étoile. 🌟 
+
+    🔗 <i>github.com/ffmemes/ff-backend</i>
+  it: |-
+    👩🏻‍💻 Per sviluppatori di software e appassionati di tecnologia 🧑🏻‍💻
+
+    Il codice di @ffmemesbot è open source. Tutti sono i benvenuti a dare un'occhiata e darci una stella. 🌟 
+
+    🔗 <i>github.com/ffmemes/ff-backend</i>
+  uz: |-
+    👩🏻‍💻 Hozirgi vaqtda IT sohalariga oid ma'lumotlar. 🧑🏻‍💻
+
+    Botning barcha kodlari ochiq va GitHubda mavjud. Hammasi qiziqishganlar ko'rish va yulduzcha qo'yishga chaqirilgan. 🌟 
+
+    🔗 <i>github.com/ffmemes/ff-backend</i>
+  
+
+popup.telegram_channel:
+  ru: |-
+    Для тех, кто до сих пор не в курсе.
+
+    У нас есть телеграм канал, куда наш AI постит лучшие мемы по версии пользователей бота. 
+
+    Хочешь смотреть самый сок? Подпишись!
+
+    <i>t.me/fastfoodmemes</i>
+  uk: |-
+    Для тих, хто досі не в курсі.
+
+    У нас є телеграм канал, куди наш AI постить найкращі меми за версією користувачів бота. 
+
+    Хочеш дивитися найсмачніше? Підпишись!
+
+    <i>t.me/fastfoodmemes</i>
+  en: |-
+    For those who are still not in the know.
+
+    We have a Telegram channel where our AI posts the best memes according to the bot users. 
+
+    Want to see the best? Subscribe!
+
+    <i>t.me/fast_food_memes</i>

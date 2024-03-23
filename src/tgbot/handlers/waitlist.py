@@ -1,5 +1,5 @@
 import telegram
-from telegram.constants import ChatMemberStatus, ParseMode
+from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from src import localizer
@@ -9,13 +9,13 @@ from src.tgbot.constants import (
     TELEGRAM_CHANNEL_RU_CHAT_ID,
     TELEGRAM_CHANNEL_RU_LINK,
 )
-from src.tgbot.handlers.language import ALMOST_CIS_LANGUAGES
 from src.tgbot.service import (
     add_user_language,
     del_user_language,
     get_user_languages,
 )
 from src.tgbot.user_info import get_user_info, update_user_info_cache
+from src.tgbot.utils import check_if_user_chat_member
 
 # TODO: find a better place for these consts
 LANGUAGE_CODE_TO_TEXT = {
@@ -127,7 +127,9 @@ async def handle_waitlist_channel_subscription(
     user_languages = await get_user_languages(update.effective_user.id)
     if not user_languages & {"ru", "en"}:
         enable_lang = (
-            "ru" if user_info["interface_lang"] in ALMOST_CIS_LANGUAGES else "en"
+            "ru"
+            if user_info["interface_lang"] in localizer.ALMOST_CIS_LANGUAGES
+            else "en"
         )
         await add_user_language(update.effective_user.id, enable_lang)
         user_info = await update_user_info_cache(update.effective_user.id)
@@ -139,7 +141,7 @@ async def handle_waitlist_channel_subscription(
         )
 
     # different channels to subscribe
-    if user_info["interface_lang"] in ALMOST_CIS_LANGUAGES:
+    if user_info["interface_lang"] in localizer.ALMOST_CIS_LANGUAGES:
         channel_link = TELEGRAM_CHANNEL_RU_LINK
     else:
         channel_link = TELEGRAM_CHANNEL_EN_LINK
@@ -170,32 +172,24 @@ async def handle_check_channel_subscription(
     update: telegram.Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
     user_info = await get_user_info(update.effective_user.id)
-    if user_info["interface_lang"] in ALMOST_CIS_LANGUAGES:
+    if user_info["interface_lang"] in localizer.ALMOST_CIS_LANGUAGES:
         channel_chat_id = TELEGRAM_CHANNEL_RU_CHAT_ID
         channel_link = TELEGRAM_CHANNEL_RU_LINK
     else:
         channel_chat_id = TELEGRAM_CHANNEL_EN_CHAT_ID
         channel_link = TELEGRAM_CHANNEL_EN_LINK
 
-    try:
-        res = await context.bot.get_chat_member(
-            chat_id=channel_chat_id, user_id=update.effective_user.id
-        )
-        if res.status in [
-            ChatMemberStatus.ADMINISTRATOR,
-            ChatMemberStatus.MEMBER,
-            ChatMemberStatus.OWNER,
-        ]:
-            await update.callback_query.answer(
-                localizer.t(
-                    "waitlist.channel_subscribed_alert", user_info["interface_lang"]
-                )
+    if await check_if_user_chat_member(
+        context.bot,
+        update.effective_user.id,
+        channel_chat_id,
+    ):
+        await update.callback_query.answer(
+            localizer.t(
+                "waitlist.channel_subscribed_alert", user_info["interface_lang"]
             )
-            return await handle_waitlist_final(update, context)
-
-    except telegram.error.BadRequest as e:
-        if e.message == "Chat not found":
-            raise Exception(f"Add bot to channel admins: {channel_link}")
+        )
+        return await handle_waitlist_final(update, context)
 
     await update.callback_query.answer(
         localizer.t(

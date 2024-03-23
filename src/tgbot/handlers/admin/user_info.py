@@ -7,7 +7,7 @@ from telegram.ext import (
 from src.stats.service import get_user_stats
 from src.stats.user import calculate_user_stats
 from src.tgbot.constants import UserType
-from src.tgbot.service import get_user_by_tg_username
+from src.tgbot.handlers.admin.service import delete_user, get_user_by_tg_username
 from src.tgbot.user_info import get_user_info, update_user_info_cache
 
 
@@ -44,3 +44,14 @@ type: {selected_user_info["type"]}
         """,
         parse_mode=ParseMode.HTML,
     )
+
+
+async def delete_user_data(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Deletes all user data we have for testing purposes"""
+    user = await get_user_info(update.effective_user.id)
+    if user["type"] != UserType.ADMIN:
+        return
+
+    # TODO: "are you sure" button + callback
+    await delete_user(update.effective_user.id)
+    await update.message.reply_text("Ciao 👋")

@@ -4,24 +4,22 @@ from telegram import Update
 from telegram.constants import ParseMode
 
 from src import localizer
-from src.recommendations.meme_queue import generate_cold_start_recommendations
 from src.tgbot.senders.next_message import next_message
-from src.tgbot.user_info import get_user_info
+from src.tgbot.user_info import update_user_info_cache
 
 
 # not sure about the best args for that func
 async def onboarding_flow(update: Update):
     user_id = update.effective_user.id
-    user_info = await get_user_info(user_id)
+    user_info = await update_user_info_cache(user_id)
 
     # TODO: select language flow
 
     await update.effective_user.send_message(
-        localizer.t("onboarding.welcome_message", user_info["language_code"]),
+        localizer.t("onboarding.welcome_message", user_info["interface_lang"]),
         parse_mode=ParseMode.HTML,
     )
 
-    await generate_cold_start_recommendations(user_id)
     await asyncio.sleep(8)
 
     m = await update.effective_user.send_message("3️⃣")

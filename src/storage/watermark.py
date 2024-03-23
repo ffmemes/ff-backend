@@ -1,12 +1,18 @@
 import logging
-import random
 from io import BytesIO
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageStat
 
 
-def draw_text_with_outline(draw, position, text, font, text_colour, outline_colour):
+def draw_text_with_outline(
+    draw: ImageDraw,
+    position: tuple,
+    text: str,
+    font: ImageFont,
+    text_colour: tuple,
+    outline_colour: tuple,
+) -> None:
     x, y = position
     # Draw outline
     for adj in range(-1, 2):
@@ -17,41 +23,71 @@ def draw_text_with_outline(draw, position, text, font, text_colour, outline_colo
     draw.text(position, text, font=font, fill=text_colour)
 
 
-def select_wm_colour(base_brightness) -> tuple:
-    # if base_brightness > 128:
-    if base_brightness > 178:
-        # Black text for lighter background
-        text_colour = (0, 0, 0, 255)
-    else:
-        # White text for darker background
-        text_colour = (255, 255, 255, 255)
+def find_least_detailed_corner(img: Image, text_bbox: tuple, margin: int) -> tuple:
+    """
+    Find the corner in an image with mean intensity closest to black or white,
+    indicating the least amount of detail. This is useful for identifying
+    a suitable place to overlay text without obscuring important image details.
 
-    return text_colour
+    Args:
+    - img: A PIL.Image object representing the original image.
+    - text_bbox: A tuple (x1, y1, x2, y2) specifying the bounding box
+      where text will be placed.
+    - margin: An integer or tuple specifying the margin size to consider
+      around each corner.
 
-
-def calculate_corners(img_w, img_h, text_bbox, margin) -> list:
-    # Estimate text size rely on font and text box
-    # the (0, 0) is the starting position. return tuple (x1, y1, x2, y2)
-
+    Returns:
+    - A tuple (x, y) representing the top-left coordinate
+        of the selected corner for text placement.
+    """
+    # Convert the original image to grayscale for intensity analysis
+    gray_img = img.convert("L")
+    img_w, img_h = img.size
+    # Calculate the width and height of the text bounding box
     text_width = text_bbox[2] - text_bbox[0]
     text_height = text_bbox[3] - text_bbox[1]
-    # Choose a random corner for the text
-    corners = [
-        (margin, margin),  # Top-left
-        (img_w - text_width - margin, margin),  # Top-right
-        (margin, img_h - text_height - margin),  # Bottom-left
-        (img_w - text_width - margin, img_h - text_height - margin),  # Bottom-right
-    ]
+    # Define dictionary with the coordinates of each corner with some margin applied
+    corners = {
+        "top_left": (margin, margin),
+        "top_right": (img_w - text_width - margin, margin),
+        "bottom_left": (margin, img_h - text_height - margin),
+        "bottom_right": (img_w - text_width - margin, img_h - text_height - margin),
+    }
+    # Initialize with infinity for comparison
+    least_detailed_score = float("inf")
+    # To store the x, y coordinates for watermark
+    selected_corner = None
+    selected_wm_colour = None
+    # Iterate through each corner to find the one with the least detail background
+    for _, (x, y) in corners.items():
+        # Crop the image around the current corner
+        # according to the text bounding box size
+        sector = gray_img.crop((x, y, x + text_width, y + text_height))
+        # Calculate mean intensity of the cropped area
+        mean_intensity = ImageStat.Stat(sector).mean[0]
+        # Determine how close the mean intensity is to either black (0) or white (255)
+        # indicates how uniform the background of the selected sector is
+        distance_to_extreme = min(abs(0 - mean_intensity), abs(255 - mean_intensity))
+        # Update if this corner has a lower score (closer to black or white)
+        if distance_to_extreme < least_detailed_score:
+            least_detailed_score = distance_to_extreme
+            selected_corner = (x, y)
+            # Selecting watermark colour based on mean intensity
+            selected_wm_colour = (0, 0, 0) if mean_intensity > 178 else (255, 255, 255)
 
-    return corners
+    return selected_corner, selected_wm_colour
 
 
 def check_font(font_path, font_family, image, width_ratio):
     fontsize = image.size[0] * width_ratio // 2
     font_file = Path(font_path) / font_family
-    font = ImageFont.truetype(str(font_file), fontsize)
+    try:
+        font = ImageFont.truetype(str(font_file), fontsize)
+        logging.info(f"Loaded font from {font_file}.")
+    except IOError:
+        logging.error(f"Failed to load font from {font_file}.")
+        raise
 
-    logging.info(f"Loaded font from {font_file}.")
     return font
 
 
@@ -65,33 +101,19 @@ def draw_corner_watermark(
 ) -> Image:
     with Image.open(image_bytes).convert("RGBA") as base:
         txt = Image.new("RGBA", base.size, (255, 255, 255, 0))
-
         d = ImageDraw.Draw(txt)
-        # ratio of text on the image
         fonts_files_dir = Path(__file__).parent.parent.parent / "static/fonts"
         font = check_font(fonts_files_dir, font_family, base, width_ratio)
-        # calculate size of textbox
         text_bbox = d.textbbox((0, 0), text, font=font)
-        # choose a random corner for the text
-        corners = calculate_corners(
-            img_w=base.size[0], img_h=base.size[1], text_bbox=text_bbox, margin=margin
-        )
-        text_position = random.choice(corners)
-        # average brightness of pixel check and switch between black/white
-        base_brightness = sum(base.getpixel(text_position)[:3]) / 3
-        text_colour = select_wm_colour(base_brightness)
-        # define outline colour (opposite of text colour for contrast)
+        text_position, text_colour = find_least_detailed_corner(base, text_bbox, margin)
         outline_colour = (
-            (0, 0, 0, 255)
-            if text_colour == (255, 255, 255, 255)
-            else (255, 255, 255, 255)
+            (0, 0, 0, 255) if text_colour == (255, 255, 255) else (255, 255, 255, 255)
         )
         draw_text_with_outline(
             d, text_position, text, font, text_colour, outline_colour
         )
         # text opacity
         txt.putalpha(txt.getchannel("A").point(lambda x: x * text_opacity))
-        # overlay image of each other
         return Image.alpha_composite(base, txt).convert("RGB")
 
 

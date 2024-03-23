@@ -187,6 +187,22 @@ user_tg = Table(
     Column("updated_at", DateTime, onupdate=func.now()),
 )
 
+user_tg_chat_membership = Table(
+    "user_tg_chat_membership",
+    metadata,
+    Column(
+        "user_tg_id", ForeignKey("user_tg.id", ondelete="CASCADE"), primary_key=True
+    ),
+    Column("chat_id", BigInteger, primary_key=True),
+    Column(
+        "last_seen_at",
+        DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    ),
+)
+
 
 user = Table(
     "user",

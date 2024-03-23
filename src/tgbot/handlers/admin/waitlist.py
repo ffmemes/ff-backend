@@ -10,12 +10,12 @@ from telegram.ext import (
 from src import localizer
 from src.tgbot.bot import bot
 from src.tgbot.constants import UserType
-from src.tgbot.logs import log
-from src.tgbot.service import (
+from src.tgbot.handlers.admin.service import (
     get_user_by_tg_username,
     get_waitlist_users_registered_before,
-    update_user,
 )
+from src.tgbot.logs import log
+from src.tgbot.service import update_user
 from src.tgbot.user_info import get_user_info, update_user_info_cache
 
 

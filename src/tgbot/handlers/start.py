@@ -1,13 +1,12 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from src.tgbot.constants import UserType
 from src.tgbot.handlers.deep_link import handle_deep_link_used
-from src.tgbot.handlers.language import init_user_languages_from_tg_user
-from src.tgbot.handlers.onboarding import onboarding_flow
-from src.tgbot.handlers.waitlist import handle_waitlist_start
+from src.tgbot.handlers.language import (
+    handle_language_settings,
+    init_user_languages_from_tg_user,
+)
 from src.tgbot.logs import log
-from src.tgbot.senders.next_message import next_message
 from src.tgbot.service import create_user, save_tg_user
 from src.tgbot.user_info import update_user_info_cache
 
@@ -45,15 +44,4 @@ type:{user_info["type"]}, ref:{deep_link}, lang:{language_code}
     """
     )
 
-    if user_info["type"] == UserType.WAITLIST:
-        return await handle_waitlist_start(update, context)
-
-    recently_joined = user_info["nmemes_sent"] <= 3
-    if recently_joined:
-        return await onboarding_flow(update)
-
-    return await next_message(
-        user_id,
-        prev_update=update,
-        prev_reaction_id=None,
-    )
+    return await handle_language_settings(update, context)
