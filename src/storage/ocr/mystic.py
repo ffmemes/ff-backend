@@ -49,6 +49,7 @@ async def ocr_mystic_file_path(
                     },
                     {"type": "string", "value": language},
                 ],
+                "wait_for_resources": True,
             },
             headers=HEADERS,
         )
