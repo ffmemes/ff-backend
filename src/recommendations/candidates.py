@@ -53,6 +53,43 @@ async def sorted_by_user_source_lr_meme_lr_meme_age(
     return res
 
 
+async def most_liked(
+    user_id: int,
+    limit: int = 10,
+    exclude_meme_ids: list[int] = [],
+) -> list[dict[str, Any]]:
+    query = f"""
+        SELECT
+            M.id, M.type, M.telegram_file_id, M.caption,
+            'most_liked' as recommended_by
+        FROM meme M
+        LEFT JOIN user_meme_reaction R
+            ON R.user_id = {user_id}
+            AND R.meme_id = M.id
+
+        INNER JOIN user_language L
+            ON L.language_code = M.language_code
+            AND L.user_id = {user_id}
+
+        LEFT JOIN meme_stats MS
+            ON MS.meme_id = M.id
+
+        WHERE 1=1
+            AND M.status = 'ok'
+            AND R.meme_id IS NULL
+            {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+
+        ORDER BY -1
+            * COALESCE((MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1), 0.5)
+            * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE 0.8 END
+            * CASE WHEN MS.age_days < 5 THEN 1 ELSE 0.8 END
+
+        LIMIT {limit}
+    """
+    res = await fetch_all(text(query))
+    return res
+
+
 async def multiply_all_scores(
     user_id: int,
     limit: int = 10,
@@ -108,6 +145,7 @@ async def multiply_all_scores(
     return res
 
 
+# like rate: 38%
 async def top_memes_from_less_seen_sources(
     user_id: int,
     limit: int = 10,
