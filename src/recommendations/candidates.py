@@ -83,6 +83,10 @@ async def most_liked(
             * COALESCE((MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1), 0.5)
             * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE 0.8 END
             * CASE WHEN MS.age_days < 5 THEN 1 ELSE 0.8 END
+            * CASE
+                WHEN MS.nmemes_sent <= 1 THEN 1
+                ELSE (MS.nlikes + MS.ndislikes) * 1. / MS.nmemes_sent
+            END
 
         LIMIT {limit}
     """
@@ -274,10 +278,13 @@ async def get_best_memes_from_each_source(
                 'cold_start' as recommended_by,
 
                 1
-                    * CASE WHEN MS.raw_impr_rank < 1 THEN 1 ELSE 0.5 END
-                    * CASE WHEN MS.age_days < 5 THEN 1 ELSE 0.5 END
+                    * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE 0.8 END
+                    * CASE WHEN MS.age_days < 14 THEN 1 ELSE 0.8 END
                     * COALESCE((MS.nlikes+1.) / (MS.nlikes+MS.ndislikes+1), 0.5)
-                    * COALESCE((MSS.nlikes+1.) / (MSS.nlikes+MSS.ndislikes+1), 0.5)
+                    * CASE
+                        WHEN MS.nmemes_sent <= 1 THEN 1
+                        ELSE (MS.nlikes + MS.ndislikes) * 1. / MS.nmemes_sent
+                    END
                 AS score
 
             FROM meme M
@@ -291,9 +298,6 @@ async def get_best_memes_from_each_source(
 
             LEFT JOIN meme_stats MS
                 ON MS.meme_id = M.id
-
-            LEFT JOIN meme_source_stats MSS
-                ON MSS.meme_source_id = M.meme_source_id
 
             WHERE 1=1
                 AND M.status = 'ok'
