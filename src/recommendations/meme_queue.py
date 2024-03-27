@@ -2,9 +2,9 @@ import random
 
 from src import redis
 from src.recommendations.candidates import (
+    classic,
     get_best_memes_from_each_source,
     like_spread_and_recent_memes,
-    most_liked,
     multiply_all_scores,
     sorted_by_user_source_lr_meme_lr_meme_age,
 )
@@ -68,7 +68,7 @@ async def generate_recommendations(user_id, limit=10):
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
     elif r < 0.4:
-        candidates = await most_liked(
+        candidates = await classic(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
     elif r < 0.6:
