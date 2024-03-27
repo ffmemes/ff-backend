@@ -110,7 +110,11 @@ async def handle_language_settings(
 
     if update.callback_query:
         await update.callback_query.answer()
-        await update.callback_query.message.edit_text(**send_message_kwargs)
+        try:
+            await update.callback_query.message.edit_text(**send_message_kwargs)
+        except telegram.error.BadRequest:
+            # specified new message content and reply markup are exactly the same
+            pass
     elif update.message:
         await update.message.reply_text(**send_message_kwargs)
     else:
