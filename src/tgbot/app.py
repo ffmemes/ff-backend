@@ -24,6 +24,7 @@ from src.tgbot.constants import (
     POPUP_BUTTON_CALLBACK_DATA_REGEXP,
     # TELEGRAM_CHANNEL_EN_CHAT_ID,
     TELEGRAM_CHANNEL_RU_CHAT_ID,
+    TELEGRAM_CHAT_RU_CHAT_ID,
 )
 from src.tgbot.handlers import (
     alerts,
@@ -45,6 +46,7 @@ from src.tgbot.handlers.admin.waitlist import (
     handle_waitlist_invite,
     handle_waitlist_invite_before,
 )
+from src.tgbot.handlers.chat.explain_meme import explain_meme_ru
 from src.tgbot.handlers.moderator import get_meme, meme_source
 
 application: Application = None  # type: ignore
@@ -162,6 +164,17 @@ def add_handlers(application: Application) -> None:
             filters=filters.ChatType.PRIVATE
             & filters.ForwardedFrom(chat_id=TELEGRAM_CHANNEL_RU_CHAT_ID),
             callback=handle_forwarded_from_tgchannelru,
+        )
+    )
+
+    ######################
+    # handle new meme in channel discussion
+    application.add_handler(
+        MessageHandler(
+            filters=filters.ChatType.PRIVATE
+            & filters.ForwardedFrom(chat_id=TELEGRAM_CHAT_RU_CHAT_ID)
+            & filters.PHOTO,
+            callback=explain_meme_ru,
         )
     )
 
