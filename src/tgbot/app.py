@@ -25,6 +25,7 @@ from src.tgbot.constants import (
     # TELEGRAM_CHANNEL_EN_CHAT_ID,
     TELEGRAM_CHANNEL_RU_CHAT_ID,
     TELEGRAM_CHAT_RU_CHAT_ID,
+    TELEGRAM_FEEDBACK_CHAT_ID,
 )
 from src.tgbot.handlers import (
     alerts,
@@ -48,6 +49,10 @@ from src.tgbot.handlers.admin.waitlist import (
 )
 from src.tgbot.handlers.chat.explain_meme import explain_meme_ru
 from src.tgbot.handlers.chat.chat_member import handle_chat_member_update
+from src.tgbot.handlers.chat.feedback import (
+    handle_feedback_message,
+    handle_feedback_reply,
+)
 from src.tgbot.handlers.moderator import get_meme, meme_source
 
 application: Application = None  # type: ignore
@@ -83,6 +88,22 @@ def add_handlers(application: Application) -> None:
         CallbackQueryHandler(
             language.handle_language_settings_end,
             pattern=LANG_SETTINGS_END_CALLBACK_DATA,
+        )
+    )
+
+    ###################
+    # user feedback & responses
+    application.add_handler(
+        MessageHandler(
+            filters=filters.ChatType.PRIVATE & filters.Regex(r"^(\/c |\/chat |\/с )"),
+            callback=handle_feedback_message,
+        )
+    )
+
+    application.add_handler(
+        MessageHandler(
+            filters=filters.Chat(TELEGRAM_FEEDBACK_CHAT_ID) & filters.REPLY,
+            callback=handle_feedback_reply,
         )
     )
 

@@ -4,14 +4,8 @@ import logging
 from typing import Optional, Tuple
 
 from telegram import Chat, ChatMember, ChatMemberUpdated, Update
-from telegram.constants import ParseMode
 from telegram.ext import (
-    Application,
-    ChatMemberHandler,
-    CommandHandler,
     ContextTypes,
-    MessageHandler,
-    filters,
 )
 
 from src.tgbot.handlers import (

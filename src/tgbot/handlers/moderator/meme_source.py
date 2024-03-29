@@ -14,11 +14,11 @@ from src.tgbot.senders.keyboards import (
 )
 from src.tgbot.senders.utils import send_or_edit
 from src.tgbot.service import (
+    get_meme_source_stats_by_id,
     get_or_create_meme_source,
     update_meme_source,
 )
 from src.tgbot.user_info import get_user_info
-from src.tgbot.service import get_meme_source_stats_by_id
 
 
 async def handle_meme_source_link(
