@@ -46,6 +46,8 @@ async def explain_meme_ru(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Explain a tg channel post to the user
     Handle message from channel in a chat
     """
+
+    logging.info(f"Explain meme ru tirggered by {update.effective_user.id}")
     file_id = update.message.photo[-1].file_id
     image_bytes = await download_meme_content_from_tg(file_id)
     vision_result = await call_chatgpt_vision(
