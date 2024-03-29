@@ -14,7 +14,7 @@ from src.tgbot.logs import log
 from src.tgbot.service import get_user_languages, update_user
 
 
-async def user_blocked_bot_handler(update: Update, context):
+async def handle_user_blocked_bot(update: Update, context):
     """Handle an event when user blocks us"""
     user_tg = user_id = update.my_chat_member.from_user
     user_id = user_tg.id

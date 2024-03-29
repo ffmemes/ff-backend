@@ -47,6 +47,7 @@ from src.tgbot.handlers.admin.waitlist import (
     handle_waitlist_invite_before,
 )
 from src.tgbot.handlers.chat.explain_meme import explain_meme_ru
+from src.tgbot.handlers.chat.chat_member import handle_chat_member_update
 from src.tgbot.handlers.moderator import get_meme, meme_source
 
 application: Application = None  # type: ignore
@@ -224,11 +225,9 @@ def add_handlers(application: Application) -> None:
         )
     )
 
-    # user blocked bot handler
+    # user blocked bot or bot was added to a chat
     application.add_handler(
-        ChatMemberHandler(
-            block.user_blocked_bot_handler, ChatMemberHandler.MY_CHAT_MEMBER
-        )
+        ChatMemberHandler(handle_chat_member_update, ChatMemberHandler.MY_CHAT_MEMBER)
     )
 
     # inline search
