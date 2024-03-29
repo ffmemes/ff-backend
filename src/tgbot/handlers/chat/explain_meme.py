@@ -47,7 +47,6 @@ async def explain_meme_ru(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Handle message from channel in a chat
     """
 
-    logging.info(f"Explain meme ru tirggered by {update.effective_user.id}")
     file_id = update.message.photo[-1].file_id
     image_bytes = await download_meme_content_from_tg(file_id)
     vision_result = await call_chatgpt_vision(
@@ -61,7 +60,7 @@ async def explain_meme_ru(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if vision_result:
         vision_result = html.unescape(vision_result)
         try:
-            update.message.reply_text(vision_result)
+            await update.message.reply_text(vision_result)
         except Forbidden:
             log(
                 f"Can't send meme explanation to chat: {vision_result}",
