@@ -18,6 +18,7 @@ from src.tgbot.service import (
     update_meme_source,
 )
 from src.tgbot.user_info import get_user_info
+from src.tgbot.service import get_meme_source_stats_by_id
 
 
 async def handle_meme_source_link(
@@ -32,7 +33,7 @@ async def handle_meme_source_link(
         meme_source_type = MemeSourceType.TELEGRAM
     elif "https://vk.com/" in url:
         meme_source_type = MemeSourceType.VK
-    elif "https://www.instagram.com" in url:
+    elif "https://www.instagram.com/" in url:
         meme_source_type = MemeSourceType.INSTAGRAM
         url = url.split("?")[0]  # remove query params
     else:
@@ -113,12 +114,34 @@ added by: {meme_source["added_by"]}
 <b>status</b>: {meme_source["status"]}
     """
 
+    # Column("nlikes", Integer, nullable=False, server_default="0"),
+    # Column("ndislikes", Integer, nullable=False, server_default="0"),
+    # Column("nmemes_sent_events", Integer, nullable=False, server_default="0"),
+    # Column("nmemes_parsed", Integer, nullable=False, server_default="0"),
+    # Column("nmemes_sent", Integer, nullable=False, server_default="0"),
+    # Column("latest_meme_age", Integer, nullable=False, server_default="0"),
+
+
+def _get_meme_source_stats_info(meme_source_stats: dict) -> str:
+    return f"""
+likes: {meme_source_stats["nlikes"]}
+dislikes: {meme_source_stats["ndislikes"]}
+memes sent events: {meme_source_stats["nmemes_sent_events"]}
+memes parsed: {meme_source_stats["nmemes_parsed"]}
+memes sent: {meme_source_stats["nmemes_sent"]}
+latest meme age: {meme_source_stats["latest_meme_age"]}
+    """
+
 
 async def meme_source_admin_pipeline(
     meme_source: dict,
     update: Update,
 ) -> Message:
     ms_info = _get_meme_source_info(meme_source)
+    ms_stats = await get_meme_source_stats_by_id(meme_source["id"])
+    if ms_stats:
+        ms_info += _get_meme_source_stats_info(ms_stats)
+
     if meme_source["language_code"] is None:
         return await send_or_edit(
             update,

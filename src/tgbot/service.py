@@ -13,6 +13,7 @@ from src.database import (
     inline_search_logs,
     meme,
     meme_source,
+    meme_source_stats,
     meme_stats,
     user,
     user_language,
@@ -87,6 +88,15 @@ async def get_meme_source_by_id(
     id: int,
 ) -> dict[str, Any] | None:
     select_statement = select(meme_source).where(meme_source.c.id == id)
+    return await fetch_one(select_statement)
+
+
+async def get_meme_source_stats_by_id(
+    id: int,
+) -> dict[str, Any] | None:
+    select_statement = select(meme_source_stats).where(
+        meme_source_stats.c.meme_source_id == id
+    )
     return await fetch_one(select_statement)
 
 
