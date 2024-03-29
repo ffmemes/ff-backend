@@ -255,6 +255,7 @@ async def final_meme_pipeline() -> None:
                 meme["id"], meme["ocr_result"]["text"]
             )
             if duplicate_meme_id:
+                logger.info(f"Found duplicate {meme['id']=} {duplicate_meme_id=}']")
                 await update_meme(
                     meme["id"],
                     status=MemeStatus.DUPLICATE,

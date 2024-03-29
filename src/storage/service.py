@@ -410,7 +410,7 @@ async def find_meme_duplicate(meme_id: int, imagetext: str) -> int | None:
             AND similarity(
                 :imagetext,
                 M.ocr_result ->> 'text'
-              ) >= 0.9
+              ) >= 0.86
             AND M.status != 'duplicate'
         ORDER BY M.id ASC
         LIMIT 1
