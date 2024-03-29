@@ -22,3 +22,4 @@ python-telegram-bot==21.0.*
 
 Pillow==10.2.*
 
+openai==1.14.*
