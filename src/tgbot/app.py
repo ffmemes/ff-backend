@@ -29,7 +29,6 @@ from src.tgbot.constants import (
 )
 from src.tgbot.handlers import (
     alerts,
-    block,
     broken,
     error,
     inline,
@@ -47,8 +46,8 @@ from src.tgbot.handlers.admin.waitlist import (
     handle_waitlist_invite,
     handle_waitlist_invite_before,
 )
-from src.tgbot.handlers.chat.explain_meme import explain_meme_ru
 from src.tgbot.handlers.chat.chat_member import handle_chat_member_update
+from src.tgbot.handlers.chat.explain_meme import explain_meme_ru
 from src.tgbot.handlers.chat.feedback import (
     handle_feedback_message,
     handle_feedback_reply,
