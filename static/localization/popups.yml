@@ -174,28 +174,28 @@ popup.feedback:
   ru: |-
     💌 Напиши нам, если у тебя есть идеи, предложения или просто хочешь поблагодарить за мемы.
 
-    Используй команду /chat <твое сообщение>, например:
+    Используй команду /chat "твое сообщение", например:
 
     /chat привет, админы
 
   en: |-
     💌 Send us your ideas, suggestions or thank us for the memes.
 
-    Use the command /chat <your message>, for example:
+    Use the command /chat "your message", for example:
 
     /chat hi giga chads
 
   uk: |-
     💌 Напиши нам, якщо у тебе є ідеї, пропозиції або просто хочеш подякувати за меми.
 
-    Використовуй команду /chat <твоє повідомлення>, наприклад:
+    Використовуй команду /chat "твоє повідомлення", наприклад:
 
     /chat привіт, адміни
   
   es: |-
     💌 Envíanos tus ideas, sugerencias o agradécenos por los memes.
 
-    Usa el comando /chat <tu mensaje>, por ejemplo:
+    Usa el comando /chat "tu mensaje", por ejemplo:
 
     /chat hola, administradores
 
@@ -204,7 +204,7 @@ popup.feedback:
   pt-br: |-
     💌 Envie-nos suas ideias, sugestões ou agradeça-nos pelos memes.
 
-    Use o comando /chat <sua mensagem>, por exemplo:
+    Use o comando /chat "sua mensagem", por exemplo:
 
     /chat oi, administradores
 
@@ -213,7 +213,7 @@ popup.feedback:
   ar: |-
     💌 أرسل لنا أفكارك، اقتراحاتك أو شكرًا لنا على الميمز.
 
-    استخدم الأمر /chat <رسالتك>, على سبيل المثال:
+    استخدم الأمر /chat "رسالتك"، على سبيل المثال:
 
     /chat مرحبًا، المشرفين
 
@@ -222,7 +222,7 @@ popup.feedback:
   de: |-
     💌 Schicke uns deine Ideen, Vorschläge oder danke uns für die Memes.
 
-    Verwende den Befehl /chat <deine Nachricht>, zum Beispiel:
+    Verwende den Befehl /chat "deine Nachricht", zum Beispiel:
 
     /chat Hallo, Administratoren
 
@@ -231,7 +231,7 @@ popup.feedback:
   fr: |-
     💌 Envoyez-nous vos idées, suggestions ou remerciez-nous pour les memes.
 
-    Utilisez la commande /chat <votre message>, par exemple:
+    Utilisez la commande /chat "votre message", par exemple:
 
     /chat salut, administrateurs
 
@@ -240,7 +240,7 @@ popup.feedback:
   it: |-
     💌 Invia le tue idee, suggerimenti o ringrazia per i meme.
 
-    Usa il comando /chat <il tuo messaggio>, per esempio:
+    Usa il comando /chat "il tuo messaggio", per esempio:
 
     /chat ciao, amministratori
 
@@ -249,7 +249,7 @@ popup.feedback:
   uz: |-
     💌 Идеяларингиз, таклифларингизни ёзинг ёки мемлар учун рахмат этинг.
 
-    /chat buyruqini foydalanинг <sizning xabaringiz>, masalan:
+    /chat buyruqini foydalanинг "sizning xabaringiz", masalan:
 
     /chat salom, administratorlar
 
