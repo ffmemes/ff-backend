@@ -20,10 +20,10 @@ async def onboarding_flow(update: Update):
         parse_mode=ParseMode.HTML,
     )
 
-    await asyncio.sleep(8)
+    await asyncio.sleep(10)
 
     m = await update.effective_user.send_message("3️⃣")
-    await asyncio.sleep(1.5)
+    await asyncio.sleep(2)
     m = await m.edit_text("2️⃣")
     await asyncio.sleep(2)
     m = await m.edit_text("1️⃣")

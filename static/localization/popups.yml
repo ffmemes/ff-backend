@@ -168,3 +168,91 @@ popup.telegram_channel:
     Want to see the best? Subscribe!
 
     <i>t.me/fast_food_memes</i>
+
+
+popup.feedback:
+  ru: |-
+    💌 Напиши нам, если у тебя есть идеи, предложения или просто хочешь поблагодарить за мемы.
+
+    Используй команду /chat <твое сообщение>, например:
+
+    /chat привет, админы
+
+  en: |-
+    💌 Send us your ideas, suggestions or thank us for the memes.
+
+    Use the command /chat <your message>, for example:
+
+    /chat hi giga chads
+
+  uk: |-
+    💌 Напиши нам, якщо у тебе є ідеї, пропозиції або просто хочеш подякувати за меми.
+
+    Використовуй команду /chat <твоє повідомлення>, наприклад:
+
+    /chat привіт, адміни
+  
+  es: |-
+    💌 Envíanos tus ideas, sugerencias o agradécenos por los memes.
+
+    Usa el comando /chat <tu mensaje>, por ejemplo:
+
+    /chat hola, administradores
+
+    (we speak only english sorry)
+  
+  pt-br: |-
+    💌 Envie-nos suas ideias, sugestões ou agradeça-nos pelos memes.
+
+    Use o comando /chat <sua mensagem>, por exemplo:
+
+    /chat oi, administradores
+
+    (we speak only english sorry)
+  
+  ar: |-
+    💌 أرسل لنا أفكارك، اقتراحاتك أو شكرًا لنا على الميمز.
+
+    استخدم الأمر /chat <رسالتك>, على سبيل المثال:
+
+    /chat مرحبًا، المشرفين
+
+    (we speak only english sorry)
+  
+  de: |-
+    💌 Schicke uns deine Ideen, Vorschläge oder danke uns für die Memes.
+
+    Verwende den Befehl /chat <deine Nachricht>, zum Beispiel:
+
+    /chat Hallo, Administratoren
+
+    (we speak only english sorry)
+  
+  fr: |-
+    💌 Envoyez-nous vos idées, suggestions ou remerciez-nous pour les memes.
+
+    Utilisez la commande /chat <votre message>, par exemple:
+
+    /chat salut, administrateurs
+
+    (we speak only english sorry)
+  
+  it: |-
+    💌 Invia le tue idee, suggerimenti o ringrazia per i meme.
+
+    Usa il comando /chat <il tuo messaggio>, per esempio:
+
+    /chat ciao, amministratori
+
+    (we speak only english sorry)
+  
+  uz: |-
+    💌 Идеяларингиз, таклифларингизни ёзинг ёки мемлар учун рахмат этинг.
+
+    /chat buyruqini foydalanинг <sizning xabaringiz>, masalan:
+
+    /chat salom, administratorlar
+
+    (we speak only english sorry)
+
+    

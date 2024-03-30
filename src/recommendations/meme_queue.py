@@ -36,8 +36,8 @@ async def check_queue(user_id: int):
     queue_key = redis.get_meme_queue_key(user_id)
     queue_length = await redis.get_meme_queue_length_by_key(queue_key)
 
-    if queue_length <= 4:
-        await generate_recommendations(user_id, limit=10)
+    if queue_length <= 2:
+        await generate_recommendations(user_id, limit=5)
 
 
 async def generate_cold_start_recommendations(user_id, limit=10):
@@ -54,7 +54,7 @@ async def generate_cold_start_recommendations(user_id, limit=10):
     await redis.add_memes_to_queue_by_key(queue_key, candidates)
 
 
-async def generate_recommendations(user_id, limit=10):
+async def generate_recommendations(user_id, limit):
     queue_key = redis.get_meme_queue_key(user_id)
     memes_in_queue = await redis.get_all_memes_in_queue_by_key(queue_key)
     meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
