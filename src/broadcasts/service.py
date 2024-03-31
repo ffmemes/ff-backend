@@ -45,3 +45,14 @@ async def get_users_to_broadcast_meme_from_tgchannelru(
     """
 
     return await fetch_all(text(select_query))
+
+
+async def get_users_with_language(
+    language_code: str,
+):
+    select_query = f"""
+        SELECT user_id
+        FROM user_language
+        WHERE language_code = '{language_code}'
+    """
+    return await fetch_all(text(select_query))

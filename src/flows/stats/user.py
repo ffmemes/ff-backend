@@ -8,3 +8,5 @@ from src.stats import user
 )
 async def calculate_user_stats() -> None:
     await user.calculate_user_stats()
+
+    await user.calculate_inviter_stats()
