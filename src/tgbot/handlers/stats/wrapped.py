@@ -158,6 +158,7 @@ async def generate_user_wrapped(user_id: int, update: Update):
     А ну-ка смотреть мемусики: /start
                 """
         )
+        return
 
     await msg.edit_text("⏳")
     most_shared_meme_report = await get_most_shared_meme_report(user_id)
@@ -252,8 +253,9 @@ async def get_most_shared_meme_report(user_id, limit=10):
             "type": meme_data["type"],
             "telegram_file_id": meme_data["telegram_file_id"],
             "caption": f"""
-Твои друзья больше всего орнули с этого мема 🤦‍♂️\n\n{meme_data["caption"]}
-            """,
+Твои друзья больше всего орнули с этого мема 🤦‍♂️{
+    ('\n\n' + meme_data["caption"]) if meme_data["caption"] is not None else ''
+}""",
         }
 
 
@@ -290,8 +292,6 @@ async def get_humor_report(user_id):
     """  # noqa: E501
 
     result = await call_chatgpt(PROMPT)
-
-    # TODO: call chatGPT
 
     REPORT = f"""
 Я посмотрел на твои лайки и немножко понял твое чувство юмора:
