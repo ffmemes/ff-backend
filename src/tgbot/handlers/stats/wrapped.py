@@ -250,7 +250,7 @@ async def get_most_shared_meme_report(user_id, limit=10):
     if meme_data:
         caption = """Твои друзья больше всего орнули с этого мема 🤦‍♂️"""
         if meme_data["caption"] is not None:
-            caption += '\n\n' + meme_data["caption"]
+            caption += "\n\n" + meme_data["caption"]
         return {
             "id": meme_data["id"],
             "type": meme_data["type"],
