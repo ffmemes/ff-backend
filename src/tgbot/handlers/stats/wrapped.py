@@ -60,7 +60,9 @@ async def handle_wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         user_wrapped = await generate_user_wrapped(user_id, update)
         if user_wrapped is None:
             return
+        print(f"Generated wrapped for user_id={user_id}: {user_wrapped}")
         await set_user_wrapped(user_id, user_wrapped)
+
     elif user_wrapped.get("lock"):
         return  # user already clicked
 
@@ -158,7 +160,7 @@ async def generate_user_wrapped(user_id: int, update: Update):
                 """
         )
 
-    msg.edit_text("⏳")
+    await msg.edit_text("⏳")
     most_shared_meme_report = await get_most_shared_meme_report(user_id)
 
     humor_sense_report = await get_humor_report(user_id)
@@ -168,10 +170,10 @@ async def generate_user_wrapped(user_id: int, update: Update):
     await asyncio.sleep(2)
 
     return {
-        "bot_usage_report": bot_usage_report,
-        "recommended_meme_sources_report": recommended_meme_sources_report,
-        "most_shared_meme_report": most_shared_meme_report,
-        "humor_sense_report": humor_sense_report,
+        "bot_usage_report": bot_usage_report or "",
+        "recommended_meme_sources_report": recommended_meme_sources_report or "",
+        "most_shared_meme_report": most_shared_meme_report or "",
+        "humor_sense_report": humor_sense_report or "",
     }
 
 
