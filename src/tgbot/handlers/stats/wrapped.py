@@ -248,14 +248,14 @@ async def get_most_shared_meme_report(user_id, limit=10):
     shared_meme_id = shared_memes[0]["meme_id"]
     meme_data = await get_meme_by_id(shared_meme_id)
     if meme_data:
+        caption = """Твои друзья больше всего орнули с этого мема 🤦‍♂️"""
+        if meme_data["caption"] is not None:
+            caption += '\n\n' + meme_data["caption"]
         return {
             "id": meme_data["id"],
             "type": meme_data["type"],
             "telegram_file_id": meme_data["telegram_file_id"],
-            "caption": f"""
-Твои друзья больше всего орнули с этого мема 🤦‍♂️{
-    ('\n\n' + meme_data["caption"]) if meme_data["caption"] is not None else ''
-}""",
+            "caption": caption,
         }
 
 
