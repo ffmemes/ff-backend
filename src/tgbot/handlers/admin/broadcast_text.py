@@ -1,3 +1,5 @@
+import asyncio
+
 from telegram import Update
 from telegram.ext import (
     ContextTypes,
@@ -44,7 +46,7 @@ async def handle_broadcast_text_ru_trigger(
         return
 
     users = await get_users_with_language("ru")
-    user_ids = [user["id"] for user in users]
+    user_ids = [user["user_id"] for user in users]
 
     await update.message.reply_text(
         f"Going to broadcast this text to {len(user_ids)} ru users:\n\n{text}",
@@ -61,3 +63,5 @@ async def handle_broadcast_text_ru_trigger(
         except Exception as e:
             print(f"Failed to send message to {user_id}: {e}")
             # TODO: proper hanlder & logging
+
+        asyncio.sleep(1)

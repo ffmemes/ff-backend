@@ -35,7 +35,7 @@ async def calculate_user_stats() -> None:
             , COUNT(*) nmemes_sent
             , COUNT(*) FILTER (WHERE lag > INTERVAL '1 hours') + 1 nsessions
             , COUNT(DISTINCT DATE(reacted_at)) AS active_days_count
-            , EXTRACT(EPOCH FROM SUM(lag) FILTER (WHERE lag < INTERVAL '2 minutes'))::INT time_spent_sec
+            , COALESCE(EXTRACT(EPOCH FROM SUM(lag) FILTER (WHERE lag < INTERVAL '2 minutes'))::INT, 0) time_spent_sec
             , MIN(reacted_at) first_reaction_at
             , MAX(reacted_at) last_reaction_at
             , NOW() AS updated_at
