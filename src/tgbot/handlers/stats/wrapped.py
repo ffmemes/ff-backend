@@ -140,12 +140,17 @@ async def generate_user_wrapped(user_id: int, update: Update):
     await set_user_wrapped(user_id, {"lock": True})
 
     msg = await update.message.reply_text("⏳ Анализирую твои лайки...")
-    await asyncio.gather(
-        calculate_user_stats(),
-        calculate_inviter_stats(),
-        calculate_meme_source_stats(),
-        calculate_user_meme_source_stats(),
-    )
+
+    try:
+        await asyncio.gather(
+            calculate_user_stats(),
+            calculate_inviter_stats(),
+            calculate_meme_source_stats(),
+            calculate_user_meme_source_stats(),
+        )
+    except Exception as e:
+        print(f"Error in recalculating stats: {e}")
+        pass
 
     bot_usage_report = await get_bot_usage_report(user_id)
     recommended_meme_sources_report = await get_meme_sources_report(user_id)
