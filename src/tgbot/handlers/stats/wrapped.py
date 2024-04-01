@@ -19,7 +19,7 @@ from src.stats.user_meme_source import calculate_user_meme_source_stats
 from src.storage.schemas import MemeData
 from src.tgbot.constants import TELEGRAM_CHANNEL_RU_CHAT_ID, TELEGRAM_CHANNEL_RU_LINK
 from src.tgbot.senders.meme import send_new_message_with_meme
-from src.tgbot.service import get_meme_by_id, get_user_by_id
+from src.tgbot.service import create_user, get_meme_by_id, get_user_by_id, save_tg_user
 from src.tgbot.utils import check_if_user_chat_member
 
 
@@ -41,6 +41,17 @@ async def call_chatgpt(prompt: str) -> str:
 
 async def handle_wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
+
+    await create_user(id=user_id)
+    await save_tg_user(
+        id=user_id,
+        username=update.effective_user.username,
+        first_name=update.effective_user.first_name,
+        last_name=update.effective_user.last_name,
+        is_premium=update.effective_user.is_premium,
+        language_code=update.effective_user.language_code,
+    )
+
     if not await check_if_user_chat_member(
         context.bot,
         user_id,
