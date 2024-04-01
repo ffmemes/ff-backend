@@ -111,7 +111,7 @@ async def handle_wrapped_button(
         else:
             key = 3
 
-    if key == 3:
+    if key == 3 and user_wrapped["humor_sense_report"]:
         await update.effective_chat.send_message(
             text=user_wrapped["humor_sense_report"],
             parse_mode="HTML",
@@ -182,7 +182,7 @@ async def get_bot_usage_report(user_id: int):
 
     user_stats = await get_user_stats(user_id)
     if user_stats is None:
-        return
+        return None
 
     days_with_us = (datetime.datetime.utcnow() - user["created_at"]).days + 1
     user_opened_bot_times = user_stats.get("nsessions", 0)
@@ -191,6 +191,9 @@ async def get_bot_usage_report(user_id: int):
     user_gave_likes = user_stats.get("nlikes", 0)
     user_spent_sec = user_stats.get("time_spent_sec", 0)
     user_invited_users = user_stats.get("invited_users", [])
+
+    if user_gave_likes < 10:
+        return None
 
     REPORT = f"""
 Ты присоединился к боту {days_with_us} дней назад.
@@ -265,6 +268,8 @@ async def get_humor_report(user_id):
         return None
 
     texts = "\n".join(f"{ocr['ocr_text']}" for ocr in ocrs)
+    if len(texts) < 100:
+        return None
 
     PROMPT = f"""
 

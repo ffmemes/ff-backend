@@ -63,19 +63,15 @@ async def generate_recommendations(user_id, limit):
     # TODO: proper A/B testing by users
 
     r = random.random()
-    if r < 0.2:
-        candidates = await sorted_by_user_source_lr_meme_lr_meme_age(
-            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-        )
-    elif r < 0.4:
+    if r < 0.25:
         candidates = await classic(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
-    elif r < 0.6:
+    elif r < 0.5:
         candidates = await like_spread_and_recent_memes(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
-    elif r < 0.8:
+    elif r < 0.75:
         candidates = await get_best_memes_from_each_source(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
