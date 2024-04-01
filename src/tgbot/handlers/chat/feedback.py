@@ -18,7 +18,7 @@ async def handle_feedback_message(update: Update, context: ContextTypes.DEFAULT_
 USAGE: /chat YOUR MESSAGE HERE
 HINT: you can use shorter command: /c
 NOTE: we will not see messages without this command
-        """
+            """
         )
         return
 

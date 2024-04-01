@@ -99,7 +99,7 @@ def add_handlers(application: Application) -> None:
     # user feedback & responses
     application.add_handler(
         MessageHandler(
-            filters=filters.ChatType.PRIVATE & filters.Regex(r"^(\/c |\/chat |\/с )"),
+            filters=filters.ChatType.PRIVATE & filters.Regex(r"^(\/c |\/chat|\/с)"),
             callback=handle_feedback_message,
         )
     )
