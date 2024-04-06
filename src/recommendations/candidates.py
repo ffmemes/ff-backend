@@ -257,8 +257,8 @@ async def classic(
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
 
         ORDER BY -1
-            * UMSS.nlikes * 1. / (UMSS.nlikes + UMSS.ndislikes)
-            * MS.nlikes * 1. / (MS.nlikes + MS.ndislikes)
+            * (UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.)
+            * (MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1.)
         LIMIT {limit}
     """
     res = await fetch_all(text(query))

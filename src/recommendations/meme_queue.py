@@ -6,7 +6,6 @@ from src.recommendations.candidates import (
     get_best_memes_from_each_source,
     like_spread_and_recent_memes,
     multiply_all_scores,
-    sorted_by_user_source_lr_meme_lr_meme_age,
 )
 from src.storage.schemas import MemeData
 
