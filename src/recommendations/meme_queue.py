@@ -8,6 +8,7 @@ from src.recommendations.candidates import (
     like_spread_and_recent_memes,
 )
 from src.storage.schemas import MemeData
+from src.tgbot.user_info import get_user_info
 
 
 async def get_next_meme_for_user(user_id: int) -> MemeData | None:
@@ -58,26 +59,42 @@ async def generate_recommendations(user_id, limit):
     memes_in_queue = await redis.get_all_memes_in_queue_by_key(queue_key)
     meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
 
-    # randomly choose the strategy
-    # TODO: proper A/B testing by users
+    user_info = await get_user_info(user_id)
 
     r = random.random()
-    if r < 0.25:
-        candidates = await classic(
-            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-        )
-    elif r < 0.5:
-        candidates = await like_spread_and_recent_memes(
-            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-        )
-    elif r < 0.75:
+
+    if user_info["nmemes_sent"] < 30:
         candidates = await get_best_memes_from_each_source(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
+
+    elif user_info["nmemes_sent"] < 100:
+        if r < 0.5:
+            candidates = await get_best_memes_from_each_source(
+                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+            )
+        else:
+            candidates = await classic(
+                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+            )
+
     else:
-        candidates = await less_seen_meme_and_source(
-            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-        )
+        if r < 0.25:
+            candidates = await classic(
+                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+            )
+        elif r < 0.5:
+            candidates = await like_spread_and_recent_memes(
+                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+            )
+        elif r < 0.75:
+            candidates = await get_best_memes_from_each_source(
+                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+            )
+        else:
+            candidates = await less_seen_meme_and_source(
+                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+            )
 
     if len(candidates) == 0:
         return
