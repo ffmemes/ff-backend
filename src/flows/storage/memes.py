@@ -5,10 +5,11 @@ from typing import Any
 from prefect import flow, get_run_logger
 from telegram.error import BadRequest, RetryAfter
 
+from src.config import settings
 from src.storage import ads
 from src.storage.constants import MemeStatus, MemeType
 from src.storage.ocr.mystic import ocr_content
-from src.storage.schemas import OcrResult
+from src.storage.schemas import MemeData, OcrResult
 from src.storage.service import (
     etl_memes_from_raw_ig_posts,
     etl_memes_from_raw_telegram_posts,
@@ -27,6 +28,9 @@ from src.storage.upload import (
     upload_meme_content_to_tg,
 )
 from src.storage.watermark import add_watermark
+from src.tgbot.logs import log
+from src.tgbot.senders.meme import send_album_with_memes
+from src.tgbot.service import get_meme_by_id
 
 
 async def ocr_meme_content(meme_id: int, content: bytes, language: str) -> None:
@@ -255,6 +259,13 @@ async def final_meme_pipeline() -> None:
                 meme["id"], meme["ocr_result"]["text"]
             )
             if duplicate_meme_id:
+                logger.info(f"Found duplicate {meme['id']=} {duplicate_meme_id=}")
+                duplicate_meme = await get_meme_by_id(duplicate_meme_id)
+
+                if meme["telegram_file_id"] and duplicate_meme["telegram_file_id"]:
+                    await send_album_with_memes(settings.ADMIN_LOGS_CHAT_ID, [MemeData(**meme), MemeData(**duplicate_meme)])
+                await log(f"Found duplicate {meme['id']=} {duplicate_meme_id=}")
+
                 await update_meme(
                     meme["id"],
                     status=MemeStatus.DUPLICATE,

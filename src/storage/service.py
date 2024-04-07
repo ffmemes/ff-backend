@@ -407,11 +407,11 @@ async def find_meme_duplicate(meme_id: int, imagetext: str) -> int | None:
         FROM meme M
         WHERE M.id < :meme_id
             AND ocr_result IS NOT NULL
+            AND M.status != 'duplicate'
             AND similarity(
                 :imagetext,
                 M.ocr_result ->> 'text'
-              ) >= 0.9
-            AND M.status != 'duplicate'
+              ) >= 0.86
         ORDER BY M.id ASC
         LIMIT 1
     """
