@@ -4,8 +4,8 @@ from src import redis
 from src.recommendations.candidates import (
     classic,
     get_best_memes_from_each_source,
+    less_seen_meme_and_source,
     like_spread_and_recent_memes,
-    multiply_all_scores,
 )
 from src.storage.schemas import MemeData
 
@@ -75,7 +75,7 @@ async def generate_recommendations(user_id, limit):
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
     else:
-        candidates = await multiply_all_scores(
+        candidates = await less_seen_meme_and_source(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
 
