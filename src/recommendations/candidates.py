@@ -346,7 +346,7 @@ async def get_best_memes_from_each_source(
                 AND M.status = 'ok'
                 AND R.meme_id IS NULL
                 {exclude_meme_ids_sql_filter(exclude_meme_ids)}
-            ORDER BY M.meme_source_id, score
+            ORDER BY M.meme_source_id, score DESC
         ) M
         ORDER BY score DESC
         LIMIT {limit}
