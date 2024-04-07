@@ -246,6 +246,10 @@ user_stats = Table(
     Column("nmemes_sent", Integer, nullable=False, server_default="0"),
     Column("nsessions", Integer, nullable=False, server_default="0"),
     Column("active_days_count", Integer, nullable=False, server_default="0"),
+    Column("time_spent_sec", Integer, nullable=False, server_default="0"),
+    Column("first_reaction_at", DateTime),
+    Column("last_reaction_at", DateTime),
+    Column("invited_users", Integer, nullable=False, server_default="0"),
     Column(
         "updated_at",
         DateTime,

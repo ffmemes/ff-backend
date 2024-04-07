@@ -94,7 +94,7 @@ async def send_new_message_with_meme(
                 parse_mode=ParseMode.HTML,
             )
         elif meme.type == MemeType.ANIMATION:
-            return await bot.send_video(
+            return await bot.send_animation(
                 chat_id=user_id,
                 animation=meme.telegram_file_id,
                 caption=meme.caption,

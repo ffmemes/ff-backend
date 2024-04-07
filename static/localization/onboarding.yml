@@ -11,6 +11,8 @@ onboarding.welcome_message:
     2. Press 👍 / 👎 buttons to react on meme.
     3. <b>AI</b> will reply with the next meme based on your <b>reaction</b>.
 
+    We will send you 10 memes now to better understand your taste.
+
     Are you ready? 🤔🤔🤔🤔🤔🤔🤔🤔🤔🤔🤔🤔🤔🤔🤔🤔🤔🤔🤔
   ru: |-
     🚀 <code>Добро пожаловать в Fast Food Memes!</code> 🍔
@@ -25,6 +27,8 @@ onboarding.welcome_message:
     3. <b>AI</b> подберет тебе следующий мем!
 
     Больше сидишь в боте - AI лучше рекомендует. Все просто 🎭
+
+    Сейчас мы пришлем 10 калибровочных мемов - отвечай честно, чтобы AI понял твои вкусы
 
     🤔🤔🤔🤔🤔 ТЫ ГОТОВ? 🤔🤔🤔🤔🤔
   uk: |-
@@ -41,6 +45,8 @@ onboarding.welcome_message:
 
     Більше сидиш в боті - AI краще рекомендує. Все просто 🎭
 
+    Зараз ми надішлемо 10 калібрувальних мемів - відповідай чесно, щоб AI зрозумів твої смаки
+
     🤔🤔🤔🤔🤔 ТИ ГОТОВИЙ? 🤔🤔🤔🤔🤔
   es: |-
     🚀 <code>¡Bienvenido a Fast Food Memes!</code> 🍔
@@ -53,6 +59,8 @@ onboarding.welcome_message:
     1. Recibirás un meme.
     2. Pulsa los botones 👍 / 👎 para reaccionar al meme.
     3. <b>AI</b> responderá con el siguiente meme basado en tu <b>reacción</b>.
+
+    Te enviaremos 10 memes ahora para entender mejor tu gusto.
 
     ¿Estás listo?
   pt-br: |-
@@ -67,7 +75,10 @@ onboarding.welcome_message:
     2. Pressione os botões 👍 / 👎 para reagir ao meme.
     3. <b>AI</b> responderá com o próximo meme com base na sua <b>reação</b>.
 
+    Vamos enviar 10 memes agora para entender melhor o seu gosto.
+
     Você está pronto?
+
   fr: |-
     🚀 <code>Bienvenue sur Fast Food Memes!</code> 🍔
 
@@ -79,6 +90,8 @@ onboarding.welcome_message:
     1. Vous recevrez un meme.
     2. Appuyez sur les boutons 👍 / 👎 pour réagir au meme.
     3. <b>AI</b> répondra avec le meme suivant en fonction de votre <b>réaction</b>.
+
+    Nous vous enverrons 10 memes maintenant pour mieux comprendre vos goûts.
 
     Êtes-vous prêt?
   it: |-
@@ -93,6 +106,8 @@ onboarding.welcome_message:
     2. Premi i pulsanti 👍 / 👎 per reagire al meme.
     3. <b>AI</b> risponderà con il meme successivo in base alla tua <b>reazione</b>.
 
+    Ti invieremo 10 meme ora per capire meglio i tuoi gusti.
+
     Sei pronto?
   fa: |-
     🚀 <code>به Fast Food Memes خوش آمدید!</code> 🍔
@@ -106,6 +121,8 @@ onboarding.welcome_message:
     2. دکمه‌های 👍 / 👎 را فشار دهید تا به میمز واکنش نشان دهید.
     3. <b>هوش مصنوعی</b> بر اساس <b>واکنش</b> شما با میمز بعدی پاسخ خواهد داد.
 
+    ما در حال ارسال 10 میمز به شما هستیم تا بهترین سلیقه‌ی شما را درک کنیم.
+
     آیا آماده‌اید؟
   uz: |-
     🚀 <code>Fast Food Memes-ga xush kelibsiz!</code> 🍔
@@ -117,7 +134,9 @@ onboarding.welcome_message:
     <i>Qanday foydalanish:</i>
     1. Siz mamlakatimizdan mamlakat olasiz.
     2. 👍 / 👎 tugmalarini bosib mamlakatga reaksiya bildirishingiz mumkin.
-    3. <b>AI</b> sizning <b>reaksiyangiz</b asosida keyingi mamlakatni tanlaydi.
+    3. <b>AI</b> sizning <b>reaksiyangiz</b> asosida keyingi mamlakatni tanlaydi.
+
+    Biz sizga 10 mamlakat yuboramiz, sizning taqdiringizni yaxshi tushunish uchun.
 
     Tayyormisiz?
 

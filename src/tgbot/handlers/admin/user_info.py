@@ -5,7 +5,7 @@ from telegram.ext import (
 )
 
 from src.stats.service import get_user_stats
-from src.stats.user import calculate_user_stats
+from src.stats.user import calculate_inviter_stats, calculate_user_stats
 from src.tgbot.constants import UserType
 from src.tgbot.handlers.admin.service import delete_user, get_user_by_tg_username
 from src.tgbot.user_info import get_user_info, update_user_info_cache
@@ -29,6 +29,8 @@ async def handle_show_user_info(
 
     # TODO: create a function which creates a user info string
     await calculate_user_stats()  # regenerate user stats
+    await calculate_inviter_stats()
+
     user_stats = await get_user_stats(selected_user["id"])
 
     report = ""

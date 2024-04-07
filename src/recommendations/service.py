@@ -58,7 +58,10 @@ async def update_user_last_active_at(
     update_query = (
         user.update()
         .where(user.c.id == user_id)
-        .values(last_active_at=datetime.utcnow())
+        .values(
+            last_active_at=datetime.utcnow(),
+            blocked_bot_at=None,
+        )
     )
     await execute(update_query)
 

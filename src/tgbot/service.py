@@ -13,6 +13,7 @@ from src.database import (
     inline_search_logs,
     meme,
     meme_source,
+    meme_source_stats,
     meme_stats,
     user,
     user_language,
@@ -90,6 +91,15 @@ async def get_meme_source_by_id(
     return await fetch_one(select_statement)
 
 
+async def get_meme_source_stats_by_id(
+    id: int,
+) -> dict[str, Any] | None:
+    select_statement = select(meme_source_stats).where(
+        meme_source_stats.c.meme_source_id == id
+    )
+    return await fetch_one(select_statement)
+
+
 async def get_meme_by_id(
     id: int,
 ) -> dict[str, Any] | None:
@@ -137,7 +147,7 @@ async def search_memes_for_inline_query(
         FROM meme M
         WHERE M.status = '{MemeStatus.OK}'
         AND M.type = '{MemeType.IMAGE}'
-        ORDER BY SIMILARITY(M.ocr_result ->> 'text',:search_query) DESC
+        ORDER BY word_similarity(:search_query, M.ocr_result ->> 'text') DESC
         LIMIT {limit};
     """
     select_statement = text(select_query).bindparams(

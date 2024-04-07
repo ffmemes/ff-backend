@@ -35,6 +35,8 @@ class Config(BaseSettings):
 
     REDIS_MAX_CONNECTIONS: int = 128
 
+    OPENAI_API_KEY: str | None = None
+
     # @model_validator(mode="after")
     # def validate_sentry_non_local(self) -> "Config":
     #     if self.ENVIRONMENT.is_deployed and not self.SENTRY_DSN:

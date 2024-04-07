@@ -2,11 +2,10 @@ import random
 
 from src import redis
 from src.recommendations.candidates import (
+    classic,
     get_best_memes_from_each_source,
+    less_seen_meme_and_source,
     like_spread_and_recent_memes,
-    multiply_all_scores,
-    sorted_by_user_source_lr_meme_lr_meme_age,
-    top_memes_from_less_seen_sources,
 )
 from src.storage.schemas import MemeData
 
@@ -36,8 +35,8 @@ async def check_queue(user_id: int):
     queue_key = redis.get_meme_queue_key(user_id)
     queue_length = await redis.get_meme_queue_length_by_key(queue_key)
 
-    if queue_length <= 4:
-        await generate_recommendations(user_id, limit=10)
+    if queue_length <= 2:
+        await generate_recommendations(user_id, limit=5)
 
 
 async def generate_cold_start_recommendations(user_id, limit=10):
@@ -45,7 +44,7 @@ async def generate_cold_start_recommendations(user_id, limit=10):
     memes_in_queue = await redis.get_all_memes_in_queue_by_key(queue_key)
     meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
 
-    candidates = await like_spread_and_recent_memes(
+    candidates = await get_best_memes_from_each_source(
         user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
     )
     if len(candidates) == 0:
@@ -54,7 +53,7 @@ async def generate_cold_start_recommendations(user_id, limit=10):
     await redis.add_memes_to_queue_by_key(queue_key, candidates)
 
 
-async def generate_recommendations(user_id, limit=10):
+async def generate_recommendations(user_id, limit):
     queue_key = redis.get_meme_queue_key(user_id)
     memes_in_queue = await redis.get_all_memes_in_queue_by_key(queue_key)
     meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
@@ -63,24 +62,20 @@ async def generate_recommendations(user_id, limit=10):
     # TODO: proper A/B testing by users
 
     r = random.random()
-    if r < 0.2:
-        candidates = await sorted_by_user_source_lr_meme_lr_meme_age(
+    if r < 0.25:
+        candidates = await classic(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
-    elif r < 0.4:
-        candidates = await top_memes_from_less_seen_sources(
-            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-        )
-    elif r < 0.6:
+    elif r < 0.5:
         candidates = await like_spread_and_recent_memes(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
-    elif r < 0.8:
+    elif r < 0.75:
         candidates = await get_best_memes_from_each_source(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
     else:
-        candidates = await multiply_all_scores(
+        candidates = await less_seen_meme_and_source(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
 

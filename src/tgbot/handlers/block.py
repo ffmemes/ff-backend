@@ -11,10 +11,10 @@ from src.stats.service import get_user_stats
 from src.stats.user import calculate_user_stats
 from src.tgbot.constants import UserType
 from src.tgbot.logs import log
-from src.tgbot.service import update_user
+from src.tgbot.service import get_user_languages, update_user
 
 
-async def user_blocked_bot_handler(update: Update, context):
+async def handle_user_blocked_bot(update: Update, context):
     """Handle an event when user blocks us"""
     user_tg = user_id = update.my_chat_member.from_user
     user_id = user_tg.id
@@ -36,13 +36,15 @@ async def user_blocked_bot_handler(update: Update, context):
         for k, v in user_stats.items():
             report += f"<b>{k}</b>: {v}\n"
 
+    languages = await get_user_languages(user_id)
+
     # TODO:
     # 1. create a function to generate this repr
     # 2. show all availabel languages
     message = f"""
 ⛔️ <b>BLOCKED</b> by {user_tg.name} / #{user_id}
 <b>registered</b>: {user["created_at"]}
-<b>lang</b>: {user_tg.language_code}
+<b>langs</b>: {user_tg.language_code} / {languages}
 {report}
     """
     await log(message)

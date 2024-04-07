@@ -1,3 +1,4 @@
+import io
 from typing import Any
 
 import httpx
@@ -23,7 +24,7 @@ async def download_meme_content_file(
         except httpx.ConnectTimeout:
             return None
 
-        if response.status_code in (404, 500):
+        if response.status_code in (403, 404, 500):
             return None
 
         response.raise_for_status()
@@ -73,8 +74,12 @@ async def upload_meme_content_to_tg(
 
     if meme_type == MemeType.ANIMATION:
         try:
+            animation_stream = io.BytesIO(content)
+            animation_stream.name = "animation.mp4"
+            animation_stream.seek(0)
             msg = await bot.send_animation(
-                chat_id=settings.MEME_STORAGE_TELEGRAM_CHAT_ID, animation=content
+                chat_id=settings.MEME_STORAGE_TELEGRAM_CHAT_ID,
+                animation=animation_stream,
             )
         except telegram.error.TimedOut:
             return None

@@ -24,10 +24,11 @@ from src.tgbot.constants import (
     POPUP_BUTTON_CALLBACK_DATA_REGEXP,
     # TELEGRAM_CHANNEL_EN_CHAT_ID,
     TELEGRAM_CHANNEL_RU_CHAT_ID,
+    TELEGRAM_CHAT_RU_CHAT_ID,
+    TELEGRAM_FEEDBACK_CHAT_ID,
 )
 from src.tgbot.handlers import (
     alerts,
-    block,
     broken,
     error,
     inline,
@@ -35,17 +36,28 @@ from src.tgbot.handlers import (
     popup,
     reaction,
     start,
-    stats,
     upload,
 )
 from src.tgbot.handlers.admin.boost import handle_chat_boost
+from src.tgbot.handlers.admin.broadcast_text import (
+    handle_broadcast_text_ru,
+    handle_broadcast_text_ru_trigger,
+)
 from src.tgbot.handlers.admin.forward_channel import handle_forwarded_from_tgchannelru
 from src.tgbot.handlers.admin.user_info import delete_user_data, handle_show_user_info
 from src.tgbot.handlers.admin.waitlist import (
     handle_waitlist_invite,
     handle_waitlist_invite_before,
 )
+from src.tgbot.handlers.chat.chat_member import handle_chat_member_update
+from src.tgbot.handlers.chat.explain_meme import explain_meme_ru
+from src.tgbot.handlers.chat.feedback import (
+    handle_feedback_message,
+    handle_feedback_reply,
+)
 from src.tgbot.handlers.moderator import get_meme, meme_source
+from src.tgbot.handlers.stats.stats import handle_stats
+from src.tgbot.handlers.stats.wrapped import handle_wrapped, handle_wrapped_button
 
 application: Application = None  # type: ignore
 
@@ -83,38 +95,45 @@ def add_handlers(application: Application) -> None:
         )
     )
 
-    ###########  waitlist flow
-    # language choose page
-    # application.add_handler(
-    #     CallbackQueryHandler(
-    #         waitlist.handle_waitlist_choose_language,
-    #         pattern=waitlist.WAITLIST_CHOOSE_LANGUAGE_PAGE_CALLBACK_DATA,
-    #     )
-    # )
+    ###################
+    # user feedback & responses
+    application.add_handler(
+        MessageHandler(
+            filters=filters.ChatType.PRIVATE & filters.Regex(r"^(\/c |\/chat|\/с)"),
+            callback=handle_feedback_message,
+        )
+    )
 
-    # # select language button
-    # application.add_handler(
-    #     CallbackQueryHandler(
-    #         waitlist.handle_waitlist_language_button,
-    #         pattern=waitlist.WAITLIST_LANGUAGE_CHANGE_CALLBACK_PATTERN,
-    #     )
-    # )
+    application.add_handler(
+        MessageHandler(
+            filters=filters.Chat(TELEGRAM_FEEDBACK_CHAT_ID) & filters.REPLY,
+            callback=handle_feedback_reply,
+        )
+    )
 
-    # # finish language selection -> show channel sub page
-    # application.add_handler(
-    #     CallbackQueryHandler(
-    #         waitlist.handle_waitlist_channel_subscription,
-    #         pattern=waitlist.WAITLIST_CHANNEL_SUBSCTIBTION_PAGE_CALLBACK_DATA,
-    #     )
-    # )
+    ####################
+    # wrapped stats
+    application.add_handler(
+        CommandHandler(
+            "wrapped",
+            handle_wrapped,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+        )
+    )
 
-    # # check channel subscription button
-    # application.add_handler(
-    #     CallbackQueryHandler(
-    #         waitlist.handle_check_channel_subscription,
-    #         pattern=waitlist.WAITLIST_CHANNEL_SUBSCRIBTION_CHECK_CALLBACK_DATA,
-    #     )
-    # )
+    application.add_handler(
+        CallbackQueryHandler(handle_wrapped_button, pattern=r"^wrapped_\d")
+    )
+
+    ####################
+    # user stats
+    application.add_handler(
+        CommandHandler(
+            "stats",
+            handle_stats,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+        )
+    )
 
     ############## meme reaction
     application.add_handler(
@@ -150,18 +169,39 @@ def add_handlers(application: Application) -> None:
     )
 
     application.add_handler(
+        MessageHandler(
+            filters=filters.ChatType.PRIVATE
+            & filters.ForwardedFrom(chat_id=TELEGRAM_CHANNEL_RU_CHAT_ID),
+            callback=handle_forwarded_from_tgchannelru,
+        )
+    )
+
+    ######################
+    # broadcast texts
+    application.add_handler(
         CommandHandler(
-            "stats",
-            stats.handle_stats,
+            "broadcastru",
+            handle_broadcast_text_ru,
             filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
         )
     )
 
     application.add_handler(
+        CommandHandler(
+            "broadcastru1",
+            handle_broadcast_text_ru_trigger,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+        )
+    )
+
+    ######################
+    # handle new meme in channel discussion
+    application.add_handler(
         MessageHandler(
-            filters=filters.ChatType.PRIVATE
-            & filters.ForwardedFrom(chat_id=TELEGRAM_CHANNEL_RU_CHAT_ID),
-            callback=handle_forwarded_from_tgchannelru,
+            filters=filters.Chat(TELEGRAM_CHAT_RU_CHAT_ID)
+            & filters.PHOTO
+            & filters.SenderChat(TELEGRAM_CHANNEL_RU_CHAT_ID),
+            callback=explain_meme_ru,
         )
     )
 
@@ -211,11 +251,9 @@ def add_handlers(application: Application) -> None:
         )
     )
 
-    # user blocked bot handler
+    # user blocked bot or bot was added to a chat
     application.add_handler(
-        ChatMemberHandler(
-            block.user_blocked_bot_handler, ChatMemberHandler.MY_CHAT_MEMBER
-        )
+        ChatMemberHandler(handle_chat_member_update, ChatMemberHandler.MY_CHAT_MEMBER)
     )
 
     # inline search

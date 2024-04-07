@@ -39,6 +39,10 @@ STOP_WORDS = [
     "разыгрыв",
     "giveaway",
     "чат-бот",
+    "заход",
+    "crypto",
+    "тинькофф",
+    "сбербанк",
 ]
 
 MENTION_WORDS = ["@", "http", "t.me/"]
