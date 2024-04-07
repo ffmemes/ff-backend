@@ -44,7 +44,7 @@ async def generate_cold_start_recommendations(user_id, limit=10):
     memes_in_queue = await redis.get_all_memes_in_queue_by_key(queue_key)
     meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
 
-    candidates = await like_spread_and_recent_memes(
+    candidates = await get_best_memes_from_each_source(
         user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
     )
     if len(candidates) == 0:
