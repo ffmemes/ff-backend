@@ -364,7 +364,7 @@ async def get_best_memes_from_each_source(
         FROM (
             SELECT DISTINCT ON (M.meme_source_id)
                 M.id, M.type, M.telegram_file_id, M.caption,
-                'cold_start' as recommended_by,
+                'best_meme_from_each_source' as recommended_by,
 
                 1
                     * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE 0.8 END

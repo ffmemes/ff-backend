@@ -36,7 +36,6 @@ from src.tgbot.handlers import (
     popup,
     reaction,
     start,
-    upload,
 )
 from src.tgbot.handlers.admin.boost import handle_chat_boost
 from src.tgbot.handlers.admin.broadcast_text import (
@@ -58,6 +57,8 @@ from src.tgbot.handlers.chat.feedback import (
 from src.tgbot.handlers.moderator import get_meme, meme_source
 from src.tgbot.handlers.stats.stats import handle_stats
 from src.tgbot.handlers.stats.wrapped import handle_wrapped, handle_wrapped_button
+
+from src.tgbot.handlers.upload import upload_meme
 
 application: Application = None  # type: ignore
 
@@ -209,15 +210,18 @@ def add_handlers(application: Application) -> None:
     # meme upload by a user
     application.add_handler(
         MessageHandler(
-            filters=filters.ChatType.PRIVATE & filters.FORWARDED & filters.ATTACHMENT,
-            callback=upload.handle_forward,
+            filters=filters.ChatType.PRIVATE
+            & filters.FORWARDED
+            & (filters.PHOTO | filters.VIDEO | filters.ANIMATION),
+            callback=upload_meme.handle_forward,
         )
     )
 
     application.add_handler(
         MessageHandler(
-            filters=filters.ChatType.PRIVATE & filters.ATTACHMENT,
-            callback=upload.handle_message,
+            filters=filters.ChatType.PRIVATE
+            & (filters.PHOTO | filters.VIDEO | filters.ANIMATION),
+            callback=upload_meme.handle_message_with_meme,
         )
     )
 
