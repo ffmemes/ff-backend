@@ -4,6 +4,7 @@ from src import redis
 from src.recommendations.candidates import (
     classic,
     get_best_memes_from_each_source,
+    get_random_best,
     less_seen_meme_and_source,
     like_spread_and_recent_memes,
 )
@@ -45,9 +46,19 @@ async def generate_cold_start_recommendations(user_id, limit=10):
     memes_in_queue = await redis.get_all_memes_in_queue_by_key(queue_key)
     meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
 
-    candidates = await get_best_memes_from_each_source(
-        user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-    )
+    candidates = []
+
+    # AB test
+    if user_id % 100 < 50:
+        candidates = await get_random_best(
+            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+        )
+
+    if len(candidates) == 0:
+        candidates = await get_best_memes_from_each_source(
+            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+        )
+
     if len(candidates) == 0:
         return
 
@@ -63,10 +74,18 @@ async def generate_recommendations(user_id, limit):
 
     r = random.random()
 
+    candidates = []
+
     if user_info["nmemes_sent"] < 30:
-        candidates = await get_best_memes_from_each_source(
-            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-        )
+        # AB test
+        if user_id % 100 < 50:
+            candidates = await get_random_best(
+                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+            )
+        if len(candidates) == 0:
+            candidates = await get_best_memes_from_each_source(
+                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+            )
 
     elif user_info["nmemes_sent"] < 100:
         if r < 0.5:
