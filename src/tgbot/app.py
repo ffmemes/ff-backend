@@ -57,7 +57,6 @@ from src.tgbot.handlers.chat.feedback import (
 from src.tgbot.handlers.moderator import get_meme, meme_source
 from src.tgbot.handlers.stats.stats import handle_stats
 from src.tgbot.handlers.stats.wrapped import handle_wrapped, handle_wrapped_button
-
 from src.tgbot.handlers.upload import upload_meme
 
 application: Application = None  # type: ignore
