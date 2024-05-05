@@ -196,14 +196,14 @@ def add_handlers(application: Application) -> None:
 
     ######################
     # handle new meme in channel discussion
-    application.add_handler(
-        MessageHandler(
-            filters=filters.Chat(TELEGRAM_CHAT_RU_CHAT_ID)
-            & filters.PHOTO
-            & filters.SenderChat(TELEGRAM_CHANNEL_RU_CHAT_ID),
-            callback=explain_meme_ru,
-        )
-    )
+    # application.add_handler(
+    #     MessageHandler(
+    #         filters=filters.Chat(TELEGRAM_CHAT_RU_CHAT_ID)
+    #         & filters.PHOTO
+    #         & filters.SenderChat(TELEGRAM_CHANNEL_RU_CHAT_ID),
+    #         callback=explain_meme_ru,
+    #     )
+    # )
 
     ######################
     # meme upload by a user
