@@ -8,18 +8,17 @@ from src.crossposting.service import (
     get_next_meme_for_tgchannelru,
     log_meme_sent,
 )
-from src.storage.constants import MemeStatus
+from src.storage.constants import MemeStatus, MemeType
 from src.storage.schemas import MemeData
 from src.storage.service import update_meme
+from src.storage.upload import download_meme_content_from_tg
 from src.tgbot.constants import (
     TELEGRAM_CHANNEL_EN_CHAT_ID,
     TELEGRAM_CHANNEL_RU_CHAT_ID,
 )
+from src.tgbot.handlers.chat.explain_meme import call_chatgpt_vision
 from src.tgbot.senders.meme import send_new_message_with_meme
 from src.tgbot.senders.utils import get_random_emoji
-
-from src.tgbot.handlers.chat.explain_meme import call_chatgpt_vision
-from src.storage.upload import download_meme_content_from_tg
 
 
 def _get_caption_for_crossposting_meme(meme: MemeData, channel: Channel) -> str:
@@ -34,6 +33,10 @@ def _get_caption_for_crossposting_meme(meme: MemeData, channel: Channel) -> str:
 
 async def get_caption_for_crossposting_meme(meme: MemeData, channel: Channel) -> str:
     logger = get_run_logger()
+
+    if meme.type != MemeType.IMAGE:
+        return _get_caption_for_crossposting_meme(meme, channel)
+
     # explain meme
     try:
         prompt = """
