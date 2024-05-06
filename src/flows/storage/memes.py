@@ -88,7 +88,7 @@ async def upload_meme_to_telegram(
         logger.warning(f"Can't add watermark to {meme['id']}/{meme['type']} content")
         return None
 
-    meme_result = upload_meme_content_to_tg(meme, watermarked_meme_content)
+    meme_result = await upload_meme_content_to_tg(meme, watermarked_meme_content)
     if meme_result is None:
         logger.warning(f"Can't upload {meme['id']}/{meme['type']} content to Telegram")
         return None
