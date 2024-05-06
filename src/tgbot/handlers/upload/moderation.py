@@ -1,5 +1,6 @@
 import logging
 import re
+from datetime import datetime
 from typing import Any
 
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -12,6 +13,7 @@ from src.flows.storage.memes import (
     ocr_meme_content,
     upload_meme_content_to_tg,
 )
+from src.recommendations.service import create_user_meme_reaction
 from src.storage.constants import MemeStatus
 from src.storage.service import (
     find_meme_duplicate,
@@ -175,7 +177,7 @@ async def handle_uploaded_meme_review_button(
     meme_upload = await get_meme_raw_upload_by_id(upload_id)
 
     if action == "approve":
-        await update_meme_by_upload_id(upload_id, status=MemeStatus.OK)
+        meme = await update_meme_by_upload_id(upload_id, status=MemeStatus.OK)
         await update.callback_query.message.edit_caption(
             caption="✅ Approved by {}".format(update.effective_user.name),
             reply_markup=None,
@@ -190,7 +192,13 @@ Your meme has been approved and soon bot will send it to other users!
             """,
         )
 
-        # TODO: add like event for this meme so it will not be shown to the same user
+        await create_user_meme_reaction(
+            meme_upload["user_id"],
+            meme["id"],
+            "uploaded_meme",
+            reaction_id=1,
+            reacted_at=datetime.utcnow(),
+        )
 
     else:
         await update_meme_by_upload_id(upload_id, status=MemeStatus.REJECTED)
