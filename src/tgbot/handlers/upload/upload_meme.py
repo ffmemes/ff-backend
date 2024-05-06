@@ -12,7 +12,6 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from src.recommendations.meme_queue import check_queue
-from src.tgbot.constants import UserType
 from src.tgbot.handlers.upload.moderation import uploaded_meme_auto_review
 from src.tgbot.handlers.upload.service import (
     create_meme_from_meme_raw_upload,
@@ -89,14 +88,14 @@ async def handle_message_with_meme(
 ) -> None:
     """When a user sends a message with a meme"""
     user = await get_user_info(update.effective_user.id)
-    if not UserType(user["type"]).is_moderator:
-        return update.message.reply_text(
-            "You are not allowed to upload memes.\n\n\n\n\n\n\nYET!"
-        )
+    # if not UserType(user["type"]).is_moderator:
+    #     return update.message.reply_text(
+    #         "You are not allowed to upload memes.\n\n\n\n\n\n\nYET!"
+    #     )
 
-    if user["nmemes_sent"] < 10:
+    if user["nmemes_sent"] < 50:
         return update.message.reply_text(
-            "Watch at least 10 memes if you want to share your memes with our community"
+            "Watch at least 50 memes if you want to share your memes with our community"
         )
 
     meme_upload = await create_meme_raw_upload(update.message)
