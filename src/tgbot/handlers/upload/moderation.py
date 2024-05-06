@@ -140,7 +140,7 @@ async def send_uploaded_meme_to_manual_review(
     if meme_upload["forward_origin"]:
         fo = meme_upload["forward_origin"]
         forward_type = fo.get("type")
-        if forward_type == "chat":
+        if forward_type == "channel":
             username = fo.get("chat", {}).get("username")
             if username:
                 text += f"\n<b>Forwarded from</b>: @{username}"
