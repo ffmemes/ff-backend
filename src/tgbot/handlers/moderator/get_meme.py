@@ -94,7 +94,7 @@ async def handle_get_meme(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     if len(meme_ids) == 1:
-        return await send_meme_info(update, meme_ids[0])
+        return await send_meme_info(context.bot, update, meme_ids[0])
 
     memes_data = await asyncio.gather(
         *[get_meme_by_id(meme_id) for meme_id in meme_ids]
