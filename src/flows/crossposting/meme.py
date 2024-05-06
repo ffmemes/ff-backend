@@ -12,6 +12,7 @@ from src.storage.constants import MemeStatus, MemeType
 from src.storage.schemas import MemeData
 from src.storage.service import update_meme
 from src.storage.upload import download_meme_content_from_tg
+from src.tgbot.bot import bot
 from src.tgbot.constants import (
     TELEGRAM_CHANNEL_EN_CHAT_ID,
     TELEGRAM_CHANNEL_RU_CHAT_ID,
@@ -75,7 +76,7 @@ async def post_meme_to_tgchannelen():
         next_meme, Channel.TG_CHANNEL_EN
     )
     await send_new_message_with_meme(
-        TELEGRAM_CHANNEL_EN_CHAT_ID, next_meme, reply_markup=None
+        bot, TELEGRAM_CHANNEL_EN_CHAT_ID, next_meme, reply_markup=None
     )
 
     await log_meme_sent(next_meme.id, Channel.TG_CHANNEL_EN)
@@ -95,7 +96,7 @@ async def post_meme_to_tgchannelru():
     )
 
     await send_new_message_with_meme(
-        TELEGRAM_CHANNEL_RU_CHAT_ID, next_meme, reply_markup=None
+        bot, TELEGRAM_CHANNEL_RU_CHAT_ID, next_meme, reply_markup=None
     )
 
     await log_meme_sent(next_meme.id, Channel.TG_CHANNEL_RU)

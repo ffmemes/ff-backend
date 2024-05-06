@@ -66,7 +66,10 @@ async def handle_meme_source_language_selection(
         await update.callback_query.answer("Meme source not found")
         return
 
-    await log(f"ℹ️ MemeSource ${meme_source_id}: set_lang={lang_code} (by {user_id})")
+    await log(
+        f"ℹ️ MemeSource ${meme_source_id}: set_lang={lang_code} (by {user_id})",
+        context.bot,
+    )
 
     await update.callback_query.answer(f"Meme source lang is {lang_code} now")
     await meme_source_admin_pipeline(meme_source, update)
@@ -91,7 +94,10 @@ async def handle_meme_source_change_status(
         await update.callback_query.answer(f"Meme source {meme_source_id} not found")
         return
 
-    await log(f"ℹ️ MemeSource ${meme_source_id}: set_status={status} (by {user_id})")
+    await log(
+        f"ℹ️ MemeSource ${meme_source_id}: set_status={status} (by {user_id})",
+        context.bot,
+    )
 
     await update.callback_query.answer(f"Meme source status is {status} now")
     await meme_source_admin_pipeline(meme_source, update)

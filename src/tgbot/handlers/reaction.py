@@ -37,6 +37,7 @@ async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     if reaction_is_new:
         return await next_message(
+            context.bot,
             user_id,
             prev_update=update,
             prev_reaction_id=int(reaction_id),

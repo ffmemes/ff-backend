@@ -6,6 +6,9 @@
 from datetime import datetime
 
 from telegram import Update
+from telegram.ext import (
+    ContextTypes,
+)
 
 from src.stats.service import get_user_stats
 from src.stats.user import calculate_user_stats
@@ -14,10 +17,20 @@ from src.tgbot.logs import log
 from src.tgbot.service import get_user_languages, update_user
 
 
-async def handle_user_blocked_bot(update: Update, context):
+async def handle_user_blocked_bot(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
     """Handle an event when user blocks us"""
-    user_tg = user_id = update.my_chat_member.from_user
+    user_tg = update.my_chat_member.from_user
     user_id = user_tg.id
+    if update.effective_chat.id != user_id:
+        # this is not a private chat
+        await log(
+            f"user #{user_id} blocked us in chat_id: {update.effective_chat.id}",
+            context.bot,
+        )
+        return
+
     user = await update_user(
         user_id, blocked_bot_at=datetime.utcnow(), type=UserType.BLOCKED_BOT
     )
@@ -47,4 +60,4 @@ async def handle_user_blocked_bot(update: Update, context):
 <b>langs</b>: {user_tg.language_code} / {languages}
 {report}
     """
-    await log(message)
+    await log(message, context.bot)

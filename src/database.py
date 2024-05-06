@@ -138,11 +138,19 @@ meme_raw_ig = Table(
 )
 
 
-# meme_raw_upload = Table(
-#     "meme_raw_upload",
-#     metadata,
-# TODO: columns TBD, probably also JSONBs to store all raw data
-# )
+meme_raw_upload = Table(
+    "meme_raw_upload",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
+    Column("message_id", Integer, nullable=False),
+    Column("date", DateTime, nullable=False),
+    Column("forward_origin", JSONB),
+    Column("media", JSONB, nullable=False),
+    Column("language_code", String),  # user selects a languages for the meme
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime, onupdate=func.now()),
+)
 
 
 meme = Table(

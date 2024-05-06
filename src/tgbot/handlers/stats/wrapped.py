@@ -113,6 +113,7 @@ async def handle_wrapped_button(
         if meme_data is not None:
             meme = MemeData(**meme_data)
             await send_new_message_with_meme(
+                context.bot,
                 update.effective_user.id,
                 meme,
                 reply_markup=InlineKeyboardMarkup(

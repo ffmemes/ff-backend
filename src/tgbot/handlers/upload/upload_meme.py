@@ -4,31 +4,54 @@
     - user sends a new message
 """
 
+import asyncio
+import re
 
-from typing import Sequence
-
-from telegram import InlineKeyboardButton, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
+from src.recommendations.meme_queue import check_queue
 from src.tgbot.constants import UserType
+from src.tgbot.handlers.upload.moderation import uploaded_meme_auto_review
+from src.tgbot.handlers.upload.service import (
+    create_meme_from_meme_raw_upload,
+    create_meme_raw_upload,
+    update_meme_raw_upload,
+)
+from src.tgbot.logs import log
+from src.tgbot.senders.next_message import next_message
 from src.tgbot.user_info import get_user_info
 
 LANGUAGES = {
     "ru": "🇷🇺 Русский",
+    "uk": "🇺🇦 Українська",
     "en": "🇺🇸 English 🇬🇧",
+    "es": "🇪🇸 Español",
 }
 
-LANG_SETTINGS_END_CALLBACK_DATA = "upload:lang:other"
+RULES_ACCEPTED_CALLBACK_DATA_PATTERN = "upload:{upload_id}:rules:accepted"
+RULES_ACCEPTED_CALLBACK_DATA_REGEXP = r"upload:(\d+):rules:accepted"
+
+LANGUAGE_SELECTED_CALLBACK_DATA_PATTERN = "upload:{upload_id}:lang:{lang}"
+LANGUAGE_SELECTED_CALLBACK_DATA_REGEXP = r"upload:(\d+):lang:(\w+)"
+
+LANGUAGE_SELECTED_OTHER_CALLBACK_DATA_PATTERN = "upload:{upload_id}:lang:other"
+LANGUAGE_SELECTED_OTHER_CALLBACK_DATA_REGEXP = r"upload:(\d+):lang:other"
 
 
-def get_meme_language_selector_keyboard(meme_id: int) -> list[list[dict]]:
+def get_meme_language_selector_keyboard(upload_id: int) -> list[list[dict]]:
     all_lang_buttons = []
     for lang, lang_text in LANGUAGES.items():
-        callback_data = f"l:{lang}:add"
         button_text = lang_text or lang
 
         all_lang_buttons.append(
-            InlineKeyboardButton(button_text, callback_data=callback_data)
+            InlineKeyboardButton(
+                button_text,
+                callback_data=LANGUAGE_SELECTED_CALLBACK_DATA_PATTERN.format(
+                    upload_id=upload_id, lang=lang
+                ),
+            )
         )
 
     languages_per_row = 2
@@ -41,12 +64,91 @@ def get_meme_language_selector_keyboard(meme_id: int) -> list[list[dict]]:
         [
             InlineKeyboardButton(
                 "Other language",
-                callback_data=LANG_SETTINGS_END_CALLBACK_DATA,
+                callback_data=LANGUAGE_SELECTED_OTHER_CALLBACK_DATA_PATTERN.format(
+                    upload_id=upload_id
+                ),
             )
         ],
     ]
 
     return lang_keyboard
+
+
+RULES = """
+~ OUR RULES ~
+1️⃣ No bullshit content, you know what I mean.
+2️⃣ We can reject any post at our discretion.
+3️⃣ Meme will be rejected if someone else has already submitted it.
+4️⃣ For now, your meme should have only 1 picture.
+5️⃣ Providing false info about the meme will lead to a rejection and penalty.
+"""
+
+
+async def handle_message_with_meme(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    """When a user sends a message with a meme"""
+    user = await get_user_info(update.effective_user.id)
+    if not UserType(user["type"]).is_moderator:
+        return update.message.reply_text(
+            "You are not allowed to upload memes.\n\n\n\n\n\n\nYET!"
+        )
+
+    if user["nmemes_sent"] < 10:
+        return update.message.reply_text(
+            "Watch at least 10 memes if you want to share your memes with our community"
+        )
+
+    meme_upload = await create_meme_raw_upload(update.message)
+    # TODO: check that a user uploaded <= N memes today
+
+    await update.message.reply_photo(
+        photo=update.message.photo[-1].file_id,
+        caption=f"""
+Do you want to share this meme with our community?
+
+{RULES.strip()}
+        """,
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "I agree",
+                        callback_data=RULES_ACCEPTED_CALLBACK_DATA_PATTERN.format(
+                            upload_id=meme_upload["id"],
+                        ),
+                    )
+                ]
+            ]
+        ),
+    )
+
+
+# callback: RULES_ACCEPTED_CALLBACK_DATA
+async def handle_rules_accepted_callback(
+    update: Update,
+    _: ContextTypes.DEFAULT_TYPE,
+) -> None:
+    # user accepted the rules. Next, we need to ask to specify the language of a meme
+    await update.callback_query.answer()
+
+    upload_id = int(
+        re.match(RULES_ACCEPTED_CALLBACK_DATA_REGEXP, update.callback_query.data).group(
+            1
+        )
+    )
+
+    await update.callback_query.message.edit_caption(
+        """
+Please select the language of the meme.
+
+Make sure you select the correct language otherwise your meme will be rejected
+and you may receive a penalty.
+        """,
+        reply_markup=InlineKeyboardMarkup(
+            get_meme_language_selector_keyboard(upload_id)
+        ),
+    )
 
 
 # callback_data = LANG_SETTINGS_END_CALLBACK_DATA
@@ -66,52 +168,36 @@ Remember that you can't select the wrong language for meme for now.
     )
 
 
-async def handle_forward(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """When a user forwards a tg message to a bot"""
-    print(update)
-
-    att = update.message.effective_attachment
-    print(att)
-
-    user = await get_user_info(update.effective_user.id)
-    if user["type"] != UserType.ADMIN:
-        return await update.message.reply_text(
-            "You are not allowed to upload memes.\n\n\n\n\n\n\nYET!"
-        )
-
-    if isinstance(update.message.effective_attachment, Sequence):
-        return await update.message.reply_text(
-            "Message with only one media supported\n\n\n\n\n\n\nYET!"
-        )
-
-    # update.message.effective_attachment
-
-    # get_meme_language_selector_keyboard
-
-    # TODO:
-    # return meme + caption + keyboard to select a language + rules
-    # save meme to a raw_meme_upload with status "created"
-    # trigger ETL ?
-    # send to modetation
-
-    # TODO: button on language select page: "other language"
-    # -> sends a message inviting to send us a message with /chat
-    # asking to add the language
-
-    # meme is valid if:
-    # language is correct
-    # moderators approved the meme
-
-
-# TODO: do we need separate handlers?
-async def handle_message_with_meme(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
+# callback: RULES_ACCEPTED_CALLBACK_DATA
+async def handle_meme_upload_lang_selected(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    """When a user sends a message with a meme"""
-    print(update)
+    reg = re.match(LANGUAGE_SELECTED_CALLBACK_DATA_REGEXP, update.callback_query.data)
+    upload_id, lang = int(reg.group(1)), reg.group(2)
 
-    user = await get_user_info(update.effective_user.id)
-    if user["type"] != UserType.ADMIN:
-        return update.message.reply_text(
-            "You are not allowed to upload memes.\n\n\n\n\n\n\nYET!"
-        )
+    meme_upload = await update_meme_raw_upload(upload_id, language_code=lang)
+    meme = await create_meme_from_meme_raw_upload(meme_upload)
+
+    await log(
+        f"""📥 Meme {meme["id"]} uploaded by #{update.effective_user.id}""", context.bot
+    )
+
+    # TODO: create a meme object from meme_raw_upload
+
+    await update.callback_query.message.edit_caption(
+        """
+🏁 <b>You submitted your meme for a review.</b>
+
+What to do next:
+1. Wait for the approval or rejection from our team.
+2. Keep watching other memes!
+        """,
+        reply_markup=None,
+        parse_mode=ParseMode.HTML,
+    )
+
+    asyncio.create_task(uploaded_meme_auto_review(meme, meme_upload, context.bot))
+    await check_queue(update.effective_user.id)  # to ensure user has memes in queue
+    await asyncio.sleep(5)
+    await next_message(context.bot, update.effective_user.id, update)

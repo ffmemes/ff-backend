@@ -1,9 +1,9 @@
 import asyncio
+import logging
 from string import punctuation
 from typing import Any
 
 from prefect import flow, get_run_logger
-from telegram.error import BadRequest, RetryAfter
 
 from src.storage import ads
 from src.storage.constants import MemeStatus, MemeType
@@ -29,16 +29,17 @@ from src.storage.upload import (
 from src.storage.watermark import add_watermark
 
 
-async def ocr_meme_content(meme_id: int, content: bytes, language: str) -> None:
-    logger = get_run_logger()
-    logger.debug(f"OCRing meme {meme_id} content.")
+async def ocr_meme_content(
+    meme_id: int, content: bytes, language: str
+) -> dict[str, Any] | None:
+    logging.debug(f"OCRing meme {meme_id} content.")
     result = await ocr_content(content, language)
     if isinstance(result, OcrResult):
         s = result.text.translate(str.maketrans("", "", punctuation)).lower()
         result.text = " ".join(s.split())
-        await update_meme(meme_id, ocr_result=result.model_dump(mode="json"))
+        return await update_meme(meme_id, ocr_result=result.model_dump(mode="json"))
     else:
-        logger.warning(msg=f"OCR: {str(result)} {meme_id=}")
+        logging.warning(msg=f"OCR: {str(result)} {meme_id=}")
 
 
 async def analyse_meme_caption(meme: dict[str, Any]) -> None:
@@ -87,28 +88,9 @@ async def upload_meme_to_telegram(
         logger.warning(f"Can't add watermark to {meme['id']}/{meme['type']} content")
         return None
 
-    meme_result = None
-    for _ in range(3):  # attempts
-        try:
-            meme_result = await upload_meme_content_to_tg(
-                meme_id=meme["id"],
-                meme_type=meme["type"],
-                content=watermarked_meme_content,
-            )
-            if meme_result:
-                break
-        except RetryAfter as e:
-            logger.warning(f"Flood control exceeded: {e}")
-            await asyncio.sleep(e.retry_after)
-        except BadRequest as e:
-            logger.warning(f"Can't upload. Telegram error: {e}")
-            await asyncio.sleep(5)
-            return None
-
-        await asyncio.sleep(3)  # flood control
-
-    if meme_result is None or meme_result.get("telegram_file_id") is None:
-        logger.warning(f"Meme {meme['id']} failed to upload to Telegram.")
+    meme_result = upload_meme_content_to_tg(meme, watermarked_meme_content)
+    if meme_result is None:
+        logger.warning(f"Can't upload {meme['id']}/{meme['type']} content to Telegram")
         return None
 
     # HACK: to save original content for OCR

@@ -24,7 +24,7 @@ from src.tgbot.constants import (
     POPUP_BUTTON_CALLBACK_DATA_REGEXP,
     # TELEGRAM_CHANNEL_EN_CHAT_ID,
     TELEGRAM_CHANNEL_RU_CHAT_ID,
-    TELEGRAM_CHAT_RU_CHAT_ID,
+    # TELEGRAM_CHAT_RU_CHAT_ID,
     TELEGRAM_FEEDBACK_CHAT_ID,
 )
 from src.tgbot.handlers import (
@@ -49,7 +49,8 @@ from src.tgbot.handlers.admin.waitlist import (
     handle_waitlist_invite_before,
 )
 from src.tgbot.handlers.chat.chat_member import handle_chat_member_update
-from src.tgbot.handlers.chat.explain_meme import explain_meme_ru
+
+# from src.tgbot.handlers.chat.explain_meme import explain_meme_ru
 from src.tgbot.handlers.chat.feedback import (
     handle_feedback_message,
     handle_feedback_reply,
@@ -57,7 +58,7 @@ from src.tgbot.handlers.chat.feedback import (
 from src.tgbot.handlers.moderator import get_meme, meme_source
 from src.tgbot.handlers.stats.stats import handle_stats
 from src.tgbot.handlers.stats.wrapped import handle_wrapped, handle_wrapped_button
-from src.tgbot.handlers.upload import upload_meme
+from src.tgbot.handlers.upload import upload_meme, moderation
 
 application: Application = None  # type: ignore
 
@@ -210,17 +211,37 @@ def add_handlers(application: Application) -> None:
     application.add_handler(
         MessageHandler(
             filters=filters.ChatType.PRIVATE
-            & filters.FORWARDED
+            # & filters.FORWARDED
             & (filters.PHOTO | filters.VIDEO | filters.ANIMATION),
-            callback=upload_meme.handle_forward,
+            callback=upload_meme.handle_message_with_meme,
         )
     )
 
     application.add_handler(
-        MessageHandler(
-            filters=filters.ChatType.PRIVATE
-            & (filters.PHOTO | filters.VIDEO | filters.ANIMATION),
-            callback=upload_meme.handle_message_with_meme,
+        CallbackQueryHandler(
+            upload_meme.handle_rules_accepted_callback,
+            pattern=upload_meme.RULES_ACCEPTED_CALLBACK_DATA_REGEXP,
+        )
+    )
+
+    application.add_handler(
+        CallbackQueryHandler(
+            upload_meme.handle_meme_upload_lang_other,
+            pattern=upload_meme.LANGUAGE_SELECTED_OTHER_CALLBACK_DATA_REGEXP,
+        )
+    )
+
+    application.add_handler(
+        CallbackQueryHandler(
+            upload_meme.handle_meme_upload_lang_selected,
+            pattern=upload_meme.LANGUAGE_SELECTED_CALLBACK_DATA_REGEXP,
+        )
+    )
+
+    application.add_handler(
+        CallbackQueryHandler(
+            moderation.handle_uploaded_meme_review_button,
+            pattern=moderation.UPLOADED_MEME_REVIEW_CALLBACK_DATA_REGEXP,
         )
     )
 
@@ -341,6 +362,7 @@ def run_polling(application: Application) -> None:
     application.run_polling(
         allowed_updates=Update.ALL_TYPES,
         timeout=60,
-        read_timeout=10,
-        connect_timeout=10,
+        read_timeout=30,
+        connect_timeout=30,
+        write_timeout=30,
     )

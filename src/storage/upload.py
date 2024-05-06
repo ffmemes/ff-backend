@@ -1,14 +1,19 @@
+import asyncio
 import io
+import logging
 from typing import Any
 
 import httpx
 import telegram
 from pydantic import AnyHttpUrl
+from telegram.error import BadRequest, RetryAfter
 
 from src.config import settings
 from src.storage.constants import MemeStatus, MemeType
 from src.storage.parsers.constants import USER_AGENT
-from src.storage.service import update_meme
+from src.storage.service import (
+    update_meme,
+)
 from src.tgbot.bot import bot
 
 
@@ -39,7 +44,7 @@ async def download_meme_content_from_tg(
     return bytes(file_bytearray)
 
 
-async def upload_meme_content_to_tg(
+async def _upload_meme_content_to_tg(
     meme_id: int,
     meme_type: MemeType,
     content: bytes,  # ??
@@ -90,3 +95,33 @@ async def upload_meme_content_to_tg(
         )
 
     return meme
+
+
+async def upload_meme_content_to_tg(
+    meme: dict[str, Any],
+    content: bytes,
+) -> dict[str, Any] | None:
+    # just a wrapper to handle retries
+
+    meme_result = None
+    for _ in range(3):  # attempts
+        try:
+            meme_result = await _upload_meme_content_to_tg(
+                meme_id=meme["id"],
+                meme_type=meme["type"],
+                content=content,
+            )
+            if meme_result and meme_result.get("telegram_file_id"):
+                return meme_result
+        except RetryAfter as e:
+            logging.warning(f"Flood control exceeded: {e}")
+            await asyncio.sleep(e.retry_after)
+        except BadRequest as e:
+            logging.warning(f"Can't upload. Telegram error: {e}")
+            await asyncio.sleep(5)
+            return None
+
+        await asyncio.sleep(3)  # flood control
+
+    logging.warning(f"Meme {meme['id']} failed to upload to Telegram.")
+    return None

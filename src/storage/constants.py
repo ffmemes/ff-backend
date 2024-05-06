@@ -43,5 +43,5 @@ class MemeStatus(str, Enum):
 
     PUBLISHED = "published"  # meme was cross-posted to a channel
 
-    # TODO: more statuses?
-    # IN_MODERATION = "in_moderation"
+    WAITING_REVIEW = "waiting_review"
+    REJECTED = "rejected"

@@ -41,7 +41,8 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         f"""
 👋 {update.effective_user.name}/#{user_id}
 type:{user_info["type"]}, ref:{deep_link}, lang:{language_code}
-    """
+        """,
+        context.bot,
     )
 
     return await handle_language_settings(update, context)

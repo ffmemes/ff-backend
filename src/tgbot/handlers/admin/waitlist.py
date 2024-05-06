@@ -75,9 +75,7 @@ async def handle_waitlist_invite_before(
     await update.message.reply_text(
         f"Inviting {len(users)} users registered before {date_str}."
     )
-    await log(
-        f"Inviting {len(users)} users registered before {date_str}.",
-    )
+    await log(f"Inviting {len(users)} users registered before {date_str}.", context.bot)
 
     for i, user in enumerate(users):
         await invite_user(user["id"])

@@ -21,7 +21,7 @@ async def send_stacktrace_to_tg_chat(
     # if the error is that we can't send them a message,
     #  then handle it as not a real error.
     if isinstance(context.error, Forbidden):
-        await log(f"User #{user_id} blocked the bot")
+        await log(f"User #{user_id} blocked the bot", context.bot)
         await update_user(user_id, type=UserType.BLOCKED_BOT)
         await update_user_info_cache(user_id)
         return
@@ -51,4 +51,4 @@ Wait for 2 minutes and press /start.
     )
 
     error_text_to_send = f"⚠️⚠️⚠️ for #{user_id}:\n{message}"
-    return await log(error_text_to_send)
+    return await log(error_text_to_send, context.bot)

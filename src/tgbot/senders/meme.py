@@ -1,6 +1,7 @@
 from typing import Tuple
 
 from telegram import (
+    Bot,
     InlineKeyboardMarkup,
     InputMediaAnimation,
     InputMediaPhoto,
@@ -72,6 +73,7 @@ async def send_album_with_memes(
 
 
 async def send_new_message_with_meme(
+    bot: Bot,
     user_id: int,
     meme: MemeData,
     reply_markup: InlineKeyboardMarkup | None = None,
@@ -110,14 +112,11 @@ async def send_new_message_with_meme(
 
 
 async def edit_last_message_with_meme(
-    user_id: int,
-    message_id: int,
+    message: Message,
     meme: MemeData,
     reply_markup: InlineKeyboardMarkup | None = None,
 ):
-    await bot.edit_message_media(
-        chat_id=user_id,
-        message_id=message_id,
+    await message.edit_media(
         media=get_input_media(meme),
         reply_markup=reply_markup,
     )
@@ -126,9 +125,7 @@ async def edit_last_message_with_meme(
     # in 1 API call. Also edit_message_media clears caption.
     # So we need to make 2 API calls...
 
-    await bot.edit_message_caption(
-        chat_id=user_id,
-        message_id=message_id,
+    await message.edit_caption(
         caption=meme.caption,
         parse_mode=ParseMode.HTML,
         reply_markup=reply_markup,

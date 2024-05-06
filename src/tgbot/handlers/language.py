@@ -138,7 +138,7 @@ async def handle_language_settings_button(
 
 # callback_data: LANG_END_CALLBACK_DATA
 async def handle_language_settings_end(
-    update: telegram.Update, _: ContextTypes.DEFAULT_TYPE
+    update: telegram.Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
     await update.callback_query.answer()
     await update.callback_query.message.delete()
@@ -148,15 +148,12 @@ async def handle_language_settings_end(
     await clear_meme_queue_for_user(update.effective_user.id)
     await generate_cold_start_recommendations(update.effective_user.id)
 
-    # Let's turn off waitlist for now to see how it goes
-    # if user_info["type"] == UserType.WAITLIST:
-    #     return await handle_waitlist_start(update, context)
-
     recently_joined = user_info["nmemes_sent"] <= 3
     if recently_joined:
-        return await onboarding_flow(update)
+        return await onboarding_flow(update, context.bot)
 
     return await next_message(
+        context.bot,
         update.effective_user.id,
         prev_update=update,
         prev_reaction_id=None,

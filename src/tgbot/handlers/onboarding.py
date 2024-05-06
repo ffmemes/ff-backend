@@ -1,6 +1,6 @@
 import asyncio
 
-from telegram import Update
+from telegram import Bot, Update
 from telegram.constants import ParseMode
 
 from src import localizer
@@ -9,7 +9,7 @@ from src.tgbot.user_info import update_user_info_cache
 
 
 # not sure about the best args for that func
-async def onboarding_flow(update: Update):
+async def onboarding_flow(update: Update, bot: Bot):
     user_id = update.effective_user.id
     user_info = await update_user_info_cache(user_id)
 
@@ -31,6 +31,7 @@ async def onboarding_flow(update: Update):
     await m.delete()
 
     return await next_message(
+        bot,
         user_id,
         prev_update=update,
         prev_reaction_id=None,

@@ -4,7 +4,7 @@
 
 import asyncio
 
-from telegram import Update
+from telegram import Bot, Update
 from telegram.constants import ParseMode
 from telegram.ext import (
     ContextTypes,
@@ -17,7 +17,7 @@ from src.tgbot.service import get_meme_by_id, get_meme_source_by_id, get_meme_st
 from src.tgbot.user_info import get_user_info
 
 
-async def send_meme_info(update: Update, meme_id: int):
+async def send_meme_info(bot: Bot, update: Update, meme_id: int):
     meme_data = await get_meme_by_id(meme_id)
     if meme_data is None:
         await update.message.reply_text(f"Meme #{meme_id} not found")
@@ -64,6 +64,7 @@ Stats:
     meme = MemeData(**meme_data)
     reply_markup = None  # TODO: add buttons to change status
     return await send_new_message_with_meme(
+        bot,
         update.effective_user.id,
         meme,
         reply_markup,
