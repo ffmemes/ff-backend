@@ -65,7 +65,7 @@ async def check_if_user_follows_related_channel(
     return await check_if_user_chat_member(bot, user_id, channel_id)
 
 
-async def get_related_channel_link(language_code: str) -> str:
+def get_related_channel_link(language_code: str) -> str:
     if language_code in ALMOST_CIS_LANGUAGES:
         return TELEGRAM_CHANNEL_RU_LINK
 

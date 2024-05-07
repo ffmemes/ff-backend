@@ -22,7 +22,6 @@ from src.tgbot.handlers.upload.service import (
 from src.tgbot.logs import log
 from src.tgbot.senders.next_message import next_message
 from src.tgbot.user_info import get_user_info
-
 from src.tgbot.utils import (
     check_if_user_follows_related_channel,
     get_related_channel_link,
