@@ -48,7 +48,8 @@ async def uploaded_meme_auto_review(
             chat_id=meme_upload["user_id"],
             reply_to_message_id=meme_upload["message_id"],
             text="""
-MEME REJECTED: Something went wrong when we tried read text on your meme.
+❌ MEME REJECTED:
+Something went wrong when we tried read text on your meme. Just try again.
             """,
         )
 
@@ -61,7 +62,8 @@ MEME REJECTED: Something went wrong when we tried read text on your meme.
             chat_id=meme_upload["user_id"],
             reply_to_message_id=meme_upload["message_id"],
             text="""
-MEME REJECTED: Something went wrong when we tried to add watermark to your meme.
+❌ MEME REJECTED:
+Something went wrong when we tried to add watermark to your meme. Just try again.
             """,
         )
 
@@ -72,7 +74,8 @@ MEME REJECTED: Something went wrong when we tried to add watermark to your meme.
             chat_id=meme_upload["user_id"],
             reply_to_message_id=meme_upload["message_id"],
             text="""
-MEME REJECTED: Something went wrong when we tried to upload your meme to Telegram.
+❌ MEME REJECTED:
+Something went wrong when we tried to upload your meme to Telegram. Just try again.
             """,
         )
 
@@ -91,11 +94,12 @@ MEME REJECTED: Something went wrong when we tried to upload your meme to Telegra
             chat_id=meme_upload["user_id"],
             reply_to_message_id=meme_upload["message_id"],
             text="""
-MEME REJECTED: Somebody already submitted this meme, sorry...
+❌ MEME REJECTED:
+Somebody already submitted this meme, sorry... Try another one.
             """,
         )
 
-    logging.info("Updating meme {meme['id']} status to WAITING_REVIEW")
+    logging.info(f"Updating meme {meme['id']} status to WAITING_REVIEW")
     meme = await update_meme(
         meme["id"],
         status=MemeStatus.WAITING_REVIEW,
@@ -132,7 +136,8 @@ async def send_uploaded_meme_to_manual_review(
     bot: Bot,
 ) -> None:
     text = f"""
-👨‍✈️ REVIEW MEME
+👨‍✈️ REVIEW MEME #{meme["id"]}
+<b>Upload Id</b>: {meme_upload["id"]}
 <b>Uploaded by</b>: #{meme_upload["user_id"]}
 <b>Language code</b>: {meme["language_code"]}
     """
@@ -175,11 +180,13 @@ async def handle_uploaded_meme_review_button(
     )
     upload_id, action = int(reg.group(1)), reg.group(2)
     meme_upload = await get_meme_raw_upload_by_id(upload_id)
+    prev_caption = update.callback_query.message.caption
 
     if action == "approve":
         meme = await update_meme_by_upload_id(upload_id, status=MemeStatus.OK)
         await update.callback_query.message.edit_caption(
-            caption="✅ Approved by {}".format(update.effective_user.name),
+            caption=prev_caption
+            + "\n✅ Approved by {}".format(update.effective_user.name),
             reply_markup=None,
         )
         await context.bot.send_message(
@@ -203,7 +210,8 @@ Your meme has been approved and soon bot will send it to other users!
     else:
         await update_meme_by_upload_id(upload_id, status=MemeStatus.REJECTED)
         await update.callback_query.message.edit_caption(
-            caption="❌ Rejected by {}".format(update.effective_user.name),
+            caption=prev_caption
+            + "\n❌ Rejected by {}".format(update.effective_user.name),
             reply_markup=None,
         )
         await context.bot.send_message(

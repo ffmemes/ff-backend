@@ -14,6 +14,7 @@ from telegram.ext import ContextTypes
 from src.recommendations.meme_queue import check_queue
 from src.tgbot.handlers.upload.moderation import uploaded_meme_auto_review
 from src.tgbot.handlers.upload.service import (
+    count_24h_uploaded_not_approved_memes,
     create_meme_from_meme_raw_upload,
     create_meme_raw_upload,
     update_meme_raw_upload,
@@ -88,14 +89,19 @@ async def handle_message_with_meme(
 ) -> None:
     """When a user sends a message with a meme"""
     user = await get_user_info(update.effective_user.id)
-    # if not UserType(user["type"]).is_moderator:
-    #     return update.message.reply_text(
-    #         "You are not allowed to upload memes.\n\n\n\n\n\n\nYET!"
-    #     )
-
     if user["nmemes_sent"] < 50:
-        return update.message.reply_text(
+        return await update.message.reply_text(
             "Watch at least 50 memes if you want to share your memes with our community"
+        )
+
+    uploaded_today = await count_24h_uploaded_not_approved_memes(
+        update.effective_user.id
+    )
+    if uploaded_today >= 10:
+        return await update.message.reply_text(
+            """
+You already uploaded lots of memes today. Try tomorrow or when we approve something.
+            """
         )
 
     meme_upload = await create_meme_raw_upload(update.message)
@@ -155,12 +161,13 @@ async def handle_meme_upload_lang_other(
     update: Update,
     _: ContextTypes.DEFAULT_TYPE,
 ) -> None:
+    await update.callback_query.answer()
     await update.effective_user.send_message(
         """
 We can easily add the language you need. Just send us a message with /chat command.
 
 Example:
-/chat Please add english language!
+/chat Please add ¬˚µ∆˜ˆ˙®∂∫ language!
 
 Remember that you can't select the wrong language for meme for now.
         """
@@ -172,6 +179,7 @@ async def handle_meme_upload_lang_selected(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
+    await update.callback_query.answer()
     reg = re.match(LANGUAGE_SELECTED_CALLBACK_DATA_REGEXP, update.callback_query.data)
     upload_id, lang = int(reg.group(1)), reg.group(2)
 

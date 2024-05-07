@@ -1,10 +1,12 @@
 from datetime import datetime
 from typing import Any
 
+from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert
 from telegram import Message
 
 from src.database import (
+    execute,
     fetch_one,
     meme,
     meme_raw_upload,
@@ -97,3 +99,18 @@ async def update_meme_by_upload_id(upload_id: int, **kwargs) -> dict[str, Any]:
         .returning(meme)
     )
     return await fetch_one(query)
+
+
+async def count_24h_uploaded_not_approved_memes(user_id: int) -> int:
+    query = f"""
+        SELECT count(*)
+        FROM meme M
+        JOIN meme_source S
+            ON S.id = M.meme_source_id
+            AND S.type = '{MemeSourceType.USER_UPLOAD}'
+            AND S.added_by = {user_id}
+            AND M.status = '{MemeStatus.CREATED}'
+            AND M.created_at > NOW() - INTERVAL '1 day'
+    """
+    res = await execute(text(query))
+    return res.scalar()
