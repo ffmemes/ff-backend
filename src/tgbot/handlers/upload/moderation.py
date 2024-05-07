@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 from datetime import datetime
@@ -14,6 +15,8 @@ from src.flows.storage.memes import (
     upload_meme_content_to_tg,
 )
 from src.recommendations.service import create_user_meme_reaction
+from src.stats.meme import calculate_meme_reactions_stats
+from src.stats.meme_source import calculate_meme_source_stats
 from src.storage.constants import MemeStatus
 from src.storage.service import (
     find_meme_duplicate,
@@ -29,6 +32,8 @@ from src.tgbot.user_info import get_user_info
 
 UPLOADED_MEME_REIVIEW_CALLBACK_DATA_PATTERN = "upload:{upload_id}:review:{action}"
 UPLOADED_MEME_REVIEW_CALLBACK_DATA_REGEXP = r"upload:(\d+):review:(\w+)"
+
+LEADERBOARD_URL = "https://metabase.okhlopkov.com/public/question/663c4def-4b42-4303-aa3b-73ab5bfa677a"
 
 
 async def uploaded_meme_auto_review(
@@ -189,15 +194,6 @@ async def handle_uploaded_meme_review_button(
             + "\n✅ Approved by {}".format(update.effective_user.name),
             reply_markup=None,
         )
-        await context.bot.send_message(
-            chat_id=meme_upload["user_id"],
-            reply_to_message_id=meme_upload["message_id"],
-            text="""
-🎉🎉🎉
-
-Your meme has been approved and soon bot will send it to other users!
-            """,
-        )
 
         await create_user_meme_reaction(
             meme_upload["user_id"],
@@ -205,6 +201,22 @@ Your meme has been approved and soon bot will send it to other users!
             "uploaded_meme",
             reaction_id=1,
             reacted_at=datetime.utcnow(),
+        )
+
+        asyncio.create_task(calculate_meme_source_stats())
+        asyncio.create_task(calculate_meme_reactions_stats())
+
+        await context.bot.send_message(
+            chat_id=meme_upload["user_id"],
+            reply_to_message_id=meme_upload["message_id"],
+            text=f"""
+🎉🎉🎉
+
+Your <b>meme has been approved</b> and soon bot will send it to other users!
+
+You can see your meme #{meme["id"]} stats on <a href="{LEADERBOARD_URL}">LEADERBOARD</a>
+            """,
+            parse_mode=ParseMode.HTML,
         )
 
     else:
