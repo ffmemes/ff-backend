@@ -23,6 +23,11 @@ from src.tgbot.logs import log
 from src.tgbot.senders.next_message import next_message
 from src.tgbot.user_info import get_user_info
 
+from src.tgbot.utils import (
+    check_if_user_follows_related_channel,
+    get_related_channel_link,
+)
+
 LANGUAGES = {
     "ru": "🇷🇺 Русский",
     "uk": "🇺🇦 Українська",
@@ -106,6 +111,17 @@ You already uploaded lots of memes today. Try tomorrow or when we approve someth
 
     meme_upload = await create_meme_raw_upload(update.message)
     # TODO: check that a user uploaded <= N memes today
+
+    if not await check_if_user_follows_related_channel(
+        context.bot, update.effective_user.id, user["interface_lang"]
+    ):
+        return await update.message.reply_text(
+            f"""
+You need to follow our channel to upload memes and try again:
+
+{get_related_channel_link(user["interface_lang"])}
+            """
+        )
 
     await update.message.reply_photo(
         photo=update.message.photo[-1].file_id,

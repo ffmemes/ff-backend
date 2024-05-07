@@ -3,6 +3,13 @@ import asyncio
 import telegram
 from telegram.constants import ChatMemberStatus
 
+from src.localizer import ALMOST_CIS_LANGUAGES
+from src.tgbot.constants import (
+    TELEGRAM_CHANNEL_EN_CHAT_ID,
+    TELEGRAM_CHANNEL_EN_LINK,
+    TELEGRAM_CHANNEL_RU_CHAT_ID,
+    TELEGRAM_CHANNEL_RU_LINK,
+)
 from src.tgbot.schemas import UserTg
 from src.tgbot.service import add_user_tg_chat_membership
 
@@ -45,3 +52,21 @@ async def check_if_user_chat_member(bot: telegram.Bot, user_id: int, chat_id: in
             raise Exception(f"Add bot to admins of chat_id: {chat_id}")
 
     return False
+
+
+async def check_if_user_follows_related_channel(
+    bot: telegram.Bot, user_id: int, language_code: str
+):
+    if language_code in ALMOST_CIS_LANGUAGES:
+        channel_id = TELEGRAM_CHANNEL_RU_CHAT_ID
+    else:
+        channel_id = TELEGRAM_CHANNEL_EN_CHAT_ID
+
+    return await check_if_user_chat_member(bot, user_id, channel_id)
+
+
+async def get_related_channel_link(language_code: str) -> str:
+    if language_code in ALMOST_CIS_LANGUAGES:
+        return TELEGRAM_CHANNEL_RU_LINK
+
+    return TELEGRAM_CHANNEL_EN_LINK
