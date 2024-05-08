@@ -101,7 +101,7 @@ async def handle_message_with_meme(
     uploaded_today = await count_24h_uploaded_not_approved_memes(
         update.effective_user.id
     )
-    if uploaded_today >= 10:
+    if uploaded_today >= 5:
         return await update.message.reply_text(
             """
 You already uploaded lots of memes today. Try tomorrow or when we approve something.
