@@ -104,7 +104,8 @@ async def handle_message_with_meme(
     if uploaded_today >= 5:
         return await update.message.reply_text(
             """
-You already uploaded lots of memes today. Try tomorrow or when we approve something.
+You already uploaded lots of memes today. Try again tomorrow.
+Think about quality, not quantity: the goal is to get as many likes as possible.
             """
         )
 
