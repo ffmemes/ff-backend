@@ -32,6 +32,8 @@ LANGUAGES = {
     "uk": "🇺🇦 Українська",
     "en": "🇺🇸 English 🇬🇧",
     "es": "🇪🇸 Español",
+    "ar": "🇸🇦 العربية",
+    "uz": "🇺🇿 O'zbekcha",
 }
 
 RULES_ACCEPTED_CALLBACK_DATA_PATTERN = "upload:{upload_id}:rules:accepted"
@@ -82,7 +84,7 @@ RULES = """
 ~ OUR RULES ~
 1️⃣ No bullshit content, you know what I mean.
 2️⃣ We can reject any post at our discretion.
-3️⃣ Meme will be rejected if someone else has already submitted it.
+3️⃣ Meme will be rejected if we already have that meme in collection.
 4️⃣ For now, your meme should have only 1 picture.
 5️⃣ Providing false info about the meme will lead to a rejection and penalty.
 """
