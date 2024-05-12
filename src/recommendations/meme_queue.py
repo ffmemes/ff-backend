@@ -116,6 +116,7 @@ async def generate_recommendations(user_id, limit):
             )
 
     if len(candidates) == 0:
+        # TODO: fallback to some algo which will always return something
         return
 
     # TODO:

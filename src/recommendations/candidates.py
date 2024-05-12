@@ -391,6 +391,9 @@ async def get_best_memes_from_each_source(
             WHERE 1=1
                 AND M.status = 'ok'
                 AND R.meme_id IS NULL
+                AND MS.nlikes > 0
+                AND (MS.nlikes) / (MS.nlikes+MS.ndislikes) > 0.2
+                AND MS.sec_to_react < 20
                 {exclude_meme_ids_sql_filter(exclude_meme_ids)}
             ORDER BY M.meme_source_id, score DESC
         ) M
