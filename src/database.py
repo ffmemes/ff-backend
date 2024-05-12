@@ -298,7 +298,7 @@ meme_stats = Table(
     Column("nmemes_sent", Integer, nullable=False, server_default="0"),
     Column("age_days", Integer, nullable=False, server_default="99999"),
     Column("raw_impr_rank", Integer, nullable=False, server_default="99999"),
-    Column("sec_to_react", Float, nullable=False, server_default="0"),  # median
+    Column("sec_to_react", Float, nullable=False, server_default="99999"),  # median
     Column("invited_count", Integer, nullable=False, server_default="0"),
     Column(
         "updated_at",

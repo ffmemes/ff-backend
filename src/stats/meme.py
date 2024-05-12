@@ -20,10 +20,10 @@ async def calculate_meme_reactions_stats() -> None:
             , COUNT(*) FILTER (WHERE reaction_id = 2) ndislikes
             , COUNT(*) nmemes_sent
             , MAX(EXTRACT('DAYS' FROM NOW() - M.published_at)) age_days
-            , EXTRACT(
+            , COALESCE(EXTRACT(
                 EPOCH FROM
                 percentile_cont(0.5) WITHIN GROUP (ORDER BY reacted_at - sent_at)
-            ) AS sec_to_react
+            ), 99999) AS sec_to_react
             , NOW() AS updated_at
         FROM user_meme_reaction E
         INNER JOIN meme M
