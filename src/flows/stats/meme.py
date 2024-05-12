@@ -10,3 +10,5 @@ async def calculate_meme_stats() -> None:
     await meme.calculate_meme_reactions_stats()
 
     await meme.calculate_meme_raw_impressions_stats()
+
+    await meme.calculate_meme_invited_count()
