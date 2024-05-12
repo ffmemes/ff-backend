@@ -11,6 +11,7 @@ async def calculate_meme_reactions_stats() -> None:
             ndislikes,
             nmemes_sent,
             age_days,
+            sec_to_react,
             updated_at
         )
         SELECT
