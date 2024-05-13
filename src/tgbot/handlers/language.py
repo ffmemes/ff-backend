@@ -141,7 +141,10 @@ async def handle_language_settings_end(
     update: telegram.Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
     await update.callback_query.answer()
-    await update.callback_query.message.delete()
+    try:
+        await update.callback_query.message.delete()
+    except telegram.error.BadRequest:
+        pass  # message was already deleted (network lagging)
 
     user_info = await get_user_info(update.effective_user.id)
 
