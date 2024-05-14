@@ -60,6 +60,11 @@ async def generate_cold_start_recommendations(user_id, limit=10):
         )
 
     if len(candidates) == 0:
+        candidates = await classic(
+            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+        )
+
+    if len(candidates) == 0:
         return
 
     await redis.add_memes_to_queue_by_key(queue_key, candidates)
@@ -114,6 +119,11 @@ async def generate_recommendations(user_id, limit):
             candidates = await less_seen_meme_and_source(
                 user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
             )
+
+    if len(candidates) == 0:
+        candidates = await classic(
+            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+        )
 
     if len(candidates) == 0:
         # TODO: fallback to some algo which will always return something
