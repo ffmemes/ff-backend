@@ -4,10 +4,10 @@ from src import redis
 from src.recommendations.candidates import (
     classic,
     get_best_memes_from_each_source,
-    get_random_best,
     less_seen_meme_and_source,
     like_spread_and_recent_memes,
 )
+from src.recommendations.candidates_ab import get_selected_sources
 from src.storage.schemas import MemeData
 from src.tgbot.user_info import get_user_info
 
@@ -50,7 +50,7 @@ async def generate_cold_start_recommendations(user_id, limit=10):
 
     # AB test
     if user_id % 100 < 50:
-        candidates = await get_random_best(
+        candidates = await get_selected_sources(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
 
@@ -84,7 +84,7 @@ async def generate_recommendations(user_id, limit):
     if user_info["nmemes_sent"] < 30:
         # AB test
         if user_id % 100 < 50:
-            candidates = await get_random_best(
+            candidates = await get_selected_sources(
                 user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
             )
         if len(candidates) == 0:

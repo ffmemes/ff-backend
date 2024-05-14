@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from src import redis
 from src.database import (engine, meme, meme_source, meme_stats, user,
                           user_language, user_meme_reaction)
-from src.recommendations.candidates_ab import get_random_best
+from src.recommendations.candidates_ab import get_selected_sources
 from src.recommendations.meme_queue import generate_cold_start_recommendations
 
 
@@ -28,9 +28,9 @@ async def conn():
             'raw_meme_id': 1, 'type': 'image', 'telegram_image_id': '111', 'caption': '111', 'meme_source_id': 1,
             'published_at': datetime(2024, 1, 1), 'status': 'ok', 'language_code': 'ru',
         }
-        good_meme_1 = 4101086
-        good_meme_2 = 4442353
-        seen_meme = 3755262
+        good_meme_1 = 6470439
+        good_meme_2 = 7648698
+        seen_meme = 6522792
         bad_meme = 1
         meme_ids = [good_meme_1, good_meme_2, seen_meme, bad_meme]
 
@@ -40,7 +40,7 @@ async def conn():
         )
         await conn.execute(
             insert(meme_stats),
-        [{'meme_id': meme_id} for meme_id in meme_ids],
+        [{'meme_id': meme_id, 'sec_to_react': 0, 'nlikes': 10, 'ndislikes': 10} for meme_id in meme_ids],
         )
         await conn.execute(
             insert(user_language),
@@ -79,6 +79,21 @@ async def conn():
 
 @pytest.mark.asyncio
 async def test_random_best(conn: AsyncConnection):
-    recs = await get_random_best(1, 10)
+    recs = await get_selected_sources(1, 10)
     assert len(recs) == 2
-    
+
+
+@pytest.mark.asyncio
+async def test_meme_queue(conn: AsyncConnection):
+    user_id = 1
+    await generate_cold_start_recommendations(user_id)
+    queue_key = redis.get_meme_queue_key(user_id)
+    recs = await redis.get_all_memes_in_queue_by_key(queue_key)
+    assert len(recs) == 2
+    assert recs[0]['recommended_by'] == 'selected_sources_240513'
+
+    user_id = 51
+    await generate_cold_start_recommendations(user_id)
+    queue_key = redis.get_meme_queue_key(user_id)
+    recs = await redis.get_all_memes_in_queue_by_key(queue_key)
+    assert recs[0]['recommended_by'] != 'selected_sources_240513'
