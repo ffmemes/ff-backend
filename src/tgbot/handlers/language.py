@@ -71,7 +71,7 @@ async def handle_language_settings(
     for lang, lang_text in SUPPORTED_MEME_LANGUAGES.items():
         if lang in user_languages:
             callback_data = f"l:{lang}:del"
-            button_text = f"{lang_text or lang} ✅".upper()
+            button_text = f"✅ {lang_text or lang} ✅".upper()
         else:
             callback_data = f"l:{lang}:add"
             button_text = lang_text or lang

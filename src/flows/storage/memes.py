@@ -33,7 +33,7 @@ async def ocr_meme_content(
     meme_id: int, content: bytes, language: str
 ) -> dict[str, Any] | None:
     logging.debug(f"OCRing meme {meme_id} content.")
-    for _ in range(3):  # attempts
+    for _ in range(5):  # attempts
         result = await ocr_content(content, language)
         if isinstance(result, OcrResult):
             s = result.text.translate(str.maketrans("", "", punctuation)).lower()
@@ -42,7 +42,7 @@ async def ocr_meme_content(
         else:
             logging.warning(msg=f"OCR: {str(result)} {meme_id=}")
 
-        await asyncio.sleep(5)  # flood control
+        await asyncio.sleep(10)  # flood control
 
 
 async def analyse_meme_caption(meme: dict[str, Any]) -> None:
