@@ -44,6 +44,7 @@ STOP_WORDS = [
     "тинькофф",
     "сбербанк",
     "channel",
+    "казино",
 ]
 
 MENTION_WORDS = ["@", "http", "t.me/"]
