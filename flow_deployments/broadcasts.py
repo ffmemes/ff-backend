@@ -33,7 +33,7 @@ deployment_broadcast_48h_ago.apply()
 deployment_broadcast_1w_ago = Deployment.build_from_flow(
     flow=broadcast_next_meme_to_active_1w_ago,
     name="broadcast_next_meme_to_active_1w_ago",
-    schedule=(CronSchedule(cron="7 * * * *", timezone="Europe/London")),
+    schedules=[CronSchedule(cron="7 * * * *", timezone="Europe/London")],
     work_pool_name=settings.ENVIRONMENT,
 )
 
@@ -43,7 +43,7 @@ deployment_broadcast_1w_ago.apply()
 deployment_broadcast_4w_ago = Deployment.build_from_flow(
     flow=broadcast_next_meme_to_active_4w_ago,
     name="broadcast_next_meme_to_active_4w_ago",
-    schedule=(CronSchedule(cron="9 * * * *", timezone="Europe/London")),
+    schedules=[CronSchedule(cron="9 * * * *", timezone="Europe/London")],
     work_pool_name=settings.ENVIRONMENT,
 )
 
