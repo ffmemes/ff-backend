@@ -12,7 +12,6 @@ from src.tgbot.constants import (
     LANG_SETTINGS_END_CALLBACK_DATA,
 )
 from src.tgbot.handlers.onboarding import onboarding_flow
-from src.tgbot.senders.next_message import next_message
 from src.tgbot.service import (
     add_user_language,
     add_user_languages,
@@ -146,18 +145,7 @@ async def handle_language_settings_end(
     except telegram.error.BadRequest:
         pass  # message was already deleted (network lagging)
 
-    user_info = await get_user_info(update.effective_user.id)
-
     await clear_meme_queue_for_user(update.effective_user.id)
     await generate_cold_start_recommendations(update.effective_user.id)
 
-    recently_joined = user_info["nmemes_sent"] <= 3
-    if recently_joined:
-        return await onboarding_flow(update, context.bot)
-
-    return await next_message(
-        context.bot,
-        update.effective_user.id,
-        prev_update=update,
-        prev_reaction_id=None,
-    )
+    return await onboarding_flow(update, context.bot)
