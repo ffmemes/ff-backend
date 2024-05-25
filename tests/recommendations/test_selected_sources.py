@@ -18,7 +18,7 @@ async def conn():
 
         await conn.execute(
             insert(user),
-            [{'id': 1, 'type': "user"}, {'id': 51, 'type': "user"}]
+            [{'id': 1, 'type': 'user'}, {'id': 21, 'type': 'user'}]
         )
         await conn.execute(
             insert(meme_source),
@@ -46,14 +46,15 @@ async def conn():
             insert(user_language),
             [
                 {'user_id': 1, 'language_code': 'ru', 'created_at': datetime(2024, 1, 1)},
-                {'user_id': 51, 'language_code': 'ru', 'created_at': datetime(2024, 1, 1)}
+                {'user_id': 21, 'language_code': 'en', 'created_at': datetime(2024, 1, 1)},
+                {'user_id': 21, 'language_code': 'es', 'created_at': datetime(2024, 1, 1)}
             ]
         )
         await conn.execute(
             insert(user_meme_reaction),
             [
                 {'user_id': 1, 'meme_id': seen_meme, 'reaction_id': 1, 'recommended_by': '111', 'sent_at': datetime(2024, 1, 1)},
-                {'user_id': 51, 'meme_id': seen_meme, 'reaction_id': 1, 'recommended_by': '111', 'sent_at': datetime(2024, 1, 1)}
+                {'user_id': 21, 'meme_id': seen_meme, 'reaction_id': 1, 'recommended_by': '111', 'sent_at': datetime(2024, 1, 1)}
             ]
         )
 
@@ -78,7 +79,7 @@ async def conn():
 
 
 @pytest.mark.asyncio
-async def test_random_best(conn: AsyncConnection):
+async def test_selected_sources(conn: AsyncConnection):
     recs = await get_selected_sources(1, 10)
     assert len(recs) == 2
 
@@ -92,8 +93,8 @@ async def test_meme_queue(conn: AsyncConnection):
     assert len(recs) == 2
     assert recs[0]['recommended_by'] == 'selected_sources_240513'
 
-    user_id = 51
+    user_id = 21
     await generate_cold_start_recommendations(user_id)
     queue_key = redis.get_meme_queue_key(user_id)
     recs = await redis.get_all_memes_in_queue_by_key(queue_key)
-    assert recs[0]['recommended_by'] != 'selected_sources_240513'
+    assert len(recs) == 0

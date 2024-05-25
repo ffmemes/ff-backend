@@ -48,11 +48,9 @@ async def generate_cold_start_recommendations(user_id, limit=10):
 
     candidates = []
 
-    # AB test
-    if user_id % 100 < 50:
-        candidates = await get_selected_sources(
-            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-        )
+    candidates = await get_selected_sources(
+        user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+    )
 
     if len(candidates) == 0:
         candidates = await get_best_memes_from_each_source(
@@ -82,11 +80,10 @@ async def generate_recommendations(user_id, limit):
     candidates = []
 
     if user_info["nmemes_sent"] < 30:
-        # AB test
-        if user_id % 100 < 50:
-            candidates = await get_selected_sources(
-                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-            )
+        candidates = await get_selected_sources(
+            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+        )
+
         if len(candidates) == 0:
             candidates = await get_best_memes_from_each_source(
                 user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
