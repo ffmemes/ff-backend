@@ -30,7 +30,7 @@ async def download_meme_content_file(
         except httpx.ConnectTimeout:
             return None
 
-        if response.status_code in (403, 404, 500):
+        if response.status_code in (400, 403, 404, 500):
             return None
 
         response.raise_for_status()
