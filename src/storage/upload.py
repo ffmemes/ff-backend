@@ -25,6 +25,7 @@ async def download_meme_content_file(
             response = await client.get(
                 url,
                 headers={"User-Agent": USER_AGENT},
+                follow_redirects=True,
             )
         except httpx.ConnectTimeout:
             return None
