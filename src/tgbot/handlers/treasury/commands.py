@@ -71,7 +71,8 @@ async def handle_show_leaderbaord(
     LEADERBOARD_TEXT = f"{emoji} Leaderboard {emoji}\n\n"
     for i, user in enumerate(leaderboard):
         icon = "🏆" if i == 0 else "🥈" if i == 1 else "🥉" if i == 2 else "🏅"
-        LEADERBOARD_TEXT += f"{icon} - {user['nickname']} - {user['balance']} 🍔\n"
+        nick = user["nickname"] or get_random_emoji() * 3
+        LEADERBOARD_TEXT += f"{icon} - {nick} - {user['balance']} 🍔\n"
 
     user_lb_data = await get_user_place_in_leaderboard(update.effective_user.id)
     if user_lb_data:
@@ -80,13 +81,18 @@ async def handle_show_leaderbaord(
             user_lb_data["nickname"],
             user_lb_data["balance"],
         )
-        LEADERBOARD_TEXT += f"""
+        if nickname:
+            LEADERBOARD_TEXT += f"""
 
 You:
 #{place} - {nickname} - {balance} 🍔
 
 /kitchen /nickname /lang /chat
         """
+        else:
+            LEADERBOARD_TEXT += (
+                "To see your place in the leaderboard, set your /nickname ⬅️\n\n"
+            )
 
     return await update.message.reply_text(LEADERBOARD_TEXT, parse_mode=ParseMode.HTML)
 
