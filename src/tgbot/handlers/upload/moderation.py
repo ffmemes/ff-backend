@@ -95,6 +95,16 @@ Something went wrong when we tried to upload your meme to Telegram. Just try aga
             status=MemeStatus.DUPLICATE,
             duplicate_of=duplicate_meme_id,
         )
+
+        # set like for the uploaded meme
+        await create_user_meme_reaction(
+            duplicate_meme_id,
+            meme["id"],
+            "uploaded_meme",
+            reaction_id=1,
+            reacted_at=datetime.utcnow(),
+        )
+
         return await bot.send_message(
             chat_id=meme_upload["user_id"],
             reply_to_message_id=meme_upload["message_id"],

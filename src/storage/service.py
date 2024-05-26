@@ -1,31 +1,18 @@
-from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import bindparam, nulls_first, or_, select, text
-from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
-    execute,
     fetch_all,
     fetch_one,
     meme,
-    meme_raw_ig,
-    meme_raw_telegram,
-    meme_raw_vk,
     meme_source,
 )
 from src.storage.constants import (
-    MEME_RAW_IG_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
-    MEME_RAW_VK_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
     MemeSourceStatus,
     MemeSourceType,
     MemeStatus,
     MemeType,
-)
-from src.storage.parsers.schemas import (
-    IgPostParsingResult,
-    TgChannelPostParsingResult,
-    VkGroupPostParsingResult,
 )
 
 
