@@ -1,9 +1,9 @@
 import asyncio
 from typing import Any
 
-from sqlalchemy import exists, func, select
+from sqlalchemy import exists, func, select, text
 
-from src.database import execute, fetch_all, treasury_trx, user
+from src.database import execute, fetch_one, fetch_all, treasury_trx, user
 from src.tgbot.handlers.treasury.constants import TrxType
 
 
@@ -33,7 +33,24 @@ async def get_leaderboard(limit=10) -> list[dict[str, Any]]:
 
 
 async def get_user_place_in_leaderboard(user_id: int) -> int:
-    pass
+    return await fetch_one(
+        text(
+            f"""
+                SELECT
+                    id, nickname, place, balance
+                FROM (
+                    SELECT
+                        ROW_NUMBER() OVER (ORDER BY balance DESC) place,
+                        id,
+                        nickname,
+                        balance
+                    FROM
+                        "user"
+                ) with_row_number
+                WHERE id = {user_id}
+            """
+        )
+    )
 
 
 async def create_treasury_trx(

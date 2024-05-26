@@ -8,6 +8,7 @@ from src.tgbot.handlers.treasury.constants import PAYOUTS, TrxType
 from src.tgbot.handlers.treasury.service import (
     get_leaderboard,
     get_user_balance,
+    get_user_place_in_leaderboard,
 )
 from src.tgbot.senders.utils import get_random_emoji
 
@@ -54,7 +55,7 @@ Soon:
 ▪ top 3 memes in weekly leaderboard: 50 🍔, 30 🍔, 20 🍔
 ▪ follow our channels: ? 🍔
 
-/leaderboard /balance /lang /chat
+/leaderboard /balance /lang /chat /nickname
         """,  # noqa
         parse_mode=ParseMode.HTML,
     )
@@ -70,9 +71,22 @@ async def handle_show_leaderbaord(
     LEADERBOARD_TEXT = f"{emoji} Leaderboard {emoji}\n\n"
     for i, user in enumerate(leaderboard):
         icon = "🏆" if i == 0 else "🥈" if i == 1 else "🥉" if i == 2 else "🏅"
-        LEADERBOARD_TEXT += f"{icon} - {user['nickname']} - {user['balance']} 🪼\n"
+        LEADERBOARD_TEXT += f"{icon} - {user['nickname']} - {user['balance']} 🍔\n"
 
-    # data = await get_user_place_in_leaderboard(user_id)
+    user_lb_data = await get_user_place_in_leaderboard(update.effective_user.id)
+    if user_lb_data:
+        place, nickname, balance = (
+            user_lb_data["place"],
+            user_lb_data["nickname"],
+            user_lb_data["balance"],
+        )
+        LEADERBOARD_TEXT += f"""
+
+You:
+#{place} - {nickname} - {balance} 🍔
+
+/kitchen /nickname /lang /chat
+        """
 
     return await update.message.reply_text(LEADERBOARD_TEXT, parse_mode=ParseMode.HTML)
 
