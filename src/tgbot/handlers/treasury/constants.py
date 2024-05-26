@@ -10,9 +10,9 @@ class TrxType(str, Enum):
 
 PAYOUTS = {
     TrxType.MEME_UPLOADER: 5,
-    TrxType.USER_INVITER: 5,
-    TrxType.USER_INVITER_PREMIUM: 10,
-    TrxType.MEME_UPLOAD_REVIEWER: 2,
+    TrxType.USER_INVITER: 10,
+    TrxType.USER_INVITER_PREMIUM: 20,
+    TrxType.MEME_UPLOAD_REVIEWER: 1,
 }
 
 # TODO: localize
