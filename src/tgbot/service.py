@@ -55,7 +55,7 @@ async def create_user(
         INSERT
         INTO "user"
         (id, type, last_active_at, nickname)
-        VALUES ({id}, '{UserType.USER.value}', NOW(), {nickname})
+        VALUES ({id}, '{UserType.USER.value}', NOW(), '{nickname}')
         ON CONFLICT(id)
         DO UPDATE SET
             blocked_bot_at = NULL,
