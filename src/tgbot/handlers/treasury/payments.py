@@ -34,7 +34,7 @@ async def pay_if_not_paid(
         external_id=enternal_id,
     )
 
-    return await get_user_balance(user_id, PAYOUTS[type])
+    return await get_user_balance(user_id)
 
 
 async def pay_if_not_paid_with_alert(
