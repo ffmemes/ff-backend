@@ -24,14 +24,13 @@ from src.storage.service import (
 )
 from src.storage.upload import download_meme_content_from_tg
 from src.tgbot.constants import UserType
+from src.tgbot.handlers.treasury.constants import TrxType
+from src.tgbot.handlers.treasury.payments import pay_if_not_paid_with_alert
 from src.tgbot.handlers.upload.service import (
     get_meme_raw_upload_by_id,
     update_meme_by_upload_id,
 )
 from src.tgbot.user_info import get_user_info
-
-from src.tgbot.handlers.treasury.constants import TrxType
-from src.tgbot.handlers.treasury.payments import pay_if_not_paid_with_alert
 
 UPLOADED_MEME_REIVIEW_CALLBACK_DATA_PATTERN = "upload:{upload_id}:review:{action}"
 UPLOADED_MEME_REVIEW_CALLBACK_DATA_REGEXP = r"upload:(\d+):review:(\w+)"
@@ -200,16 +199,35 @@ async def handle_uploaded_meme_review_button(
     meme_upload = await get_meme_raw_upload_by_id(upload_id)
     prev_caption = update.callback_query.message.caption
 
+    meme = await update_meme_by_upload_id(
+        upload_id,
+        status=MemeStatus.OK if action == "approve" else MemeStatus.REJECTED,
+    )
+
+    await pay_if_not_paid_with_alert(
+        context.bot,
+        update.effective_user.id,
+        TrxType.MEME_UPLOAD_REVIEWER,
+        enternal_id=str(meme["id"]),
+    )
+
     if action == "approve":
-        meme = await update_meme_by_upload_id(upload_id, status=MemeStatus.OK)
         await update.callback_query.message.edit_caption(
             caption=prev_caption
             + "\n✅ Approved by {}".format(update.effective_user.name),
             reply_markup=None,
         )
 
-        await create_user_meme_reaction(
+        await create_user_meme_reaction(  # author auto like for the uploaded meme
             meme_upload["user_id"],
+            meme["id"],
+            "uploaded_meme",
+            reaction_id=1,
+            reacted_at=datetime.utcnow(),
+        )
+
+        await create_user_meme_reaction(  # moderator auto like for the uploaded meme
+            update.effective_user.id,
             meme["id"],
             "uploaded_meme",
             reaction_id=1,

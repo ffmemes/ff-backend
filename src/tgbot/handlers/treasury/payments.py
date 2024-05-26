@@ -45,6 +45,7 @@ async def pay_if_not_paid_with_alert(
     type: TrxType,
     enternal_id: str | None = None,
 ) -> None:
+    # TODO: atomic?
     if not await pay_if_not_paid(user_id, type, enternal_id):
         return
 
