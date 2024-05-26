@@ -3,6 +3,7 @@
 """
 
 import asyncio
+
 from telegram import Bot
 
 from src.tgbot.handlers.treasury.constants import (
@@ -15,7 +16,6 @@ from src.tgbot.handlers.treasury.service import (
     create_treasury_trx,
     update_user_balance,
 )
-
 from src.tgbot.logs import log
 
 
@@ -45,7 +45,7 @@ async def pay_if_not_paid_with_alert(
     type: TrxType,
     enternal_id: str | None = None,
 ) -> None:
-    if not pay_if_not_paid(user_id, type, enternal_id):
+    if not await pay_if_not_paid(user_id, type, enternal_id):
         return
 
     await bot.send_message(
