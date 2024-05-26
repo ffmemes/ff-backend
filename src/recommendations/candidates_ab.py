@@ -1,3 +1,5 @@
+from typing import Dict, List
+
 from sqlalchemy import text
 
 from src.database import fetch_all
@@ -89,10 +91,25 @@ async def get_selected_sources(
     user_id: int,
     limit: int = 10,
     exclude_meme_ids: list[int] = [],
-):
+) -> List[Dict]:
     """Implements a test version of an algotighm which takes best memes from
     some selected sources
     """
+
+    query_lang = f"""
+        SELECT language_code
+        FROM user_language
+        WHERE user_id = {user_id}
+    """
+
+    res = await fetch_all(text(query_lang))
+    if not len(res):
+        return []
+    print(res)
+    is_lang_ru_en = all([row["language_code"] in ("ru", "en") for row in res])
+
+    if not is_lang_ru_en:
+        return []
 
     query = f"""
         SELECT
