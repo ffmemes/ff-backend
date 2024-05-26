@@ -4,10 +4,10 @@ from datetime import datetime
 from prefect import flow, get_run_logger
 
 from src.flows.storage.memes import ig_meme_pipeline
+from src.storage.etl import insert_parsed_posts_from_ig
 from src.storage.parsers.ig import get_user_info, get_user_medias
 from src.storage.service import (
     get_ig_sources_to_parse,
-    insert_parsed_posts_from_ig,
     update_meme_source,
 )
 

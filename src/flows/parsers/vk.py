@@ -4,10 +4,10 @@ from datetime import datetime
 from prefect import flow, get_run_logger
 
 from src.flows.storage.memes import vk_meme_pipeline
+from src.storage.etl import insert_parsed_posts_from_vk
 from src.storage.parsers.vk import VkGroupScraper
 from src.storage.service import (
     get_vk_sources_to_parse,
-    insert_parsed_posts_from_vk,
     update_meme_source,
 )
 

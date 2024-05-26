@@ -7,12 +7,14 @@ from prefect import flow, get_run_logger
 
 from src.storage import ads
 from src.storage.constants import MemeStatus, MemeType
-from src.storage.ocr.mystic import ocr_content
-from src.storage.schemas import OcrResult
-from src.storage.service import (
+from src.storage.etl import (
     etl_memes_from_raw_ig_posts,
     etl_memes_from_raw_telegram_posts,
     etl_memes_from_raw_vk_posts,
+)
+from src.storage.ocr.mystic import ocr_content
+from src.storage.schemas import OcrResult
+from src.storage.service import (
     find_meme_duplicate,
     get_memes_to_ocr,
     get_pending_memes,

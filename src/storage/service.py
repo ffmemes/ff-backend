@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import bindparam, nulls_first, or_, select, text
@@ -16,7 +16,6 @@ from src.database import (
 )
 from src.storage.constants import (
     MEME_RAW_IG_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
-    MEME_RAW_TELEGRAM_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
     MEME_RAW_VK_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
     MemeSourceStatus,
     MemeSourceType,
@@ -28,73 +27,6 @@ from src.storage.parsers.schemas import (
     TgChannelPostParsingResult,
     VkGroupPostParsingResult,
 )
-
-
-async def insert_parsed_posts_from_telegram(
-    meme_source_id: int,
-    telegram_posts: list[TgChannelPostParsingResult],
-) -> None:
-    posts = [
-        post.model_dump() | {"meme_source_id": meme_source_id}
-        for post in telegram_posts
-    ]
-    insert_statement = insert(meme_raw_telegram).values(posts)
-    insert_posts_query = insert_statement.on_conflict_do_update(
-        constraint=MEME_RAW_TELEGRAM_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
-        set_={
-            "media": insert_statement.excluded.media,
-            "views": insert_statement.excluded.views,
-            "updated_at": datetime.utcnow(),
-        },
-    )
-
-    await execute(insert_posts_query)
-
-
-async def insert_parsed_posts_from_vk(
-    meme_source_id: int,
-    vk_posts: list[VkGroupPostParsingResult],
-) -> None:
-    posts = [
-        post.model_dump() | {"meme_source_id": meme_source_id} for post in vk_posts
-    ]
-    insert_statement = insert(meme_raw_vk).values(posts)
-    insert_posts_query = insert_statement.on_conflict_do_update(
-        constraint=MEME_RAW_VK_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
-        set_={
-            "media": insert_statement.excluded.media,
-            "views": insert_statement.excluded.views,
-            "likes": insert_statement.excluded.likes,
-            "reposts": insert_statement.excluded.reposts,
-            "comments": insert_statement.excluded.comments,
-            "updated_at": datetime.utcnow(),
-        },
-    )
-
-    await execute(insert_posts_query)
-
-
-async def insert_parsed_posts_from_ig(
-    meme_source_id: int,
-    vk_posts: list[IgPostParsingResult,],
-) -> None:
-    posts = [
-        post.model_dump() | {"meme_source_id": meme_source_id} for post in vk_posts
-    ]
-    insert_statement = insert(meme_raw_ig).values(posts)
-    insert_posts_query = insert_statement.on_conflict_do_update(
-        constraint=MEME_RAW_IG_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
-        set_={
-            "media": insert_statement.excluded.media,
-            "views": insert_statement.excluded.views,
-            "likes": insert_statement.excluded.likes,
-            "shares": insert_statement.excluded.shares,
-            "comments": insert_statement.excluded.comments,
-            "updated_at": datetime.utcnow(),
-        },
-    )
-
-    await execute(insert_posts_query)
 
 
 async def get_telegram_sources_to_parse(limit=10) -> list[dict[str, Any]]:
@@ -138,124 +70,6 @@ async def update_meme_source(meme_source_id: int, **kwargs) -> dict[str, Any] | 
         .returning(meme_source)
     )
     return await fetch_one(update_query)
-
-
-# TODO: separate file for ETL scripts?
-async def etl_memes_from_raw_telegram_posts() -> None:
-    insert_query = """
-        INSERT INTO meme (
-            meme_source_id,
-            raw_meme_id,
-            caption,
-            status,
-            type,
-            language_code,
-            published_at
-        )
-        SELECT
-            DISTINCT ON (COALESCE(MRT.forwarded_url, random()::text))
-            MRT.meme_source_id,
-            MRT.id AS raw_meme_id,
-            MRT.content AS caption,
-            'created' AS status,
-            CASE
-                WHEN media->0->>'duration' IS NOT NULL THEN 'video'
-                WHEN media->0->>'url' LIKE '%.mp4%' THEN 'animation'
-                ELSE 'image'
-            END AS type,
-            MS.language_code AS language_code,
-            MRT.date AS published_at
-        FROM meme_raw_telegram MRT
-        INNER JOIN meme_source MS
-            ON MS.id = MRT.meme_source_id
-        WHERE 1=1
-            AND JSONB_ARRAY_LENGTH(MRT.media) = 1
-            AND COALESCE(MRT.updated_at, MRT.created_at) >= NOW() - INTERVAL '24 hours'
-        ON CONFLICT (meme_source_id, raw_meme_id)
-        DO UPDATE
-        SET
-            status = CASE
-                WHEN meme.status != 'broken_content_link'
-                THEN meme.status
-                ELSE 'created'
-            END
-    """
-    await execute(text(insert_query))
-
-
-async def etl_memes_from_raw_vk_posts() -> None:
-    insert_query = """
-        INSERT INTO meme (
-            meme_source_id,
-            raw_meme_id,
-            caption,
-            status,
-            type,
-            language_code,
-            published_at
-        )
-        SELECT
-            MRV.meme_source_id,
-            MRV.id AS raw_meme_id,
-            MRV.content AS caption,
-            'created' AS status,
-            'image' AS type,
-            MS.language_code AS language_code,
-            MRV.date AS published_at
-        FROM meme_raw_vk AS MRV
-        LEFT JOIN meme_source AS MS
-            ON MS.id = MRV.meme_source_id
-        WHERE 1=1
-            -- only one attachment
-            AND JSONB_ARRAY_LENGTH(MRV.media) = 1
-            AND COALESCE(MRV.updated_at, MRV.created_at) >= NOW() - INTERVAL '24 hours'
-        ON CONFLICT (meme_source_id, raw_meme_id)
-        DO UPDATE
-        SET
-            status = CASE
-                WHEN meme.status != 'broken_content_link'
-                THEN meme.status
-                ELSE 'created'
-            END
-    """
-    await execute(text(insert_query))
-
-
-async def etl_memes_from_raw_ig_posts() -> None:
-    insert_query = """
-        INSERT INTO meme (
-            meme_source_id,
-            raw_meme_id,
-            type,
-            status,
-            language_code,
-            published_at
-        )
-        SELECT
-            MRI.meme_source_id,
-            MRI.id AS raw_meme_id,
-            CASE
-                WHEN media->0->>'url' LIKE '%.mp4%' THEN 'video'
-                ELSE 'image'
-            END AS type,
-            'created' AS status,
-            MS.language_code,
-            MRI.published_at
-        FROM meme_raw_ig AS MRI
-        LEFT JOIN meme_source AS MS
-            ON MS.id = MRI.meme_source_id
-        WHERE 1=1
-            AND COALESCE(MRI.updated_at, MRI.created_at) >= NOW() - INTERVAL '24 hours'
-        ON CONFLICT (meme_source_id, raw_meme_id)
-        DO UPDATE
-        SET
-            status = CASE
-                WHEN meme.status != 'broken_content_link'
-                THEN meme.status
-                ELSE 'created'
-            END
-    """
-    await execute(text(insert_query))
 
 
 async def update_meme(meme_id: int, **kwargs) -> dict[str, Any] | None:
