@@ -216,8 +216,10 @@ user = Table(
     "user",
     metadata,
     Column("id", BigInteger, primary_key=True),
+    Column("nickname", String),
     Column("type", String, nullable=False),  # super_user, moderator,
     Column("inviter_id", ForeignKey("user.id", ondelete="SET NULL")),
+    Column("balance", Integer, nullable=False, server_default="0"),
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
     Column("last_active_at", DateTime, onupdate=func.now()),
     Column("blocked_bot_at", DateTime),
@@ -370,6 +372,17 @@ inline_search_chosen_result_logs = Table(
     Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
     Column("query", String, nullable=False),
     Column("chosen_at", DateTime, server_default=func.now(), nullable=False),
+)
+
+treasury_trx = Table(
+    "treasury_trx",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
+    Column("type", String, nullable=False, index=True),
+    Column("amount", Integer, nullable=False),
+    Column("external_id", String),
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
 )
 
 

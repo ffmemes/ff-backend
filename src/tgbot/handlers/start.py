@@ -33,11 +33,12 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         deep_link=deep_link,
     )
 
-    user = await create_user(id=user_id)
+    user = await create_user(id=user_id, nickname=update.effective_user.name)
     await init_user_languages_from_tg_user(update.effective_user)
     if deep_link:
         asyncio.create_task(
             handle_deep_link_used(
+                bot=context.bot,
                 invited_user=user,
                 invited_user_name=update.effective_user.name,
                 deep_link=deep_link,

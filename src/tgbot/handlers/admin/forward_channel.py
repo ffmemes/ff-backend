@@ -60,11 +60,6 @@ async def handle_forwarded_from_tgchannelru(
     if user["type"] != UserType.ADMIN:
         return
 
-    await log(
-        f"Forwarded from tgchannelru: {escape(str(update.message.to_dict()))}",
-        context.bot,
-    )
-
     ces = update.message.caption_entities
     urls = [ce.url for ce in ces if ce.type == MessageEntityType.TEXT_LINK]
     if len(urls) != 1:
@@ -86,7 +81,8 @@ async def handle_forwarded_from_tgchannelru(
 
     meme = MemeData(**meme_data)
     users = await get_users_to_broadcast_meme_from_tgchannelru(meme.id)
-    await log(f"Going to forward meme_id={meme.id} to {len(users)} users", context.bot)
+    await update.message.reply_text(f"Forwarding meme_id={meme.id} to {len(users)}")
+    await log(f"Forwarding meme_id={meme.id} to {len(users)}", context.bot)
 
     users_received = 0
     random.shuffle(users)
@@ -102,11 +98,10 @@ async def handle_forwarded_from_tgchannelru(
 
         if await forward_message_to_user(update.message, user_id):
             users_received += 1
-
-        if users_received % 100 == 0:
-            await log(
-                f"⏳ {users_received} users received forward with meme #{meme.id}"
-            )
+            if users_received % 100 == 0:
+                await log(
+                    f"⏳ {users_received} users received forward with meme #{meme.id}"
+                )
 
         await asyncio.sleep(0.5)
 

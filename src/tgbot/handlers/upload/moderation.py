@@ -30,6 +30,9 @@ from src.tgbot.handlers.upload.service import (
 )
 from src.tgbot.user_info import get_user_info
 
+from src.tgbot.handlers.treasury.constants import TrxType
+from src.tgbot.handlers.treasury.payments import pay_if_not_paid_with_alert
+
 UPLOADED_MEME_REIVIEW_CALLBACK_DATA_PATTERN = "upload:{upload_id}:review:{action}"
 UPLOADED_MEME_REVIEW_CALLBACK_DATA_REGEXP = r"upload:(\d+):review:(\w+)"
 
@@ -215,6 +218,13 @@ async def handle_uploaded_meme_review_button(
 
         asyncio.create_task(calculate_meme_source_stats())
         asyncio.create_task(calculate_meme_reactions_stats())
+
+        await pay_if_not_paid_with_alert(
+            context.bot,
+            meme_upload["user_id"],
+            TrxType.MEME_UPLOADER,
+            enternal_id=str(meme["id"]),
+        )
 
         await context.bot.send_message(
             chat_id=meme_upload["user_id"],

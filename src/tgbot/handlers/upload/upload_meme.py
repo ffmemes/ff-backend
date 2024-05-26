@@ -97,7 +97,11 @@ async def handle_message_with_meme(
     user = await get_user_info(update.effective_user.id)
     if user["nmemes_sent"] < 50:
         return await update.message.reply_text(
-            "Watch at least 50 memes if you want to share your memes with our community"
+            """
+Watch at least 50 memes if you want to share your memes with our community:
+
+➡️ /start ⬅️
+            """
         )
 
     uploaded_today = await count_24h_uploaded_not_approved_memes(

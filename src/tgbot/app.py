@@ -58,6 +58,12 @@ from src.tgbot.handlers.chat.feedback import (
 from src.tgbot.handlers.moderator import get_meme, meme_source
 from src.tgbot.handlers.stats.stats import handle_stats
 from src.tgbot.handlers.stats.wrapped import handle_wrapped, handle_wrapped_button
+from src.tgbot.handlers.treasury.commands import (
+    handle_change_nickname,
+    handle_show_balance,
+    handle_show_kitchen,
+    handle_show_leaderbaord,
+)
 from src.tgbot.handlers.upload import moderation, upload_meme
 
 application: Application = None  # type: ignore
@@ -109,6 +115,45 @@ def add_handlers(application: Application) -> None:
         MessageHandler(
             filters=filters.Chat(TELEGRAM_FEEDBACK_CHAT_ID) & filters.REPLY,
             callback=handle_feedback_reply,
+        )
+    )
+
+    ###################
+    # treasury-related commands
+
+    # show balance
+    application.add_handler(
+        CommandHandler(
+            ["b", "balance"],
+            handle_show_balance,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+        )
+    )
+
+    # show kitchen
+    application.add_handler(
+        CommandHandler(
+            ["kitchen"],
+            handle_show_kitchen,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+        )
+    )
+
+    # show leaderboard
+    application.add_handler(
+        CommandHandler(
+            ["leaderboard", "l"],
+            handle_show_leaderbaord,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+        )
+    )
+
+    # change nickname
+    application.add_handler(
+        CommandHandler(
+            ["nickname"],
+            handle_change_nickname,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
         )
     )
 

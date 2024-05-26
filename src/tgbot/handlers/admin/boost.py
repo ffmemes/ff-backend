@@ -15,3 +15,5 @@ async def handle_chat_boost(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     )
 
     # TODO: I don't know how to get user_id from the boost. Let's see the logs
+
+    # give user 2 🍔

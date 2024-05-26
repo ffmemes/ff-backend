@@ -4,10 +4,10 @@ from telegram.ext import (
     ContextTypes,
 )
 
-from src.stats.service import get_user_stats
 from src.stats.user import calculate_inviter_stats, calculate_user_stats
 from src.tgbot.constants import UserType
 from src.tgbot.handlers.admin.service import delete_user, get_user_by_tg_username
+from src.tgbot.handlers.stats.stats import get_user_stats_report
 from src.tgbot.user_info import get_user_info, update_user_info_cache
 
 
@@ -31,12 +31,7 @@ async def handle_show_user_info(
     await calculate_user_stats()  # regenerate user stats
     await calculate_inviter_stats()
 
-    user_stats = await get_user_stats(selected_user["id"])
-
-    report = ""
-    if user_stats:
-        for k, v in user_stats.items():
-            report += f"<b>{k}</b>: {v}\n"
+    report = await get_user_stats_report(selected_user_info["id"])
 
     await update.message.reply_text(
         f"""
