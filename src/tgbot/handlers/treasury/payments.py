@@ -2,6 +2,7 @@
     Additional layer of control for treasury payments
 """
 
+import asyncio
 from telegram import Bot
 
 from src.tgbot.handlers.treasury.constants import (
@@ -14,6 +15,8 @@ from src.tgbot.handlers.treasury.service import (
     create_treasury_trx,
     update_user_balance,
 )
+
+from src.tgbot.logs import log
 
 
 async def pay_if_not_paid(
@@ -51,4 +54,8 @@ async def pay_if_not_paid_with_alert(
 💳 /b: +<b>{PAYOUTS[type]} 🍔</b> for <b>{TRX_TYPE_DESCRIPTIONS[type]}</b>!
         """,
         parse_mode="HTML",
+    )
+
+    asyncio.create_task(
+        log(f"💳 {user_id}: +{PAYOUTS[type]} 🍔 for {TRX_TYPE_DESCRIPTIONS[type]}")
     )
