@@ -14,7 +14,7 @@ from src.tgbot.handlers.treasury.constants import (
 from src.tgbot.handlers.treasury.service import (
     check_if_treasury_trx_exists,
     create_treasury_trx,
-    update_user_balance,
+    get_user_balance,
 )
 from src.tgbot.logs import log
 
@@ -34,9 +34,7 @@ async def pay_if_not_paid(
         external_id=enternal_id,
     )
 
-    await update_user_balance(user_id, PAYOUTS[type])
-
-    return True
+    return await get_user_balance(user_id, PAYOUTS[type])
 
 
 async def pay_if_not_paid_with_alert(

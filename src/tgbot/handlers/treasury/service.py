@@ -3,7 +3,7 @@ from typing import Any
 
 from sqlalchemy import exists, func, select, text
 
-from src.database import execute, fetch_one, fetch_all, treasury_trx, user
+from src.database import execute, fetch_all, fetch_one, treasury_trx, user
 from src.tgbot.handlers.treasury.constants import TrxType
 
 
