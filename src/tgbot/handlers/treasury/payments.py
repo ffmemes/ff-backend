@@ -27,7 +27,7 @@ async def pay_if_not_paid(
     if await check_if_treasury_trx_exists(user_id, type, external_id=enternal_id):
         return
 
-    trx = await create_treasury_trx(
+    _ = await create_treasury_trx(
         user_id,
         type,
         PAYOUTS[type],
@@ -36,7 +36,7 @@ async def pay_if_not_paid(
 
     await update_user_balance(user_id, PAYOUTS[type])
 
-    return trx
+    return True
 
 
 async def pay_if_not_paid_with_alert(

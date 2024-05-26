@@ -42,7 +42,7 @@ async def create_treasury_trx(
     amount: int,
     external_id: str | None = None,
 ):
-    await execute(
+    return await execute(
         treasury_trx.insert().values(
             user_id=user_id,
             type=type,
