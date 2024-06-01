@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 
 from prefect import flow, get_run_logger
@@ -126,26 +127,25 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
 
     # send message to authors
 
+    author_ids = set(m["author_id"] for m in top_memes)
+    logger.info(f"Going to notify {len(author_ids)} authors about rewards")
+    for author_id in author_ids:
+        user_uploaded_memes = [m for m in uploaded_memes if m["author_id"] == author_id]
+        likes = sum(m["nlikes"] for m in user_uploaded_memes)
+        dislikes = sum(m["ndislikes"] for m in user_uploaded_memes)
+        like_prc = (likes * 100.0 / (likes + dislikes)).round()
 
-#     author_ids = set(m["author_id"] for m in top_memes)
-#     logger.info(f"Going to notify {len(author_ids)} authors about rewards")
-#     for author_id in author_ids:
-#         user_uploaded_memes = [m for m in uploaded_memes if m["author_id"] == author_id]
-#         likes = sum(m["nlikes"] for m in user_uploaded_memes)
-#         dislikes = sum(m["ndislikes"] for m in user_uploaded_memes)
-#         like_prc = (likes * 100.0 / (likes + dislikes)).round()
+        user_text = f"""
+Стата по загруженным тобой мемам:
+📥 Загружено мемов: {len(user_uploaded_memes)}
+👁️ Просмотры: {sum(m["nviews"] for m in user_uploaded_memes)}
+👍 Доля лайков: {like_prc}%
 
-#         user_text = f"""
-# Стата по загруженным тобой мемам:
-# 📥 Загружено мемов: {len(user_uploaded_memes)}
-# 👁️ Просмотры: {sum(m["nviews"] for m in user_uploaded_memes)}
-# 👍 Доля лайков: {like_prc}%
+Смотри топ-5 мемов недели в нашем канале: {message_link}
+        """
+        try:
+            await bot.send_message(author_id, user_text)
+        except Exception as e:
+            logger.error(f"Failed to send message to {author_id}: {e}")
 
-# Смотри топ-5 мемов недели в нашем канале: {message_link}
-#         """
-#         try:
-#             await bot.send_message(author_id, user_text)
-#         except Exception as e:
-#             logger.error(f"Failed to send message to {author_id}: {e}")
-
-#         await asyncio.sleep(2)
+        await asyncio.sleep(2)
