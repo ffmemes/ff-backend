@@ -1,6 +1,8 @@
 import asyncio
 from datetime import datetime
 
+import telegram
+
 from prefect import flow, get_run_logger
 
 from src.flows.rewards.service import get_all_uploaded_memes_weerly_ru
@@ -112,13 +114,7 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
 
     m = await bot.send_media_group(
         TELEGRAM_CHANNEL_RU_CHAT_ID,
-        [
-            {
-                "type": "photo",
-                "media": m["telegram_file_id"],
-            }
-            for m in top_memes
-        ],
+        [telegram.InputMediaPhoto(media=m["telegram_file_id"]) for m in top_memes],
         caption=channel_text,
         parse_mode="HTML",
     )
