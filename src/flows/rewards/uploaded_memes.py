@@ -15,6 +15,14 @@ from src.tgbot.handlers.treasury.constants import TrxType
 from src.tgbot.handlers.treasury.payments import pay_if_not_paid_with_alert
 from src.tgbot.logs import log
 
+from src.crossposting.service import (
+    log_meme_sent,
+)
+from src.storage.service import update_meme
+
+from src.crossposting.constants import Channel
+from src.storage.constants import MemeStatus
+
 
 @flow(name="Reward RU users for weekly top uploaded memes")
 async def reward_ru_users_for_weekly_top_uploaded_memes():
@@ -92,6 +100,9 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
             type,
             enternal_id=today,
         )
+
+        await log_meme_sent(top_meme["id"], channel=Channel.TG_CHANNEL_RU)
+        await update_meme(top_meme["id"], status=MemeStatus.PUBLISHED)
 
     # send message to tgchannelru
 
