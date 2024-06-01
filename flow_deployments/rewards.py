@@ -1,5 +1,5 @@
+from prefect.client.schemas.schedules import CronSchedule
 from prefect.deployments import Deployment
-from prefect.server.schemas.schedules import CronSchedule
 
 from src.config import settings
 from src.flows.rewards.uploaded_memes import (
