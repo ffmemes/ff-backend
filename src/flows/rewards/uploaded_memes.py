@@ -90,7 +90,7 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
             bot,
             top_meme["author_id"],
             type,
-            external_id=today,
+            enternal_id=today,
         )
 
     # send message to tgchannelru
