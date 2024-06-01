@@ -53,14 +53,12 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
 
     nuploaded = len(uploaded_memes)
     nusers = len(set(m["author_id"] for m in uploaded_memes))
-    total_views = sum(m["nmemes_sent"] for m in uploaded_memes)
+    views = sum(m["nmemes_sent"] for m in uploaded_memes)
     likes = sum(m["nlikes"] for m in uploaded_memes)
     dislikes = sum(m["ndislikes"] for m in uploaded_memes)
     avg_like = likes / (likes + dislikes) if likes + dislikes > 0 else 0
 
-    logger.info(
-        f"Uploaded memes: {nuploaded}, users: {nusers}, total views: {total_views}, avg like: {avg_like}",
-    )
+    logger.info(f"Uploaded: {nuploaded} by {nusers}, views: {views}, like%: {avg_like}")
     today = datetime.today().date().strftime("%Y-%m-%d")
 
     ###########################
@@ -108,7 +106,7 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
 
 📥 Загружено мемов: {nuploaded}
 👤 Пользователями: {nusers}
-👁️ Просмотры: {total_views}
+👁️ Просмотры: {views}
 👍 Доля лайков: {round(likes * 100. / (likes + dislikes))}%
     """
 
@@ -130,11 +128,12 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
         likes = sum(m["nlikes"] for m in user_uploaded_memes)
         dislikes = sum(m["ndislikes"] for m in user_uploaded_memes)
         like_prc = round(likes * 100.0 / (likes + dislikes))
+        views = sum(m["nmemes_sent"] for m in uploaded_memes)
 
         user_text = f"""
 Стата по загруженным тобой мемам:
 📥 Загружено мемов: {len(user_uploaded_memes)}
-👁️ Просмотры: {sum(m["nviews"] for m in user_uploaded_memes)}
+👁️ Просмотры: {views}
 👍 Доля лайков: {like_prc}%
 
 Смотри топ-5 мемов недели в нашем канале: {message_link}
