@@ -112,14 +112,14 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
 👍 Доля лайков: {round(likes * 100. / (likes + dislikes))}%
     """
 
-    m = await bot.send_media_group(
+    ms = await bot.send_media_group(
         TELEGRAM_CHANNEL_RU_CHAT_ID,
         [telegram.InputMediaPhoto(media=m["telegram_file_id"]) for m in top_memes],
         caption=channel_text,
         parse_mode="HTML",
     )
 
-    message_link = f"{TELEGRAM_CHANNEL_RU_LINK}/{m.id}"
+    message_link = f"{TELEGRAM_CHANNEL_RU_LINK}/{ms[0].id}"
 
     # send message to authors
 
