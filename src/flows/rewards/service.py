@@ -13,7 +13,8 @@ async def get_all_uploaded_memes_weerly_ru() -> list[dict[str, Any]]:
             S.added_by AS author_id,
             U.nickname,
             MS.nmemes_sent,
-            MS.nlikes * 1. / (MS.nlikes + MS.ndislikes) AS like_prc
+            MS.nlikes,
+            MS.ndislikes
         FROM meme M
         LEFT JOIN meme_source S
             ON M.meme_source_id = S.id
@@ -29,6 +30,5 @@ async def get_all_uploaded_memes_weerly_ru() -> list[dict[str, Any]]:
             AND M.created_at > NOW() - INTERVAL '7 days'
             AND (UL.language_code = 'ru' OR M.language_code = 'ru')
             AND MS.nmemes_sent >= 10
-        ORDER BY like_prc DESC
     """
     return await fetch_all(text(select_statement))

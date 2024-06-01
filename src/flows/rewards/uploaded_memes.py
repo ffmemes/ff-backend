@@ -51,7 +51,7 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
 
     nuploaded = len(uploaded_memes)
     nusers = len(set(m["author_id"] for m in uploaded_memes))
-    total_views = sum(m["nviews"] for m in uploaded_memes)
+    total_views = sum(m["nmemes_sent"] for m in uploaded_memes)
     likes = sum(m["nlikes"] for m in uploaded_memes)
     dislikes = sum(m["ndislikes"] for m in uploaded_memes)
     avg_like = likes / (likes + dislikes) if likes + dislikes > 0 else 0
