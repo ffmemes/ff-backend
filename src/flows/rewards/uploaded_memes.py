@@ -107,7 +107,7 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
 📥 Загружено мемов: {nuploaded}
 👤 Пользователями: {nusers}
 👁️ Просмотры: {total_views}
-👍 Доля лайков: {(likes * 100. / (likes + dislikes)).round()}%
+👍 Доля лайков: {round(likes * 100. / (likes + dislikes))}%
     """
 
     m = await bot.send_media_group(
@@ -133,7 +133,7 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
         user_uploaded_memes = [m for m in uploaded_memes if m["author_id"] == author_id]
         likes = sum(m["nlikes"] for m in user_uploaded_memes)
         dislikes = sum(m["ndislikes"] for m in user_uploaded_memes)
-        like_prc = (likes * 100.0 / (likes + dislikes)).round()
+        like_prc = round(likes * 100.0 / (likes + dislikes))
 
         user_text = f"""
 Стата по загруженным тобой мемам:
