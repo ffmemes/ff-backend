@@ -14,7 +14,7 @@ uvicorn[standard]==0.28.*
 sentry-sdk==2.1.*
 
 # prefect + worker
-prefect==2.18.3
+prefect==2.19.3
 beautifulsoup4==4.12.*
 lxml==5.2.*
 
