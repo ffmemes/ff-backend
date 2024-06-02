@@ -157,6 +157,7 @@ async def handle_rules_accepted_callback(
         reply_markup=InlineKeyboardMarkup(
             get_meme_language_selector_keyboard(upload_id)
         ),
+        parse_mode=ParseMode.HTML,
     )
 
 
