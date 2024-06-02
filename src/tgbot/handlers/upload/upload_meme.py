@@ -11,6 +11,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
+from src import localizer
 from src.recommendations.meme_queue import check_queue
 from src.tgbot.handlers.upload.moderation import uploaded_meme_auto_review
 from src.tgbot.handlers.upload.service import (
@@ -80,16 +81,6 @@ def get_meme_language_selector_keyboard(upload_id: int) -> list[list[dict]]:
     return lang_keyboard
 
 
-RULES = """
-~ OUR RULES ~
-1️⃣ No bullshit content, you know what I mean.
-2️⃣ We can reject any post at our discretion.
-3️⃣ Meme will be rejected if we already have that meme in collection.
-4️⃣ For now, your meme should have only 1 picture.
-5️⃣ Providing false info about the meme will lead to a rejection and penalty.
-"""
-
-
 async def handle_message_with_meme(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
@@ -97,11 +88,7 @@ async def handle_message_with_meme(
     user = await get_user_info(update.effective_user.id)
     if user["nmemes_sent"] < 50:
         return await update.message.reply_text(
-            """
-Watch at least 50 memes if you want to share your memes with our community:
-
-➡️ /start ⬅️
-            """
+            localizer.t("upload.watch_memes_to_unblock_upload", user["interface_lang"]),
         )
 
     uploaded_today = await count_24h_uploaded_not_approved_memes(
@@ -131,16 +118,15 @@ You need to follow our channel to upload memes and try again:
 
     await update.message.reply_photo(
         photo=update.message.photo[-1].file_id,
-        caption=f"""
-Do you want to share this meme with our community?
-
-{RULES.strip()}
-        """,
+        caption=localizer.t("upload.rules", user["interface_lang"]),
+        parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(
             [
                 [
                     InlineKeyboardButton(
-                        "I agree",
+                        localizer.t(
+                            "upload.rules_accept_button", user["interface_lang"]
+                        ),
                         callback_data=RULES_ACCEPTED_CALLBACK_DATA_PATTERN.format(
                             upload_id=meme_upload["id"],
                         ),
@@ -158,6 +144,7 @@ async def handle_rules_accepted_callback(
 ) -> None:
     # user accepted the rules. Next, we need to ask to specify the language of a meme
     await update.callback_query.answer()
+    user_info = await get_user_info(update.effective_user.id)
 
     upload_id = int(
         re.match(RULES_ACCEPTED_CALLBACK_DATA_REGEXP, update.callback_query.data).group(
@@ -166,12 +153,7 @@ async def handle_rules_accepted_callback(
     )
 
     await update.callback_query.message.edit_caption(
-        """
-Please select the language of the meme.
-
-Make sure you select the correct language otherwise your meme will be rejected
-and you may receive a penalty.
-        """,
+        localizer.t("upload.select_language", user_info["interface_lang"]),
         reply_markup=InlineKeyboardMarkup(
             get_meme_language_selector_keyboard(upload_id)
         ),
@@ -184,15 +166,9 @@ async def handle_meme_upload_lang_other(
     _: ContextTypes.DEFAULT_TYPE,
 ) -> None:
     await update.callback_query.answer()
+    user_info = await get_user_info(update.effective_user.id)
     await update.effective_user.send_message(
-        """
-We can easily add the language you need. Just send us a message with /chat command.
-
-Example:
-/chat Please add ¬˚µ∆˜ˆ˙®∂∫ language!
-
-Remember that you can't select the wrong language for meme for now.
-        """
+        localizer.t("upload.we_can_add_language_you_need", user_info["interface_lang"]),
     )
 
 
@@ -202,6 +178,8 @@ async def handle_meme_upload_lang_selected(
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
     await update.callback_query.answer()
+    user_info = await get_user_info(update.effective_user.id)
+
     reg = re.match(LANGUAGE_SELECTED_CALLBACK_DATA_REGEXP, update.callback_query.data)
     upload_id, lang = int(reg.group(1)), reg.group(2)
 
@@ -215,13 +193,7 @@ async def handle_meme_upload_lang_selected(
     # TODO: create a meme object from meme_raw_upload
 
     await update.callback_query.message.edit_caption(
-        """
-🏁 <b>You submitted your meme for a review.</b>
-
-What to do next:
-1. Wait for the approval or rejection from our team.
-2. Keep watching other memes!
-        """,
+        localizer.t("upload.submitted", user_info["interface_lang"]),
         reply_markup=None,
         parse_mode=ParseMode.HTML,
     )

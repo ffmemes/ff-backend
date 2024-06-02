@@ -57,17 +57,17 @@ type:{user_info["type"]}, ref:{deep_link}, lang:{language_code}
         )
     )
 
-    # ONBOARDING AB TEST
-    if user_id % 2 == 1:
-        # old onboarding
-        return await handle_language_settings(update, context)
+    # # ONBOARDING AB TEST
+    # if user_id % 2 == 1:
+    #     # old onboarding
+    return await handle_language_settings(update, context)
 
     # test: send memes immediately
-    await clear_meme_queue_for_user(user_id)
-    await generate_cold_start_recommendations(user_id)
-    return await next_message(
-        context.bot,
-        user_id,
-        prev_update=update,
-        prev_reaction_id=None,
-    )
+    # await clear_meme_queue_for_user(user_id)
+    # await generate_cold_start_recommendations(user_id)
+    # return await next_message(
+    #     context.bot,
+    #     user_id,
+    #     prev_update=update,
+    #     prev_reaction_id=None,
+    # )
