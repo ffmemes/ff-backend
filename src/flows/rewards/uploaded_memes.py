@@ -2,10 +2,15 @@ import asyncio
 from datetime import datetime
 
 import telegram
-
 from prefect import flow, get_run_logger
 
+from src.crossposting.constants import Channel
+from src.crossposting.service import (
+    log_meme_sent,
+)
 from src.flows.rewards.service import get_all_uploaded_memes_weerly_ru
+from src.storage.constants import MemeStatus
+from src.storage.service import update_meme
 from src.tgbot.bot import bot
 from src.tgbot.constants import (
     TELEGRAM_CHANNEL_RU_CHAT_ID,
@@ -15,23 +20,7 @@ from src.tgbot.handlers.treasury.constants import TrxType
 from src.tgbot.handlers.treasury.payments import pay_if_not_paid_with_alert
 from src.tgbot.logs import log
 
-from src.crossposting.service import (
-    log_meme_sent,
-)
-from src.storage.service import update_meme
-
-from src.crossposting.constants import Channel
-from src.storage.constants import MemeStatus
-
-
-@flow(name="Reward RU users for weekly top uploaded memes")
-async def reward_ru_users_for_weekly_top_uploaded_memes():
-    logger = get_run_logger()
-
-    logger.info("Going to reward users for weekly top uploaded memes")
-
-    """
-    # TODO:
+"""
     1. Get all uploaded memes this week.
     2. Calculate some stats:
        - uploaded memes
@@ -50,7 +39,13 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
        - for meme authors which doesn't follow the channel,
          send a message with a link to the post in channel.
          with stats of user's uploaded memes
-    """
+"""
+
+
+@flow(name="Reward RU users for weekly top uploaded memes")
+async def reward_ru_users_for_weekly_top_uploaded_memes():
+    logger = get_run_logger()
+    logger.info("Going to reward users for weekly top uploaded memes")
 
     uploaded_memes = await get_all_uploaded_memes_weerly_ru()
     logger.info(f"Received {len(uploaded_memes)} uploaded memes")
@@ -107,7 +102,7 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
     # send message to tgchannelru
 
     channel_text = f"""
-🏆 ТОП-5 загруженных мемов недели
+🏆 <code>ТОП-5 загруженных мемов недели</code>
 
 🥇 - {top_memes[0]["nickname"] or '???'}
 🥈 - {top_memes[1]["nickname"] or '???'}
@@ -115,11 +110,13 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
 🏅 - {top_memes[3]["nickname"] or '???'}
 🏅 - {top_memes[4]["nickname"] or '???'}
 
-📥 Загружено мемов: {nuploaded}
-👤 Пользователями: {nusers}
-👁️ Просмотры: {views}
-👍 Доля лайков: {round(likes * 100. / (likes + dislikes))}%
-    """
+📥 Загружено мемов: <b>{nuploaded}</b>
+👤 Пользователями: <b>{nusers}</b>
+👁️ Просмотры: <b>{views}</b>
+👍 Доля лайков: <b>{round(likes * 100. / (likes + dislikes))}%</b>
+
+Перешли топ мем в бота → <a href="https://t.me/ffmemesbot?start=kitchen">выиграй до 500 🍔</a>
+    """  # noqa
 
     ms = await bot.send_media_group(
         TELEGRAM_CHANNEL_RU_CHAT_ID,
