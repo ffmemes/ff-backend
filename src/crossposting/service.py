@@ -72,6 +72,8 @@ async def get_next_meme_for_tgchannelen() -> dict[str, Any]:
             AND CP.meme_id IS NULL
             AND M.status = 'ok'
             AND M.language_code = 'en'
+            AND M.meme_source_id not in (173)
+
 
         ORDER BY -1
             * COALESCE((MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1), 0.5)
