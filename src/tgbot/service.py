@@ -45,7 +45,6 @@ async def save_tg_user(
 
 async def create_user(
     id: int,
-    nickname: str | None = None,
 ) -> None:
     """
     Creates a row in user table
@@ -54,8 +53,8 @@ async def create_user(
     sql = f"""
         INSERT
         INTO "user"
-        (id, type, last_active_at, nickname)
-        VALUES ({id}, '{UserType.USER.value}', NOW(), '{nickname}')
+        (id, type, last_active_at)
+        VALUES ({id}, '{UserType.USER.value}', NOW())
         ON CONFLICT(id)
         DO UPDATE SET
             blocked_bot_at = NULL,

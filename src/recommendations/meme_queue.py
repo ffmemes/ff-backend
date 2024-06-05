@@ -100,25 +100,22 @@ async def generate_recommendations(user_id, limit):
             )
 
     else:
-        if r < 0.25:
+        if r < 0.5:
             candidates = await classic(
                 user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
             )
-        elif r < 0.5:
-            candidates = await like_spread_and_recent_memes(
-                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-            )
-        elif r < 0.75:
-            candidates = await get_best_memes_from_each_source(
-                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-            )
         else:
-            candidates = await less_seen_meme_and_source(
+            candidates = await like_spread_and_recent_memes(
                 user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
             )
 
     if len(candidates) == 0:
         candidates = await classic(
+            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+        )
+
+    if len(candidates) == 0 and user_info["nmemes_sent"] > 1000:
+        candidates = await less_seen_meme_and_source(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
 

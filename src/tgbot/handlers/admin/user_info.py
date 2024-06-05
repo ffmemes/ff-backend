@@ -25,11 +25,11 @@ async def handle_show_user_info(
         await update.message.reply_text(f"🚫 User @{username} not found.")
         return
 
-    selected_user_info = await update_user_info_cache(selected_user["id"])
-
     # TODO: create a function which creates a user info string
     await calculate_user_stats()  # regenerate user stats
     await calculate_inviter_stats()
+
+    selected_user_info = await update_user_info_cache(selected_user["id"])
 
     report = await get_user_stats_report(selected_user_info["id"])
 

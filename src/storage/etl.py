@@ -108,24 +108,24 @@ async def insert_parsed_posts_from_vk(
 
 async def insert_parsed_posts_from_ig(
     meme_source_id: int,
-    vk_posts: list[IgPostParsingResult,],
+    ig_posts: list[IgPostParsingResult,],
 ) -> None:
     result = await fetch_all(
         select(meme_raw_ig.c.post_id)
         .where(meme_raw_ig.c.meme_source_id == meme_source_id)
-        .where(meme_raw_ig.c.post_id.in_([post.post_id for post in vk_posts]))
+        .where(meme_raw_ig.c.post_id.in_([post.post_id for post in ig_posts]))
     )
     post_ids_in_db = {row["post_id"] for row in result}
 
     posts_to_create = [
         post.model_dump() | {"meme_source_id": meme_source_id}
-        for post in vk_posts
+        for post in ig_posts
         if post.post_id not in post_ids_in_db
     ]
 
     if len(posts_to_create) > 0:
         print(f"Going to insert {len(posts_to_create)} new posts.")
-        await execute(insert(vk_posts).values(posts_to_create))
+        await execute(insert(meme_raw_ig).values(posts_to_create))
 
     posts_to_update = [
         post.model_dump()
@@ -133,7 +133,7 @@ async def insert_parsed_posts_from_ig(
             "meme_source_id": meme_source_id,
             "updated_at": datetime.now(timezone.utc).replace(tzinfo=None),
         }
-        for post in vk_posts
+        for post in ig_posts
         if post.post_id in post_ids_in_db
     ]
 
