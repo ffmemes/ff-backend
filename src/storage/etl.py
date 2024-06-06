@@ -139,9 +139,9 @@ async def insert_parsed_posts_from_ig(
 
     for post in posts_to_update:
         update_query = (
-            meme_raw_vk.update()
-            .where(meme_raw_vk.c.meme_source_id == meme_source_id)
-            .where(meme_raw_vk.c.post_id == post["post_id"])
+            meme_raw_ig.update()
+            .where(meme_raw_ig.c.meme_source_id == meme_source_id)
+            .where(meme_raw_ig.c.post_id == post["post_id"])
             .values(post)
         )
         await execute(update_query)
