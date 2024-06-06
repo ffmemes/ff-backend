@@ -1,5 +1,5 @@
+from prefect.client.schemas.schedules import CronSchedule
 from prefect.deployments import Deployment
-from prefect.server.schemas.schedules import CronSchedule
 
 from src.config import settings
 from src.flows.broadcasts.meme import (
@@ -14,7 +14,7 @@ from src.flows.broadcasts.meme import (
 deployment_broadcast_15m_ago = Deployment.build_from_flow(
     flow=broadcast_next_meme_to_active_15m_ago,
     name="broadcast_next_meme_to_active_15m_ago",
-    schedule=(CronSchedule(cron="*/15 * * * *", timezone="Europe/London")),
+    schedules=[CronSchedule(cron="*/15 * * * *", timezone="Europe/London")],
     work_pool_name=settings.ENVIRONMENT,
 )
 
@@ -24,7 +24,7 @@ deployment_broadcast_15m_ago.apply()
 deployment_broadcast_24h_ago = Deployment.build_from_flow(
     flow=broadcast_next_meme_to_active_24h_ago,
     name="broadcast_next_meme_to_active_24h_ago",
-    schedule=(CronSchedule(cron="5 * * * *", timezone="Europe/London")),
+    schedules=[CronSchedule(cron="5 * * * *", timezone="Europe/London")],
     work_pool_name=settings.ENVIRONMENT,
 )
 
@@ -35,7 +35,7 @@ deployment_broadcast_24h_ago.apply()
 deployment_broadcast_48h_ago = Deployment.build_from_flow(
     flow=broadcast_next_meme_to_active_48h_ago,
     name="broadcast_next_meme_to_active_48h_ago",
-    schedule=(CronSchedule(cron="5 * * * *", timezone="Europe/London")),
+    schedules=[CronSchedule(cron="5 * * * *", timezone="Europe/London")],
     work_pool_name=settings.ENVIRONMENT,
 )
 
