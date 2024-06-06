@@ -79,7 +79,7 @@ async def next_message(
         # TODO: also edit / delete previous message
         return await send_queue_preparing_alert(bot, user_id)
 
-    reply_markup = meme_reaction_keyboard(meme.id)
+    reply_markup = meme_reaction_keyboard(meme.id, user_id)
     meme.caption = await get_meme_caption_for_user_id(meme, user_id, user_info)
 
     send_new_message = (

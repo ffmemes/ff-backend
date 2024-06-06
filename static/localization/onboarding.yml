@@ -8,7 +8,7 @@ onboarding.welcome_message:
 
     <i>How to use:</i>
     1. You will receive a meme.
-    2. Press 👍 / 👎 buttons to react on meme.
+    2. Smash like for memes you enjoy
     3. <b>AI</b> will reply with the next meme based on your <b>reaction</b>.
 
     We will send you 10 memes now to better understand your taste.
@@ -23,7 +23,7 @@ onboarding.welcome_message:
 
     <i>Как пользоваться ботом:</i>
     1. Ты получишь мем.
-    2. Оцени мем, нажав на кнопки 👍 / 👎.
+    2. Лайкай те, что зашли
     3. <b>AI</b> подберет тебе следующий мем!
 
     Больше сидишь в боте - AI лучше рекомендует. Все просто 🎭
@@ -40,7 +40,7 @@ onboarding.welcome_message:
 
     <i>Як користуватися ботом:</i>
     1. Ти отримаєш мем.
-    2. Оціни мем, натиснувши на кнопки 👍 / 👎.
+    2. Лайкай ті, що сподобались
     3. <b>AI</b> підбере тобі наступний мем!
 
     Більше сидиш в боті - AI краще рекомендує. Все просто 🎭
@@ -57,7 +57,7 @@ onboarding.welcome_message:
 
     <i>Cómo usar:</i>
     1. Recibirás un meme.
-    2. Pulsa los botones 👍 / 👎 para reaccionar al meme.
+    2. Dale like a los memes que te gusten.
     3. <b>AI</b> responderá con el siguiente meme basado en tu <b>reacción</b>.
 
     Te enviaremos 10 memes ahora para entender mejor tu gusto.
@@ -72,7 +72,7 @@ onboarding.welcome_message:
 
     <i>Como usar:</i>
     1. Você receberá um meme.
-    2. Pressione os botões 👍 / 👎 para reagir ao meme.
+    2. Dê like nos memes que você gostar.
     3. <b>AI</b> responderá com o próximo meme com base na sua <b>reação</b>.
 
     Vamos enviar 10 memes agora para entender melhor o seu gosto.
@@ -88,7 +88,7 @@ onboarding.welcome_message:
 
     <i>Comment utiliser :</i>
     1. Vous recevrez un meme.
-    2. Appuyez sur les boutons 👍 / 👎 pour réagir au meme.
+    2. Likez les memes que vous aimez.
     3. <b>AI</b> répondra avec le meme suivant en fonction de votre <b>réaction</b>.
 
     Nous vous enverrons 10 memes maintenant pour mieux comprendre vos goûts.
@@ -103,7 +103,7 @@ onboarding.welcome_message:
 
     <i>Come usare:</i>
     1. Riceverai un meme.
-    2. Premi i pulsanti 👍 / 👎 per reagire al meme.
+    2. Metti like ai meme che ti piacciono.
     3. <b>AI</b> risponderà con il meme successivo in base alla tua <b>reazione</b>.
 
     Ti invieremo 10 meme ora per capire meglio i tuoi gusti.
@@ -118,7 +118,7 @@ onboarding.welcome_message:
 
     <i>چگونه استفاده کنید:</i>
     1. شما یک میمز دریافت خواهید کرد.
-    2. دکمه‌های 👍 / 👎 را فشار دهید تا به میمز واکنش نشان دهید.
+    2. برای میمزهایی که دوست دارید، لایک کنید.
     3. <b>هوش مصنوعی</b> بر اساس <b>واکنش</b> شما با میمز بعدی پاسخ خواهد داد.
 
     ما در حال ارسال 10 میمز به شما هستیم تا بهترین سلیقه‌ی شما را درک کنیم.
@@ -133,7 +133,7 @@ onboarding.welcome_message:
 
     <i>Qanday foydalanish:</i>
     1. Siz mamlakatimizdan mamlakat olasiz.
-    2. 👍 / 👎 tugmalarini bosib mamlakatga reaksiya bildirishingiz mumkin.
+    2. Sizga yoqgan mamlakatlarga laik qo'yasiz
     3. <b>AI</b> sizning <b>reaksiyangiz</b> asosida keyingi mamlakatni tanlaydi.
 
     Biz sizga 10 mamlakat yuboramiz, sizning taqdiringizni yaxshi tushunish uchun.
@@ -166,6 +166,21 @@ onboarding.invitation_successfull_alert:
   de: |-
     🎉 Dein Freund {invited_user_name} ist gerade dem Bot beigetreten!
     Teile weiterhin Memes vom Bot und du wirst vielleicht belohnt 🤫 🔺 💎
+  uz: |-
+    🎉 Sizning do'stingiz {invited_user_name} faqat hozir botga kirdi!
+    Botdan mamlakatlar almashib yuboring va shayd, sizga mukofot beriladi 🤫🔺💎
+  fa: |-
+    🎉 دوست شما {invited_user_name} به تازگی به بات پیوست!
+    ادامه دادن به اشتراک گذاری میمز از بات ممکن است مزایا داشته باشد 🤫🔺💎
+  ar: |-
+    🎉 صديقك {invited_user_name} انضم للتو إلى البوت!
+    استمر في مشاركة الميمز من البوت وقد تحصل على مكافأة 🤫🔺💎
+  tr: |-
+    🎉 Arkadaşın {invited_user_name} botumuza katıldı!
+    Botun memelerini paylaşmaya devam et ve ödüllendirilebilirsin 🤫🔺💎
+  hi: |-
+    🎉 आपका दोस्त {invited_user_name} अभी बॉट में शामिल हुआ है!
+    बॉट से मीम शेयर करना जारी रखें और आपको इनाम मिल सकता है 🤫🔺💎
 
 
 onboarding.invited_by_admin:
@@ -189,6 +204,12 @@ onboarding.invited_by_admin:
     💎 Salom! Endi sizga ham kirish berildi. ➡️ /start tugmasini bosing
   fa: |-
     💎 سلام! حالا شما هم دسترسی دارید. روی ➡️ /start کلیک کنید
+  ar: |-
+    💎 مرحبًا! الآن لديك أيضًا الوصول. انقر على ➡️ /start
+  tr: |-
+    💎 Merhaba! Artık senin de erişimin var. ➡️ /start'a tıkla
+  hi: |-
+    💎 नमस्ते! अब आपके पास भी पहुंच है। ➡️ /start पर क्लिक करें
 
 
 onboarding.language_settings:
@@ -212,7 +233,14 @@ onboarding.language_settings:
     Meme olishni istagan BARCHA tillarni tanlang
   fa: |-
     همه زبان‌هایی که می‌خواهید میمز دریافت کنید را انتخاب کنید
-  
+  ar: |-
+    اختر جميع اللغات التي تريد استلام الميمز بها
+  hi: |-
+    सभी भाषाएं चुनें जिनमें आप मीम प्राप्त करना चाहते हैं
+  tr: |-
+    Meme almak istediğiniz TÜM dilleri seçin
+  uk: |-
+    Оберіть ВСІ мови, на яких ви хочете отримувати меми
 
 
 onboarding.language_settings_end_button:
@@ -236,3 +264,9 @@ onboarding.language_settings_end_button:
     💎 برویم 💎
   pt-br: |-
     🚀 VAMOS LÁ 🚀
+  ar: |-
+    💎 لنذهب 💎
+  hi: |-
+    🚀 चलो चलें 🚀
+  tr: |-
+    🚀 HADİ GİDELİM 🚀
