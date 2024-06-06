@@ -5,6 +5,7 @@ from telegram import Bot
 
 from src.broadcasts.service import (
     get_users_active_minutes_ago,
+    get_users_active_more_than_days_ago,
 )
 from src.recommendations.meme_queue import check_queue, get_next_meme_for_user
 from src.recommendations.service import create_user_meme_reaction
@@ -66,4 +67,11 @@ async def broadcast_next_meme_to_active_1w_ago():
 @flow
 async def broadcast_next_meme_to_active_4w_ago():
     users = await get_users_active_minutes_ago(4 * 7 * 24 * 60, 4 * 7 * 24 * 60 + 60)
+    await broadcast_next_meme_to_users(users)
+
+
+@flow
+async def broadcast_next_meme_to_active_more_than_days_ago(days: int = 3):
+    """To call manually sometimes"""
+    users = await get_users_active_more_than_days_ago(days)
     await broadcast_next_meme_to_users(users)
