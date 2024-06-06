@@ -18,7 +18,7 @@ from src.tgbot.user_info import get_user_info
 
 async def send_meme_to_user(bot: Bot, user_id: int, meme: MemeData):
     user_info = await get_user_info(user_id)
-    reply_markup = meme_reaction_keyboard(meme.id)
+    reply_markup = meme_reaction_keyboard(meme.id, user_id)
     meme.caption = await get_meme_caption_for_user_id(meme, user_id, user_info)
 
     await send_new_message_with_meme(bot, user_id, meme, reply_markup)
