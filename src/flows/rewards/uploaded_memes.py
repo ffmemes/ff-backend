@@ -96,8 +96,8 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
             enternal_id=today,
         )
 
-        await log_meme_sent(top_meme["id"], channel=Channel.TG_CHANNEL_RU)
-        await update_meme(top_meme["id"], status=MemeStatus.PUBLISHED)
+        await log_meme_sent(top_meme["meme_id"], channel=Channel.TG_CHANNEL_RU)
+        await update_meme(top_meme["meme_id"], status=MemeStatus.PUBLISHED)
 
     # send message to tgchannelru
 

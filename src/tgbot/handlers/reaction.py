@@ -10,6 +10,7 @@ from telegram.ext import (
     ContextTypes,
 )
 
+from src.flows.rewards.daily import reward_user_for_daily_activity
 from src.recommendations.service import (
     update_user_last_active_at,
     update_user_meme_reaction,
@@ -28,6 +29,7 @@ async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # do that in sync since we'll use counters in next_message
     await update_user_info_counters(user_id)
     asyncio.create_task(update_user_last_active_at(user_id))
+    asyncio.create_task(reward_user_for_daily_activity(user_id))
 
     reaction_is_new = await update_user_meme_reaction(
         user_id=user_id,
