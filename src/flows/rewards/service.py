@@ -9,6 +9,7 @@ async def get_all_uploaded_memes_weerly_ru() -> list[dict[str, Any]]:
     select_statement = """
         SELECT
             M.id meme_id,
+            M.status,
             M.telegram_file_id,
             S.added_by AS author_id,
             U.nickname,
