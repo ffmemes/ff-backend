@@ -93,7 +93,7 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
             bot,
             top_meme["author_id"],
             type,
-            enternal_id=today,
+            external_id=today,
         )
 
         if top_meme["status"] != MemeStatus.PUBLISHED:

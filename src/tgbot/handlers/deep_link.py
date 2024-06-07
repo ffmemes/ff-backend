@@ -49,7 +49,7 @@ async def handle_deep_link_used(
                 bot,
                 invitor_user_id,
                 TrxType.USER_INVITER_PREMIUM if is_premium else TrxType.USER_INVITER,
-                enternal_id=str(invited_user["id"]),
+                external_id=str(invited_user["id"]),
             )
 
             await log(f"🤝 #{invitor_user_id} invited {invited_user_name}")

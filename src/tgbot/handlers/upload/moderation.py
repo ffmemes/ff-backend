@@ -208,7 +208,7 @@ async def handle_uploaded_meme_review_button(
         context.bot,
         update.effective_user.id,
         TrxType.MEME_UPLOAD_REVIEWER,
-        enternal_id=str(meme["id"]),
+        external_id=str(meme["id"]),
     )
 
     if action == "approve":
@@ -241,7 +241,7 @@ async def handle_uploaded_meme_review_button(
             context.bot,
             meme_upload["user_id"],
             TrxType.MEME_UPLOADER,
-            enternal_id=str(meme["id"]),
+            external_id=str(meme["id"]),
         )
 
         await context.bot.send_message(
