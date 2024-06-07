@@ -18,7 +18,7 @@ async def reward_user_for_daily_activity(user_id: int):
         res = await pay_if_not_paid(
             user_id,
             TrxType.DAILY_REWARD,
-            external_id=datetime.today().strftime("%Y-%m-%d"),
+            datetime.today().strftime("%Y-%m-%d"),
         )
         if res:
             msg = (

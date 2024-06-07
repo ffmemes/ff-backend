@@ -22,16 +22,16 @@ from src.tgbot.logs import log
 async def pay_if_not_paid(
     user_id: int,
     type: TrxType,
-    enternal_id: str | None = None,
+    external_id: str | None = None,
 ) -> None:
-    if await check_if_treasury_trx_exists(user_id, type, external_id=enternal_id):
+    if await check_if_treasury_trx_exists(user_id, type, external_id=external_id):
         return
 
     _ = await create_treasury_trx(
         user_id,
         type,
         PAYOUTS[type],
-        external_id=enternal_id,
+        external_id=external_id,
     )
 
     return await get_user_balance(user_id)
@@ -41,10 +41,10 @@ async def pay_if_not_paid_with_alert(
     bot: Bot,
     user_id: int,
     type: TrxType,
-    enternal_id: str | None = None,
+    external_id: str | None = None,
 ) -> None:
     # TODO: atomic?
-    if not await pay_if_not_paid(user_id, type, enternal_id):
+    if not await pay_if_not_paid(user_id, type, external_id):
         return
 
     await bot.send_message(
