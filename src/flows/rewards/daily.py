@@ -21,12 +21,10 @@ async def reward_user_for_daily_activity(user_id: int):
             datetime.today().strftime("%Y-%m-%d"),
         )
         if res:
-            msg = (
-                localizer.t(
-                    "rewards.daily_reward",
-                    user_info["interface_lang"],
-                ).format(amount=PAYOUTS[TrxType.DAILY_REWARD]),
-            )
+            msg = localizer.t(
+                "rewards.daily_reward",
+                user_info["interface_lang"],
+            ).format(amount=PAYOUTS[TrxType.DAILY_REWARD])
             await bot.send_message(
                 user_id,
                 msg,
