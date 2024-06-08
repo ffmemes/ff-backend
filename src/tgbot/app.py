@@ -45,10 +45,6 @@ from src.tgbot.handlers.admin.broadcast_text import (
 )
 from src.tgbot.handlers.admin.forward_channel import handle_forwarded_from_tgchannelru
 from src.tgbot.handlers.admin.user_info import delete_user_data, handle_show_user_info
-from src.tgbot.handlers.admin.waitlist import (
-    handle_waitlist_invite,
-    handle_waitlist_invite_before,
-)
 from src.tgbot.handlers.chat.chat_member import handle_chat_member_update
 from src.tgbot.handlers.chat.explain_meme import explain_meme_en, explain_meme_ru
 from src.tgbot.handlers.chat.feedback import (
@@ -198,21 +194,6 @@ def add_handlers(application: Application) -> None:
     )
 
     ############## admin
-    # invite user from waitlist
-    application.add_handler(
-        CommandHandler(
-            "invite",
-            handle_waitlist_invite,
-            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
-        )
-    )
-    application.add_handler(
-        CommandHandler(
-            "invite_before",
-            handle_waitlist_invite_before,
-            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
-        )
-    )
 
     application.add_handler(
         MessageHandler(

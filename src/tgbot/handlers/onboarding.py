@@ -21,7 +21,7 @@ async def onboarding_flow(update: Update, bot: Bot):
             parse_mode=ParseMode.HTML,
         )
 
-        await asyncio.sleep(10)
+        await asyncio.sleep(3)
 
         m = await update.effective_user.send_message("3️⃣")
         await asyncio.sleep(2)
@@ -29,8 +29,8 @@ async def onboarding_flow(update: Update, bot: Bot):
         await asyncio.sleep(2)
         m = await m.edit_text("1️⃣")
         await asyncio.sleep(2)
-        m = await m.edit_text("💣")
-        await asyncio.sleep(2.5)
+        # m = await m.edit_text("💣")
+        # await asyncio.sleep(2.5)
         await m.delete()
 
     return await next_message(
