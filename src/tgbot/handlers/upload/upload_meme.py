@@ -86,7 +86,7 @@ async def handle_message_with_meme(
 ) -> None:
     """When a user sends a message with a meme"""
     user = await get_user_info(update.effective_user.id)
-    if user["nmemes_sent"] < 50:
+    if user["nmemes_sent"] < 10:
         return await update.message.reply_text(
             localizer.t("upload.watch_memes_to_unblock_upload", user["interface_lang"]),
         )
