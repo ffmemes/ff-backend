@@ -7,6 +7,7 @@ from telegram import Message
 
 from src.database import (
     execute,
+    fetch_all,
     fetch_one,
     meme,
     meme_raw_upload,
@@ -113,3 +114,25 @@ async def count_24h_uploaded_not_approved_memes(user_id: int) -> int:
     """
     res = await execute(text(query))
     return res.scalar()
+
+
+async def get_uploaded_memes_of_user_id(user_id: int) -> list[dict[str, Any]]:
+    query = f"""
+        SELECT
+            M.id meme_id,
+            M.status,
+            MS.nmemes_sent,
+            MS.nlikes,
+            MS.ndislikes
+        FROM meme M
+        LEFT JOIN meme_source S
+            ON M.meme_source_id = S.id
+        LEFT JOIN meme_stats MS
+            ON M.id = MS.meme_id
+        WHERE 1=1
+            AND S.added_by = {user_id}
+            AND S.type = 'user upload'
+            AND M.status IN ('ok', 'published')
+        ORDER BY M.created_at DESC
+    """
+    return await fetch_all(text(query))

@@ -60,7 +60,7 @@ from src.tgbot.handlers.treasury.commands import (
     handle_show_kitchen,
     handle_show_leaderbaord,
 )
-from src.tgbot.handlers.upload import moderation, upload_meme
+from src.tgbot.handlers.upload import moderation, stats, upload_meme
 
 application: Application = None  # type: ignore
 
@@ -276,6 +276,14 @@ def add_handlers(application: Application) -> None:
         CallbackQueryHandler(
             moderation.handle_uploaded_meme_review_button,
             pattern=moderation.UPLOADED_MEME_REVIEW_CALLBACK_DATA_REGEXP,
+        )
+    )
+
+    application.add_handler(
+        CommandHandler(
+            "uploads",
+            stats.handle_uploaded_memes_stats,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
         )
     )
 
