@@ -9,6 +9,7 @@ from src.tgbot.handlers.treasury.service import (
     get_leaderboard,
     get_user_balance,
     get_user_place_in_leaderboard,
+    get_token_supply,
 )
 from src.tgbot.senders.utils import get_random_emoji
 
@@ -93,6 +94,9 @@ You:
             LEADERBOARD_TEXT += (
                 "To see your place in the leaderboard, set your /nickname ⬅️\n\n"
             )
+
+    tokens = await get_token_supply()
+    LEADERBOARD_TEXT += f"\n Total supply: {tokens} 🍔"
 
     return await update.message.reply_text(LEADERBOARD_TEXT, parse_mode=ParseMode.HTML)
 

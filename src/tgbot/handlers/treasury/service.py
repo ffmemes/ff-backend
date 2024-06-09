@@ -32,6 +32,12 @@ async def get_leaderboard(limit=10) -> list[dict[str, Any]]:
     return await fetch_all(select_statement)
 
 
+async def get_token_supply() -> int:
+    select_statement = select(func.sum(treasury_trx.c.amount))
+    result = await execute(select_statement)
+    return result.scalar()
+
+
 async def get_user_place_in_leaderboard(user_id: int) -> int:
     return await fetch_one(
         text(
