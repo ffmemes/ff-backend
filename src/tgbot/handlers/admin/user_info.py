@@ -30,8 +30,7 @@ async def handle_show_user_info(
     await calculate_inviter_stats()
 
     selected_user_info = await update_user_info_cache(selected_user["id"])
-
-    report = await get_user_stats_report(selected_user_info["id"])
+    report = await get_user_stats_report(selected_user["id"])
 
     await update.message.reply_text(
         f"""
