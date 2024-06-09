@@ -46,10 +46,8 @@ Just forward a meme to our bot to upload it. Only pics are supported yet.
 👍 Likes: {total_likes}
 ♥️ Like %: {total_like_prc}%
 
-
 <b>Latest uploads</b>
-views - likes - like %
-    """
+views - likes - like %"""
 
     # show stats for last 5 uploads:
     for uploaded_meme in uploaded_memes[-5:]:
@@ -60,7 +58,7 @@ views - likes - like %
 
         STATS_TEXT += f"\n▪ {views} - {likes} - {like_prc}%"
 
-    STATS_TEXT += "\nupload more memes and win lots of 🍔 /kitchen"
+    STATS_TEXT += "\n\nUpload more memes and win lots of 🍔 /kitchen"
 
     await update.message.reply_text(
         STATS_TEXT,
