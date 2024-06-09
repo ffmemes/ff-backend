@@ -6,7 +6,10 @@
 """
 
 
-from telegram import Update
+from telegram import (
+    InputMediaPhoto,
+    Update,
+)
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
@@ -50,17 +53,21 @@ Just forward a meme to our bot to upload it. Only pics are supported yet.
 views - likes - like %"""
 
     # show stats for last 5 uploads:
+    media = []
     for uploaded_meme in uploaded_memes[-5:]:
         views = uploaded_meme["nmemes_sent"]
         likes = uploaded_meme["nlikes"]
         dislikes = uploaded_meme["ndislikes"]
         like_prc = round(likes * 100.0 / (likes + dislikes))
 
+        media.append(InputMediaPhoto(media=uploaded_meme["telegram_file_id"]))
+
         STATS_TEXT += f"\n▪ {views} - {likes} - {like_prc}%"
 
     STATS_TEXT += "\n\nUpload more memes and win lots of 🍔 /kitchen"
 
-    await update.message.reply_text(
-        STATS_TEXT,
+    await update.message.reply_media_group(
+        media=media,
+        caption=STATS_TEXT,
         parse_mode=ParseMode.HTML,
     )
