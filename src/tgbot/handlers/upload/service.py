@@ -135,6 +135,6 @@ async def get_uploaded_memes_of_user_id(user_id: int) -> list[dict[str, Any]]:
             AND S.added_by = {user_id}
             AND S.type = 'user upload'
             AND M.status IN ('ok', 'published')
-        ORDER BY M.created_at DESC
+        ORDER BY M.created_at
     """
     return await fetch_all(text(query))
