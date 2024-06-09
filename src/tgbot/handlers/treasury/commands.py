@@ -7,9 +7,9 @@ from telegram.ext import (
 from src.tgbot.handlers.treasury.constants import PAYOUTS, TrxType
 from src.tgbot.handlers.treasury.service import (
     get_leaderboard,
+    get_token_supply,
     get_user_balance,
     get_user_place_in_leaderboard,
-    get_token_supply,
 )
 from src.tgbot.senders.utils import get_random_emoji
 
@@ -75,6 +75,9 @@ async def handle_show_leaderbaord(
         nick = user["nickname"] or get_random_emoji() * 3
         LEADERBOARD_TEXT += f"{icon} - {nick} - {user['balance']} 🍔\n"
 
+    tokens = await get_token_supply()
+    LEADERBOARD_TEXT += f"\nTotal supply: {tokens} 🍔"
+
     user_lb_data = await get_user_place_in_leaderboard(update.effective_user.id)
     if user_lb_data:
         place, nickname, balance = (
@@ -94,9 +97,6 @@ You:
             LEADERBOARD_TEXT += (
                 "To see your place in the leaderboard, set your /nickname ⬅️\n\n"
             )
-
-    tokens = await get_token_supply()
-    LEADERBOARD_TEXT += f"\n Total supply: {tokens} 🍔"
 
     return await update.message.reply_text(LEADERBOARD_TEXT, parse_mode=ParseMode.HTML)
 
