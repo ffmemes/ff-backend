@@ -31,6 +31,7 @@ from src.tgbot.handlers.upload.service import (
     update_meme_by_upload_id,
 )
 from src.tgbot.user_info import get_user_info
+from src.tgbot.handlers.upload.constants import SUPPORTED_LANGUAGES
 
 UPLOADED_MEME_REIVIEW_CALLBACK_DATA_PATTERN = "upload:{upload_id}:review:{action}"
 UPLOADED_MEME_REVIEW_CALLBACK_DATA_REGEXP = r"upload:(\d+):review:(\w+)"
@@ -152,11 +153,12 @@ async def send_uploaded_meme_to_manual_review(
     meme_upload: dict[str, Any],
     bot: Bot,
 ) -> None:
+    meme_lang = SUPPORTED_LANGUAGES.get(meme["language_code"]) or meme["language_code"]
     text = f"""
 👨‍✈️ REVIEW MEME #{meme["id"]}
 <b>Upload Id</b>: {meme_upload["id"]}
 <b>Uploaded by</b>: #{meme_upload["user_id"]}
-<b>Language code</b>: {meme["language_code"]}
+<b>Language code</b>: {meme_lang}
     """
 
     if meme_upload["forward_origin"]:

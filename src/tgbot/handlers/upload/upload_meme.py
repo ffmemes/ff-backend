@@ -13,6 +13,7 @@ from telegram.ext import ContextTypes
 
 from src import localizer
 from src.recommendations.meme_queue import check_queue
+from src.tgbot.handlers.upload.constants import SUPPORTED_LANGUAGES
 from src.tgbot.handlers.upload.moderation import uploaded_meme_auto_review
 from src.tgbot.handlers.upload.service import (
     count_24h_uploaded_not_approved_memes,
@@ -28,15 +29,6 @@ from src.tgbot.utils import (
     get_related_channel_link,
 )
 
-LANGUAGES = {
-    "ru": "🇷🇺 Русский",
-    "uk": "🇺🇦 Українська",
-    "en": "🇺🇸 English 🇬🇧",
-    "es": "🇪🇸 Español",
-    "ar": "🇸🇦 العربية",
-    "uz": "🇺🇿 O'zbekcha",
-}
-
 RULES_ACCEPTED_CALLBACK_DATA_PATTERN = "upload:{upload_id}:rules:accepted"
 RULES_ACCEPTED_CALLBACK_DATA_REGEXP = r"upload:(\d+):rules:accepted"
 
@@ -49,7 +41,7 @@ LANGUAGE_SELECTED_OTHER_CALLBACK_DATA_REGEXP = r"upload:(\d+):lang:other"
 
 def get_meme_language_selector_keyboard(upload_id: int) -> list[list[dict]]:
     all_lang_buttons = []
-    for lang, lang_text in LANGUAGES.items():
+    for lang, lang_text in SUPPORTED_LANGUAGES.items():
         button_text = lang_text or lang
 
         all_lang_buttons.append(
