@@ -85,7 +85,7 @@ async def handle_get_meme(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     try:
-        meme_ids = [int(i) for i in message_split[1:]]
+        meme_ids = [int(i.replace(",", "").strip()) for i in message_split[1:]]
     except ValueError:
         await update.message.reply_text(
             "Please specify a valid <code>meme_id</code> (a number!)",
