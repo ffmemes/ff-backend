@@ -247,12 +247,12 @@ async def handle_uploaded_meme_review_button(
         await context.bot.send_message(
             chat_id=meme_upload["user_id"],
             reply_to_message_id=meme_upload["message_id"],
-            text=f"""
+            text="""
 🎉🎉🎉
 
 Your <b>meme has been approved</b> and soon bot will send it to other users!
 
-You can see your meme #{meme["id"]} stats on <a href="{LEADERBOARD_URL}">LEADERBOARD</a>
+See realtime stats of your uploaded memes: /uploads
             """,
             parse_mode=ParseMode.HTML,
         )

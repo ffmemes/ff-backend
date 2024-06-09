@@ -21,7 +21,7 @@ async def handle_uploaded_memes_stats(
 
     uploaded_memes = await get_uploaded_memes_of_user_id(update.effective_user.id)
     if len(uploaded_memes) == 0:
-        await update.message.reply(
+        await update.message.reply_text(
             """
 📭 <b>You haven't uploaded any memes yet!</b>
 
@@ -60,7 +60,9 @@ views - likes - like %
 
         STATS_TEXT += f"\n▪ {views} - {likes} - {like_prc}%"
 
-    await update.message.reply(
+    STATS_TEXT += "\nupload more memes and win lots of 🍔 /kitchen"
+
+    await update.message.reply_text(
         STATS_TEXT,
         parse_mode=ParseMode.HTML,
     )
