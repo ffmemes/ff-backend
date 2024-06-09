@@ -21,11 +21,9 @@ HEART_EMOJI = ["❤️", "♥️", "💙", "💜", "💛", "🧡", "💚", "🩵
 
 
 def meme_reaction_keyboard(meme_id: int, user_id: int):
-    if user_id // 4 == 0:
-        heart = random.choice(HEART_EMOJI)
-        like, dislike = heart, "⏬"
-    else:
-        like, dislike = "👍", "👎"
+    heart = random.choice(HEART_EMOJI)
+    like, dislike = heart, "⏬"
+    # like, dislike = "👍", "👎"
 
     return InlineKeyboardMarkup(
         [
