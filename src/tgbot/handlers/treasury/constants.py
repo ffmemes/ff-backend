@@ -15,6 +15,8 @@ class TrxType(str, Enum):
 
     DAILY_REWARD = "daily_reward"
 
+    MEME_PUBLISHED = "meme_published"
+
 
 PAYOUTS = {
     TrxType.MEME_UPLOADER: 5,
@@ -27,6 +29,7 @@ PAYOUTS = {
     TrxType.UPLOADER_TOP_WEEKLY_4: 100,
     TrxType.UPLOADER_TOP_WEEKLY_5: 50,
     TrxType.DAILY_REWARD: 1,
+    TrxType.MEME_PUBLISHED: 50,
 }
 
 # TODO: localize
@@ -41,4 +44,5 @@ TRX_TYPE_DESCRIPTIONS = {
     TrxType.UPLOADER_TOP_WEEKLY_4: "weekly top 4 meme",
     TrxType.UPLOADER_TOP_WEEKLY_5: "weekly top 5 meme",
     TrxType.DAILY_REWARD: "daily activity",
+    TrxType.MEME_PUBLISHED: "meme published in our channel",
 }

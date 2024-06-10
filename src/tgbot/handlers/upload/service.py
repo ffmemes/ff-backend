@@ -138,3 +138,34 @@ async def get_uploaded_memes_of_user_id(user_id: int) -> list[dict[str, Any]]:
         ORDER BY M.created_at
     """
     return await fetch_all(text(query))
+
+
+async def get_fans_of_user_id(user_id: int) -> list[dict[str, Any]]:
+    query = f"""
+        SELECT
+            COUNT(*) fans
+        FROM user_meme_source_stats UMSS
+        INNER JOIN meme_source S
+            ON S.id = UMSS.meme_source_id
+        WHERE 1=1
+            AND S.type = 'user upload'
+            AND S.added_by = {user_id}
+            AND UMSS.nlikes >= UMSS.ndislikes
+    """
+    res = await execute(text(query))
+    return res.scalar()
+
+
+async def get_meme_uploader_user_id(meme_id: int) -> int | None:
+    query = f"""
+        SELECT
+            S.added_by
+        FROM meme M
+        INNER JOIN meme_source S
+            ON S.id = M.meme_source_id
+        WHERE 1=1
+            AND M.id = {meme_id}
+            AND S.type = 'user upload'
+    """
+    res = await execute(text(query))
+    return res.scalar()

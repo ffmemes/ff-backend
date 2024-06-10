@@ -6,6 +6,7 @@ from src.recommendations.candidates import (
     get_best_memes_from_each_source,
     less_seen_meme_and_source,
     like_spread_and_recent_memes,
+    uploaded_memes,
 )
 from src.recommendations.candidates_ab import get_selected_sources
 from src.storage.schemas import MemeData
@@ -90,7 +91,11 @@ async def generate_recommendations(user_id, limit):
             )
 
     elif user_info["nmemes_sent"] < 100:
-        if r < 0.5:
+        if r < 0.3:
+            candidates = await uploaded_memes(
+                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+            )
+        elif r < 0.6:
             candidates = await get_best_memes_from_each_source(
                 user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
             )
@@ -100,12 +105,16 @@ async def generate_recommendations(user_id, limit):
             )
 
     else:
-        if r < 0.5:
-            candidates = await classic(
+        if r < 0.3:
+            candidates = await uploaded_memes(
+                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+            )
+        if r < 0.6:
+            candidates = await like_spread_and_recent_memes(
                 user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
             )
         else:
-            candidates = await like_spread_and_recent_memes(
+            candidates = await classic(
                 user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
             )
 

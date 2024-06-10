@@ -91,7 +91,7 @@ async def handle_show_leaderbaord(
 You:
 #{place} - {nickname} - {balance} 🍔
 
-/kitchen /nickname /lang /chat
+/kitchen /uploads /chat
         """
         else:
             LEADERBOARD_TEXT += (

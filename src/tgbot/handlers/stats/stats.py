@@ -13,7 +13,7 @@ async def handle_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 <code>🤓 Your stats 🧐</code>
 {report}
 
-/leaderboard /kitchen /lang /chat
+/leaderboard /kitchen /uploads /chat
         """,
         parse_mode=ParseMode.HTML,
     )

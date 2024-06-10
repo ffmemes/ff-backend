@@ -311,6 +311,52 @@ async def classic(
     return res
 
 
+async def uploaded_memes(
+    user_id: int,
+    limit: int = 10,
+    exclude_meme_ids: list[int] = [],
+):
+    query = f"""
+        SELECT
+            M.id
+            , M.type, M.telegram_file_id, M.caption
+            , 'best_uploaded_memes' AS recommended_by
+
+        FROM meme M
+        INNER JOIN meme_stats MS
+            ON MS.meme_id = M.id
+
+        INNER JOIN meme_source S
+            ON S.id = M.meme_source_id
+
+        INNER JOIN user_language L
+            ON L.language_code = M.language_code
+            AND L.user_id = {user_id}
+
+        LEFT JOIN user_meme_reaction R
+            ON R.meme_id = M.id
+            AND R.user_id = {user_id}
+
+        LEFT JOIN user_meme_source_stats UMSS
+            ON UMSS.meme_source_id = M.meme_source_id
+            AND UMSS.user_id = {user_id}
+
+        WHERE 1=1
+            AND M.status = 'ok'
+            AND R.meme_id IS NULL
+            AND S.type = 'user upload'
+            {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+
+        ORDER BY -1
+            * (UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.)
+            * (MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1.)
+        NULLS FIRST
+        LIMIT {limit}
+    """
+    res = await fetch_all(text(query))
+    return res
+
+
 async def like_spread_and_recent_memes(
     user_id: int,
     limit: int = 10,

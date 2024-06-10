@@ -13,7 +13,10 @@ from telegram import (
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
-from src.tgbot.handlers.upload.service import get_uploaded_memes_of_user_id
+from src.tgbot.handlers.upload.service import (
+    get_fans_of_user_id,
+    get_uploaded_memes_of_user_id,
+)
 
 
 async def handle_uploaded_memes_stats(
@@ -36,6 +39,8 @@ Just forward a meme to our bot to upload it. Only pics are supported yet.
         )
         return
 
+    total_fans = await get_fans_of_user_id(update.effective_user.id)
+
     total_views = sum(m["nmemes_sent"] for m in uploaded_memes)
     total_likes = sum(m["nlikes"] for m in uploaded_memes)
     total_dislikes = sum(m["ndislikes"] for m in uploaded_memes)
@@ -45,9 +50,10 @@ Just forward a meme to our bot to upload it. Only pics are supported yet.
 <b>YOUR UPLOADED MEMES</b>
 
 📥 You uploaded <b>{len(uploaded_memes)}</b> memes
-👁️ Views: {total_views}
-👍 Likes: {total_likes}
-♥️ Like %: {total_like_prc}%
+👁️ Views: <b>{total_views}</b>
+👍 Likes: <b>{total_likes}</b>
+♥️ Like %: <b>{total_like_prc}%</b>
+🙋 Fans: <b>{total_fans}</b>
 
 <b>Latest uploads</b>
 views - likes - like %"""
@@ -64,7 +70,8 @@ views - likes - like %"""
 
         STATS_TEXT += f"\n▪ {views} - {likes} - {like_prc}%"
 
-    STATS_TEXT += "\n\nUpload more memes and win lots of 🍔 /kitchen"
+    STATS_TEXT += "\n\n<b>Upload more memes and win lots of 🍔</b> /kitchen"
+    STATS_TEXT += "\n/leaderboard /stats /balance"
 
     await update.message.reply_media_group(
         media=media,
