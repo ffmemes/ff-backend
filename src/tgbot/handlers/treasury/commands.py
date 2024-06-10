@@ -95,7 +95,7 @@ You:
         """
         else:
             LEADERBOARD_TEXT += (
-                "To see your place in the leaderboard, set your /nickname ⬅️\n\n"
+                "\nTo see your place in the leaderboard, set your /nickname ⬅️\n\n"
             )
 
     return await update.message.reply_text(LEADERBOARD_TEXT, parse_mode=ParseMode.HTML)
