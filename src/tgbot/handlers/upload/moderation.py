@@ -153,12 +153,12 @@ async def send_uploaded_meme_to_manual_review(
     meme_upload: dict[str, Any],
     bot: Bot,
 ) -> None:
+    user_info = await get_user_info(meme_upload["user_id"])
     meme_lang = SUPPORTED_LANGUAGES.get(meme["language_code"]) or meme["language_code"]
     text = f"""
 👨‍✈️ REVIEW MEME #{meme["id"]}
-<b>Upload Id</b>: {meme_upload["id"]}
-<b>Uploaded by</b>: #{meme_upload["user_id"]}
-<b>Language code</b>: {meme_lang}
+<b>Uploaded by</b>: #{meme_upload["user_id"]} {user_info["interface_lang"]}
+<b>Meme language</b>: {meme_lang}
     """
 
     if meme_upload["forward_origin"]:
