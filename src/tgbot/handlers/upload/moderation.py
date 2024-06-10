@@ -26,12 +26,12 @@ from src.storage.upload import download_meme_content_from_tg
 from src.tgbot.constants import UserType
 from src.tgbot.handlers.treasury.constants import TrxType
 from src.tgbot.handlers.treasury.payments import pay_if_not_paid_with_alert
+from src.tgbot.handlers.upload.constants import SUPPORTED_LANGUAGES
 from src.tgbot.handlers.upload.service import (
     get_meme_raw_upload_by_id,
     update_meme_by_upload_id,
 )
 from src.tgbot.user_info import get_user_info
-from src.tgbot.handlers.upload.constants import SUPPORTED_LANGUAGES
 
 UPLOADED_MEME_REIVIEW_CALLBACK_DATA_PATTERN = "upload:{upload_id}:review:{action}"
 UPLOADED_MEME_REVIEW_CALLBACK_DATA_REGEXP = r"upload:(\d+):review:(\w+)"
@@ -101,8 +101,8 @@ Something went wrong when we tried to upload your meme to Telegram. Just try aga
 
         # set like for the uploaded meme
         await create_user_meme_reaction(
+            meme_upload["user_id"],
             duplicate_meme_id,
-            meme["id"],
             "uploaded_meme",
             reaction_id=1,
             reacted_at=datetime.utcnow(),
