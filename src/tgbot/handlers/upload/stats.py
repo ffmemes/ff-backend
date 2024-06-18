@@ -60,7 +60,7 @@ views - likes - like %"""
 
     # show stats for last 5 uploads:
     media = []
-    for uploaded_meme in uploaded_memes[-5:]:
+    for uploaded_meme in uploaded_memes[:5]:
         views = uploaded_meme["nmemes_sent"]
         likes = uploaded_meme["nlikes"]
         dislikes = uploaded_meme["ndislikes"]
