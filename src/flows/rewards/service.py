@@ -21,8 +21,6 @@ async def get_all_uploaded_memes_weekly_ru() -> list[dict[str, Any]]:
             ON M.meme_source_id = S.id
         LEFT JOIN meme_stats MS
             ON M.id = MS.meme_id
-        LEFT JOIN user_language UL
-            ON S.added_by = UL.user_id
         LEFT JOIN "user" U
             ON U.id = S.added_by
         WHERE 1=1
@@ -51,8 +49,6 @@ async def get_all_uploaded_memes_weekly_en() -> list[dict[str, Any]]:
             ON M.meme_source_id = S.id
         LEFT JOIN meme_stats MS
             ON M.id = MS.meme_id
-        LEFT JOIN user_language UL
-            ON S.added_by = UL.user_id
         LEFT JOIN "user" U
             ON U.id = S.added_by
         WHERE 1=1
