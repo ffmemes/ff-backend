@@ -6,6 +6,7 @@ from telegram import (
     Message,
     Update,
 )
+from telegram.error import BadRequest
 
 from src.recommendations import meme_queue
 from src.recommendations.service import (
@@ -86,9 +87,14 @@ async def next_message(
         prev_reaction_id is None or Reaction(prev_reaction_id).is_positive
     )
     if not send_new_message and prev_update_can_be_edited_with_media(prev_update):
-        msg = await edit_last_message_with_meme(
-            prev_update.callback_query.message, meme, reply_markup
-        )
+        try:
+            msg = await edit_last_message_with_meme(
+                prev_update.callback_query.message, meme, reply_markup
+            )
+        except BadRequest as e:
+            logging.error(f"Failed to edit message: {e}")
+            msg = await send_new_message_with_meme(bot, user_id, meme, reply_markup)
+
     else:
         msg = await send_new_message_with_meme(bot, user_id, meme, reply_markup)
 
