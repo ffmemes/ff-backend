@@ -188,7 +188,7 @@ async def handle_uploaded_meme_review_button(
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
     user = await get_user_info(update.effective_user.id)
-    if user["type"] != UserType.ADMIN:
+    if not UserType(user["type"]).is_moderator:
         await update.callback_query.answer("You are not allowed to review memes")
         return
 

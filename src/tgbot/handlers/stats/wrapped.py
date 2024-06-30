@@ -42,7 +42,7 @@ async def call_chatgpt(prompt: str) -> str:
 async def handle_wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
 
-    await create_user(id=user_id, nickname=update.effective_user.name)
+    await create_user(id=user_id)
     await save_tg_user(
         id=user_id,
         username=update.effective_user.username,
