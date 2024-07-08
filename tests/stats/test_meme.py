@@ -27,7 +27,7 @@ async def conn():
             'type': 'image', 'telegram_image_id': '111', 'caption': '111', 'meme_source_id': 1,
             'published_at': datetime(2024, 1, 1), 'status': 'ok', 'language_code': 'ru',
         }
-        meme_ids = [1, 2, 3, 4, 5]
+        meme_ids = [1, 2, 3, 4, 5, 6]
         await conn.execute(
             insert(meme),
             [{'id': meme_id, 'raw_meme_id': meme_id, **meme_common} for meme_id in meme_ids]
@@ -49,12 +49,14 @@ async def conn():
                 {'user_id': 1, 'meme_id': 2, 'reaction_id': 1, **umr_common},
                 {'user_id': 1, 'meme_id': 3, 'reaction_id': 1, **umr_common},
                 {'user_id': 1, 'meme_id': 4, 'reaction_id': 1, **umr_common},
-                {'user_id': 1, 'meme_id': 5, 'reaction_id': 2, **umr_common},
+                {'user_id': 1, 'meme_id': 5, 'reaction_id': 1, **umr_common},
+                {'user_id': 1, 'meme_id': 6, 'reaction_id': 2, **umr_common},
                 {'user_id': 2, 'meme_id': 1, 'reaction_id': 1, **umr_common},
                 {'user_id': 2, 'meme_id': 2, 'reaction_id': 2, **umr_common},
                 {'user_id': 2, 'meme_id': 3, 'reaction_id': 2, **umr_common},
                 {'user_id': 2, 'meme_id': 4, 'reaction_id': 2, **umr_common},
                 {'user_id': 2, 'meme_id': 5, 'reaction_id': 2, **umr_common},
+                {'user_id': 2, 'meme_id': 6, 'reaction_id': 2, **umr_common},
             ]
         )
 
@@ -73,8 +75,16 @@ async def conn():
 
 @pytest.mark.asyncio
 async def test_calculate_meme_reactions_stats(conn: AsyncConnection):
-    await calculate_meme_reactions_stats()
+    await calculate_meme_reactions_stats(min_meme_reactions=0, min_user_reactions=0)
 
     res = await fetch_all(select(meme_stats))
+    assert len(res) == 6
+
     print(res)
-    assert len(res) == 5
+
+    eps = 1e-3
+    for row in res:
+        if row['meme_id'] == 1:
+            assert abs(row['lr_smoothed'] - 1) < eps
+        if row['meme_id'] == 2:
+            assert abs(row['lr_smoothed']) < eps
