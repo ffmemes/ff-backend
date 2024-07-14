@@ -150,6 +150,56 @@ async def multiply_all_scores(
     return res
 
 
+async def less_seen_meme_and_source(
+    user_id: int,
+    limit: int = 10,
+    exclude_meme_ids: list[int] = [],
+) -> list[dict[str, Any]]:
+    query = f"""
+        WITH LESS_SEEN_MEME_FROM_EACH_SOURCE AS (
+            SELECT DISTINCT ON (M.meme_source_id)
+                M.id, M.type, M.telegram_file_id, M.caption,
+                'less_seen_meme_and_source' as recommended_by
+
+                , M.meme_source_id
+                , COALESCE(MS.nmemes_sent, 0) meme_sent_times
+                , COALESCE(UMSS.nlikes + UMSS.ndislikes, 0) source_seen_times
+            FROM meme M
+            LEFT JOIN user_meme_reaction R
+                ON R.user_id = {user_id}
+                AND R.meme_id = M.id
+
+            INNER JOIN user_language L
+                ON L.language_code = M.language_code
+                AND L.user_id = {user_id}
+
+            LEFT JOIN meme_stats MS
+                ON MS.meme_id = M.id
+
+            LEFT JOIN user_meme_source_stats UMSS
+                ON UMSS.meme_source_id = M.meme_source_id
+                AND UMSS.user_id = {user_id}
+
+            WHERE 1=1
+                AND M.status = 'ok'
+                AND R.meme_id IS NULL
+                {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+
+            ORDER BY
+                M.meme_source_id, -- one meme from each source
+                meme_sent_times
+        )
+
+        SELECT
+            id, type, telegram_file_id, caption, recommended_by
+        FROM LESS_SEEN_MEME_FROM_EACH_SOURCE
+        ORDER BY source_seen_times -- less seen sources
+        LIMIT {limit}
+    """
+    res = await fetch_all(text(query))
+    return res
+
+
 # like rate: 38%
 async def top_memes_from_less_seen_sources(
     user_id: int,
@@ -191,10 +241,6 @@ async def top_memes_from_less_seen_sources(
             LEFT JOIN user_meme_reaction R
                 ON R.meme_id = M.id
                 AND R.user_id = {user_id}
-
-            LEFT JOIN user_meme_source_stats UMSS
-                ON M.meme_source_id = UMSS.meme_source_id
-                AND UMSS.user_id = {user_id}
 
             INNER JOIN user_language L
                 ON L.user_id = {user_id}
@@ -257,8 +303,54 @@ async def classic(
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
 
         ORDER BY -1
-            * UMSS.nlikes * 1. / (UMSS.nlikes + UMSS.ndislikes)
-            * MS.nlikes * 1. / (MS.nlikes + MS.ndislikes)
+            * (UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.)
+            * (MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1.)
+        LIMIT {limit}
+    """
+    res = await fetch_all(text(query))
+    return res
+
+
+async def uploaded_memes(
+    user_id: int,
+    limit: int = 10,
+    exclude_meme_ids: list[int] = [],
+):
+    query = f"""
+        SELECT
+            M.id
+            , M.type, M.telegram_file_id, M.caption
+            , 'best_uploaded_memes' AS recommended_by
+
+        FROM meme M
+        INNER JOIN meme_stats MS
+            ON MS.meme_id = M.id
+
+        INNER JOIN meme_source S
+            ON S.id = M.meme_source_id
+
+        INNER JOIN user_language L
+            ON L.language_code = M.language_code
+            AND L.user_id = {user_id}
+
+        LEFT JOIN user_meme_reaction R
+            ON R.meme_id = M.id
+            AND R.user_id = {user_id}
+
+        LEFT JOIN user_meme_source_stats UMSS
+            ON UMSS.meme_source_id = M.meme_source_id
+            AND UMSS.user_id = {user_id}
+
+        WHERE 1=1
+            AND M.status = 'ok'
+            AND R.meme_id IS NULL
+            AND S.type = 'user upload'
+            {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+
+        ORDER BY -1
+            * (UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.)
+            * (MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1.)
+        NULLS FIRST
         LIMIT {limit}
     """
     res = await fetch_all(text(query))
@@ -318,7 +410,7 @@ async def get_best_memes_from_each_source(
         FROM (
             SELECT DISTINCT ON (M.meme_source_id)
                 M.id, M.type, M.telegram_file_id, M.caption,
-                'cold_start' as recommended_by,
+                'best_meme_from_each_source' as recommended_by,
 
                 1
                     * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE 0.8 END
@@ -345,8 +437,11 @@ async def get_best_memes_from_each_source(
             WHERE 1=1
                 AND M.status = 'ok'
                 AND R.meme_id IS NULL
+                AND MS.nlikes > 0
+                AND (MS.nlikes) / (MS.nlikes+MS.ndislikes) > 0.2
+                AND MS.sec_to_react < 20
                 {exclude_meme_ids_sql_filter(exclude_meme_ids)}
-            ORDER BY M.meme_source_id, score
+            ORDER BY M.meme_source_id, score DESC
         ) M
         ORDER BY score DESC
         LIMIT {limit}

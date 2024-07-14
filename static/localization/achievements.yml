@@ -3,30 +3,64 @@ achievement.nmemes_sent_10:
     Кажись, ты понял, как работает бот 😉
     Схема проста: чем честнее ты реагируешь на мемы, тем лучше они становятся.
     Ведь у меня внутри нейроночка, которая и подбирает тебе мемы. 🤖🧠💎
+
+    Смотреть мемы на других языках: /lang
   en: |-
     Looks like you've figured out how the bot works 😉
     The scheme is simple: the more honestly you react to memes, the better they become.
     After all, I have AI inside me that picks memes for you. 🤖🧠💎
+
+    Watch memes in other languages: /lang
   uk: |-
     Здається, ти зрозумів, як працює бот 😉
     Схема проста: чим чесніше ти реагуєш на меми, тим краще вони стають.
     Адже у мене всередині нейронка, яка і підбирає тобі меми. 🤖🧠💎
+
+    Дивитися меми на інших мовах: /lang
   es: |-
     Parece que has descubierto cómo funciona el bot 😉
     El esquema es simple: cuanto más honestamente reacciones a los memes, mejor se vuelven.
     Después de todo, tengo IA dentro de mí que elige memes para ti. 🤖🧠💎
+
+    Ver memes en otros idiomas: /lang
   de: |-
     Sieht so aus, als hättest du herausgefunden, wie der Bot funktioniert 😉
     Das Schema ist einfach: je ehrlicher du auf Memes reagierst, desto besser werden sie.
     Immerhin habe ich KI in mir, die Memes für dich auswählt. 🤖🧠💎
+
+    Memes in anderen Sprachen ansehen: /lang
   it: |-
     Sembra che tu abbia capito come funziona il bot 😉
     Lo schema è semplice: più onestamente reagisci ai meme, meglio diventano.
     Dopotutto, ho l'IA dentro di me che sceglie meme per te. 🤖🧠💎
+
+    Guarda i meme in altre lingue: /lang
   fr: |-
     On dirait que tu as compris comment fonctionne le bot 😉
     Le schéma est simple : plus tu réagis honnêtement aux memes, mieux ils deviennent.
     Après tout, j'ai une IA à l'intérieur de moi qui choisit des memes pour toi. 🤖🧠💎
+
+    Regardez des memes dans d'autres langues : /lang
+  uz: |-
+    Bot qanday ishlayotganini tushundizmi 😉
+    Skema oddiy: memlarga qanday qarashni o'zizga qanday ishonch bilan qilasiz, ular shuncha yaxshi bo'ladi.
+    Aqlli, mening ichimda siz uchun memlarni tanlaydigan AI bor. 🤖🧠💎
+
+    Boshqa tillardagi memlarni ko'rish: /lang
+  fa: |-
+    به نظر می‌رسد که شما متوجه شده‌اید که ربات چگونه کار می‌کند 😉
+    این طرح ساده است: هر چه صادقانه‌تر به میم‌ها واکنش نشان دهید، آن‌ها بهتر می‌شوند.
+    در نهایت، من دارای هوش مصنوعی درون خودم هستم که میم‌ها را برای شما انتخاب می‌کند. 🤖🧠💎
+
+    میم‌ها را به زبان‌های دیگر تماشا کنید: /lang
+  ar: |-
+    يبدو أنك فهمت كيف يعمل الروبوت 😉
+    الخطة بسيطة: كلما كنت أكثر صدقًا في ردودك على الميمات، كلما أصبحت أفضل.
+    بعد كل شيء، لدي ذكاء اصطناعي بداخلي يختار الميمات لك. 🤖🧠💎
+
+    شاهد الميمات بلغات أخرى: /lang
+
+  
 
 
 achievement.nmemes_sent_100:
@@ -44,6 +78,12 @@ achievement.nmemes_sent_100:
     🚀 Hai appena guardato <b>100</b> meme! Guarda di PIÙ 🍔
   fr: |-
     🚀 Vous venez de regarder <b>100</b> memes! Regardez PLUS 🍔
+  uz: |-
+    🚀 Siz faqat <b>100</b> mimga qarashga oldingiz! KO'PROQ ko'ring 🍔
+  fa: |-
+    🚀 شما به تازگی <b>100</b> میم را تماشا کرده‌اید! بیشتر ببینید 🍔
+  ar: |-
+    🚀 لقد شاهدت <b>100</b> ميم! شاهد المزيد 🍔
 
 
 achievement.nmemes_sent_1000:
@@ -63,6 +103,12 @@ achievement.nmemes_sent_1000:
     Пожалуйста, не останавливайся. И продолжай делиться мемами с друзьями. Распространяй любовь, распространяй веселье.
 
     Я тебя люблю ❤️ 
+  uz: |-
+    Qanday aytishni bilmayman lekin bu muhim. Siz faqat hozirgacha bizning botimizdan <b>1000</b>-chi mimga qaradingiz. 
+    
+    Bu juda aqldosh, do'stim. Siz haqiqiy mimga ishon uvchi odams 
+
+    Iltimos, to'xtang. Va mimgalarni do'stlaringiz bilan baham bo'lishni davom ettiring. Sevgini tarqating, qiziqarli narsalarni tarqating
   uk: |-
     Я не знаю, як краще висловитися, але це важливо. Ти щойно подивився <b>1000-й</b> мем від нашого бота. 
     
@@ -111,3 +157,11 @@ achievement.nmemes_sent_1000:
     S'il vous plaît, ne vous arrêtez pas. Et continuez à partager des memes avec vos amis. Propagez l'amour, propagez le plaisir.
 
     Je t'aime ❤️
+  it: |-
+    Non so come dirlo ma è importante. Hai appena guardato il <b>1000°</b> meme dal nostro bot. 
+    
+    Questo è pazzesco, amico. Sei un vero amante dei meme. Sono orgoglioso di te. 
+
+    Per favore, non fermarti. E continua a condividere meme con i tuoi amici. Diffondi l'amore, diffondi il divertimento.
+
+    Ti amo ❤

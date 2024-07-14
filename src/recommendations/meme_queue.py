@@ -4,11 +4,13 @@ from src import redis
 from src.recommendations.candidates import (
     classic,
     get_best_memes_from_each_source,
+    less_seen_meme_and_source,
     like_spread_and_recent_memes,
-    multiply_all_scores,
-    sorted_by_user_source_lr_meme_lr_meme_age,
+    uploaded_memes,
 )
+from src.recommendations.candidates_ab import get_lr_smoothed, get_selected_sources
 from src.storage.schemas import MemeData
+from src.tgbot.user_info import get_user_info
 
 
 async def get_next_meme_for_user(user_id: int) -> MemeData | None:
@@ -45,9 +47,22 @@ async def generate_cold_start_recommendations(user_id, limit=10):
     memes_in_queue = await redis.get_all_memes_in_queue_by_key(queue_key)
     meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
 
-    candidates = await like_spread_and_recent_memes(
+    candidates = []
+
+    candidates = await get_selected_sources(
         user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
     )
+
+    if len(candidates) == 0:
+        candidates = await get_best_memes_from_each_source(
+            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+        )
+
+    if len(candidates) == 0:
+        candidates = await classic(
+            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+        )
+
     if len(candidates) == 0:
         return
 
@@ -59,32 +74,80 @@ async def generate_recommendations(user_id, limit):
     memes_in_queue = await redis.get_all_memes_in_queue_by_key(queue_key)
     meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
 
-    # randomly choose the strategy
-    # TODO: proper A/B testing by users
+    user_info = await get_user_info(user_id)
+
+
+    is_lr_smoothed_ab = user_id % 100 >= 50
 
     r = random.random()
-    if r < 0.2:
-        candidates = await sorted_by_user_source_lr_meme_lr_meme_age(
+
+    candidates = []
+
+    if user_info["nmemes_sent"] < 30:
+        candidates = await get_selected_sources(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
-    elif r < 0.4:
-        candidates = await classic(
-            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-        )
-    elif r < 0.6:
-        candidates = await like_spread_and_recent_memes(
-            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-        )
-    elif r < 0.8:
-        candidates = await get_best_memes_from_each_source(
-            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-        )
+
+        if len(candidates) == 0:
+            candidates = await get_best_memes_from_each_source(
+                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+            )
+
+    elif user_info["nmemes_sent"] < 100:
+        if r < 0.3:
+            candidates = await uploaded_memes(
+                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+            )
+        elif r < 0.6:
+            candidates = await get_best_memes_from_each_source(
+                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+            )
+        else:
+            if is_lr_smoothed_ab:
+                candidates = await get_lr_smoothed(
+                    user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+                )
+            else:
+                candidates = await classic(
+                    user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+                )
+
     else:
-        candidates = await multiply_all_scores(
+        if r < 0.3:
+            candidates = await uploaded_memes(
+                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+            )
+        if r < 0.6:
+            candidates = await like_spread_and_recent_memes(
+                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+            )
+        else:
+            if is_lr_smoothed_ab:
+                candidates = await get_lr_smoothed(
+                    user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+                )
+            else:
+                candidates = await classic(
+                    user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+                )
+
+    if len(candidates) == 0:
+        if is_lr_smoothed_ab:
+            candidates = await get_lr_smoothed(
+                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+            )
+        else:
+            candidates = await classic(
+                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+            )
+
+    if len(candidates) == 0 and user_info["nmemes_sent"] > 1000:
+        candidates = await less_seen_meme_and_source(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
 
     if len(candidates) == 0:
+        # TODO: fallback to some algo which will always return something
         return
 
     # TODO:

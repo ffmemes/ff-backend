@@ -18,6 +18,8 @@ async def create_user_meme_reaction(
     user_id: int,
     meme_id: int,
     recommended_by: str,
+    reaction_id: int | None = None,
+    reacted_at: datetime | None = None,
 ) -> None:
     insert_query = (
         insert(user_meme_reaction)
@@ -25,6 +27,8 @@ async def create_user_meme_reaction(
             user_id=user_id,
             meme_id=meme_id,
             recommended_by=recommended_by,
+            reaction_id=reaction_id,
+            reacted_at=reacted_at,
         )
         .on_conflict_do_nothing(
             index_elements=(user_meme_reaction.c.user_id, user_meme_reaction.c.meme_id)

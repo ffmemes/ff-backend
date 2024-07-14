@@ -1,3 +1,5 @@
+import random
+
 from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -15,19 +17,25 @@ from src.tgbot.constants import (
 
 # IDEA: use sometimes another emoji pair like 🤣/🤮
 
+HEART_EMOJI = ["❤️", "♥️", "💙", "💜", "💛", "🧡", "💚", "🩵"]
 
-def meme_reaction_keyboard(meme_id):
+
+def meme_reaction_keyboard(meme_id: int, user_id: int):
+    heart = random.choice(HEART_EMOJI)
+    like, dislike = heart, "⏬"
+    # like, dislike = "👍", "👎"
+
     return InlineKeyboardMarkup(
         [
             [
                 InlineKeyboardButton(
-                    "👍",
+                    like,
                     callback_data=MEME_BUTTON_CALLBACK_DATA_PATTERN.format(
                         meme_id=meme_id, reaction_id=Reaction.LIKE
                     ),
                 ),
                 InlineKeyboardButton(
-                    "👎",
+                    dislike,
                     callback_data=MEME_BUTTON_CALLBACK_DATA_PATTERN.format(
                         meme_id=meme_id, reaction_id=Reaction.DISLIKE
                     ),

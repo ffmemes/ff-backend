@@ -4,10 +4,11 @@ from telegram.ext import (
     ContextTypes,
 )
 
-from src.stats.service import get_user_stats
 from src.stats.user import calculate_inviter_stats, calculate_user_stats
 from src.tgbot.constants import UserType
 from src.tgbot.handlers.admin.service import delete_user, get_user_by_tg_username
+from src.tgbot.handlers.stats.stats import get_user_stats_report
+from src.tgbot.handlers.treasury.service import get_user_balance
 from src.tgbot.user_info import get_user_info, update_user_info_cache
 
 
@@ -25,23 +26,19 @@ async def handle_show_user_info(
         await update.message.reply_text(f"🚫 User @{username} not found.")
         return
 
-    selected_user_info = await update_user_info_cache(selected_user["id"])
-
     # TODO: create a function which creates a user info string
     await calculate_user_stats()  # regenerate user stats
     await calculate_inviter_stats()
+    balance = await get_user_balance(selected_user["id"])
 
-    user_stats = await get_user_stats(selected_user["id"])
-
-    report = ""
-    if user_stats:
-        for k, v in user_stats.items():
-            report += f"<b>{k}</b>: {v}\n"
+    selected_user_info = await update_user_info_cache(selected_user["id"])
+    report = await get_user_stats_report(selected_user["id"])
 
     await update.message.reply_text(
         f"""
 ℹ️ <b>@{username}</b>
 type: {selected_user_info["type"]}
+balance: {balance} 🍔
 {report}
         """,
         parse_mode=ParseMode.HTML,

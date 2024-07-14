@@ -22,7 +22,7 @@ async def call_chatgpt_vision(image: bytes, prompt: str) -> str:
     client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
     response = await client.chat.completions.create(
-        model="gpt-4-vision-preview",
+        model="gpt-4o",
         messages=[
             {
                 "role": "user",
@@ -41,7 +41,7 @@ async def call_chatgpt_vision(image: bytes, prompt: str) -> str:
     return response.choices[0].message.content
 
 
-async def explain_meme_ru(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def explain_meme_ru(update: Update, _: ContextTypes.DEFAULT_TYPE):
     """
     Explain a tg channel post to the user
     Handle message from channel in a chat
@@ -54,6 +54,29 @@ async def explain_meme_ru(update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
 Мама прислала тебе эту смешную картинку. Объясни двумя предложениями, в чем прикол.
 Не пересказывай содержание мема и используй неформальную лексику.
+        """,
+    )
+
+    if vision_result:
+        vision_result = html.unescape(vision_result)
+        try:
+            await update.message.reply_text(vision_result)
+        except Forbidden:
+            log(
+                f"Can't send meme explanation to chat: {vision_result}",
+                level=logging.ERROR,
+                exc_info=True,
+            )
+
+
+async def explain_meme_en(update: Update, _: ContextTypes.DEFAULT_TYPE):
+    file_id = update.message.photo[-1].file_id
+    image_bytes = await download_meme_content_from_tg(file_id)
+    vision_result = await call_chatgpt_vision(
+        image_bytes,
+        """
+Your mom sent you this funny picture. Explain the joke in two sentences.
+Don't retell the meme and use informal language.
         """,
     )
 

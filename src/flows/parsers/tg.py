@@ -4,10 +4,10 @@ from datetime import datetime
 from prefect import flow, get_run_logger
 
 from src.flows.storage.memes import tg_meme_pipeline
+from src.storage.etl import insert_parsed_posts_from_telegram
 from src.storage.parsers.tg import TelegramChannelScraper
 from src.storage.service import (
     get_telegram_sources_to_parse,
-    insert_parsed_posts_from_telegram,
     update_meme_source,
 )
 

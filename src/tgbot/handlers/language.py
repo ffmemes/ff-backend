@@ -12,7 +12,6 @@ from src.tgbot.constants import (
     LANG_SETTINGS_END_CALLBACK_DATA,
 )
 from src.tgbot.handlers.onboarding import onboarding_flow
-from src.tgbot.senders.next_message import next_message
 from src.tgbot.service import (
     add_user_language,
     add_user_languages,
@@ -71,7 +70,7 @@ async def handle_language_settings(
     for lang, lang_text in SUPPORTED_MEME_LANGUAGES.items():
         if lang in user_languages:
             callback_data = f"l:{lang}:del"
-            button_text = f"{lang_text or lang} ✅".upper()
+            button_text = f"✅ {lang_text or lang} ✅".upper()
         else:
             callback_data = f"l:{lang}:add"
             button_text = lang_text or lang
@@ -138,26 +137,15 @@ async def handle_language_settings_button(
 
 # callback_data: LANG_END_CALLBACK_DATA
 async def handle_language_settings_end(
-    update: telegram.Update, _: ContextTypes.DEFAULT_TYPE
+    update: telegram.Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
     await update.callback_query.answer()
-    await update.callback_query.message.delete()
-
-    user_info = await get_user_info(update.effective_user.id)
+    try:
+        await update.callback_query.message.delete()
+    except telegram.error.BadRequest:
+        pass  # message was already deleted (network lagging)
 
     await clear_meme_queue_for_user(update.effective_user.id)
     await generate_cold_start_recommendations(update.effective_user.id)
 
-    # Let's turn off waitlist for now to see how it goes
-    # if user_info["type"] == UserType.WAITLIST:
-    #     return await handle_waitlist_start(update, context)
-
-    recently_joined = user_info["nmemes_sent"] <= 3
-    if recently_joined:
-        return await onboarding_flow(update)
-
-    return await next_message(
-        update.effective_user.id,
-        prev_update=update,
-        prev_reaction_id=None,
-    )
+    return await onboarding_flow(update, context.bot)

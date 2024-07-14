@@ -18,7 +18,7 @@ async def load_file_to_mystic(file_content: bytes) -> str:
     file_name = f"{uuid.uuid4()}.jpg"
     files = {"pfile": (file_name, file_content, "image/jpeg")}
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(
             "https://www.mystic.ai/v4/files",
             files=files,
@@ -35,7 +35,7 @@ async def ocr_mystic_file_path(
     language: str,
     pipeline_id: str = PIPELINE_ID,
 ) -> dict[str, Any]:
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(
             "https://www.mystic.ai/v4/runs",
             json={

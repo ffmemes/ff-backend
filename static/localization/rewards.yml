@@ -1,0 +1,42 @@
+rewards.daily_reward:
+  en: |-
+    💳 /b: +<b>{amount} 🍔</b>. It's your daily reward for watching memes ❤️
+  ru: |-
+    💳 /b: +<b>{amount} 🍔</b> за то, что посмотрели мемы сегодня ❤️
+  uk: |-
+    💳 /b: +<b>{amount} 🍔</b> за те, що переглянули меми сьогодні ❤️
+  kz: |-
+    💳 /b: +<b>{amount} 🍔</b> бұл сіздің мемелерді көру үшін күндізгі мүшелеріңіз ❤️
+  be: |-
+    💳 /b: +<b>{amount} 🍔</b> за тое, што паглядзелі мемы сёння ❤️
+  kk: |-
+    💳 /b: +<b>{amount} 🍔</b> сіздің мемелерді көру үшін күндізгі мүшелеріңіз ❤️
+  uz: |-
+    💳 /b: +<b>{amount} 🍔</b>. Siz bugungi kunda memlarni ko'rganingiz uchun ❤️
+  tr: |-
+    💳 /b: +<b>{amount} 🍔</b>. Bugün memelere baktığınız için ❤️
+  es: |-
+    💳 /b: +<b>{amount} 🍔</b>. Es tu recompensa diaria por ver memes ❤️
+  pt-br: |-
+    💳 /b: +<b>{amount} 🍔</b>. É a sua recompensa diária por ver memes ❤️
+  pl: |-
+    💳 /b: +<b>{amount} 🍔</b>. To twoja codzienna nagroda za oglądanie memów ❤️
+  de: |-
+    💳 /b: +<b>{amount} 🍔</b>. Es ist deine tägliche Belohnung für das Ansehen von Memes ❤️
+  fr: |-
+    💳 /b: +<b>{amount} 🍔</b>. C'est votre récompense quotidienne pour avoir regardé des mèmes ❤️
+  id: |-
+    💳 /b: +<b>{amount} 🍔</b>. Ini adalah hadiah harian Anda untuk menonton meme ❤️
+  ar: |-
+    💳 /b: +<b>{amount} 🍔</b>. إنها مكافأتك اليومية لمشاهدة الصور الساخرة ❤️
+  fa: |-
+    💳 /b: +<b>{amount} 🍔</b>. این پاداش روزانه شما برای تماشای میم‌هاست ❤️
+  ja: |-
+    💳 /b: +<b>{amount} 🍔</b>。これはミームを見るための毎日の報酬です ❤️
+  zh: |-
+    💳 /b: +<b>{amount} 🍔</b>。这是您每天观看表情包的奖励 ❤️
+  ko: |-
+    💳 /b: +<b>{amount} 🍔</b>. 미미를 보는 것에 대한 매일 보상입니다 ❤️
+  vi: |-
+    💳 /b: +<b>{amount} 🍔</b>. Đây là phần thưởng hàng ngày của bạn vì đã xem meme ❤️
+  

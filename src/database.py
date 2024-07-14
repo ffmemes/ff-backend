@@ -138,11 +138,19 @@ meme_raw_ig = Table(
 )
 
 
-# meme_raw_upload = Table(
-#     "meme_raw_upload",
-#     metadata,
-# TODO: columns TBD, probably also JSONBs to store all raw data
-# )
+meme_raw_upload = Table(
+    "meme_raw_upload",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
+    Column("message_id", Integer, nullable=False),
+    Column("date", DateTime, nullable=False),
+    Column("forward_origin", JSONB),
+    Column("media", JSONB, nullable=False),
+    Column("language_code", String),  # user selects a languages for the meme
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime, onupdate=func.now()),
+)
 
 
 meme = Table(
@@ -208,8 +216,10 @@ user = Table(
     "user",
     metadata,
     Column("id", BigInteger, primary_key=True),
+    Column("nickname", String),
     Column("type", String, nullable=False),  # super_user, moderator,
     Column("inviter_id", ForeignKey("user.id", ondelete="SET NULL")),
+    Column("balance", Integer, nullable=False, server_default="0"),
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
     Column("last_active_at", DateTime, onupdate=func.now()),
     Column("blocked_bot_at", DateTime),
@@ -290,6 +300,9 @@ meme_stats = Table(
     Column("nmemes_sent", Integer, nullable=False, server_default="0"),
     Column("age_days", Integer, nullable=False, server_default="99999"),
     Column("raw_impr_rank", Integer, nullable=False, server_default="99999"),
+    Column("sec_to_react", Float, nullable=False, server_default="99999"),  # median
+    Column("invited_count", Integer, nullable=False, server_default="0"),
+    Column("lr_smoothed", Float, nullable=False, server_default="0"),
     Column(
         "updated_at",
         DateTime,
@@ -360,6 +373,17 @@ inline_search_chosen_result_logs = Table(
     Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
     Column("query", String, nullable=False),
     Column("chosen_at", DateTime, server_default=func.now(), nullable=False),
+)
+
+treasury_trx = Table(
+    "treasury_trx",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
+    Column("type", String, nullable=False, index=True),
+    Column("amount", Integer, nullable=False),
+    Column("external_id", String),
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
 )
 
 

@@ -2,9 +2,11 @@ import asyncio
 import logging
 
 from telegram import (
+    Bot,
     Message,
     Update,
 )
+from telegram.error import BadRequest
 
 from src.recommendations import meme_queue
 from src.recommendations.service import (
@@ -60,6 +62,7 @@ async def get_next_meme_for_user(user_id: int) -> MemeData | None:
 
 
 async def next_message(
+    bot: Bot,
     user_id: int,
     prev_update: Update,
     prev_reaction_id: int | None = None,
@@ -75,20 +78,25 @@ async def next_message(
     if not meme:
         asyncio.create_task(meme_queue.check_queue(user_id))
         # TODO: also edit / delete previous message
-        return await send_queue_preparing_alert(user_id)
+        return await send_queue_preparing_alert(bot, user_id)
 
-    reply_markup = meme_reaction_keyboard(meme.id)
+    reply_markup = meme_reaction_keyboard(meme.id, user_id)
     meme.caption = await get_meme_caption_for_user_id(meme, user_id, user_info)
 
     send_new_message = (
         prev_reaction_id is None or Reaction(prev_reaction_id).is_positive
     )
     if not send_new_message and prev_update_can_be_edited_with_media(prev_update):
-        msg = await edit_last_message_with_meme(
-            user_id, prev_update.callback_query.message.id, meme, reply_markup
-        )
+        try:
+            msg = await edit_last_message_with_meme(
+                prev_update.callback_query.message, meme, reply_markup
+            )
+        except BadRequest as e:
+            logging.error(f"Failed to edit message: {e}")
+            msg = await send_new_message_with_meme(bot, user_id, meme, reply_markup)
+
     else:
-        msg = await send_new_message_with_meme(user_id, meme, reply_markup)
+        msg = await send_new_message_with_meme(bot, user_id, meme, reply_markup)
 
     await create_user_meme_reaction(user_id, meme.id, meme.recommended_by)
     asyncio.create_task(meme_queue.check_queue(user_id))

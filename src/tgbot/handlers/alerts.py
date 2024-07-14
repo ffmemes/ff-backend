@@ -16,7 +16,7 @@ from src.tgbot.senders.next_message import next_message
 
 # callback_data: MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA
 async def handle_empty_meme_queue_alert(
-    update: Update, _: ContextTypes.DEFAULT_TYPE
+    update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
     emoji = random.choice(LOADING_EMOJIS)
     await update.callback_query.answer(emoji)
@@ -24,14 +24,14 @@ async def handle_empty_meme_queue_alert(
     user_id = update.effective_user.id
     if await has_memes_in_queue(user_id):
         await update.callback_query.message.delete()
-        return await next_message(user_id, update, prev_reaction_id=None)
+        return await next_message(context.bot, user_id, update, prev_reaction_id=None)
 
     # if there are still no memes in queue
     emoji = random.choice(LOADING_EMOJIS)
     await update.callback_query.message.edit_reply_markup(
         reply_markup=queue_empty_alert_keyboard(emoji),
     )
-    await log(f"user_id: {user_id} has empty meme queue.")
+    await log(f"user_id: {user_id} has empty meme queue.", context.bot)
 
     # Not sure if that's a good idea, a generation should be already triggered.
     await check_queue(user_id)

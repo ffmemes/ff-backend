@@ -56,3 +56,15 @@ async def get_users_with_language(
         WHERE language_code = '{language_code}'
     """
     return await fetch_all(text(select_query))
+
+
+async def get_users_active_more_than_days_ago(
+    days_ago: int,
+):
+    select_query = f"""
+        SELECT id
+        FROM "user"
+        WHERE last_active_at < NOW() - INTERVAL '{days_ago} DAYS'
+        AND type != 'blocked_bot'
+    """
+    return await fetch_all(text(select_query))

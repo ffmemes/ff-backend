@@ -4,7 +4,7 @@
 
 import asyncio
 
-from telegram import Update
+from telegram import Bot, Update
 from telegram.constants import ParseMode
 from telegram.ext import (
     ContextTypes,
@@ -17,7 +17,7 @@ from src.tgbot.service import get_meme_by_id, get_meme_source_by_id, get_meme_st
 from src.tgbot.user_info import get_user_info
 
 
-async def send_meme_info(update: Update, meme_id: int):
+async def send_meme_info(bot: Bot, update: Update, meme_id: int):
     meme_data = await get_meme_by_id(meme_id)
     if meme_data is None:
         await update.message.reply_text(f"Meme #{meme_id} not found")
@@ -64,6 +64,7 @@ Stats:
     meme = MemeData(**meme_data)
     reply_markup = None  # TODO: add buttons to change status
     return await send_new_message_with_meme(
+        bot,
         update.effective_user.id,
         meme,
         reply_markup,
@@ -84,7 +85,7 @@ async def handle_get_meme(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     try:
-        meme_ids = [int(i) for i in message_split[1:]]
+        meme_ids = [int(i.replace(",", "").strip()) for i in message_split[1:]]
     except ValueError:
         await update.message.reply_text(
             "Please specify a valid <code>meme_id</code> (a number!)",
@@ -93,7 +94,7 @@ async def handle_get_meme(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     if len(meme_ids) == 1:
-        return await send_meme_info(update, meme_ids[0])
+        return await send_meme_info(context.bot, update, meme_ids[0])
 
     memes_data = await asyncio.gather(
         *[get_meme_by_id(meme_id) for meme_id in meme_ids]

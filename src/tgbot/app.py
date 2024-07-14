@@ -22,8 +22,9 @@ from src.tgbot.constants import (
     MEME_SOURCE_SET_LANG_REGEXP,
     MEME_SOURCE_SET_STATUS_REGEXP,
     POPUP_BUTTON_CALLBACK_DATA_REGEXP,
-    # TELEGRAM_CHANNEL_EN_CHAT_ID,
+    TELEGRAM_CHANNEL_EN_CHAT_ID,
     TELEGRAM_CHANNEL_RU_CHAT_ID,
+    TELEGRAM_CHAT_EN_CHAT_ID,
     TELEGRAM_CHAT_RU_CHAT_ID,
     TELEGRAM_FEEDBACK_CHAT_ID,
 )
@@ -36,7 +37,6 @@ from src.tgbot.handlers import (
     popup,
     reaction,
     start,
-    upload,
 )
 from src.tgbot.handlers.admin.boost import handle_chat_boost
 from src.tgbot.handlers.admin.broadcast_text import (
@@ -45,12 +45,8 @@ from src.tgbot.handlers.admin.broadcast_text import (
 )
 from src.tgbot.handlers.admin.forward_channel import handle_forwarded_from_tgchannelru
 from src.tgbot.handlers.admin.user_info import delete_user_data, handle_show_user_info
-from src.tgbot.handlers.admin.waitlist import (
-    handle_waitlist_invite,
-    handle_waitlist_invite_before,
-)
 from src.tgbot.handlers.chat.chat_member import handle_chat_member_update
-from src.tgbot.handlers.chat.explain_meme import explain_meme_ru
+from src.tgbot.handlers.chat.explain_meme import explain_meme_en, explain_meme_ru
 from src.tgbot.handlers.chat.feedback import (
     handle_feedback_message,
     handle_feedback_reply,
@@ -58,6 +54,13 @@ from src.tgbot.handlers.chat.feedback import (
 from src.tgbot.handlers.moderator import get_meme, meme_source
 from src.tgbot.handlers.stats.stats import handle_stats
 from src.tgbot.handlers.stats.wrapped import handle_wrapped, handle_wrapped_button
+from src.tgbot.handlers.treasury.commands import (
+    handle_change_nickname,
+    handle_show_balance,
+    handle_show_kitchen,
+    handle_show_leaderbaord,
+)
+from src.tgbot.handlers.upload import moderation, stats, upload_meme
 
 application: Application = None  # type: ignore
 
@@ -99,7 +102,7 @@ def add_handlers(application: Application) -> None:
     # user feedback & responses
     application.add_handler(
         MessageHandler(
-            filters=filters.ChatType.PRIVATE & filters.Regex(r"^(\/c |\/chat |\/с )"),
+            filters=filters.ChatType.PRIVATE & filters.Regex(r"^(\/c |\/chat|\/с)"),
             callback=handle_feedback_message,
         )
     )
@@ -108,6 +111,45 @@ def add_handlers(application: Application) -> None:
         MessageHandler(
             filters=filters.Chat(TELEGRAM_FEEDBACK_CHAT_ID) & filters.REPLY,
             callback=handle_feedback_reply,
+        )
+    )
+
+    ###################
+    # treasury-related commands
+
+    # show balance
+    application.add_handler(
+        CommandHandler(
+            ["b", "balance"],
+            handle_show_balance,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+        )
+    )
+
+    # show kitchen
+    application.add_handler(
+        CommandHandler(
+            ["kitchen"],
+            handle_show_kitchen,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+        )
+    )
+
+    # show leaderboard
+    application.add_handler(
+        CommandHandler(
+            ["leaderboard", "l"],
+            handle_show_leaderbaord,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+        )
+    )
+
+    # change nickname
+    application.add_handler(
+        CommandHandler(
+            ["nickname"],
+            handle_change_nickname,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
         )
     )
 
@@ -152,21 +194,6 @@ def add_handlers(application: Application) -> None:
     )
 
     ############## admin
-    # invite user from waitlist
-    application.add_handler(
-        CommandHandler(
-            "invite",
-            handle_waitlist_invite,
-            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
-        )
-    )
-    application.add_handler(
-        CommandHandler(
-            "invite_before",
-            handle_waitlist_invite_before,
-            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
-        )
-    )
 
     application.add_handler(
         MessageHandler(
@@ -205,19 +232,58 @@ def add_handlers(application: Application) -> None:
         )
     )
 
+    application.add_handler(
+        MessageHandler(
+            filters=filters.Chat(TELEGRAM_CHAT_EN_CHAT_ID)
+            & filters.PHOTO
+            & filters.SenderChat(TELEGRAM_CHANNEL_EN_CHAT_ID),
+            callback=explain_meme_en,
+        )
+    )
+
     ######################
     # meme upload by a user
     application.add_handler(
         MessageHandler(
-            filters=filters.ChatType.PRIVATE & filters.FORWARDED & filters.ATTACHMENT,
-            callback=upload.handle_forward,
+            filters=filters.ChatType.PRIVATE & filters.PHOTO,
+            # & (filters.PHOTO | filters.VIDEO | filters.ANIMATION),
+            callback=upload_meme.handle_message_with_meme,
         )
     )
 
     application.add_handler(
-        MessageHandler(
-            filters=filters.ChatType.PRIVATE & filters.ATTACHMENT,
-            callback=upload.handle_message,
+        CallbackQueryHandler(
+            upload_meme.handle_rules_accepted_callback,
+            pattern=upload_meme.RULES_ACCEPTED_CALLBACK_DATA_REGEXP,
+        )
+    )
+
+    application.add_handler(
+        CallbackQueryHandler(
+            upload_meme.handle_meme_upload_lang_other,
+            pattern=upload_meme.LANGUAGE_SELECTED_OTHER_CALLBACK_DATA_REGEXP,
+        )
+    )
+
+    application.add_handler(
+        CallbackQueryHandler(
+            upload_meme.handle_meme_upload_lang_selected,
+            pattern=upload_meme.LANGUAGE_SELECTED_CALLBACK_DATA_REGEXP,
+        )
+    )
+
+    application.add_handler(
+        CallbackQueryHandler(
+            moderation.handle_uploaded_meme_review_button,
+            pattern=moderation.UPLOADED_MEME_REVIEW_CALLBACK_DATA_REGEXP,
+        )
+    )
+
+    application.add_handler(
+        CommandHandler(
+            "uploads",
+            stats.handle_uploaded_memes_stats,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
         )
     )
 
@@ -338,6 +404,7 @@ def run_polling(application: Application) -> None:
     application.run_polling(
         allowed_updates=Update.ALL_TYPES,
         timeout=60,
-        read_timeout=10,
-        connect_timeout=10,
+        read_timeout=30,
+        connect_timeout=30,
+        write_timeout=30,
     )

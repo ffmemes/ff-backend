@@ -1,0 +1,408 @@
+upload.rules:
+  en: |-
+    Do you want to share this meme with our community?
+
+    <b>~ OUR RULES ~</b>
+    1️⃣ No bullshit content, you know what I mean.
+    2️⃣ We can reject any post at our discretion.
+    3️⃣ Meme will be rejected if we already have that meme in collection.
+    4️⃣ For now, your meme should have only 1 picture.
+    5️⃣ Providing false info about the meme will lead to a rejection and penalty.
+  
+  ru: |-
+    Хочешь показать этот мем юзерам @ffmemesbot?
+
+    <b>~ НАШИ ПРАВИЛА ~</b>
+    1️⃣ Никакого бреда. Ты понимаешь, о чем я.
+    2️⃣ Мы можем отклонить любой пост по своему усмотрению.
+    3️⃣ Мем будет отклонен, если у нас уже есть такой мем в коллекции.
+    4️⃣ Пока что, ваш мем может быть только картинкой.
+    5️⃣ Предоставление ложной информации о меме приведет к отклонению и штрафу.
+
+
+upload.rules_accept_button:
+  en: |-
+    I agree
+  
+  ru: |-
+    Я согласен
+  
+  uk: |-
+    Я погоджуюсь
+  
+  es: |-
+    Estoy de acuerdo
+  
+  pt-br: |-
+    Eu concordo
+  
+  fr: |-
+    J'accepte
+  
+  it: |-
+    Accetto
+  
+  de: |-
+    Ich stimme zu
+  
+  tr: |-
+    Kabul ediyorum
+  
+  fa: |-
+    من موافقم
+  
+  uz: |-
+    Roziman
+  
+  ar: |-
+    أوافق
+
+  hi: |-
+    मैं सहमत हूँ
+
+
+upload.watch_memes_to_unblock_upload:
+  en: |-
+    Watch at least 10 memes if you want to share your memes with our community:
+
+    ➡️ /start ⬅️
+  
+  ru: |-
+    Посмотри хотя бы 10 мемов, чтобы разблокировать загрузку своих мемов и начать делиться годным юмором с нашим сообществом:
+
+    ➡️ /start ⬅️
+
+  uk: |-
+    Подивися принаймні 10 мемів, щоб розблокувати завантаження своїх мемів та почати ділитися гідним гумором з нашою спільнотою:
+
+    ➡️ /start ⬅️
+  
+  es: |-
+    Mira al menos 10 memes si quieres compartir tus memes con nuestra comunidad:
+
+    ➡️ /start ⬅️
+  
+  pt-br: |-
+    Assista pelo menos 10 memes se você quiser compartilhar seus memes com nossa comunidade:
+
+    ➡️ /start ⬅️
+  
+  fr: |-
+    Regardez au moins 10 memes si vous voulez partager vos memes avec notre communauté:
+
+    ➡️ /start ⬅️
+  
+  it: |-
+    Guarda almeno 10 meme se vuoi condividere i tuoi meme con la nostra comunità:
+
+    ➡️ /start ⬅️
+
+  de: |-
+    Schauen Sie sich mindestens 10 Memes an, wenn Sie Ihre Memes mit unserer Community teilen möchten:
+
+    ➡️ /start ⬅️
+  
+  tr: |-
+    Meme'lerinizi topluluğumuzla paylaşmak istiyorsanız en az 10 meme izleyin:
+
+    ➡️ /start ⬅️
+  
+  fa: |-
+    اگر می‌خواهید میم‌های خود را با جامعه ما به اشتراک بگذارید، حداقل 10 میم تماشا کنید:
+
+    ➡️ /start ⬅️
+  
+  uz: |-
+    Agar memingizni jamoamiz bilan baham ko'rishni istasangiz, kamida 10 memni ko'ring:
+
+    ➡️ /start ⬅️
+  
+  ar: |-
+    شاهد ما لا يقل عن 10 صورة نمطية إذا كنت تريد مشاركة صورك النمطية مع مجتمعنا:
+
+    ➡️ /start ⬅️
+  
+  hi: |-
+    अगर आप अपने जोक्स को हमारे समुदाय के साथ साझा करना चाहते हैं तो कम से कम 10 जोक्स देखें:
+
+    ➡️ /start ⬅️
+
+
+upload.select_language:
+  en: |-
+    Please select the language of the meme.
+
+    Make sure you select the correct language otherwise your meme will be rejected
+    and you may receive a penalty.
+  
+  ru: |-
+    Теперь выбери язык мема.
+
+    Убедись, что выбрал <b>правильный</b> язык, иначе мем будет отклонен. Много отклонений - штраф.
+
+  uk: |-
+    Тепер виберіть мову мема.
+
+    Переконайтеся, що ви вибрали <b>правильну</b> мову, інакше мем буде відхилений. Багато відхилень - штраф.
+
+  es: |-
+    Por favor, selecciona el idioma del meme.
+
+    Asegúrate de seleccionar el idioma correcto, de lo contrario tu meme será rechazado y podrías recibir una penalización.
+
+  pt-br: |-
+    Por favor, selecione o idioma do meme.
+
+    Certifique-se de selecionar o idioma correto, caso contrário seu meme será rejeitado e você poderá receber uma penalidade.
+
+  fr: |-
+    Veuillez sélectionner la langue du meme.
+
+    Assurez-vous de sélectionner la bonne langue, sinon votre meme sera rejeté et vous pourriez recevoir une pénalité.
+
+  it: |-
+    Seleziona la lingua del meme.
+
+    Assicurati di selezionare la lingua corretta, altrimenti il tuo meme verrà rifiutato e potresti ricevere una penalità.
+
+  de: |-
+    Bitte wähle die Sprache des Memes aus.
+
+    Stelle sicher, dass du die richtige Sprache auswählst, sonst wird dein Meme abgelehnt und du könntest eine Strafe erhalten.
+
+  tr: |-
+    Lütfen meme dilini seçin.
+
+    Meme dilini doğru seçtiğinizden emin olun, aksi takdirde memeniz reddedilebilir ve ceza alabilirsiniz.
+  
+  fa: |-
+    لطفا زبان میم را انتخاب کنید.
+
+    اطمینان حاصل کنید که زبان صحیح را انتخاب کرده‌اید، در غیر این صورت میم شما رد خواهد شد و ممکن است مجازات دریافت کنید.
+
+  uz: |-
+    Memingiz tilini tanlang.
+
+    To'g'ri tilni tanlaganingizga ishonch hosil qiling, aks holda memingiz rad etilishi mumkin va siz jazo olishingiz mumkin.
+
+  ar: |-
+    يرجى اختيار لغة الصورة النمطية.
+
+    تأكد من اختيار اللغة الصحيحة، وإلا سيتم رفض صورتك النمطية وقد تتلقى عقوبة.
+
+  hi: |-
+    कृपया मीम की भाषा का चयन करें।
+
+    सुनिश्चित करें कि आप सही भाषा का चयन करते हैं अन्यथा आपका मीम अस्वीकृत हो सकता है और आपको दंड मिल सकता है।
+
+
+upload.we_can_add_language_you_need:
+  en: |-
+    We can easily add the language you need. Just send us a direct message with /chat:
+
+    Example:
+    /chat Please add ¬˚µ∆˜®∂∫ language!
+
+    Remember that you can't select the wrong language for meme for now.
+
+  ru: |-
+    Хочешь, добавим язык, который ты хочешь? 
+    Просто напиши нам в личные сообщения с помощью /chat:
+
+    Например:
+    /chat Пожалуйста, добавь язык отцов!
+
+    Помни, что пока нельзя выбрать неправильный язык для мема. Но хорошие мемы мы не хотим упускать!
+
+  uk: |-
+    Хочеш, додамо мову, яку ти хочеш? 
+    Просто напиши нам в особисті повідомлення за допомогою /chat:
+
+    Наприклад:
+    /chat Будь ласка, додай мову батьків!
+
+    Пам'ятай, що поки не можна вибрати неправильну мову для мема. Але гарні меми ми не хочемо пропускати!
+
+  es: |-
+    ¿Quieres que añadamos el idioma que necesitas? 
+    Solo envíanos un mensaje directo con /chat:
+
+    Ejemplo:
+    /chat ¡Por favor, añade el idioma de los padres!
+
+    Recuerda que por ahora no puedes seleccionar el idioma incorrecto para el meme. ¡Pero no queremos perdernos los buenos memes!
+  
+  pt-br: |-
+    Quer que adicionemos o idioma que você precisa? 
+    Basta nos enviar uma mensagem direta com /chat:
+
+    Exemplo:
+    /chat Por favor, adicione o idioma dos pais!
+
+    Lembre-se de que, por enquanto, você não pode selecionar o idioma errado para o meme. Mas não queremos perder os bons memes!
+  
+  fr: |-
+    Vous voulez que nous ajoutions la langue dont vous avez besoin? 
+    Envoyez-nous simplement un message direct avec /chat:
+
+    Exemple:
+    /chat Veuillez ajouter la langue des parents!
+
+    N'oubliez pas que, pour le moment, vous ne pouvez pas sélectionner la mauvaise langue pour le meme. Mais nous ne voulons pas manquer les bons memes!
+
+  it: |-
+    Vuoi che aggiungiamo la lingua di cui hai bisogno? 
+    Invia un messaggio diretto con /chat:
+
+    Esempio:
+    /chat Per favore, aggiungi la lingua dei genitori!
+
+    Ricorda che per ora non puoi selezionare la lingua sbagliata per il meme. Ma non vogliamo perdere i bei meme!
+  
+  de: |-
+    Möchtest du die Sprache hinzufügen, die du brauchst? 
+    Schicke uns einfach eine Direktnachricht mit /chat:
+
+    Beispiel:
+    /chat Bitte füge die Sprache der Eltern hinzu!
+
+    Denke daran, dass du für den Moment nicht die falsche Sprache für das Meme auswählen kannst. Aber wir wollen die guten Memes nicht verpassen!
+
+  tr: |-
+    İhtiyacınız olan dili eklememizi ister misiniz? 
+    Sadece /chat ile bize doğrudan mesaj gönderin:
+
+    Örnek:
+    /chat Lütfen ebeveynlerin dilini ekleyin!
+
+    Şu anda meme için yanlış dili seçemezsiniz. Ama iyi memeleri kaçırmak istemeyiz!
+
+  fa: |-
+    آیا می‌خواهید زبان مورد نیاز خود را اضافه کنیم؟ 
+    فقط یک پیام مستقیم با /chat برای ما ارسال کنید:
+
+    مثال:
+    /chat لطفاً زبان والدین را اضافه کنید!
+
+    به خاطر داشته باشید که بعداً نمی‌توانید زبان اشتباهی برای میم انتخاب کنید. اما ما نمی‌خواهیم میم‌های خوب را از دست بدهیم!
+  
+  uz: |-
+    Kerak bo'lgan tilni qo'shishni xohlaysizmi? 
+    Faqat /chat orqali bizga to'g'ri xabar yuboring:
+
+    Misol:
+    /chat Iltimos, ota-onalar tilini qo'shing!
+
+    Hozircha mema uchun noto'g'ri tilni tanlay olmaysiz. Lekin biz yaxshi memalarni yo'qotishni istamaymiz!
+  
+  ar: |-
+    هل تريدنا أن نضيف اللغة التي تحتاجها؟ 
+    ما عليك سوى إرسال رسالة مباشرة مع /chat:
+
+    مثال:
+    /chat يرجى إضافة لغة الآباء!
+
+    تذكر أنه لا يمكنك اختيار اللغة الخاطئة للصورة النمطية حاليًا. ولكننا لا نريد أن نفوت الصور النمطية الجيدة!
+
+  hi: |-
+    क्या आप चाहते हैं कि हम आपकी आवश्यकता की भाषा जोड़ें? 
+    बस हमें /chat के साथ एक सीधा संदेश भेजें:
+
+    उदाहरण:
+    /chat कृपया माता-पिता की भाषा जोड़ें!
+
+    ध्यान दें कि आप अभी के लिए मीम के लिए गलत भाषा का चयन नहीं कर सकते। लेकिन हम अच्छे मीम नहीं छोड़ना चाहते हैं!
+
+
+upload.submitted:
+  en: |-
+    🏁 <b>You submitted your meme for a review.</b> 🕵️‍♀️
+
+    What to do next:
+    1. Wait for the approval or rejection from our team.
+    2. Keep watching other memes - rate other uploads! 🕒
+
+  ru: |-
+    🏁 <b>Мем отправлен на проверку</b> 🕵️‍♀️
+
+    Что делать дальше:
+    1. Ожидайте апрува/реджекта от нашей команды.
+    2. Продолжай смотреть другие мемы - оцени другие загрузки! 🕒
+
+  uk: |-
+    🏁 <b>Мем відправлено на перевірку</b> 🕵️‍♀️
+
+    Що робити далі:
+    1. Очікуйте апрува/режекта від нашої команди.
+    2. Продовжуй дивитися інші меми - оцінюй інші завантаження! 🕒
+
+  es: |-
+    🏁 <b>Has enviado tu meme para revisión.</b> 🕵️‍♀️
+
+    ¿Qué hacer a continuación?
+    1. Espera la aprobación o rechazo de nuestro equipo.
+    2. ¡Sigue viendo otros memes - califica otras cargas! 🕒
+  
+  pt-br: |-
+    🏁 <b>Você enviou seu meme para revisão.</b> 🕵️‍♀️
+
+    O que fazer a seguir:
+    1. Aguarde a aprovação ou rejeição de nossa equipe.
+    2. Continue assistindo outros memes - avalie outros uploads! 🕒
+
+  fr: |-
+    🏁 <b>Vous avez soumis votre meme pour examen.</b> 🕵️‍♀️
+
+    Que faire ensuite:
+    1. Attendez l'approbation ou le rejet de notre équipe.
+    2. Continuez à regarder d'autres memes - évaluez d'autres téléchargements! 🕒
+  
+  it: |-
+    🏁 <b>Hai inviato il tuo meme per una revisione.</b> 🕵️‍♀️
+
+    Cosa fare dopo:
+    1. Attendi l'approvazione o il rifiuto del nostro team.
+    2. Continua a guardare altri meme - valuta altri caricamenti! 🕒
+  
+  de: |-
+    🏁 <b>Du hast deinen Meme zur Überprüfung eingereicht.</b> 🕵️‍♀️
+
+    Was als nächstes zu tun ist:
+    1. Warten Sie auf die Genehmigung oder Ablehnung unseres Teams.
+    2. Schauen Sie sich weiterhin andere Memes an - bewerten Sie andere Uploads! 🕒
+
+  tr: |-
+    🏁 <b>Memeni incelememiz için gönderdin.</b> 🕵️‍♀️
+
+    Bundan sonraki adımlar:
+    1. Takımımızdan onay veya reddi bekleyin.
+    2. Diğer memelere bakmaya devam edin - diğer yüklemeleri değerlendirin! 🕒
+
+  fa: |-
+    🏁 <b>میم خود را برای بررسی ارسال کردید.</b> 🕵️‍♀️
+
+    چه کار باید انجام دهید:
+    1. منتظر تأیید یا رد از تیم ما باشید.
+    2. ادامه دیدن میم‌های دیگر - ارزیابی بارگذاری‌های دیگر! 🕒
+
+  uz: |-
+    🏁 <b>Siz memingizni tekshirish uchun yubordingiz.</b> 🕵️‍♀️
+
+    Keyingi qadam:
+    1. Bizning jamoamizdan tasdiqni yoki rad etishni kutib turing.
+    2. Boshqa memelarni ko'rishni davom ettiring - boshqa yuklamalarni baholang! 🕒
+
+  ar: |-
+    🏁 <b>لقد قمت بإرسال صورتك النمطية للمراجعة.</b> 🕵️‍♀️
+
+    ما الذي يجب القيام به بعد؟
+    1. انتظر الموافقة أو الرفض من فريقنا.
+    2. استمر في مشاهدة الصور النمطية الأخرى - قيم الرفع الآخر! 🕒
+  
+  hi: |-
+    🏁 <b>आपने अपना जोक्स समीक्षा के लिए भेजा है।</b> 🕵️‍♀️
+
+    आगे क्या करना है:
+    1. हमारी टीम से मंजूरी या अस्वीकृति का इंतजार करें।
+    2. अन्य जोक्स देखते रहें - अन्य अपलोड की रेटिंग करें! 🕒
+

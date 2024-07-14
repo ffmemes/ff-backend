@@ -80,6 +80,59 @@ popup.inline_search:
     Наприклад: @ffmemesbot котики
 
 
+popup.upload_meme:
+  en: |-
+    📤 Send us your memes! 📥
+
+    If you find an explosive meme somewhere, forward it to this bot and if you pass the moderation we will show it to everyone. 🤯
+    Best meme authors will be rewarded with our tokens (coming soon). 🤫🎁
+  ru: |-
+    📤 Присылай нам свои мемы! 📥
+
+    Если ты где-то нашел взрывной мем, перешли его прямо в этот бот! И если он пройдет модерацию, мы покажем его всем нашим в боте. 🤯
+    Лучшие авторы мемов будут вознаграждены нашими токенами (coming soon). 🤫🎁
+  uk: |-
+    📤 Надсилай нам свої меми! 📥
+
+    Якщо ти десь знайшов вибуховий мем, перешли його прямо в цього бота! І якщо він пройде модерацію, ми покажемо його всім нашим в боті. 🤯
+    Найкращі автори мемів будуть винагороджені нашими токенами (coming soon). 🤫🎁
+  es: |-
+    📤 ¡Envíanos tus memes! 📥
+
+    Si encuentras un meme explosivo en algún lugar, ¡reenvíalo a este bot! Y si pasa la moderación, lo mostraremos a todos en el bot. 🤯
+    Los mejores autores de memes serán recompensados con nuestros tokens (próximamente). 🤫🎁
+  pt-br: |-
+    📤 Envie-nos seus memes! 📥
+
+    Se você encontrar um meme explosivo em algum lugar, encaminhe-o para este bot! E se passar pela moderação, mostraremos a todos no bot. 🤯
+    Os melhores autores de memes serão recompensados com nossos tokens (em breve). 🤫🎁
+  uz: |-
+    📤 Memlaringni bizga yuboring! 📥
+
+    Agar biror joyda zor mem topgan bo'lsang, uni shu botga yuboring! Va agar moderatsiyadan o'tsa, biz uningni botda hammasiga ko'rsatamiz. 🤯
+    Eng yaxshi mem mualliflari bizning tokenlarimiz bilan mukofotlanadi (tez kunda). 🤫🎁
+  ar: |-
+    📤 أرسل لنا ميماتك! 📥
+
+    إذا وجدت ميمًا متفجرًا في مكان ما، أعد إرساله إلى هذا البوت! وإذا تمت الموافقة عليه، سنعرضه للجميع في البوت. 🤯
+    سيتم مكافأة أفضل مؤلفي الميمات برموزنا (قريبًا). 🤫🎁
+  fa: |-
+    📤 میم‌های خود را برای ما ارسال کنید! 📥
+
+    اگر در هر جایی میمی انفجاری پیدا کردید، آن را به این بات ارسال کنید! و اگر مدیریت را پشت سر گذاشت، آن را به همه در بات نشان خواهیم داد. 🤯
+    بهترین نویسندگان میم با نشان‌های ما (به زودی) پاداش داده خواهند شد. 🤫🎁
+  de: |-
+    📤 Schicke uns deine Memes! 📥
+
+    Wenn du irgendwo ein explosives Meme findest, leite es an diesen Bot weiter! Und wenn es die Moderation besteht, zeigen wir es allen im Bot. 🤯
+    Die besten Meme-Autoren werden mit unseren Token belohnt (bald verfügbar). 🤫🎁
+  fr: |-
+    📤 Envoyez-nous vos memes! 📥
+
+    Si vous trouvez un meme explosif quelque part, transférez-le à ce bot! Et s'il passe la modération, nous le montrerons à tout le monde dans le bot. 🤯
+    Les meilleurs auteurs de memes seront récompensés avec nos jetons (bientôt). 🤫🎁
+
+
 popup.github_repo:
   ru: |-
     👩🏻‍💻 А сейчас информация для айтишников. 🧑🏻‍💻

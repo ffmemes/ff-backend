@@ -19,7 +19,7 @@ from src.stats.user_meme_source import calculate_user_meme_source_stats
 from src.storage.schemas import MemeData
 from src.tgbot.constants import TELEGRAM_CHANNEL_RU_CHAT_ID, TELEGRAM_CHANNEL_RU_LINK
 from src.tgbot.senders.meme import send_new_message_with_meme
-from src.tgbot.service import get_meme_by_id, get_user_by_id
+from src.tgbot.service import create_user, get_meme_by_id, get_user_by_id, save_tg_user
 from src.tgbot.utils import check_if_user_chat_member
 
 
@@ -27,7 +27,7 @@ async def call_chatgpt(prompt: str) -> str:
     client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
     response = await client.chat.completions.create(
-        model="gpt-4",
+        model="gpt-4o",
         messages=[
             {
                 "role": "user",
@@ -41,6 +41,17 @@ async def call_chatgpt(prompt: str) -> str:
 
 async def handle_wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
+
+    await create_user(id=user_id)
+    await save_tg_user(
+        id=user_id,
+        username=update.effective_user.username,
+        first_name=update.effective_user.first_name,
+        last_name=update.effective_user.last_name,
+        is_premium=update.effective_user.is_premium,
+        language_code=update.effective_user.language_code,
+    )
+
     if not await check_if_user_chat_member(
         context.bot,
         user_id,
@@ -102,6 +113,7 @@ async def handle_wrapped_button(
         if meme_data is not None:
             meme = MemeData(**meme_data)
             await send_new_message_with_meme(
+                context.bot,
                 update.effective_user.id,
                 meme,
                 reply_markup=InlineKeyboardMarkup(
@@ -111,7 +123,7 @@ async def handle_wrapped_button(
         else:
             key = 3
 
-    if key == 3:
+    if key == 3 and user_wrapped["humor_sense_report"]:
         await update.effective_chat.send_message(
             text=user_wrapped["humor_sense_report"],
             parse_mode="HTML",
@@ -140,12 +152,17 @@ async def generate_user_wrapped(user_id: int, update: Update):
     await set_user_wrapped(user_id, {"lock": True})
 
     msg = await update.message.reply_text("⏳ Анализирую твои лайки...")
-    await asyncio.gather(
-        calculate_user_stats(),
-        calculate_inviter_stats(),
-        calculate_meme_source_stats(),
-        calculate_user_meme_source_stats(),
-    )
+
+    try:
+        await asyncio.gather(
+            calculate_user_stats(),
+            calculate_inviter_stats(),
+            calculate_meme_source_stats(),
+            calculate_user_meme_source_stats(),
+        )
+    except Exception as e:
+        print(f"Error in recalculating stats: {e}")
+        pass
 
     bot_usage_report = await get_bot_usage_report(user_id)
     recommended_meme_sources_report = await get_meme_sources_report(user_id)
@@ -153,10 +170,10 @@ async def generate_user_wrapped(user_id: int, update: Update):
     if bot_usage_report is None or recommended_meme_sources_report is None:
         await msg.edit_text(
             """
-    Маловато ты пользовался ботом, чтобы я мог показать тебе что-нибудь интересненькое.
+Маловато ты пользовался ботом, чтобы я мог показать тебе что-нибудь интересненькое.
 
-    А ну-ка смотреть мемусики: /start
-                """
+А ну-ка смотреть мемусики ➡️ жми /start
+            """
         )
         return
 
@@ -182,7 +199,7 @@ async def get_bot_usage_report(user_id: int):
 
     user_stats = await get_user_stats(user_id)
     if user_stats is None:
-        return
+        return None
 
     days_with_us = (datetime.datetime.utcnow() - user["created_at"]).days + 1
     user_opened_bot_times = user_stats.get("nsessions", 0)
@@ -191,6 +208,9 @@ async def get_bot_usage_report(user_id: int):
     user_gave_likes = user_stats.get("nlikes", 0)
     user_spent_sec = user_stats.get("time_spent_sec", 0)
     user_invited_users = user_stats.get("invited_users", [])
+
+    if user_gave_likes < 10:
+        return None
 
     REPORT = f"""
 Ты присоединился к боту {days_with_us} дней назад.
@@ -265,6 +285,8 @@ async def get_humor_report(user_id):
         return None
 
     texts = "\n".join(f"{ocr['ocr_text']}" for ocr in ocrs)
+    if len(texts) < 100:
+        return None
 
     PROMPT = f"""
 
@@ -294,7 +316,7 @@ async def get_humor_report(user_id):
     result = await call_chatgpt(PROMPT)
 
     REPORT = f"""
-Я посмотрел на твои лайки и немножко понял твое чувство юмора:
+👀 Я посмотрел на твои лайки и немножко понял твое чувство юмора:
 
 {result}
     """
