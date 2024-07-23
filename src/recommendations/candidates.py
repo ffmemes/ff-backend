@@ -448,3 +448,131 @@ async def get_best_memes_from_each_source(
     """
     res = await fetch_all(text(query))
     return res
+
+
+async def get_selected_sources(
+    user_id: int,
+    limit: int = 10,
+    exclude_meme_ids: list[int] = [],
+) -> list[dict]:
+    """Implements a test version of an algotighm which takes best memes from
+    some selected sources
+    """
+
+    query_lang = f"""
+        SELECT language_code
+        FROM user_language
+        WHERE user_id = {user_id}
+    """
+
+    res = await fetch_all(text(query_lang))
+    if not len(res):
+        return []
+    print(res)
+    is_lang_ru_en = all([row["language_code"] in ("ru", "en") for row in res])
+
+    if not is_lang_ru_en:
+        return []
+
+    query = f"""
+        SELECT
+            M.id
+            , M.type, M.telegram_file_id, M.caption, M.recommended_by
+        FROM (
+            SELECT
+                M.id
+                , M.type, M.telegram_file_id, M.caption
+                , 'selected_sources_240513' AS recommended_by
+                , random() rand
+            FROM meme M
+            INNER JOIN meme_stats MS
+                ON MS.meme_id = M.id
+
+            INNER JOIN user_language L
+                ON L.user_id = {user_id}
+                AND L.language_code = M.language_code
+
+            LEFT JOIN user_meme_reaction R
+                    ON R.meme_id = M.id
+                    AND R.user_id = {user_id}
+
+            WHERE 1=1
+                AND M.status = 'ok'
+                AND R.meme_id IS NULL
+                -- 100 ru, 50 en, 50 all lang
+                AND M.id IN (
+                    12632, 2687384, 4691317, 7800835, 7263240,
+                    7800833, 7273747, 5594231, 1190355, 7313587,
+                    7737207, 121592, 5762991, 1173406, 6393105,
+                    6470439, 7648698, 6522792, 7746601, 1023569,
+                    121513, 6680926, 7003156, 2163445, 7728617,
+                    3855063, 6305615, 7564457, 6953202, 2341860,
+                    7462187, 7650435, 6691124, 7425200, 7800853,
+                    5688394, 7309298, 7743723, 130092, 6494305,
+                    6931153, 1173405, 2744097, 1976242, 1220485,
+                    3530822, 1017007, 5903961, 7398465, 6952525,
+                    285571, 6965529, 7510581, 2010680, 2086971,
+                    1573399, 6902677, 7264007, 6623571, 7515039,
+                    5111892, 7527928, 7186939, 7341028, 6606148,
+                    7234885, 7447514, 12684, 7118266, 6690818,
+                    7797882, 7570548, 5439952, 6452942, 7532191,
+                    5048161, 1190740, 7109188, 12664, 6611543,
+
+                    6965529, 6930231, 5605642, 4047586, 6902689,
+                    7820185, 6663230
+                )
+                {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+            ORDER BY rand
+            LIMIT {limit}
+        ) M
+    """
+    res = await fetch_all(text(query))
+    return res
+
+
+async def get_lr_smoothed(
+    user_id: int,
+    limit: int = 10,
+    exclude_meme_ids: list[int] = [],
+):
+    """
+    Uses the following score to rank memes
+
+    score = Like Rate Smoothed * User-Source Like Rate
+    """
+
+    query = f"""
+        SELECT
+            M.id
+            , M.type, M.telegram_file_id, M.caption
+            , 'lr_smoothed' AS recommended_by
+
+        FROM meme M
+        INNER JOIN meme_stats MS
+            ON MS.meme_id = M.id
+
+        INNER JOIN user_language L
+            ON L.language_code = M.language_code
+            AND L.user_id = {user_id}
+
+        LEFT JOIN user_meme_reaction R
+            ON R.meme_id = M.id
+            AND R.user_id = {user_id}
+
+        LEFT JOIN user_meme_source_stats UMSS
+            ON UMSS.meme_source_id = M.meme_source_id
+            AND UMSS.user_id = {user_id}
+
+        WHERE 1=1
+            AND M.status = 'ok'
+            AND R.meme_id IS NULL
+            AND MS.nlikes > 1
+            {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+
+        ORDER BY -1
+            * (UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.)
+            * MS.lr_smoothed
+        LIMIT {limit}
+    """
+    res = await fetch_all(text(query))
+    return res
