@@ -6,9 +6,9 @@ from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from src import redis
-from src.database import (engine, fetch_all, meme, meme_source, meme_stats,
+from src.database import (engine, meme, meme_source, meme_stats,
                           user, user_language, user_meme_reaction, user_meme_source_stats)
-from src.recommendations.candidates_ab import get_lr_smoothed
+from src.recommendations.candidates import get_lr_smoothed
 
 
 @pytest_asyncio.fixture()

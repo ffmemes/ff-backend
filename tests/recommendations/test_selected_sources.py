@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from src import redis
 from src.database import (engine, meme, meme_source, meme_stats, user,
                           user_language, user_meme_reaction)
-from src.recommendations.candidates_ab import get_selected_sources
+from src.recommendations.candidates import get_selected_sources
 from src.recommendations.meme_queue import generate_cold_start_recommendations
 
 
