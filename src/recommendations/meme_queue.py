@@ -2,9 +2,9 @@ import random
 
 from src import redis
 from src.recommendations.candidates import (
+    get_best_memes_from_each_source,
     get_lr_smoothed,
     get_selected_sources,
-    get_best_memes_from_each_source,
     less_seen_meme_and_source,
     like_spread_and_recent_memes,
     uploaded_memes,
@@ -76,8 +76,6 @@ async def generate_recommendations(user_id, limit):
 
     user_info = await get_user_info(user_id)
 
-
-    is_lr_smoothed_ab = user_id % 100 >= 50
 
     r = random.random()
 
