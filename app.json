@@ -1,10 +1,10 @@
 {
-    "formation": {
-      "web": {
-        "quantity": 1
-      },
-      "prefect_worker": {
-        "quantity": 1
-      }
+  "formation": {
+    "web": {
+      "quantity": 2
+    },
+    "prefect_worker": {
+      "quantity": 1
     }
   }
+}
