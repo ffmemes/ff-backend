@@ -13,6 +13,7 @@ from telegram.ext import ContextTypes
 
 from src import localizer
 from src.recommendations.meme_queue import check_queue
+from src.tgbot.constants import UserType
 from src.tgbot.handlers.upload.constants import SUPPORTED_LANGUAGES
 from src.tgbot.handlers.upload.moderation import uploaded_meme_auto_review
 from src.tgbot.handlers.upload.service import (
@@ -78,21 +79,24 @@ async def handle_message_with_meme(
 ) -> None:
     """When a user sends a message with a meme"""
     user = await get_user_info(update.effective_user.id)
-    if user["nmemes_sent"] < 10:
-        return await update.message.reply_text(
-            localizer.t("upload.watch_memes_to_unblock_upload", user["interface_lang"]),
-        )
+    if not UserType(user["type"]).is_moderator:
+        if user["nmemes_sent"] < 10:
+            return await update.message.reply_text(
+                localizer.t(
+                    "upload.watch_memes_to_unblock_upload", user["interface_lang"]
+                ),
+            )
 
-    uploaded_today = await count_24h_uploaded_not_approved_memes(
-        update.effective_user.id
-    )
-    if uploaded_today >= 5:
-        return await update.message.reply_text(
-            """
-You already uploaded lots of memes today. Try again tomorrow.
-Think about quality, not quantity: the goal is to get as many likes as possible.
-            """
+        uploaded_today = await count_24h_uploaded_not_approved_memes(
+            update.effective_user.id
         )
+        if uploaded_today >= 5:
+            return await update.message.reply_text(
+                """
+    You already uploaded lots of memes today. Try again tomorrow.
+    Think about quality, not quantity: the goal is to get as many likes as possible.
+                """
+            )
 
     meme_upload = await create_meme_raw_upload(update.message)
     # TODO: check that a user uploaded <= N memes today
