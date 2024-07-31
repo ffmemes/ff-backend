@@ -64,7 +64,7 @@ views - likes - like %"""
         views = uploaded_meme["nmemes_sent"]
         likes = uploaded_meme["nlikes"]
         dislikes = uploaded_meme["ndislikes"]
-        like_prc = round(likes * 100.0 / (likes + dislikes))
+        like_prc = round(likes * 100.0 / (likes + dislikes)) if likes + dislikes else 0
 
         media.append(InputMediaPhoto(media=uploaded_meme["telegram_file_id"]))
 
