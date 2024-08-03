@@ -141,7 +141,7 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
         user_uploaded_memes = [m for m in uploaded_memes if m["author_id"] == author_id]
         likes = sum(m["nlikes"] for m in user_uploaded_memes)
         dislikes = sum(m["ndislikes"] for m in user_uploaded_memes)
-        like_prc = round(likes * 100.0 / (likes + dislikes))
+        like_prc = round(likes * 100.0 / (likes + dislikes)) if likes + dislikes else 0
         views = sum(m["nmemes_sent"] for m in uploaded_memes)
 
         user_text = f"""
@@ -254,7 +254,7 @@ Forward top meme to our bot → <a href="https://t.me/ffmemesbot?start=kitchen">
         user_uploaded_memes = [m for m in uploaded_memes if m["author_id"] == author_id]
         likes = sum(m["nlikes"] for m in user_uploaded_memes)
         dislikes = sum(m["ndislikes"] for m in user_uploaded_memes)
-        like_prc = round(likes * 100.0 / (likes + dislikes))
+        like_prc = round(likes * 100.0 / (likes + dislikes)) if likes + dislikes else 0
         views = sum(m["nmemes_sent"] for m in uploaded_memes)
 
         user_text = f"""

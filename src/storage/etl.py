@@ -299,7 +299,8 @@ async def update_or_create_memes(transformed_memes, memes_not_in_memes_table):
     create_these_memes = [
         m
         for m in transformed_memes
-        if (m["meme_source_id"], m["raw_meme_id"]) in memes_not_in_memes_table
+        if {"meme_source_id": m["meme_source_id"], "raw_meme_id": m["raw_meme_id"]}
+        in memes_not_in_memes_table
     ]
     if len(create_these_memes):
         await execute(insert(meme).values(create_these_memes))
@@ -308,7 +309,8 @@ async def update_or_create_memes(transformed_memes, memes_not_in_memes_table):
         m
         | {"status": "created" if m["status"] == "broken_content_link" else m["status"]}
         for m in transformed_memes
-        if (m["meme_source_id"], m["raw_meme_id"]) not in memes_not_in_memes_table
+        if {"meme_source_id": m["meme_source_id"], "raw_meme_id": m["raw_meme_id"]}
+        not in memes_not_in_memes_table
     ]
 
     for m in update_these_memes:

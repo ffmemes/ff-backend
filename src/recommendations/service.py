@@ -11,7 +11,6 @@ from src.database import (
     user,
     user_meme_reaction,
 )
-from src.recommendations.utils import exclude_meme_ids_sql_filter
 
 
 async def create_user_meme_reaction(
@@ -71,11 +70,11 @@ async def update_user_last_active_at(
 
 
 # test handler, will be removed
-async def get_unseen_memes(
+async def filter_unseen_memes(
     user_id: int,
-    limit: int = 10,
-    exclude_meme_ids: list[int] = [],
+    meme_ids: list[int],
 ) -> list[dict[str, Any]]:
+    meme_ids_str = ", ".join(map(str, meme_ids))
     query = f"""
         SELECT
             M.id, M.type, M.telegram_file_id, M.caption,
@@ -90,8 +89,7 @@ async def get_unseen_memes(
         WHERE 1=1
             AND M.status = 'ok'
             AND R.meme_id IS NULL
-            {exclude_meme_ids_sql_filter(exclude_meme_ids)}
-        LIMIT {limit}
+            AND M.id IN ({meme_ids_str})
     """
     res = await fetch_all(text(query))
     return res
@@ -102,6 +100,18 @@ async def get_user_reactions(
 ) -> list[dict[str, Any]]:
     select_statement = select(user_meme_reaction).where(
         user_meme_reaction.c.user_id == user_id
+    )
+    return await fetch_all(select_statement)
+
+
+async def get_user_reactions_for_meme_ids(
+    user_id: int,
+    meme_ids: list[int],
+) -> list[dict[str, Any]]:
+    select_statement = (
+        select(user_meme_reaction)
+        .where(user_meme_reaction.c.user_id == user_id)
+        .where(user_meme_reaction.c.meme_id.in_(meme_ids))
     )
     return await fetch_all(select_statement)
 

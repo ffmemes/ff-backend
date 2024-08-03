@@ -52,6 +52,10 @@ async def pop_meme_from_queue_by_key(key: str) -> dict | None:
     return orjson.loads(meme) if meme else None
 
 
+async def clear_meme_queue_by_key(key: str) -> None:
+    await redis_client.delete(key)
+
+
 async def get_meme_queue_length_by_key(key: str) -> int:
     return await redis_client.scard(key)
 

@@ -1,6 +1,3 @@
-import asyncio
-from datetime import datetime
-
 from telegram import Update
 from telegram.error import Forbidden
 from telegram.ext import (
@@ -12,9 +9,7 @@ from src.tgbot.bot import bot
 from src.tgbot.constants import UserType
 from src.tgbot.handlers.admin.service import (
     get_user_by_tg_username,
-    get_waitlist_users_registered_before,
 )
-from src.tgbot.logs import log
 from src.tgbot.service import update_user
 from src.tgbot.user_info import get_user_info, update_user_info_cache
 
