@@ -339,6 +339,14 @@ def add_handlers(application: Application) -> None:
         )
     )
 
+    application.add_handler(
+        CommandHandler(
+            "show",
+            get_meme.handle_show_memes,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+        )
+    )
+
     # show user info
     application.add_handler(
         MessageHandler(

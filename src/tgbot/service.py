@@ -285,6 +285,11 @@ async def get_meme_stats(meme_id: int) -> dict[str, Any] | None:
     return await fetch_one(select_statement)
 
 
+async def get_meme_stats_for_meme_ids(meme_ids: list[int]) -> list[dict[str, Any]]:
+    select_statement = select(meme_stats).where(meme_stats.c.meme_id.in_(meme_ids))
+    return await fetch_all(select_statement)
+
+
 async def update_user(user_id: int, **kwargs) -> dict[str, Any] | None:
     update_query = (
         user.update().where(user.c.id == user_id).values(**kwargs).returning(user)

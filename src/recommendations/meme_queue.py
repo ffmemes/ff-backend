@@ -76,7 +76,6 @@ async def generate_recommendations(user_id, limit):
 
     user_info = await get_user_info(user_id)
 
-
     r = random.random()
 
     candidates = []
