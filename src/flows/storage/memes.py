@@ -6,7 +6,7 @@ from typing import Any
 from prefect import flow, get_run_logger
 
 from src.storage import ads
-from src.storage.constants import MemeStatus, MemeType
+from src.storage.constants import MemeSourceType, MemeStatus, MemeType
 from src.storage.etl import (
     etl_memes_from_raw_ig_posts,
     etl_memes_from_raw_telegram_posts,
@@ -27,8 +27,13 @@ from src.storage.service import (
 from src.storage.upload import (
     download_meme_content_file,
     upload_meme_content_to_tg,
+    download_meme_content_from_tg,
 )
 from src.storage.watermark import add_watermark
+
+from src.tgbot.handlers.upload.service import (
+    get_meme_raw_upload_by_id,
+)
 
 
 async def ocr_meme_content(
@@ -205,12 +210,22 @@ async def ocr_uploaded_memes(limit=10):
     logger.info(f"Going to OCR {len(memes)} memes.")
 
     for meme in memes:
-        if meme["content_url"] is None:
+        if meme["content_url"] is not None:
+            meme_original_content = await download_meme_content_file(
+                meme["content_url"]
+            )
+            await asyncio.sleep(2)  # flood control
+        elif meme["meme_source_type"] == MemeSourceType.USER_UPLOAD:
+            meme_raw_upload = await get_meme_raw_upload_by_id(meme["raw_meme_id"])
+            meme_original_file_id = meme_raw_upload["media"]["file_id"]
+            meme_original_content = download_meme_content_from_tg(
+                meme_original_file_id,
+            )
+            await asyncio.sleep(2)  # flood control
+
+        else:
             logger.warning(f"Failed to extract #{meme['id']} content_url, skipping.")
             continue
-
-        meme_original_content = await download_meme_content_file(meme["content_url"])
-        await asyncio.sleep(3)  # flood control
 
         if meme_original_content is None:
             logger.info(f"Meme {meme['id']} content is not available to download.")

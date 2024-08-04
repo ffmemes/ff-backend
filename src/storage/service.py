@@ -86,6 +86,7 @@ async def get_memes_to_ocr(limit=100):
     select_query = """
         SELECT
             M.*,
+            MS.type meme_source_type,
             COALESCE(
                 MRV.media->>0,
                 MRT.media->0->>'url',
