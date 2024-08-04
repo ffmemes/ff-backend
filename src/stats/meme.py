@@ -4,8 +4,8 @@ from src.database import execute
 
 
 async def calculate_meme_reactions_stats(
-        min_user_reactions=10,
-        min_meme_reactions=3) -> None:
+    min_user_reactions=10, min_meme_reactions=3
+) -> None:
     """
     lr_smoothed algorithm
 
@@ -82,7 +82,13 @@ async def calculate_meme_reactions_stats(
                 , MAX(EXTRACT('DAYS' FROM NOW() - M.published_at)) age_days
                 , COALESCE(EXTRACT(
                     EPOCH FROM
-                    percentile_cont(0.5) WITHIN GROUP (ORDER BY reacted_at - sent_at)
+                    percentile_cont(0.5)
+                        WITHIN GROUP (ORDER BY reacted_at - sent_at)
+                        FILTER (
+                            WHERE reacted_at - sent_at
+                            BETWEEN '0.5 second'
+                            AND '1 minute'
+                        )
                 ), 99999) AS sec_to_react
                 , NOW() AS updated_at
             FROM user_meme_reaction E

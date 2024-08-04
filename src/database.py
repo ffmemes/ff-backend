@@ -242,7 +242,7 @@ user_meme_reaction = Table(
     Column("meme_id", ForeignKey("meme.id", ondelete="CASCADE"), primary_key=True),
     Column("recommended_by", String, nullable=False),
     Column("sent_at", DateTime, server_default=func.now(), nullable=False),
-    Column("reaction_id", Integer),
+    Column("reaction_id", Integer, index=True),
     Column("reacted_at", DateTime),
 )
 
