@@ -42,27 +42,14 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     user_info = await update_user_info_cache(user_id)
 
-    asyncio.create_task(
-        log(
-            f"""
-👋 {update.effective_user.name}/#{user_id}
-type:{user_info["type"]}, ref:{deep_link}, lang:{language_code}
-        """,
-            context.bot,
+    if deep_link:
+        asyncio.create_task(
+            log(
+                f"""
+    👋 {update.effective_user.name}/#{user_id}
+    type:{user_info["type"]}, ref:{deep_link}, lang:{language_code}
+            """,
+                context.bot,
+            )
         )
-    )
-
-    # # ONBOARDING AB TEST
-    # if user_id % 2 == 1:
-    #     # old onboarding
     return await handle_language_settings(update, context)
-
-    # test: send memes immediately
-    # await clear_meme_queue_for_user(user_id)
-    # await generate_cold_start_recommendations(user_id)
-    # return await next_message(
-    #     context.bot,
-    #     user_id,
-    #     prev_update=update,
-    #     prev_reaction_id=None,
-    # )
