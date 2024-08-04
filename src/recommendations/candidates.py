@@ -616,6 +616,10 @@ async def get_fast_dopamine(
             ON L.user_id = {user_id}
             AND L.language_code = M.language_code
 
+        LEFT JOIN user_meme_source_stats UMSS
+            ON UMSS.meme_source_id = M.meme_source_id
+            AND UMSS.user_id = {user_id}
+
         LEFT JOIN user_meme_reaction R
                 ON R.meme_id = M.id
                 AND R.user_id = {user_id}
@@ -627,10 +631,12 @@ async def get_fast_dopamine(
             AND M.status = 'ok'
             AND R.meme_id IS NULL
 
-            AND MS.age_days < 30
+            AND MS.raw_impr_rank IN (0, 1)
+            AND MS.age_days < 90
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
 
         ORDER BY -1  -- BIGGER the BETTER
+            * (UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.)
             * (-1) * MSTL.sec_to_like
             * lr_smoothed
         LIMIT {limit}
