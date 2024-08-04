@@ -3,6 +3,7 @@ import random
 from src import redis
 from src.recommendations.candidates import (
     get_best_memes_from_each_source,
+    get_fast_dopamine,
     get_lr_smoothed,
     get_selected_sources,
     less_seen_meme_and_source,
@@ -91,8 +92,12 @@ async def generate_recommendations(user_id, limit):
             )
 
     elif user_info["nmemes_sent"] < 100:
-        if r < 0.3:
+        if r < 0.2:
             candidates = await uploaded_memes(
+                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+            )
+        elif r < 0.4:
+            candidates = await get_fast_dopamine(
                 user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
             )
         elif r < 0.6:

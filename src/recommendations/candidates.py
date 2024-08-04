@@ -576,3 +576,65 @@ async def get_lr_smoothed(
     """
     res = await fetch_all(text(query))
     return res
+
+
+async def get_fast_dopamine(
+    user_id: int,
+    limit: int = 10,
+    exclude_meme_ids: list[int] = [],
+):
+    query = f"""
+        WITH MEME_SEC_TO_LIKE AS (
+            SELECT
+                meme_id
+                , COALESCE(EXTRACT(
+                    EPOCH FROM
+                    percentile_cont(0.5) WITHIN GROUP (ORDER BY reacted_at - sent_at)
+                ), 99999) AS sec_to_like,
+                COUNT(*) events
+
+            FROM user_meme_reaction E
+            INNER JOIN meme M
+                ON M.id = E.meme_id
+            WHERE 1=1
+                AND reaction_id = 1
+                AND reacted_at - sent_at BETWEEN '0.5 second' AND '30 seconds'
+            GROUP BY 1
+            HAVING COUNT(*) >= 1
+        )
+
+        SELECT
+            M.id
+            , M.type, M.telegram_file_id, M.caption
+            , 'fast_dopamine_20240804' AS recommended_by
+
+        FROM meme M
+        INNER JOIN meme_stats MS
+            ON MS.meme_id = M.id
+
+        INNER JOIN user_language L
+            ON L.user_id = {user_id}
+            AND L.language_code = M.language_code
+
+        LEFT JOIN user_meme_reaction R
+                ON R.meme_id = M.id
+                AND R.user_id = {user_id}
+
+        LEFT JOIN MEME_SEC_TO_LIKE MSTL
+            ON MSTL.meme_id = M.id
+
+        WHERE 1=1
+            AND M.status = 'ok'
+            AND R.meme_id IS NOT NULL
+
+            AND MS.age_days < 30
+            {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+
+        ORDER BY -1  -- BIGGER the BETTER
+    --		* (UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.)
+            * (-1) * MSTL.sec_to_like
+            * lr_smoothed
+        LIMIT {limit}
+    """
+    res = await fetch_all(text(query))
+    return res
