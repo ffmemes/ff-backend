@@ -77,11 +77,16 @@ async def generate_recommendations(user_id, limit):
 
     user_info = await get_user_info(user_id)
 
-    r = random.random()
-
     candidates = []
 
-    if user_info["nmemes_sent"] < 30:
+    r = random.random()
+
+    if r < 0.3:
+        candidates = await get_best_memes_from_each_source(
+            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+        )
+
+    elif user_info["nmemes_sent"] < 30:
         candidates = await get_selected_sources(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )

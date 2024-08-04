@@ -631,7 +631,6 @@ async def get_fast_dopamine(
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
 
         ORDER BY -1  -- BIGGER the BETTER
-    --		* (UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.)
             * (-1) * MSTL.sec_to_like
             * lr_smoothed
         LIMIT {limit}
