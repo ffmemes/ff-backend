@@ -625,7 +625,7 @@ async def get_fast_dopamine(
 
         WHERE 1=1
             AND M.status = 'ok'
-            AND R.meme_id IS NOT NULL
+            AND R.meme_id IS NULL
 
             AND MS.age_days < 30
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}

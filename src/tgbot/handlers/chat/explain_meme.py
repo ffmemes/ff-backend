@@ -70,6 +70,9 @@ async def explain_meme_ru(update: Update, _: ContextTypes.DEFAULT_TYPE):
 
 
 async def explain_meme_en(update: Update, _: ContextTypes.DEFAULT_TYPE):
+    if update.message is None:
+        return  # idk why that happens
+
     file_id = update.message.photo[-1].file_id
     image_bytes = await download_meme_content_from_tg(file_id)
     vision_result = await call_chatgpt_vision(
