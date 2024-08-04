@@ -131,7 +131,6 @@ async def edit_last_message_with_meme(
 ):
     await message.edit_media(
         media=get_input_media(meme),
-        parse_mode=ParseMode.HTML,
         reply_markup=reply_markup,
     )
 
