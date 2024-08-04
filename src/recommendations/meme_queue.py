@@ -87,7 +87,7 @@ async def generate_recommendations(user_id, limit):
 
     r = random.random()
 
-    if r < 0.5:
+    if r < 0.2:
         candidates = await get_fast_dopamine(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )

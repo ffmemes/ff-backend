@@ -598,9 +598,9 @@ async def get_fast_dopamine(
                 ON M.id = E.meme_id
             WHERE 1=1
                 AND reaction_id = 1
-                AND reacted_at - sent_at BETWEEN '0.5 second' AND '30 seconds'
+                AND reacted_at - sent_at BETWEEN '2 seconds' AND '20 seconds'
             GROUP BY 1
-            HAVING COUNT(*) >= 1
+            HAVING COUNT(*) >= 3
         )
 
         SELECT
@@ -624,7 +624,7 @@ async def get_fast_dopamine(
                 ON R.meme_id = M.id
                 AND R.user_id = {user_id}
 
-        LEFT JOIN MEME_SEC_TO_LIKE MSTL
+        INNER JOIN MEME_SEC_TO_LIKE MSTL
             ON MSTL.meme_id = M.id
 
         WHERE 1=1
