@@ -72,12 +72,6 @@ async def next_message(
 
     popup = await get_popup_to_send(user_id, user_info)
     if popup:
-        # if negative reaction, delete last message before sending popup
-        if prev_reaction_id is None or Reaction(prev_reaction_id).is_positive:
-            await bot.delete_message(
-                chat_id=user_id,
-                message_id=prev_update.callback_query.message.message_id,
-            )
         return await send_popup(user_id, popup)
 
     meme = await get_next_meme_for_user(user_id)
