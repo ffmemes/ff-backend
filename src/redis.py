@@ -60,15 +60,10 @@ async def get_meme_queue_length_by_key(key: str) -> int:
     return await redis_client.scard(key)
 
 
-async def add_memes_to_queue_by_key(
-        key: str, memes: list[dict],
-        expire: int = 3600
-    ) -> None:
+async def add_memes_to_queue_by_key(key: str, memes: list[dict]) -> int:
     jsoned_memes = [orjson.dumps(meme) for meme in memes]
-    p = await redis_client.pipeline(transaction=True)
-    await p.sadd(key, *jsoned_memes)
-    await p.expire(key, expire)
-    await p.execute(raise_on_error=True)
+    # TODO: add ttl, probably using redis transactions
+    return await redis_client.sadd(key, *jsoned_memes)
 
 
 def get_user_info_key(user_id: int) -> str:
