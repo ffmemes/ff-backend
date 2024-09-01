@@ -26,11 +26,10 @@ from src.storage.service import (
 )
 from src.storage.upload import (
     download_meme_content_file,
-    upload_meme_content_to_tg,
     download_meme_content_from_tg,
+    upload_meme_content_to_tg,
 )
 from src.storage.watermark import add_watermark
-
 from src.tgbot.handlers.upload.service import (
     get_meme_raw_upload_by_id,
 )
