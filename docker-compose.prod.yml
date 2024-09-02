@@ -12,9 +12,7 @@ services:
     volumes:
       - ./:/src
     ports:
-      - "${APP_PORT:-8000}:80"
-    expose:
-      - "${APP_PORT:-8000}"
+      - "80:8000"
 
   app_prefect:
     container_name: prefect_worker
