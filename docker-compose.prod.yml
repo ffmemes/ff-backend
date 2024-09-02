@@ -1,0 +1,34 @@
+version: '3.7'
+
+services:
+  app:
+    container_name: app
+    image: app_image
+    env_file:
+      - .env
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./:/src
+    ports:
+      - "${APP_PORT:-8000}:80"
+    expose:
+      - "${APP_PORT:-8000}"
+
+  app_prefect:
+    container_name: prefect_worker
+    image: app_image
+    env_file:
+      - .env
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: prefect worker start -p PRODUCTION -n PRODUCTION
+    volumes:
+      - ./:/src
+
+networks:
+  default:
+    external: true
+    name: ffmemes_network
