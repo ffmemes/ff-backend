@@ -25,8 +25,3 @@ services:
     command: prefect worker start -p PRODUCTION -n PRODUCTION
     volumes:
       - ./:/src
-
-networks:
-  default:
-    external: true
-    name: ffmemes_network
