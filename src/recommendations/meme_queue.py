@@ -81,8 +81,8 @@ async def generate_cold_start_recommendations(user_id, limit=10):
 
 async def generate_recommendations(user_id: int, limit: int):
 
-    if (user_id + 50) % 100 < 50:
-        generate_with_blender(user_id, limit)
+    if (user_id + 25) % 100 < 50:
+        await generate_with_blender(user_id, limit)
         return
 
     queue_key = redis.get_meme_queue_key(user_id)
@@ -197,7 +197,6 @@ async def generate_with_blender(
         if nmemes_sent < 30:
             candidates = await retriever.get_candidates(
                 'fast_dopamine', user_id, limit, exclude_mem_ids=meme_ids_in_queue)
-
 
             if len(candidates) == 0:
                 candidates = await retriever.get_candidates(
