@@ -53,7 +53,7 @@ def blend(
         if len(candidates_dict[engine]) > 0
     ]
 
-    weights = [ (weights_dict[engine] + EPS) for engine in engines]
+    weights = [ (weights_dict[engine] + EPS) for engine in engines ]
     if len(engines) == 0:
         return []
 

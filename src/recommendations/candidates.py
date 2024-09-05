@@ -643,3 +643,42 @@ async def get_fast_dopamine(
     """
     res = await fetch_all(text(query))
     return res
+
+
+class CandidatesRetriever:
+    """CandidatesRetriever class is used for unit testing"""
+
+    engine_map = {
+        'less_seen_meme_and_source': less_seen_meme_and_source,
+        'uploaded_memes': uploaded_memes,
+        'fast_dopamine': get_fast_dopamine,
+        'lr_smoothed': get_lr_smoothed,
+        'selected_sources': get_selected_sources,
+        'best_memes_from_each_source': get_best_memes_from_each_source,
+    }
+
+    async def get_candidates(
+            self,
+            engine: str,
+            user_id: int,
+            limit: int = 10,
+            exclude_mem_ids: list[int] = []
+        ) -> list[dict[str, Any]]:
+        if engine not in self.engine_map:
+            raise ValueError(f'engine {engine} is not supported')
+
+        return await self.engine_map[engine](user_id, limit, exclude_mem_ids)
+
+    async def get_candidates_dict(
+            self,
+            engines: list[str],
+            user_id: int,
+            limit: int = 10,
+            exclude_mem_ids: list[int] = []
+    ) -> dict[str, list[dict[str, Any]]]:
+        candidates_dict = {}
+        for engine in engines:
+            candidates_dict[engine] = await self.get_candidates(
+                engine, user_id, limit, exclude_mem_ids)
+
+        return candidates_dict
