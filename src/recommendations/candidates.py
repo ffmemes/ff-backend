@@ -655,6 +655,7 @@ class CandidatesRetriever:
         'lr_smoothed': get_lr_smoothed,
         'selected_sources': get_selected_sources,
         'best_memes_from_each_source': get_best_memes_from_each_source,
+        'like_spread_and_recent_memes': like_spread_and_recent_memes,
     }
 
     async def get_candidates(
