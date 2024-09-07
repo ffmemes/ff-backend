@@ -61,9 +61,8 @@ async def get_meme_queue_length_by_key(key: str) -> int:
 
 
 async def add_memes_to_queue_by_key(
-        key: str, memes: list[dict],
-        expire: int = 3600
-    ) -> None:
+    key: str, memes: list[dict], expire: int = 3600
+) -> None:
     jsoned_memes = [orjson.dumps(meme) for meme in memes]
     p = await redis_client.pipeline(transaction=True)
     await p.sadd(key, *jsoned_memes)
