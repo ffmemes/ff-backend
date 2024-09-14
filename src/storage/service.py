@@ -110,10 +110,10 @@ async def get_memes_to_ocr(limit=100):
     return await fetch_all(text(select_query))
 
 
-async def get_unloaded_tg_memes(limit) -> list[dict[str, Any]]:
+async def get_unloaded_tg_memes(limit: int) -> list[dict[str, Any]]:
     """Returns memes from Telegram, that have not been yet uploaded to Telegram."""
 
-    select_query = f"""
+    select_query = """
         SELECT
             meme.id,
             meme.type,
@@ -132,9 +132,9 @@ async def get_unloaded_tg_memes(limit) -> list[dict[str, Any]]:
             )
             AND MRT.media->0->>'url' IS NOT NULL
             AND COALESCE(MRT.updated_at, MRT.created_at) >= NOW() - INTERVAL '24 hours'
-        LIMIT {limit}
+        LIMIT :limit
     """
-    return await fetch_all(text(select_query))
+    return await fetch_all(text(select_query), {"limit": limit})
 
 
 async def get_unloaded_vk_memes(limit: int) -> list[dict[str, Any]]:

@@ -1,5 +1,7 @@
 import uuid
 from typing import Any
+import logging
+from httpx import HTTPStatusError, RequestError
 
 import httpx
 
@@ -60,16 +62,22 @@ async def ocr_mystic_file_path(
 async def ocr_content(content: bytes, language: str) -> OcrResult | dict:
     try:
         mystic_file_path = await load_file_to_mystic(content)
-    except Exception as e:
-        return {"error:": e}
+    except (HTTPStatusError, RequestError) as e:
+        logging.error(f"Error loading file to Mystic: {str(e)}")
+        return {"error": f"Failed to load file: {str(e)}"}
 
     try:
         ocr_result = await ocr_mystic_file_path(mystic_file_path, language)
-    except Exception as e:
-        return {"error:": e, "mystic_file_path:": mystic_file_path}
+    except (HTTPStatusError, RequestError) as e:
+        logging.error(f"Error during OCR process: {str(e)}")
+        return {
+            "error": f"OCR process failed: {str(e)}",
+            "mystic_file_path": mystic_file_path,
+        }
 
     if ocr_result is None or ocr_result["outputs"] is None:
-        return {"error:": "Mystic OCR returned no result", "ocr_result:": ocr_result}
+        logging.warning("Mystic OCR returned no result")
+        return {"error": "Mystic OCR returned no result", "ocr_result": ocr_result}
 
     rows = ocr_result["outputs"][0]["value"]
     full_text = " ".join([r[1] for r in rows])

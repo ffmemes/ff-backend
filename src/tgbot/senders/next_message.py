@@ -47,8 +47,11 @@ def prev_update_can_be_edited_with_media(prev_update: Update) -> bool:
 # 8. Дизлайкнули старое сообщение - удалять и присылать новое сообщение
 
 
-async def get_next_meme_for_user(user_id: int) -> MemeData | None:
-    while True:
+async def get_next_meme_for_user(
+    user_id: int,
+    max_attempts: int = 10,
+) -> MemeData | None:
+    for _ in range(max_attempts):
         meme = await meme_queue.get_next_meme_for_user(user_id)
         if not meme:  # no memes in queue
             await meme_queue.generate_recommendations(user_id, limit=5)
@@ -61,6 +64,11 @@ async def get_next_meme_for_user(user_id: int) -> MemeData | None:
             return meme
         else:
             logging.warning(f"User {user_id} already received meme {meme.id}")
+
+    logging.error(
+        f"Failed to find a new meme for user {user_id} after {max_attempts} attempts"
+    )
+    return None
 
 
 async def next_message(
