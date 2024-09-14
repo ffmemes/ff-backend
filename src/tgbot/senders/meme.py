@@ -9,7 +9,7 @@ from telegram import (
     Message,
 )
 from telegram.constants import ParseMode
-from telegram.error import Forbidden
+from telegram.error import BadRequest, Forbidden
 
 from src.recommendations.service import create_user_meme_reaction
 from src.storage.constants import MemeType
@@ -129,10 +129,15 @@ async def edit_last_message_with_meme(
     meme: MemeData,
     reply_markup: InlineKeyboardMarkup | None = None,
 ):
-    await message.edit_media(
-        media=get_input_media(meme),
-        reply_markup=reply_markup,
-    )
+    try:
+        await message.edit_media(
+            media=get_input_media(meme),
+            reply_markup=reply_markup,
+        )
+    except BadRequest as e:
+        if "Message to edit not found" in str(e):
+            return
+        raise
 
     # INFO: current TG BOT API doesn't support media + caption edit
     # in 1 API call. Also edit_message_media clears caption.
