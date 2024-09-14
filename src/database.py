@@ -32,7 +32,14 @@ from src.storage.constants import (
 )
 
 DATABASE_URL = str(settings.DATABASE_URL)
-engine = create_async_engine(DATABASE_URL, pool_recycle=1800)
+engine = create_async_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_size=10,  # You can adjust this value based on your needs
+    max_overflow=20,
+    pool_recycle=1800,  # Recycle connections after 1800 seconds (30 minutes)
+    pool_timeout=30,  # Timeout for acquiring a connection from the pool
+)
 
 metadata = MetaData(naming_convention=DB_NAMING_CONVENTION)
 
