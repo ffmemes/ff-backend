@@ -32,7 +32,7 @@ from src.storage.constants import (
 )
 
 DATABASE_URL = str(settings.DATABASE_URL)
-engine = create_async_engine(DATABASE_URL)
+engine = create_async_engine(DATABASE_URL, pool_recycle=1800)
 
 metadata = MetaData(naming_convention=DB_NAMING_CONVENTION)
 
