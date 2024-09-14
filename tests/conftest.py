@@ -1,9 +1,7 @@
 import asyncio
-from typing import AsyncGenerator, Generator
+from typing import Generator
 
 import pytest
-import pytest_asyncio
-from async_asgi_testclient import TestClient
 
 
 @pytest.fixture(autouse=True, scope="session")

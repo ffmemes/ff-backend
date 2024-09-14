@@ -1,9 +1,7 @@
-from datetime import datetime
 
 import asyncio
 
 import pytest
-import pytest_asyncio
 
 from src import redis
 
@@ -22,7 +20,7 @@ async def test_add_memes_to_queue_by_key_ok():
 
     stored = await redis.redis_client.smembers(queue_key)
     assert len(stored) == 2
-    
+
     await asyncio.sleep(3)
 
     stored = await redis.redis_client.smembers(queue_key)
