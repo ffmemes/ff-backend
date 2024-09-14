@@ -51,22 +51,23 @@ async def get_next_meme_for_user(
     user_id: int,
     max_attempts: int = 10,
 ) -> MemeData | None:
-    for _ in range(max_attempts):
+    for attempt in range(max_attempts):
         meme = await meme_queue.get_next_meme_for_user(user_id)
         if not meme:  # no memes in queue
-            await meme_queue.generate_recommendations(user_id, limit=5)
-            meme = await meme_queue.get_next_meme_for_user(user_id)
-            if not meme:
+            if attempt == max_attempts - 1:
+                logging.warning(
+                    f"Failed to get meme for user {user_id}, attempt {max_attempts}"
+                )
                 return None
+            await meme_queue.generate_recommendations(user_id, limit=5)
+            continue
 
         exists = await user_meme_reaction_exists(user_id, meme.id)
         if not exists:  # this meme wasn't sent yet
             return meme
-        else:
-            logging.warning(f"User {user_id} already received meme {meme.id}")
 
-    logging.error(
-        f"Failed to find a new meme for user {user_id} after {max_attempts} attempts"
+    logging.warning(
+        f"Failed to find unseen meme for user {user_id} after {max_attempts} attempts"
     )
     return None
 

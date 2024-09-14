@@ -45,23 +45,37 @@ async def get_shared_memes(user_id: int, limit: int) -> list[dict[str, Any]]:
 
 
 async def get_ocr_text_of_liked_memes_for_llm(user_id: int) -> list:
-    select_statement = f"""
+    select_statement = """
         SELECT
-            MEME.ocr_result->>'text' as ocr_text
-        FROM user_meme_reaction UMR
-        LEFT JOIN meme MEME ON MEME.id = UMR.meme_id
-        WHERE user_id={user_id}
-            AND reaction_id=1
+            MEME.ocr_result->>'text' AS ocr_text
+        FROM
+            user_meme_reaction UMR
+        LEFT JOIN
+            meme MEME ON MEME.id = UMR.meme_id
+        WHERE
+            user_id = :user_id
+            AND reaction_id = 1
             AND MEME.type = 'image'
-            AND MEME.status='ok'
+            AND MEME.status = 'ok'
             AND MEME.language_code = 'ru'
-            -- Filter to ensure more than 50% of ocr_text are Cyrillic symbols
             AND (
-                LENGTH(REGEXP_REPLACE(MEME.ocr_result->>'text', '[^\u0410-\u044F]', '', 'g'))::float / NULLIF(LENGTH(MEME.ocr_result->>'text'), 0)
+                LENGTH(
+                    REGEXP_REPLACE(
+                        MEME.ocr_result->>'text',
+                        '[^\u0410-\u044F]',
+                        '',
+                        'g'
+                    )
+                )::float /
+                NULLIF(
+                    LENGTH(MEME.ocr_result->>'text'),
+                    0
+                )
             ) > 0.5
-        AND LENGTH(MEME.ocr_result->>'text') > 8
-        AND LENGTH(MEME.ocr_result->>'text') < 100
-        ORDER BY reacted_at DESC
+            AND LENGTH(MEME.ocr_result->>'text') > 8
+            AND LENGTH(MEME.ocr_result->>'text') < 100
+        ORDER BY
+            reacted_at DESC
         LIMIT 20;
-    """  # noqa: E501
-    return await fetch_all(text(select_statement))
+    """
+    return await fetch_all(text(select_statement), {"user_id": user_id})

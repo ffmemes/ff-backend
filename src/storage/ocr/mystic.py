@@ -1,9 +1,9 @@
+import logging
 import uuid
 from typing import Any
-import logging
-from httpx import HTTPStatusError, RequestError
 
 import httpx
+from httpx import HTTPStatusError, RequestError
 
 from src.config import settings
 from src.storage.schemas import OcrResult
@@ -20,16 +20,19 @@ async def load_file_to_mystic(file_content: bytes) -> str:
     file_name = f"{uuid.uuid4()}.jpg"
     files = {"pfile": (file_name, file_content, "image/jpeg")}
 
-    async with httpx.AsyncClient(timeout=60) as client:
-        response = await client.post(
-            "https://www.mystic.ai/v4/files",
-            files=files,
-            headers=HEADERS,
-        )
-        response.raise_for_status()
-        # Concatenating as v4 just returns starting with /pipeline_files
-        path = "https://storage.mystic.ai/" + response.json()["path"]
-        return path
+    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=60.0)) as client:
+        try:
+            response = await client.post(
+                "https://www.mystic.ai/v4/files",
+                files=files,
+                headers=HEADERS,
+            )
+            response.raise_for_status()
+            path = "https://storage.mystic.ai/" + response.json()["path"]
+            return path
+        except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.HTTPStatusError) as e:
+            logging.error(f"Error loading file to Mystic: {str(e)}")
+            raise
 
 
 async def ocr_mystic_file_path(
@@ -37,26 +40,28 @@ async def ocr_mystic_file_path(
     language: str,
     pipeline_id: str = PIPELINE_ID,
 ) -> dict[str, Any]:
-    async with httpx.AsyncClient(timeout=60) as client:
-        response = await client.post(
-            "https://www.mystic.ai/v4/runs",
-            json={
-                "pipeline": pipeline_id,
-                # Removed as not required now
-                # "async_run": False,
-                "inputs": [
-                    {
-                        "type": "file",
-                        "file_path": mystic_file_path,
-                    },
-                    {"type": "string", "value": language},
-                ],
-                "wait_for_resources": True,
-            },
-            headers=HEADERS,
-        )
-        response.raise_for_status()
-        return response.json()
+    async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, read=120.0)) as client:
+        try:
+            response = await client.post(
+                "https://www.mystic.ai/v4/runs",
+                json={
+                    "pipeline": pipeline_id,
+                    "inputs": [
+                        {
+                            "type": "file",
+                            "file_path": mystic_file_path,
+                        },
+                        {"type": "string", "value": language},
+                    ],
+                    "wait_for_resources": True,
+                },
+                headers=HEADERS,
+            )
+            response.raise_for_status()
+            return response.json()
+        except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.HTTPStatusError) as e:
+            logging.error(f"Error in OCR process: {str(e)}")
+            raise
 
 
 async def ocr_content(content: bytes, language: str) -> OcrResult | dict:
