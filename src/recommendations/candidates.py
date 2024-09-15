@@ -645,6 +645,54 @@ async def get_fast_dopamine(
     return res
 
 
+async def get_recently_liked(
+    user_id: int,
+    limit: int = 10,
+    exclude_meme_ids: list[int] = [],
+):
+    query = f"""
+        WITH EVENTS AS (
+            SELECT *
+            FROM user_meme_reaction UMR
+            WHERE reaction_id = 1
+            ORDER BY sent_at DESC
+            LIMIT 10000
+        )
+        , CANDIDATES AS (
+            SELECT meme_id AS id
+            FROM EVENTS
+            GROUP BY meme_id
+            HAVING COUNT(*) > 1
+            ORDER BY COUNT(*) DESC
+        )
+
+        SELECT
+            M.id
+            , M.type, M.telegram_file_id, M.caption
+            , 'recently_liked' AS recommended_by
+
+        FROM CANDIDATES C
+        INNER JOIN meme M
+            ON M.id = C.id
+
+        INNER JOIN user_language L
+            ON L.language_code = M.language_code
+            AND L.user_id = {user_id}
+
+        LEFT JOIN user_meme_reaction R
+            ON R.meme_id = M.id
+            AND R.user_id = {user_id}
+
+        WHERE 1=1
+            AND M.status = 'ok'
+            AND R.meme_id IS NULL
+            {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+        LIMIT {limit}
+    """
+    res = await fetch_all(text(query))
+    return res
+
+
 class CandidatesRetriever:
     """CandidatesRetriever class is used for unit testing"""
 
@@ -656,6 +704,7 @@ class CandidatesRetriever:
         "selected_sources": get_selected_sources,
         "best_memes_from_each_source": get_best_memes_from_each_source,
         "like_spread_and_recent_memes": like_spread_and_recent_memes,
+        "recently_liked": get_recently_liked,
     }
 
     async def get_candidates(
