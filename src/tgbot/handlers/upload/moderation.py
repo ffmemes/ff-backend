@@ -7,6 +7,7 @@ from typing import Any
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
+from telegram.error import BadRequest
 
 from src.config import settings
 from src.flows.storage.memes import (
@@ -246,18 +247,29 @@ async def handle_uploaded_meme_review_button(
             external_id=str(meme["id"]),
         )
 
-        await context.bot.send_message(
-            chat_id=meme_upload["user_id"],
-            reply_to_message_id=meme_upload["message_id"],
-            text="""
+        text = """
 🎉🎉🎉
 
 Your <b>meme has been approved</b> and soon bot will send it to other users!
 
 See realtime stats of your uploaded memes: /uploads
-            """,
-            parse_mode=ParseMode.HTML,
-        )
+        """
+
+        try:
+            await context.bot.send_message(
+                chat_id=meme_upload["user_id"],
+                reply_to_message_id=meme_upload["message_id"],
+                text=text,
+                parse_mode=ParseMode.HTML,
+            )
+        except BadRequest:
+            # messsage was deleted ??
+            # trying again withount reply_message_id
+            await context.bot.send_message(
+                chat_id=meme_upload["user_id"],
+                text=text,
+                parse_mode=ParseMode.HTML,
+            )
 
     else:
         await update_meme_by_upload_id(upload_id, status=MemeStatus.REJECTED)
