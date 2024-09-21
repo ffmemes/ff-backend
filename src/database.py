@@ -31,14 +31,13 @@ from src.storage.constants import (
     MEME_RAW_VK_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
 )
 
-DATABASE_URL = str(settings.DATABASE_URL)
+DATABASE_URL = str(settings.DATABASE_ASYNC_URL)
 engine = create_async_engine(
     DATABASE_URL,
-    pool_pre_ping=True,
-    pool_size=10,  # You can adjust this value based on your needs
     max_overflow=20,
-    pool_recycle=1800,  # Recycle connections after 1800 seconds (30 minutes)
-    pool_timeout=30,  # Timeout for acquiring a connection from the pool
+    pool_size=settings.DATABASE_POOL_SIZE,
+    pool_recycle=settings.DATABASE_POOL_TTL,
+    pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
 )
 
 metadata = MetaData(naming_convention=DB_NAMING_CONVENTION)
