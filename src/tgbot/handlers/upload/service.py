@@ -123,9 +123,9 @@ async def get_uploaded_memes_of_user_id(user_id: int) -> list[dict[str, Any]]:
             M.status,
             M.telegram_file_id,
             M.type,
-            MS.nmemes_sent,
-            MS.nlikes,
-            MS.ndislikes
+            COALESCE(MS.nmemes_sent, 0) nmemes_sent,
+            COALESCE(MS.nlikes, 0) nlikes,
+            COALESCE(MS.ndislikes, 0) ndislikes
         FROM meme M
         LEFT JOIN meme_source S
             ON M.meme_source_id = S.id
