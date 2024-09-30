@@ -1,15 +1,16 @@
 import asyncio
+import re
 
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from src.tgbot.handlers.deep_link import handle_deep_link_used
+from src.tgbot.handlers.deep_link import LINK_UNDER_MEME_PATTERN, handle_deep_link_used
 from src.tgbot.handlers.language import (
     handle_language_settings,
     init_user_languages_from_tg_user,
 )
 from src.tgbot.logs import log
-from src.tgbot.service import create_user, save_tg_user
+from src.tgbot.service import create_user, get_tg_user_by_id, save_tg_user
 from src.tgbot.user_info import update_user_info_cache
 
 
@@ -18,6 +19,9 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     deep_link = context.args[0] if context.args else None
     language_code = update.effective_user.language_code
 
+    tg_user = await get_tg_user_by_id(user_id)
+    tg_user
+
     await save_tg_user(
         id=user_id,
         username=update.effective_user.username,
@@ -25,7 +29,11 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         last_name=update.effective_user.last_name,
         is_premium=update.effective_user.is_premium,
         language_code=language_code,
-        deep_link=deep_link,
+        deep_link=deep_link
+        if tg_user is None
+        or tg_user["deep_link"] is None
+        or not re.match(LINK_UNDER_MEME_PATTERN, tg_user["deep_link"])
+        else None,
     )
 
     user = await create_user(id=user_id)

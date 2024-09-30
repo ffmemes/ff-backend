@@ -29,18 +29,18 @@ async def save_tg_user(
     id: int,
     **kwargs,
 ) -> None:
+    filtered_kwargs = {k: v for k, v in kwargs.items() if v is not None}
+
     insert_statement = (
         insert(user_tg)
-        .values({"id": id, **kwargs})
+        .values({"id": id, **filtered_kwargs})
         .on_conflict_do_update(
             index_elements=(user_tg.c.id,),
-            set_={"updated_at": datetime.utcnow()},
-            # do we need to update more fields if a user already exists?
+            set_={"updated_at": datetime.utcnow(), **filtered_kwargs},
         )
     )
 
     await execute(insert_statement)
-    # do not return the same data
 
 
 async def create_user(
