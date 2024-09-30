@@ -72,17 +72,20 @@ async def next_message(
         and prev_update.callback_query.message.effective_attachment
     )
 
-    try:
-        msg = (
-            await edit_last_message_with_meme(
+    if should_edit:
+        try:
+            msg = await edit_last_message_with_meme(
                 prev_update.callback_query.message, meme, reply_markup
             )
-            if should_edit
-            else await send_new_message_with_meme(bot, user_id, meme, reply_markup)
-        )
-    except BadRequest as e:
-        logging.error(f"Failed to send/edit message: {e}")
-        msg = await send_new_message_with_meme(bot, user_id, meme, reply_markup)
+        except BadRequest as e:
+            logging.error(f"Failed to edit message: {e}")
+            msg = await send_new_message_with_meme(bot, user_id, meme, reply_markup)
+    else:
+        try:
+            msg = await send_new_message_with_meme(bot, user_id, meme, reply_markup)
+        except BadRequest as e:
+            logging.error(f"Failed to send new message: {e}")
+            raise  # Re-raise the exception if sending a new message fails
 
     await create_user_meme_reaction(user_id, meme.id, meme.recommended_by)
     asyncio.create_task(meme_queue.check_queue(user_id))
