@@ -15,41 +15,42 @@ LINK_UNDER_MEME_PATTERN = r"s_\d+_\d+"
 async def handle_deep_link_used(
     bot: Bot, invited_user: dict, invited_user_name: str, deep_link: str
 ):
-    """
-    E.g. if user was invited, send a msg to invited about used invitation
-    """
+    """Handle deep link usage, including user invitations."""
+    if not re.match(LINK_UNDER_MEME_PATTERN, deep_link):
+        return
 
-    # TODO: log all deep link used
-    if re.match(LINK_UNDER_MEME_PATTERN, deep_link):
-        _, user_id, _ = deep_link.split("_")
-        invitor_user_id = int(user_id)
+    _, user_id, _ = deep_link.split("_")
+    invitor_user_id = int(user_id)
 
-        if invitor_user_id == invited_user["id"]:
-            return  # clicked on own link
+    if invitor_user_id == invited_user["id"]:
+        return  # User clicked their own link
 
-        invitor_user = await get_user_by_id(invitor_user_id)
-        if not invitor_user:
-            return  # user with this id doesn't exist
+    invitor_user = await get_user_by_id(invitor_user_id)
+    if not invitor_user:
+        return  # Invitor doesn't exist
 
-        if not invited_user.get("inviter_id"):
-            await update_user(invited_user["id"], inviter_id=invitor_user_id)
-            # TODO: should we send to inviter alert message?
+    if not invited_user.get("inviter_id"):
+        await update_user(invited_user["id"], inviter_id=invitor_user_id)
 
-        if invitor_user["type"] != UserType.WAITLIST and invited_user["type"] in [
-            UserType.WAITLIST,
-            UserType.BLOCKED_BOT,
-        ]:
-            await update_user(invited_user["id"], type=UserType.USER)
+    if invitor_user["type"] != UserType.WAITLIST and invited_user["type"] in [
+        UserType.WAITLIST,
+        UserType.BLOCKED_BOT,
+    ]:
+        await update_user(invited_user["id"], type=UserType.USER)
+        await send_successfull_invitation_alert(invitor_user_id, invited_user_name)
 
-            await send_successfull_invitation_alert(invitor_user_id, invited_user_name)
-            invitor_user_tg = await get_tg_user_by_id(invitor_user_id)
-            is_premium = invitor_user_tg and invitor_user_tg.get("is_premium")
+        invitor_user_tg = await get_tg_user_by_id(invitor_user_id)
+        trx_type = (
+            TrxType.USER_INVITER_PREMIUM
+            if invitor_user_tg and invitor_user_tg.get("is_premium")
+            else TrxType.USER_INVITER
+        )
 
-            await pay_if_not_paid_with_alert(
-                bot,
-                invitor_user_id,
-                TrxType.USER_INVITER_PREMIUM if is_premium else TrxType.USER_INVITER,
-                external_id=str(invited_user["id"]),
-            )
+        await pay_if_not_paid_with_alert(
+            bot,
+            invitor_user_id,
+            trx_type,
+            external_id=str(invited_user["id"]),
+        )
 
-            await log(f"🤝 #{invitor_user_id} invited {invited_user_name}")
+        await log(f"🤝 #{invitor_user_id} invited {invited_user_name}")
