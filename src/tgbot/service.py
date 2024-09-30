@@ -16,6 +16,7 @@ from src.database import (
     meme_source_stats,
     meme_stats,
     user,
+    user_deep_link_log,
     user_language,
     user_popup_logs,
     user_tg,
@@ -368,5 +369,13 @@ async def create_inline_chosen_result_log(
         user_id=user_id,
         result_id=result_id,
         query=query,
+    )
+    await execute(insert_query)
+
+
+async def log_user_deep_link(user_id: int, deep_link: str | None) -> None:
+    insert_query = insert(user_deep_link_log).values(
+        user_id=user_id,
+        deep_link=deep_link,
     )
     await execute(insert_query)

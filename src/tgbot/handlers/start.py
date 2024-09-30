@@ -10,7 +10,12 @@ from src.tgbot.handlers.language import (
     init_user_languages_from_tg_user,
 )
 from src.tgbot.logs import log
-from src.tgbot.service import create_user, get_tg_user_by_id, save_tg_user
+from src.tgbot.service import (
+    create_user,
+    get_tg_user_by_id,
+    log_user_deep_link,
+    save_tg_user,
+)
 from src.tgbot.user_info import update_user_info_cache
 
 
@@ -20,7 +25,6 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     language_code = update.effective_user.language_code
 
     tg_user = await get_tg_user_by_id(user_id)
-    tg_user
 
     await save_tg_user(
         id=user_id,
@@ -35,6 +39,9 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         or not re.match(LINK_UNDER_MEME_PATTERN, tg_user["deep_link"])
         else None,
     )
+
+    # Log the deep_link
+    await log_user_deep_link(user_id, deep_link)
 
     user = await create_user(id=user_id)
     await init_user_languages_from_tg_user(update.effective_user)

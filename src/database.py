@@ -392,6 +392,17 @@ treasury_trx = Table(
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
 )
 
+user_deep_link_log = Table(
+    "user_deep_link_log",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column(
+        "user_id", BigInteger, ForeignKey("user.id", ondelete="CASCADE"), nullable=False
+    ),
+    Column("deep_link", String),
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+)
+
 
 async def fetch_one(select_query: Select | Insert | Update) -> dict[str, Any] | None:
     async with engine.begin() as conn:
