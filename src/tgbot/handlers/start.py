@@ -37,8 +37,9 @@ async def save_user_data(user_id: int, update: Update, deep_link: str | None):
         else None,
     )
 
+    user = await create_user(id=user_id)
     await log_user_deep_link(user_id, deep_link)
-    return await create_user(id=user_id)
+    return user
 
 
 async def handle_deep_link_if_present(context, user, user_name, deep_link):
