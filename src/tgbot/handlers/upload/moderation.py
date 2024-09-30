@@ -6,8 +6,8 @@ from typing import Any
 
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
-from telegram.ext import ContextTypes
 from telegram.error import BadRequest
+from telegram.ext import ContextTypes
 
 from src.config import settings
 from src.flows.storage.memes import (
