@@ -278,12 +278,24 @@ See realtime stats of your uploaded memes: /uploads
             + "\n❌ Rejected by {}".format(update.effective_user.name),
             reply_markup=None,
         )
-        await context.bot.send_message(
-            chat_id=meme_upload["user_id"],
-            reply_to_message_id=meme_upload["message_id"],
-            text="""
+        try:
+            await context.bot.send_message(
+                chat_id=meme_upload["user_id"],
+                reply_to_message_id=meme_upload["message_id"],
+                text="""
 😢😢😢
 
 Your meme was rejected by our moderators. Send us something else!
             """,
-        )
+            )
+        except BadRequest:
+            # messsage was deleted ??
+            # trying again withount reply_message_id
+            await context.bot.send_message(
+                chat_id=meme_upload["user_id"],
+                text="""
+😢😢😢
+
+Your meme was rejected by our moderators. Send us something else!
+            """,
+            )
