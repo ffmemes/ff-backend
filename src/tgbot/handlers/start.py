@@ -19,12 +19,9 @@ from src.tgbot.service import (
 from src.tgbot.user_info import update_user_info_cache
 
 
-async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user_id = update.effective_user.id
-    deep_link = context.args[0] if context.args else None
-    language_code = update.effective_user.language_code
-
+async def save_user_data(user_id: int, update: Update, deep_link: str | None):
     tg_user = await get_tg_user_by_id(user_id)
+    language_code = update.effective_user.language_code
 
     await save_tg_user(
         id=user_id,
@@ -40,31 +37,48 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         else None,
     )
 
-    # Log the deep_link
     await log_user_deep_link(user_id, deep_link)
+    return await create_user(id=user_id)
 
-    user = await create_user(id=user_id)
-    await init_user_languages_from_tg_user(update.effective_user)
+
+async def handle_deep_link_if_present(context, user, user_name, deep_link):
     if deep_link:
-        asyncio.create_task(
+        return asyncio.create_task(
             handle_deep_link_used(
                 bot=context.bot,
                 invited_user=user,
-                invited_user_name=update.effective_user.name,
+                invited_user_name=user_name,
                 deep_link=deep_link,
             )
         )
 
-    user_info = await update_user_info_cache(user_id)
 
+async def log_start_event(update, user_info, deep_link, language_code, context):
     if deep_link:
-        asyncio.create_task(
+        return asyncio.create_task(
             log(
                 f"""
-    👋 {update.effective_user.name}/#{user_id}
-    type:{user_info["type"]}, ref:{deep_link}, lang:{language_code}
-            """,
+👋 {update.effective_user.name}/#{update.effective_user.id}
+type:{user_info["type"]}, ref:{deep_link}, lang:{language_code}
+        """,
                 context.bot,
             )
         )
+
+
+async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = update.effective_user.id
+    deep_link = context.args[0] if context.args else None
+    language_code = update.effective_user.language_code
+
+    user = await save_user_data(user_id, update, deep_link)
+    await init_user_languages_from_tg_user(update.effective_user)
+
+    await handle_deep_link_if_present(
+        context, user, update.effective_user.name, deep_link
+    )
+
+    user_info = await update_user_info_cache(user_id)
+    await log_start_event(update, user_info, deep_link, language_code, context)
+
     return await handle_language_settings(update, context)
