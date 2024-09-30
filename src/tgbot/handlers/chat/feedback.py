@@ -1,6 +1,7 @@
 import random
 
 from telegram import Update
+from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 from src.tgbot.constants import TELEGRAM_FEEDBACK_CHAT_ID
@@ -41,8 +42,16 @@ async def handle_feedback_reply(update: Update, context: ContextTypes.DEFAULT_TY
     header, _ = update.message.reply_to_message.text.split("\n", 1)
     user_id, message_id = header.split(":")
 
-    await context.bot.send_message(
-        chat_id=user_id,
-        text=reply_text,
-        reply_to_message_id=int(message_id),
-    )
+    try:
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=reply_text,
+            reply_to_message_id=int(message_id),
+        )
+    except BadRequest:
+        # message was deleted ??
+        # trying again without reply_message_id
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=reply_text,
+        )

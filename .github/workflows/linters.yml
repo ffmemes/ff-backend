@@ -12,7 +12,7 @@ jobs:
     container: python:3.10.7
     services:
       postgres:
-        image: postgres:14.1
+        image: postgres:16.1
         env:
           POSTGRES_PASSWORD: app
           POSTGRES_USER: app
