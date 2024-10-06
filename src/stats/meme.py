@@ -152,15 +152,17 @@ async def calculate_meme_invited_count():
     insert_query = """
         WITH MEME_IDS_IN_DEEP_LINKS AS (
             SELECT
-                deep_link,
-                CASE
-                    WHEN deep_link ~ '^s_[0-9]+_[0-9]+$'
-                        THEN SUBSTRING(deep_link FROM '_([0-9]+)$')::INT
-                    WHEN deep_link ~ '^sc_[0-9]+$'
-                        THEN SUBSTRING(deep_link FROM '_([0-9]+)$')::INT
-                    ELSE NULL
-                END AS meme_id
-            FROM user_tg
+                CAST(regexp_replace(
+                    deep_link,
+                    's_\\d+_(\\d+)$',
+                    '\1'
+                ) AS INTEGER) AS meme_id,
+                user_id
+            FROM
+                user_deep_link_log
+            WHERE
+                deep_link IS NOT NULL
+                AND deep_link LIKE 's\\_%\\_%'
         )
 
         INSERT INTO meme_stats (
@@ -169,12 +171,11 @@ async def calculate_meme_invited_count():
         )
         SELECT
             meme_id,
-            COUNT(*)
+            COUNT(DISTINCT user_id) AS invited_count
         FROM MEME_IDS_IN_DEEP_LINKS
         INNER JOIN meme M
             ON M.id = MEME_IDS_IN_DEEP_LINKS.meme_id
-        WHERE meme_id IS NOT NULL
-        GROUP BY 1
+        GROUP BY meme_id
         ON CONFLICT (meme_id) DO
         UPDATE SET
             invited_count = EXCLUDED.invited_count
