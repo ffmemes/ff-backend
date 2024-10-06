@@ -5,11 +5,12 @@ from src import redis
 from src.recommendations.blender import blend
 from src.recommendations.candidates import (
     CandidatesRetriever,
+    # less_seen_meme_and_source,
+    classic,
     get_best_memes_from_each_source,
     get_fast_dopamine,
     get_lr_smoothed,
     get_selected_sources,
-    less_seen_meme_and_source,
     like_spread_and_recent_memes,
     uploaded_memes,
 )
@@ -88,76 +89,31 @@ async def generate_recommendations(user_id: int, limit: int):
     memes_in_queue = await redis.get_all_memes_in_queue_by_key(queue_key)
     meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
 
-    user_info = await get_user_info(user_id)
-
     candidates = []
 
     r = random.random()
 
-    if r < 0.2:
-        candidates = await get_fast_dopamine(
+    if r < 0.33:
+        candidates = await classic(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
-
-    elif user_info["nmemes_sent"] < 30:
-        candidates = await get_selected_sources(
+    elif r < 0.66:
+        candidates = await uploaded_memes(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
-
-        if len(candidates) == 0:
-            candidates = await get_best_memes_from_each_source(
-                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-            )
-
-    elif user_info["nmemes_sent"] < 100:
-        if r < 0.2:
-            candidates = await uploaded_memes(
-                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-            )
-        elif r < 0.4:
-            candidates = await get_fast_dopamine(
-                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-            )
-        elif r < 0.6:
-            candidates = await get_best_memes_from_each_source(
-                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-            )
-        else:
-            candidates = await get_lr_smoothed(
-                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-            )
-
     else:
-        if r < 0.3:
-            candidates = await uploaded_memes(
-                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-            )
-        if r < 0.6:
-            candidates = await like_spread_and_recent_memes(
-                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-            )
-        else:
-            candidates = await get_lr_smoothed(
-                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-            )
+        candidates = await like_spread_and_recent_memes(
+            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+        )
 
     if len(candidates) == 0:
         candidates = await get_lr_smoothed(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
 
-    if len(candidates) == 0 and user_info["nmemes_sent"] > 1000:
-        candidates = await less_seen_meme_and_source(
-            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-        )
-
     if len(candidates) == 0:
         # TODO: fallback to some algo which will always return something
         return
-
-    # TODO:
-    # inference ML api
-    # select the best LIMIT memes -> save them to queue
 
     await redis.add_memes_to_queue_by_key(queue_key, candidates)
 
