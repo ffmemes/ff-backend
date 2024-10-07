@@ -153,9 +153,7 @@ async def calculate_meme_invited_count():
     insert_query = """
         WITH MEME_IDS_IN_DEEP_LINKS AS (
             SELECT
-                CAST(regexp_replace(
-                    deep_link, 's_\d+_(\d+)$', '\1'
-                ) AS INTEGER) AS meme_id,
+                CAST(SPLIT_PART(deep_link, '_', 3) AS INTEGER) AS meme_id,
                 user_id
             FROM
                 user_deep_link_log
@@ -177,6 +175,6 @@ async def calculate_meme_invited_count():
         GROUP BY meme_id
         ON CONFLICT (meme_id) DO
         UPDATE SET
-            invited_count = EXCLUDED.invited_count;
+            invited_count = EXCLUDED.invited_count
     """
     await execute(text(insert_query))
