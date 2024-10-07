@@ -5,12 +5,13 @@ from src import redis
 from src.recommendations.blender import blend
 from src.recommendations.candidates import (
     CandidatesRetriever,
-    # less_seen_meme_and_source,
     classic,
     get_best_memes_from_each_source,
     get_fast_dopamine,
     get_lr_smoothed,
+    get_most_shared_memes,
     get_selected_sources,
+    less_seen_meme_and_source,
     like_spread_and_recent_memes,
     uploaded_memes,
 )
@@ -81,9 +82,9 @@ async def generate_cold_start_recommendations(user_id, limit=10):
 
 
 async def generate_recommendations(user_id: int, limit: int):
-    if (user_id + 25) % 100 < 50:
-        await generate_with_blender(user_id, limit)
-        return
+    # if (user_id + 25) % 100 < 50:
+    #     await generate_with_blender(user_id, limit)
+    #     return
 
     queue_key = redis.get_meme_queue_key(user_id)
     memes_in_queue = await redis.get_all_memes_in_queue_by_key(queue_key)
@@ -93,16 +94,20 @@ async def generate_recommendations(user_id: int, limit: int):
 
     r = random.random()
 
-    if r < 0.33:
+    if r < 0.3:
         candidates = await classic(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
-    elif r < 0.66:
+    elif r < 0.6:
         candidates = await uploaded_memes(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
-    else:
+    elif r < 0.9:
         candidates = await like_spread_and_recent_memes(
+            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+        )
+    else:
+        candidates = await get_most_shared_memes(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
 
@@ -112,8 +117,9 @@ async def generate_recommendations(user_id: int, limit: int):
         )
 
     if len(candidates) == 0:
-        # TODO: fallback to some algo which will always return something
-        return
+        candidates = await less_seen_meme_and_source(
+            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+        )
 
     await redis.add_memes_to_queue_by_key(queue_key, candidates)
 

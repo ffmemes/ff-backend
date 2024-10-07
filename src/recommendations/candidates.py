@@ -645,6 +645,36 @@ async def get_fast_dopamine(
     return res
 
 
+async def get_most_shared_memes(
+    user_id: int,
+    limit: int = 10,
+    exclude_meme_ids: list[int] = [],
+):
+    query = f"""
+        SELECT
+            M.id
+            , M.type, M.telegram_file_id, M.caption
+            , 'most_shared' AS recommended_by
+        FROM meme M
+        INNER JOIN meme_stats MS
+            ON MS.meme_id = M.id
+        INNER JOIN user_language L
+            ON L.language_code = M.language_code
+            AND L.user_id = {user_id}
+        LEFT JOIN user_meme_reaction R
+            ON R.meme_id = M.id
+            AND R.user_id = {user_id}
+        WHERE 1=1
+            AND M.status = 'ok'
+            AND R.meme_id IS NULL
+            {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+        ORDER BY MS.invited_count DESC
+        LIMIT {limit}
+    """
+    res = await fetch_all(text(query))
+    return res
+
+
 async def get_recently_liked(
     user_id: int,
     limit: int = 10,
