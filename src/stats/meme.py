@@ -149,20 +149,19 @@ async def calculate_meme_raw_impressions_stats() -> None:
 
 
 async def calculate_meme_invited_count():
+    # ruff: noqa: W605
     insert_query = """
         WITH MEME_IDS_IN_DEEP_LINKS AS (
             SELECT
                 CAST(regexp_replace(
-                    deep_link,
-                    's_\\d+_(\\d+)$',
-                    '\1'
+                    deep_link, 's_\d+_(\d+)$', '\1'
                 ) AS INTEGER) AS meme_id,
                 user_id
             FROM
                 user_deep_link_log
             WHERE
                 deep_link IS NOT NULL
-                AND deep_link LIKE 's\\_%\\_%'
+                AND deep_link LIKE 's\_%\_%'
         )
 
         INSERT INTO meme_stats (
@@ -178,6 +177,6 @@ async def calculate_meme_invited_count():
         GROUP BY meme_id
         ON CONFLICT (meme_id) DO
         UPDATE SET
-            invited_count = EXCLUDED.invited_count
+            invited_count = EXCLUDED.invited_count;
     """
     await execute(text(insert_query))
