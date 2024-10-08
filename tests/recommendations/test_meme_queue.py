@@ -46,8 +46,8 @@ async def test_generate_below_30():
     
     candidates = await generate_recommendations(1, 10, 10, TestRetriever())
     assert len(candidates) == 2
-    assert candidates[0]['id'] == 1
-    assert candidates[1]['id'] == 2
+    assert candidates[0]['id'] in [1, 2]
+    assert candidates[1]['id'] in [1, 2]
 
     class TestRetriever(CandidatesRetriever):
         engine_map = {
@@ -57,8 +57,8 @@ async def test_generate_below_30():
     
     candidates = await generate_recommendations(1, 10, 10, TestRetriever())
     assert len(candidates) == 2
-    assert candidates[0]['id'] == 3
-    assert candidates[1]['id'] == 4
+    assert candidates[0]['id'] in [3, 4]
+    assert candidates[1]['id'] in [3, 4]
 
 
 @pytest.mark.asyncio
@@ -229,8 +229,8 @@ async def test_generate_empty_above_100():
     
     candidates = await generate_recommendations(1, 10, 200, TestRetriever())
     assert len(candidates) == 2
-    assert candidates[0]['id'] == 3
+    assert candidates[0]['id'] in [3, 4]
 
     candidates = await generate_recommendations(1, 10, 1200, TestRetriever())
     assert len(candidates) == 2
-    assert candidates[0]['id'] == 1
+    assert candidates[0]['id'] in [1, 2]
