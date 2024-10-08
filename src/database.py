@@ -1,3 +1,4 @@
+import uuid
 from typing import Any
 
 from sqlalchemy import (
@@ -38,6 +39,11 @@ engine = create_async_engine(
     pool_size=settings.DATABASE_POOL_SIZE,
     pool_recycle=settings.DATABASE_POOL_TTL,
     pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
+    connect_args={
+        "prepared_statement_name_func": lambda: f"__asyncpg_{uuid.uuid4()}__",
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+    },
 )
 
 metadata = MetaData(naming_convention=DB_NAMING_CONVENTION)
