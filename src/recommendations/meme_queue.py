@@ -1,4 +1,3 @@
-import random
 from typing import Any, Optional
 
 from src import redis
@@ -9,9 +8,6 @@ from src.recommendations.candidates import (
     get_fast_dopamine,
     get_lr_smoothed,
     get_selected_sources,
-    less_seen_meme_and_source,
-    like_spread_and_recent_memes,
-    uploaded_memes,
 )
 from src.storage.schemas import MemeData
 from src.tgbot.user_info import get_user_info
@@ -79,96 +75,13 @@ async def generate_cold_start_recommendations(user_id, limit=10):
     await redis.add_memes_to_queue_by_key(queue_key, candidates)
 
 
-async def generate_recommendations(user_id: int, limit: int):
-
-    if (user_id + 25) % 100 < 50:
-        await generate_with_blender(user_id, limit)
-        return
-
-    queue_key = redis.get_meme_queue_key(user_id)
-    memes_in_queue = await redis.get_all_memes_in_queue_by_key(queue_key)
-    meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
-
-    user_info = await get_user_info(user_id)
-
-    candidates = []
-
-    r = random.random()
-
-    if r < 0.2:
-        candidates = await get_fast_dopamine(
-            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-        )
-
-    elif user_info["nmemes_sent"] < 30:
-        candidates = await get_selected_sources(
-            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-        )
-
-        if len(candidates) == 0:
-            candidates = await get_best_memes_from_each_source(
-                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-            )
-
-    elif user_info["nmemes_sent"] < 100:
-        if r < 0.2:
-            candidates = await uploaded_memes(
-                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-            )
-        elif r < 0.4:
-            candidates = await get_fast_dopamine(
-                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-            )
-        elif r < 0.6:
-            candidates = await get_best_memes_from_each_source(
-                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-            )
-        else:
-            candidates = await get_lr_smoothed(
-                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-            )
-
-    else:
-        if r < 0.3:
-            candidates = await uploaded_memes(
-                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-            )
-        if r < 0.6:
-            candidates = await like_spread_and_recent_memes(
-                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-            )
-        else:
-            candidates = await get_lr_smoothed(
-                user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-            )
-
-    if len(candidates) == 0:
-        candidates = await get_lr_smoothed(
-            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-        )
-
-    if len(candidates) == 0 and user_info["nmemes_sent"] > 1000:
-        candidates = await less_seen_meme_and_source(
-            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue)
-
-    if len(candidates) == 0:
-        # TODO: fallback to some algo which will always return something
-        return
-
-    # TODO:
-    # inference ML api
-    # select the best LIMIT memes -> save them to queue
-
-    await redis.add_memes_to_queue_by_key(queue_key, candidates)
-
-
-async def generate_with_blender(
-        user_id: int,
-        limit: int,
-        nmemes_sent: Optional[int] = None,
-        retriever: Optional[CandidatesRetriever] = None,
-        random_seed: int = 42,
-    ) -> list[dict[str, Any]]:
+async def generate_recommendations(
+    user_id: int,
+    limit: int,
+    nmemes_sent: Optional[int] = None,
+    retriever: Optional[CandidatesRetriever] = None,
+    random_seed: int = 42,
+) -> list[dict[str, Any]]:
     """Uses blender to mix candidates from different engines
 
     The function aims to keep the same logic as generate_candidates but
@@ -179,7 +92,7 @@ async def generate_with_blender(
 
     if nmemes_sent is None:
         user_info = await get_user_info(user_id)
-        nmemes_sent = user_info['nmemes_sent']
+        nmemes_sent = user_info["nmemes_sent"]
 
     queue_key = redis.get_meme_queue_key(user_id)
 
@@ -196,54 +109,63 @@ async def generate_with_blender(
         # <30 is treated as cold start. no blending
         if nmemes_sent < 30:
             candidates = await retriever.get_candidates(
-                'fast_dopamine', user_id, limit, exclude_mem_ids=meme_ids_in_queue)
+                "fast_dopamine", user_id, limit, exclude_mem_ids=meme_ids_in_queue
+            )
 
             if len(candidates) == 0:
                 candidates = await retriever.get_candidates(
-                    'best_memes_from_each_source', user_id, limit,
-                    exclude_mem_ids=meme_ids_in_queue)
+                    "best_memes_from_each_source",
+                    user_id,
+                    limit,
+                    exclude_mem_ids=meme_ids_in_queue,
+                )
 
             return candidates
 
         if nmemes_sent < 100:
             weights = {
-                'uploaded_memes': 0.2,
-                'fast_dopamine': 0.2,
-                'best_memes_from_each_source': 0.2,
-                'lr_smoothed': 0.4,
+                "uploaded_memes": 0.2,
+                "fast_dopamine": 0.2,
+                "best_memes_from_each_source": 0.2,
+                "lr_smoothed": 0.4,
             }
 
-            engines = ['uploaded_memes', 'fast_dopamine',
-                       'best_memes_from_each_source', 'lr_smoothed']
             candidates_dict = await retriever.get_candidates_dict(
-                engines, user_id, limit, exclude_mem_ids=meme_ids_in_queue)
+                weights.keys(), user_id, limit, exclude_mem_ids=meme_ids_in_queue
+            )
 
-            fixed_pos = {0: 'lr_smoothed', 1: 'lr_smoothed'}
+            fixed_pos = {0: "lr_smoothed"}
             return blend(candidates_dict, weights, fixed_pos, limit, random_seed)
 
         # >=100
         weights = {
-            'uploaded_memes': 0.3,
-            'like_spread_and_recent_memes': 0.3,
-            'lr_smoothed': 0.4,
+            "uploaded_memes": 0.3,
+            "like_spread_and_recent_memes": 0.3,
+            "lr_smoothed": 0.4,
         }
 
-        engines = ['uploaded_memes', 'like_spread_and_recent_memes', 'lr_smoothed']
         candidates_dict = await retriever.get_candidates_dict(
-            engines, user_id, limit, exclude_mem_ids=meme_ids_in_queue)
+            weights.keys(), user_id, limit, exclude_mem_ids=meme_ids_in_queue
+        )
 
-        fixed_pos = {0: 'lr_smoothed', 1: 'lr_smoothed'}
+        fixed_pos = {0: "lr_smoothed"}
         candidates = blend(candidates_dict, weights, fixed_pos, limit, random_seed)
 
         if len(candidates) == 0 and nmemes_sent > 1000:
             candidates = await retriever.get_candidates(
-                'less_seen_meme_and_source', user_id, limit,
-                exclude_mem_ids=meme_ids_in_queue)
+                "less_seen_meme_and_source",
+                user_id,
+                limit,
+                exclude_mem_ids=meme_ids_in_queue,
+            )
 
         if len(candidates) == 0:
             candidates = await retriever.get_candidates(
-                'best_memes_from_each_source', user_id, limit,
-                exclude_mem_ids=meme_ids_in_queue)
+                "best_memes_from_each_source",
+                user_id,
+                limit,
+                exclude_mem_ids=meme_ids_in_queue,
+            )
 
         return candidates
 
@@ -252,4 +174,3 @@ async def generate_with_blender(
         await redis.add_memes_to_queue_by_key(queue_key, candidates)
 
     return candidates
-

@@ -51,7 +51,7 @@ async def get_next_meme_for_user(user_id: int) -> MemeData | None:
     while True:
         meme = await meme_queue.get_next_meme_for_user(user_id)
         if not meme:  # no memes in queue
-            await meme_queue.generate_recommendations(user_id, limit=5)
+            await meme_queue.generate_recommendations(user_id, limit=7)
             meme = await meme_queue.get_next_meme_for_user(user_id)
             if not meme:
                 return None
