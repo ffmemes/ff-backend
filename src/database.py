@@ -10,6 +10,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Identity,
+    Index,
     Insert,
     Integer,
     MetaData,
@@ -19,6 +20,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Update,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -175,7 +177,7 @@ meme = Table(
         nullable=False,
     ),
     Column("raw_meme_id", Integer, nullable=False, index=True),
-    Column("status", String, nullable=False),
+    Column("status", String, nullable=False, index=True),
     Column("type", String, nullable=False, index=True),
     Column("telegram_file_id", String),
     Column("caption", String),
@@ -189,6 +191,11 @@ meme = Table(
         "meme_source_id",
         "raw_meme_id",
         name=MEME_MEME_SOURCE_RAW_MEME_UNIQUE_CONSTRAINT,
+    ),
+    Index(
+        "idx_meme_ocr_text_gin",
+        text("(ocr_result ->> 'text') gin_trgm_ops"),
+        postgresql_using="gin",
     ),
 )
 
