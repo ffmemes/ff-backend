@@ -43,22 +43,22 @@ async def test_generate_below_30():
             "fast_dopamine": get_fast_dopamine,
             "best_meme_from_each_source": get_best_memes_from_each_source,
         }
-    
+
     candidates = await generate_recommendations(1, 10, 10, TestRetriever())
     assert len(candidates) == 2
-    assert candidates[0]['id'] in [1, 2]
-    assert candidates[1]['id'] in [1, 2]
+    assert candidates[0]["id"] in [1, 2]
+    assert candidates[1]["id"] in [1, 2]
 
     class TestRetriever(CandidatesRetriever):
         engine_map = {
             "fast_dopamine": get_fast_dopamine_empty,
             "best_memes_from_each_source": get_best_memes_from_each_source,
         }
-    
+
     candidates = await generate_recommendations(1, 10, 10, TestRetriever())
     assert len(candidates) == 2
-    assert candidates[0]['id'] in [3, 4]
-    assert candidates[1]['id'] in [3, 4]
+    assert candidates[0]["id"] in [3, 4]
+    assert candidates[1]["id"] in [3, 4]
 
 
 @pytest.mark.asyncio
@@ -126,10 +126,11 @@ async def test_generate_below_100():
             "lr_smoothed": get_lr_smoothed,
             "recently_liked": get_recentrly_liked,
         }
-    
+
     candidates = await generate_recommendations(1, 10, 40, TestRetriever())
     assert len(candidates) == 10
-    assert candidates[0]['id'] in [7, 8, 9, 10]
+    assert candidates[0]["id"] in [7, 8, 9, 10]
+
 
 @pytest.mark.asyncio
 async def test_generate_above_100():
@@ -176,10 +177,12 @@ async def test_generate_above_100():
             "like_spread_and_recent_memes": like_spread_and_recent_memes,
             "lr_smoothed": get_lr_smoothed,
         }
-    
-    candidates = await generate_recommendations(1, 10, 200, TestRetriever(), random_seed=102)
+
+    candidates = await generate_recommendations(
+        1, 10, 200, TestRetriever(), random_seed=102
+    )
     assert len(candidates) == 10
-    assert candidates[0]['id'] in [7, 8, 9, 10]
+    assert candidates[0]["id"] in [7, 8, 9, 10]
 
 
 @pytest.mark.asyncio
@@ -238,11 +241,11 @@ async def test_generate_empty_above_100():
             "less_seen_meme_and_source": top_memes_from_less_seen_sources,
             "best_memes_from_each_source": get_best_memes_from_each_source,
         }
-    
+
     candidates = await generate_recommendations(1, 10, 200, TestRetriever())
     assert len(candidates) == 2
-    assert candidates[0]['id'] in [3, 4]
+    assert candidates[0]["id"] in [3, 4]
 
     candidates = await generate_recommendations(1, 10, 1200, TestRetriever())
     assert len(candidates) == 2
-    assert candidates[0]['id'] in [1, 2]
+    assert candidates[0]["id"] in [1, 2]
