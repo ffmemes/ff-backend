@@ -4,11 +4,9 @@ from src import redis
 from src.recommendations.blender import blend
 from src.recommendations.candidates import (
     CandidatesRetriever,
-    classic,
     get_best_memes_from_each_source,
     get_fast_dopamine,
     get_lr_smoothed,
-    get_most_shared_memes,
     get_selected_sources,
 )
 from src.storage.schemas import MemeData
