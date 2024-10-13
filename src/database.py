@@ -34,7 +34,7 @@ from src.storage.constants import (
     MEME_RAW_VK_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
 )
 
-DATABASE_URL = str(settings.DATABASE_ASYNC_URL)
+DATABASE_URL = str(settings.DATABASE_URL)
 engine = create_async_engine(
     DATABASE_URL,
     max_overflow=20,
