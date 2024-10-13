@@ -21,8 +21,8 @@ def test_blender_few_candidates():
     assert(len(res) == 4)
 
 
-def test_blender_item_intersection_and_zero_weight(): 
-    
+def test_blender_item_intersection_and_zero_weight():
+
     candidates_dict = {
         'engine_1': [
             {'id': 1},

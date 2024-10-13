@@ -12,7 +12,7 @@ services:
     volumes:
       - ./:/src
     ports:
-      - "9898:8000"
+      - "9898:9000"
 
   app_prefect:
     container_name: prefect_worker

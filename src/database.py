@@ -31,8 +31,14 @@ from src.storage.constants import (
     MEME_RAW_VK_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
 )
 
-DATABASE_URL = str(settings.DATABASE_URL)
-engine = create_async_engine(DATABASE_URL)
+DATABASE_URL = str(settings.DATABASE_ASYNC_URL)
+engine = create_async_engine(
+    DATABASE_URL,
+    max_overflow=20,
+    pool_size=settings.DATABASE_POOL_SIZE,
+    pool_recycle=settings.DATABASE_POOL_TTL,
+    pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
+)
 
 metadata = MetaData(naming_convention=DB_NAMING_CONVENTION)
 
@@ -383,6 +389,17 @@ treasury_trx = Table(
     Column("type", String, nullable=False, index=True),
     Column("amount", Integer, nullable=False),
     Column("external_id", String),
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+)
+
+user_deep_link_log = Table(
+    "user_deep_link_log",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column(
+        "user_id", BigInteger, ForeignKey("user.id", ondelete="CASCADE"), nullable=False
+    ),
+    Column("deep_link", String),
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
 )
 

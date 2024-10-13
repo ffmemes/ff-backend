@@ -402,6 +402,10 @@ def setup_application(is_webhook: bool = False) -> Application:
     if is_webhook:
         application_builder.updater(None)
 
+    application_builder.connect_timeout(10)
+    application_builder.read_timeout(10)
+    application_builder.write_timeout(10)
+
     application = application_builder.build()
     add_handlers(application)
 

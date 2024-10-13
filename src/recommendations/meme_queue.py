@@ -4,9 +4,11 @@ from src import redis
 from src.recommendations.blender import blend
 from src.recommendations.candidates import (
     CandidatesRetriever,
+    classic,
     get_best_memes_from_each_source,
     get_fast_dopamine,
     get_lr_smoothed,
+    get_most_shared_memes,
     get_selected_sources,
 )
 from src.storage.schemas import MemeData
@@ -127,7 +129,8 @@ async def generate_recommendations(
                 "uploaded_memes": 0.2,
                 "fast_dopamine": 0.2,
                 "best_memes_from_each_source": 0.2,
-                "lr_smoothed": 0.4,
+                "lr_smoothed": 0.2,
+                "recently_liked": 0.2,
             }
 
             candidates_dict = await retriever.get_candidates_dict(

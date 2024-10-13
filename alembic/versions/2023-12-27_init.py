@@ -1,13 +1,14 @@
 """init
 
 Revision ID: 4a4b3b418d3b
-Revises: 
+Revises:
 Create Date: 2023-12-27 17:09:05.578955
 
 """
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "4a4b3b418d3b"

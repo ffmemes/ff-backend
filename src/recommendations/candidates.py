@@ -645,40 +645,121 @@ async def get_fast_dopamine(
     return res
 
 
+async def get_most_shared_memes(
+    user_id: int,
+    limit: int = 10,
+    exclude_meme_ids: list[int] = [],
+):
+    query = f"""
+        SELECT
+            M.id
+            , M.type, M.telegram_file_id, M.caption
+            , 'most_shared' AS recommended_by
+        FROM meme M
+        INNER JOIN meme_stats MS
+            ON MS.meme_id = M.id
+        INNER JOIN user_language L
+            ON L.language_code = M.language_code
+            AND L.user_id = {user_id}
+        LEFT JOIN user_meme_reaction R
+            ON R.meme_id = M.id
+            AND R.user_id = {user_id}
+        WHERE 1=1
+            AND M.status = 'ok'
+            AND R.meme_id IS NULL
+            {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+        ORDER BY MS.invited_count DESC
+        LIMIT {limit}
+    """
+    res = await fetch_all(text(query))
+    return res
+
+
+async def get_recently_liked(
+    user_id: int,
+    limit: int = 10,
+    exclude_meme_ids: list[int] = [],
+):
+    query = f"""
+        WITH EVENTS AS (
+            SELECT *
+            FROM user_meme_reaction UMR
+            WHERE reaction_id = 1
+            ORDER BY sent_at DESC
+            LIMIT 10000
+        )
+        , CANDIDATES AS (
+            SELECT meme_id AS id
+            FROM EVENTS
+            GROUP BY meme_id
+            HAVING COUNT(*) > 1
+            ORDER BY COUNT(*) DESC
+        )
+
+        SELECT
+            M.id
+            , M.type, M.telegram_file_id, M.caption
+            , 'recently_liked' AS recommended_by
+
+        FROM CANDIDATES C
+        INNER JOIN meme M
+            ON M.id = C.id
+
+        INNER JOIN user_language L
+            ON L.language_code = M.language_code
+            AND L.user_id = {user_id}
+
+        LEFT JOIN user_meme_reaction R
+            ON R.meme_id = M.id
+            AND R.user_id = {user_id}
+
+        WHERE 1=1
+            AND M.status = 'ok'
+            AND R.meme_id IS NULL
+            {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+        LIMIT {limit}
+    """
+    res = await fetch_all(text(query))
+    return res
+
+
 class CandidatesRetriever:
     """CandidatesRetriever class is used for unit testing"""
 
     engine_map = {
-        'less_seen_meme_and_source': less_seen_meme_and_source,
-        'uploaded_memes': uploaded_memes,
-        'fast_dopamine': get_fast_dopamine,
-        'lr_smoothed': get_lr_smoothed,
-        'selected_sources': get_selected_sources,
-        'best_memes_from_each_source': get_best_memes_from_each_source,
+        "less_seen_meme_and_source": less_seen_meme_and_source,
+        "uploaded_memes": uploaded_memes,
+        "fast_dopamine": get_fast_dopamine,
+        "lr_smoothed": get_lr_smoothed,
+        "selected_sources": get_selected_sources,
+        "best_memes_from_each_source": get_best_memes_from_each_source,
+        "like_spread_and_recent_memes": like_spread_and_recent_memes,
+        "recently_liked": get_recently_liked,
     }
 
     async def get_candidates(
-            self,
-            engine: str,
-            user_id: int,
-            limit: int = 10,
-            exclude_mem_ids: list[int] = []
-        ) -> list[dict[str, Any]]:
+        self,
+        engine: str,
+        user_id: int,
+        limit: int = 10,
+        exclude_mem_ids: list[int] = [],
+    ) -> list[dict[str, Any]]:
         if engine not in self.engine_map:
-            raise ValueError(f'engine {engine} is not supported')
+            raise ValueError(f"engine {engine} is not supported")
 
         return await self.engine_map[engine](user_id, limit, exclude_mem_ids)
 
     async def get_candidates_dict(
-            self,
-            engines: list[str],
-            user_id: int,
-            limit: int = 10,
-            exclude_mem_ids: list[int] = []
+        self,
+        engines: list[str],
+        user_id: int,
+        limit: int = 10,
+        exclude_mem_ids: list[int] = [],
     ) -> dict[str, list[dict[str, Any]]]:
         candidates_dict = {}
         for engine in engines:
             candidates_dict[engine] = await self.get_candidates(
-                engine, user_id, limit, exclude_mem_ids)
+                engine, user_id, limit, exclude_mem_ids
+            )
 
         return candidates_dict

@@ -72,7 +72,7 @@ async def search_inline(update: Update, _: ContextTypes.DEFAULT_TYPE):
                 start_parameter=INLINE_SEARCH_REQUEST_DEEPLINK,
             ),
         )
-    if len(query) >= MAX_SEARCH_QUERY_LENGTH:
+    elif len(query) > MAX_SEARCH_QUERY_LENGTH:  # Bug fix: Changed '>=' to '>'
         return await update.inline_query.answer(
             [],
             button=InlineQueryResultsButton(
@@ -117,5 +117,5 @@ async def handle_chosen_inline_result(update: Update, _: ContextTypes.DEFAULT_TY
     await create_inline_chosen_result_log(
         user_id=chosen_inline_result.from_user.id,
         result_id=chosen_inline_result.result_id,
-        query=update.chosen_inline_result.query,
+        query=chosen_inline_result.query,
     )
