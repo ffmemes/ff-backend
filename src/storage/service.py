@@ -1,6 +1,6 @@
 from typing import Any
 
-from sqlalchemy import bindparam, nulls_first, or_, select, text
+from sqlalchemy import nulls_first, or_, select, text
 
 from src.database import (
     fetch_all,
@@ -203,22 +203,20 @@ async def find_meme_duplicate(meme_id: int, imagetext: str) -> int | None:
     if len(imagetext) <= 11:  # skip all memes with less than 11 letters
         return None
 
-    select_query = """
+    select_query = f"""
         SET pg_trgm.similarity_threshold = 0.6;
         SELECT
             M.id
         FROM meme M
-        WHERE M.id < :meme_id
+        WHERE M.id < {meme_id}
             AND M.status = 'ok'
             AND M.type = 'image'
             AND M.ocr_result IS NOT NULL
-            AND (M.ocr_result ->> 'text') % :imagetext
+            AND (M.ocr_result ->> 'text') % '{imagetext}'
         ORDER BY M.id ASC
         LIMIT 1
     """
-    select_query = text(select_query).bindparams(
-        bindparam("meme_id", value=meme_id), bindparam("imagetext", value=imagetext)
-    )
+    select_query = text(select_query)
 
     res = await fetch_one(select_query)
     if res:
