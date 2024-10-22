@@ -204,7 +204,6 @@ async def find_meme_duplicate(meme_id: int, imagetext: str) -> int | None:
         return None
 
     select_query = f"""
-        SET pg_trgm.similarity_threshold = 0.6;
         SELECT
             M.id
         FROM meme M

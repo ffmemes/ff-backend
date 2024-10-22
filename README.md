@@ -85,3 +85,8 @@ Creating a new database...
 Applying the backup to the new database...
 Backup applied successfully.
 ```
+
+
+### useful sql commands that should not be forgotten
+
+- `SET pg_trgm.similarity_threshold = 0.6;`
