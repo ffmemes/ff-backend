@@ -12,7 +12,7 @@ from src.storage.etl import (
     etl_memes_from_raw_telegram_posts,
     etl_memes_from_raw_vk_posts,
 )
-from src.storage.ocr.mystic import ocr_content
+from src.storage.ocr.modal import ocr_content
 from src.storage.schemas import OcrResult
 from src.storage.service import (
     find_meme_duplicate,

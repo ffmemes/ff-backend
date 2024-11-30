@@ -6,17 +6,14 @@ import httpx
 from src.config import settings
 from src.storage.schemas import OcrResult
 
-HEADERS = {
-    "accept": "application/json",
-    "Content-Type": "application/octet-stream"
-}
+HEADERS = {"accept": "application/json", "Content-Type": "application/octet-stream"}
+
 
 async def ocr_modal(
     file_content: bytes,
     language: str = "en",
     endpoint: str = settings.MODAL_ENDPOINT,
 ) -> dict[str, Any]:
-
     async with httpx.AsyncClient() as client:
         response = await client.post(
             endpoint,
