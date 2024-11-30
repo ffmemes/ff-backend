@@ -37,6 +37,7 @@ class Config(BaseSettings):
     HIKERAPI_TOKEN: str | None = None
 
     MYSTIC_TOKEN: str | None = None
+    MODAL_ENDPOINT: str | None = None
 
     REDIS_MAX_CONNECTIONS: int = 128
 
