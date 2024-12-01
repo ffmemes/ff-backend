@@ -78,7 +78,10 @@ async def create_meme_from_meme_raw_upload(
         else meme_upload["date"]
     )
 
-    if meme_upload["media"].get("duration") and meme_upload["media"].get("duration") > 0:
+    if (
+        meme_upload["media"].get("duration")
+        and meme_upload["media"].get("duration") > 0
+    ):
         meme_type = MemeType.VIDEO
     else:
         meme_type = MemeType.IMAGE
