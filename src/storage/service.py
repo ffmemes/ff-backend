@@ -108,6 +108,7 @@ async def get_memes_to_ocr(limit=100):
             AND MRI.comments / (MRI.likes + 1.) > 0.01
         WHERE 1=1
             AND M.ocr_result IS NULL
+            AND M.language_code IN ('en', 'ru')
             AND M.status != 'broken_content_link'
             AND M.type = 'image'
             AND COALESCE(
