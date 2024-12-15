@@ -20,6 +20,7 @@ async def ocr_modal(
             params={"lang": language},
             headers=HEADERS,
             data=file_content,
+            timeout=60,
         )
         response.raise_for_status()
         return response.json()

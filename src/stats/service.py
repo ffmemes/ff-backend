@@ -62,7 +62,7 @@ async def get_ocr_text_of_liked_memes_for_llm(user_id: int) -> list:
                 LENGTH(
                     REGEXP_REPLACE(
                         MEME.ocr_result->>'text',
-                        '[^\u0410-\u044F]',
+                        '[^\u0410-\u044f]',
                         '',
                         'g'
                     )
