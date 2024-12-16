@@ -77,8 +77,8 @@ async def next_message(
             msg = await edit_last_message_with_meme(
                 prev_update.callback_query.message, meme, reply_markup
             )
-        except BadRequest as e:
-            logging.error(f"Failed to edit message: {e}")
+        except BadRequest:
+            # logging.error(f"Failed to edit message: {e}")
             msg = await send_new_message_with_meme(bot, user_id, meme, reply_markup)
     else:
         try:
