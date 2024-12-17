@@ -9,7 +9,7 @@ from src.flows.parsers.vk import parse_vk_sources
 deployment_tg = Deployment.build_from_flow(
     flow=parse_telegram_sources,
     name="Parse Telegram Sources",
-    schedules=[CronSchedule(cron="0 * * * *", timezone="Europe/London")],
+    schedules=[CronSchedule(cron="40 * * * *", timezone="Europe/London")],
     work_pool_name=settings.ENVIRONMENT,
 )
 
