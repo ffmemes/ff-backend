@@ -46,7 +46,10 @@ Just forward a meme to our bot to upload it. Only pics are supported yet.
     total_views = sum(m["nmemes_sent"] for m in uploaded_memes)
     total_likes = sum(m["nlikes"] for m in uploaded_memes)
     total_dislikes = sum(m["ndislikes"] for m in uploaded_memes)
-    total_like_prc = round(total_likes * 100.0 / (total_likes + total_dislikes))
+    if total_likes + total_dislikes == 0:
+        total_like_prc = 0
+    else:
+        total_like_prc = round(total_likes * 100.0 / (total_likes + total_dislikes))
 
     STATS_TEXT = f"""
 <b>YOUR UPLOADED MEMES</b>
