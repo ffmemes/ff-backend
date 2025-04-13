@@ -126,7 +126,7 @@ async def count_24h_uploaded_not_approved_memes(user_id: int) -> int:
         LEFT JOIN meme_source ON meme.meme_source_id = meme_source.id
         WHERE meme_source.type = 'user upload'
         AND meme.created_at >= NOW() - INTERVAL '1 day'
-        AND meme.status != 'ok'
+        -- AND meme.status != 'ok'
         AND meme_source.added_by = {user_id}
     """
     res = await execute(text(query))
