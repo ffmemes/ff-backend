@@ -54,7 +54,7 @@ from src.tgbot.handlers.admin.user_info import (
 )
 from src.tgbot.handlers.chat.chat import handle_chat_message
 from src.tgbot.handlers.chat.chat_member import handle_chat_member_update
-from src.tgbot.handlers.chat.explain_meme import explain_meme_en, explain_meme_ru
+# from src.tgbot.handlers.chat.explain_meme import explain_meme_en, explain_meme_ru
 from src.tgbot.handlers.chat.feedback import (
     handle_feedback_message,
     handle_feedback_reply,
@@ -263,24 +263,25 @@ def add_handlers(application: Application) -> None:
 
     ######################
     # handle new meme in channel discussion
-    application.add_handler(
-        MessageHandler(
-            filters=filters.Chat([TELEGRAM_CHAT_RU_CHAT_ID, TELEGRAM_MODERATOR_CHAT_ID])
-            & filters.PHOTO
-            & filters.UpdateType.MESSAGE,
-            callback=explain_meme_ru,
-        )
-    )
+    # TODO: turn in when I'll have more free ChatGPT credits (probably never)
+    # application.add_handler(
+    #     MessageHandler(
+    #         filters=filters.Chat([TELEGRAM_CHAT_RU_CHAT_ID, TELEGRAM_MODERATOR_CHAT_ID])
+    #         & filters.PHOTO
+    #         & filters.UpdateType.MESSAGE,
+    #         callback=explain_meme_ru,
+    #     )
+    # )
 
-    application.add_handler(
-        MessageHandler(
-            filters=filters.Chat(TELEGRAM_CHAT_EN_CHAT_ID)
-            & filters.PHOTO
-            & filters.SenderChat(TELEGRAM_CHANNEL_EN_CHAT_ID)
-            & filters.UpdateType.MESSAGE,
-            callback=explain_meme_en,
-        )
-    )
+    # application.add_handler(
+    #     MessageHandler(
+    #         filters=filters.Chat(TELEGRAM_CHAT_EN_CHAT_ID)
+    #         & filters.PHOTO
+    #         & filters.SenderChat(TELEGRAM_CHANNEL_EN_CHAT_ID)
+    #         & filters.UpdateType.MESSAGE,
+    #         callback=explain_meme_en,
+    #     )
+    # )
 
     ######################
     # chat activity

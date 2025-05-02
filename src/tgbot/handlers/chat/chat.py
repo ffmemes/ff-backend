@@ -41,22 +41,25 @@ async def handle_chat_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     await save_telegram_message(msg)
 
     # Check if message is a reply to bot's message
-    if if_bot_was_mentioned(msg):
-        if random.random() < 0.3:  # free generation
-            return await send_ai_message_to_chat(
-                context.bot,
-                chat_id=update.effective_chat.id,
-                reply_to_message_id=msg.id,
-            )
+    # if if_bot_was_mentioned(msg):
+    #     if random.random() < 0.3:  # free generation
+    #         return await send_ai_message_to_chat(
+    #             context.bot,
+    #             chat_id=update.effective_chat.id,
+    #             reply_to_message_id=msg.id,
+    #         )
 
-        return await generate_ai_reply_to_a_message(update, context)
-    elif random.random() < 0.1:
-        return await send_ai_message_to_chat(
-            context.bot,
-            chat_id=update.effective_chat.id,
-            reply_to_message_id=msg.id,
-        )
-    else:
+    #     return await generate_ai_reply_to_a_message(update, context)
+    # elif random.random() < 0.1:
+    #     return await send_ai_message_to_chat(
+    #         context.bot,
+    #         chat_id=update.effective_chat.id,
+    #         reply_to_message_id=msg.id,
+    #     )
+    # else:
+    #     await give_random_reaction(update, context)
+
+    if random.random() < 0.05:
         await give_random_reaction(update, context)
 
 
