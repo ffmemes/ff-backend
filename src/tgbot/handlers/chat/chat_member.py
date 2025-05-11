@@ -67,7 +67,8 @@ async def handle_chat_member_update(
             logging.info("%s unblocked the bot", cause_name)
         elif was_member and not is_member:
             logging.info("%s blocked the bot", cause_name)
-            await block.handle_user_blocked_bot(update, context)
+            # doesn't work properly
+            # await block.handle_user_blocked_bot(update, context)
 
     elif chat.type in [Chat.GROUP, Chat.SUPERGROUP]:
         if not was_member and is_member:
