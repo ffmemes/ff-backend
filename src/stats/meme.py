@@ -159,7 +159,7 @@ async def calculate_meme_invited_count():
                 user_deep_link_log
             WHERE
                 deep_link IS NOT NULL
-                AND deep_link LIKE 's\_%\_%'
+                AND deep_link LIKE 's\\_%\\_%'
         )
 
         INSERT INTO meme_stats (
