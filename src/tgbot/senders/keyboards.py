@@ -31,13 +31,13 @@ def meme_reaction_keyboard(meme_id: int, user_id: int):
                 InlineKeyboardButton(
                     like,
                     callback_data=MEME_BUTTON_CALLBACK_DATA_PATTERN.format(
-                        meme_id=meme_id, reaction_id=Reaction.LIKE
+                        meme_id=meme_id, reaction_id=Reaction.LIKE.value
                     ),
                 ),
                 InlineKeyboardButton(
                     dislike,
                     callback_data=MEME_BUTTON_CALLBACK_DATA_PATTERN.format(
-                        meme_id=meme_id, reaction_id=Reaction.DISLIKE
+                        meme_id=meme_id, reaction_id=Reaction.DISLIKE.value
                     ),
                 ),
             ],
