@@ -224,6 +224,10 @@ async def handle_uploaded_meme_review_button(
     meme_upload = await get_meme_raw_upload_by_id(upload_id)
     prev_caption = update.callback_query.message.caption
 
+    if meme_upload["user_id"] == update.effective_user.id:
+        await update.callback_query.answer("You can't review your own memes")
+        return
+
     meme = await update_meme_by_upload_id(
         upload_id,
         status=MemeStatus.OK if action == "approve" else MemeStatus.REJECTED,
