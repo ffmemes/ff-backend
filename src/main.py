@@ -5,7 +5,7 @@ import sentry_sdk
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
-from src import redis, redis_client
+from src import redis
 from src.config import app_configs, settings
 from src.tgbot import app as tgbot_app
 from src.tgbot.router import router as tgbot_router
@@ -20,7 +20,7 @@ async def lifespan(_application: FastAPI) -> AsyncGenerator:
     await tgbot_app.application.initialize()
 
     # flush all redis keys on startup for debug 
-    await redis_client.flushall()
+    await redis.redis_client.flushall()
 
     # if is_webhook:  # all gunicorn workers will call this and hit rate limit
     #     await bot.setup_webhook(bot.application)
