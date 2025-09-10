@@ -18,7 +18,7 @@ prefect==3.4.17
 beautifulsoup4==4.13.*
 lxml==6.0.*
 
-python-telegram-bot==22.3.*
+python-telegram-bot[rate-limiter]==22.3.*
 
 Pillow==11.3.*
 

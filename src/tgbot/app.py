@@ -11,6 +11,7 @@ from telegram.ext import (
     InlineQueryHandler,
     MessageHandler,
     PreCheckoutQueryHandler,
+    AIORateLimiter,
     filters,
 )
 
@@ -467,6 +468,7 @@ async def setup_webhook(application: Application) -> None:
 
 def setup_application(is_webhook: bool = False) -> Application:
     application_builder = Application.builder().token(settings.TELEGRAM_BOT_TOKEN)
+    application_builder.rate_limiter(AIORateLimiter(limit=10, interval=1))
 
     if is_webhook:
         application_builder.updater(None)

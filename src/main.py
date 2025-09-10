@@ -21,7 +21,7 @@ async def lifespan(_application: FastAPI) -> AsyncGenerator:
 
     # flush all redis keys on startup for debug 
     await redis_client.flushall()
-    
+
     # if is_webhook:  # all gunicorn workers will call this and hit rate limit
     #     await bot.setup_webhook(bot.application)
 
