@@ -2,7 +2,7 @@ redis==5.0.*
 alembic==1.13.*
 psycopg2==2.9.*
 python-jose==3.3.*
-SQLAlchemy==2.0.30
+SQLAlchemy==2.0.43
 httpx==0.28.*
 
 pydantic[email]==2.11.*
@@ -11,7 +11,7 @@ asyncpg==0.30.*
 fastapi==0.115.*
 uvicorn[standard]==0.32.*
 
-sentry-sdk==2.31.*
+# sentry-sdk==2.39.*
 
 # prefect + worker
 prefect==3.4.17
