@@ -13,6 +13,7 @@ class Config(BaseSettings):
     DATABASE_POOL_PRE_PING: bool = True
 
     REDIS_URL: RedisDsn
+    REDIS_HEALTH_CHECK_INTERVAL: int = 30
 
     SITE_DOMAIN: str = "myapp.com"
 
