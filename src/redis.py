@@ -10,6 +10,8 @@ from src.models import CustomModel
 pool = aioredis.ConnectionPool.from_url(
     str(settings.REDIS_URL),
     max_connections=settings.REDIS_MAX_CONNECTIONS,
+    health_check_interval=settings.REDIS_HEALTH_CHECK_INTERVAL,
+    socket_keepalive=True,
     decode_responses=True,
 )
 redis_client = aioredis.Redis(connection_pool=pool)
@@ -64,10 +66,10 @@ async def add_memes_to_queue_by_key(
     key: str, memes: list[dict], expire: int = 3600
 ) -> None:
     jsoned_memes = [orjson.dumps(meme) for meme in memes]
-    p = await redis_client.pipeline(transaction=True)
-    await p.sadd(key, *jsoned_memes)
-    await p.expire(key, expire)
-    await p.execute(raise_on_error=True)
+    async with redis_client.pipeline(transaction=True) as pipe:
+        await pipe.sadd(key, *jsoned_memes)
+        await pipe.expire(key, expire)
+        await pipe.execute(raise_on_error=True)
 
 
 def get_user_info_key(user_id: int) -> str:
