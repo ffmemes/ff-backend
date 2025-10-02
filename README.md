@@ -1,6 +1,8 @@
-# Fast Food Memes 
+# Fast Food Memes
 
 ➡️ https://t.me/ffmemesbot ⬅️
+
+For a distilled onboarding guide, see [AGENTS.md](AGENTS.md).
 
 ## Local Development
 
