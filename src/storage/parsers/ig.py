@@ -11,16 +11,26 @@ async def _get_user_info(
     username: str,
 ) -> dict | None:
     async with httpx.AsyncClient(timeout=20.0) as client:
-        response = await client.get(
-            "https://api.hikerapi.com/v2/user/by/username",
-            params={"username": username},
-            headers={
-                "accept": "application/json",
-                "x-access-key": settings.HIKERAPI_TOKEN,
-            },
-        )
+        try:
+            response = await client.get(
+                "https://api.hikerapi.com/v2/user/by/username",
+                params={"username": username},
+                headers={
+                    "accept": "application/json",
+                    "x-access-key": settings.HIKERAPI_TOKEN,
+                },
+            )
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                logging.warning(
+                    "Instagram user '%s' not found. Skipping.",
+                    username,
+                )
+                return None
 
-        response.raise_for_status()
+            raise
+
         return response.json()
 
 
@@ -43,6 +53,9 @@ async def _get_user_medias(
 
 async def get_user_info(instagram_username: str):
     user_info_response = await _get_user_info(instagram_username)
+    if not user_info_response:
+        return None
+
     if user_info_response["status"] != "ok" or not user_info_response.get("user"):
         logging.warning(
             f"Failed to get @{instagram_username} info. Result: {user_info_response}"
