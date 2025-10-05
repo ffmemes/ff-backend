@@ -42,6 +42,7 @@ from src.tgbot.handlers.admin.broadcast_text import (
     handle_broadcast_text_ru_trigger,
 )
 from src.tgbot.handlers.admin.forward_channel import handle_forwarded_from_tgchannelru
+from src.tgbot.handlers.admin.promote_moderator import handle_promote_moderator
 from src.tgbot.handlers.admin.user_info import (
     DELETE_USER_DATA_CONFIRMATION_CALLBACK,
     delete_user_data,
@@ -62,6 +63,10 @@ from src.tgbot.handlers.chat.send_tokens import (
     send_tokens_to_reply,
 )
 from src.tgbot.handlers.moderator import get_meme, meme_source
+from src.tgbot.handlers.moderator.invite import (
+    MODERATOR_INVITE_CALLBACK_DATA,
+    handle_moderator_invite_callback,
+)
 from src.tgbot.handlers.payments.purchase import (
     PURCHASE_TOKEN_CALLBACK_DATA_REGEXP,
     handle_new_token_purchase_request_callback,
@@ -224,6 +229,13 @@ def add_handlers(application: Application) -> None:
         )
     )
 
+    application.add_handler(
+        CallbackQueryHandler(
+            handle_moderator_invite_callback,
+            pattern=fr"^{MODERATOR_INVITE_CALLBACK_DATA}$",
+        )
+    )
+
     ############## popup reaction
     application.add_handler(
         CallbackQueryHandler(
@@ -238,6 +250,14 @@ def add_handlers(application: Application) -> None:
             filters=filters.ChatType.PRIVATE
             & filters.ForwardedFrom(chat_id=TELEGRAM_CHANNEL_RU_CHAT_ID),
             callback=handle_forwarded_from_tgchannelru,
+        )
+    )
+
+    application.add_handler(
+        CommandHandler(
+            "promotemod",
+            handle_promote_moderator,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
         )
     )
 

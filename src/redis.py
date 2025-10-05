@@ -100,3 +100,4 @@ async def get_user_wrapped(user_id: str) -> dict | None:
 
 async def set_user_wrapped(user_id: str, data: dict) -> None:
     await redis_client.set(get_user_wrapped_key(user_id), orjson.dumps(data))
+

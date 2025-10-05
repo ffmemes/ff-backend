@@ -37,20 +37,31 @@ async def _fetch_hikerapi(  # pragma: no cover - thin wrapper around httpx
         return response.json()
 
 
-async def _get_user_info(username: str) -> dict | None:
-    return await _fetch_hikerapi(
-        "/user/by/username",
-        params={"username": username},
-        not_found_message=f"Instagram user '{username}' not found. Skipping.",
-    )
+async def _get_user_medias(
+    user_id: int,
+) -> dict | None:
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        try:
+            response = await client.get(
+                "https://api.hikerapi.com/v2/user/medias",
+                params={"user_id": user_id},
+                headers={
+                    "accept": "application/json",
+                    "x-access-key": settings.HIKERAPI_TOKEN,
+                },
+            )
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 404:
+                logging.warning(
+                    "Instagram user with id '%s' not found. Skipping.",
+                    user_id,
+                )
+                return None
 
+            raise
 
-async def _get_user_medias(user_id: int) -> dict | None:
-    return await _fetch_hikerapi(
-        "/user/medias",
-        params={"user_id": user_id},
-        not_found_message=f"Instagram user with id '{user_id}' not found. Skipping.",
-    )
+        return response.json()
 
 
 async def get_user_info(instagram_username: str):
@@ -74,21 +85,10 @@ async def get_user_info(instagram_username: str):
 async def get_user_medias(user_id: int) -> list[IgPostParsingResult]:
     user_medias_response = await _get_user_medias(user_id)
     if not user_medias_response:
-        return []
-
-    response_payload = user_medias_response.get("response") or {}
-    if response_payload.get("status") != "ok":
-        logging.warning("Failed to get %s medias: %s", user_id, user_medias_response)
-        return []
-
-    medias = response_payload.get("items") or []
-    if not isinstance(medias, list):
-        logging.warning(
-            "Unexpected medias payload for %s: %s",
-            user_id,
-            user_medias_response,
-        )
-        return []
+        return None
+    if user_medias_response["response"]["status"] != "ok":
+        logging.warning(f"Failed to get {user_id} medias: {user_medias_response}")
+        return None
 
     logging.info("Received %s medias for %s", len(medias), user_id)
 
