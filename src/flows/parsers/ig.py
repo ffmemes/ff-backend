@@ -54,9 +54,7 @@ async def parse_ig_sources(
             fetched_user_info = await get_user_info(ig_username)
 
             if not fetched_user_info or fetched_user_info.get("pk") is None:
-                logger.warning(
-                    f"Could not retrieve user info for @{ig_username}, skipping source"
-                )
+                logger.warning(f"Could not retrieve user info for @{ig_username}, skipping source")
                 user_info = {
                     "username": ig_username,
                     "not_found": True,
@@ -82,9 +80,7 @@ async def parse_ig_sources(
 
         user_info = data.get("ig_user_info")
         if not user_info:
-            logger.warning(
-                f"Instagram user info missing for source {ig_source['id']}, skipping"
-            )
+            logger.warning(f"Instagram user info missing for source {ig_source['id']}, skipping")
             continue
 
         if user_info.get("not_found"):

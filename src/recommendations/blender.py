@@ -48,9 +48,7 @@ def blend(
         candidates_dict[engine] = candidates_dict[engine].copy()
 
     # engines list is ensured to have non-empty engines
-    engines = [
-        engine for engine in candidates_dict.keys() if len(candidates_dict[engine]) > 0
-    ]
+    engines = [engine for engine in candidates_dict.keys() if len(candidates_dict[engine]) > 0]
 
     weights = [(weights_dict[engine] + EPS) for engine in engines]
     if len(engines) == 0:

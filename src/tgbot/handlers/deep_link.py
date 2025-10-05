@@ -41,8 +41,8 @@ async def handle_invited_user(
     if invited_user.get("inviter_id"):
         return await log(
             f"""
-User #{invited_user['id']}/{invited_user_name}
-was already invited by #{invited_user['inviter_id']}"""
+User #{invited_user["id"]}/{invited_user_name}
+was already invited by #{invited_user["inviter_id"]}"""
         )
 
     # set inviter id

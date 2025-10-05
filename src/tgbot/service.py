@@ -101,9 +101,7 @@ async def get_meme_source_by_id(
 async def get_meme_source_stats_by_id(
     id: int,
 ) -> dict[str, Any] | None:
-    select_statement = select(meme_source_stats).where(
-        meme_source_stats.c.meme_source_id == id
-    )
+    select_statement = select(meme_source_stats).where(meme_source_stats.c.meme_source_id == id)
     return await fetch_one(select_statement)
 
 
@@ -145,9 +143,7 @@ async def update_meme_source(
     return await fetch_one(update_statement)
 
 
-async def search_memes_for_inline_query(
-    search_query: str, limit: int
-) -> list[dict[str, Any]]:
+async def search_memes_for_inline_query(search_query: str, limit: int) -> list[dict[str, Any]]:
     select_query = f"""
         SELECT
             M.*
@@ -158,9 +154,7 @@ async def search_memes_for_inline_query(
         ORDER BY word_similarity(:search_query, M.ocr_result ->> 'text') DESC
         LIMIT {limit};
     """
-    select_statement = text(select_query).bindparams(
-        bindparam("search_query", value=search_query)
-    )
+    select_statement = text(select_query).bindparams(bindparam("search_query", value=search_query))
 
     return await fetch_all(select_statement)
 
@@ -195,8 +189,7 @@ async def add_user_languages(
     # Prepare a list of dictionaries where each dictionary represents
     # the values to be inserted for one row.
     values_to_insert = [
-        {"user_id": user_id, "language_code": language_code}
-        for language_code in language_codes
+        {"user_id": user_id, "language_code": language_code} for language_code in language_codes
     ]
 
     insert_language_query = (
@@ -299,9 +292,7 @@ async def get_meme_stats_for_meme_ids(meme_ids: list[int]) -> list[dict[str, Any
 
 
 async def update_user(user_id: int, **kwargs) -> dict[str, Any] | None:
-    update_query = (
-        user.update().where(user.c.id == user_id).values(**kwargs).returning(user)
-    )
+    update_query = user.update().where(user.c.id == user_id).values(**kwargs).returning(user)
     return await fetch_one(update_query)
 
 

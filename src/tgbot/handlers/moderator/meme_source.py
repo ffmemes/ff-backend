@@ -24,9 +24,7 @@ from src.tgbot.service import (
 from src.tgbot.user_info import get_user_info
 
 
-async def handle_meme_source_link(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def handle_meme_source_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_info = await get_user_info(update.effective_user.id)
     if not UserType(user_info["type"]).is_moderator:
         return
@@ -84,9 +82,7 @@ async def handle_meme_source_change_status(
     user_id = update.effective_user.id
     user_info = await get_user_info(user_id)
     if not UserType(user_info["type"]).is_moderator:
-        await update.callback_query.answer(
-            "🤷‍♀️ Only moderators can change meme source status 🤷‍♂️"
-        )
+        await update.callback_query.answer("🤷‍♀️ Only moderators can change meme source status 🤷‍♂️")
         return
 
     args = update.callback_query.data.split(":")
@@ -173,15 +169,11 @@ async def meme_source_admin_pipeline(
         return await send_or_edit(
             update,
             text=f"""{ms_info}\nPlease select a language for {meme_source["url"]}""",
-            reply_markup=meme_source_language_selection_keyboard(
-                meme_source_id=meme_source["id"]
-            ),
+            reply_markup=meme_source_language_selection_keyboard(meme_source_id=meme_source["id"]),
         )
 
     return await send_or_edit(
         update,
         text=ms_info,
-        reply_markup=meme_source_change_status_keyboard(
-            meme_source["id"], meme_source["status"]
-        ),
+        reply_markup=meme_source_change_status_keyboard(meme_source["id"], meme_source["status"]),
     )

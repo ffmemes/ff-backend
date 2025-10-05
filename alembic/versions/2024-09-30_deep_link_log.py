@@ -5,8 +5,8 @@ Revises: 5e6843001af4
 Create Date: 2024-09-30 21:25:49.970165
 
 """
-import sqlalchemy as sa
 
+import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -23,9 +23,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), sa.Identity(always=False), nullable=False),
         sa.Column("user_id", sa.BigInteger(), nullable=False),
         sa.Column("deep_link", sa.String(), nullable=True),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.ForeignKeyConstraint(
             ["user_id"],
             ["user.id"],

@@ -5,8 +5,8 @@ Revises: b780738c821f
 Create Date: 2024-03-07 20:09:12.025031
 
 """
-import sqlalchemy as sa
 
+import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -24,18 +24,14 @@ def upgrade() -> None:
         sa.Column("result_id", sa.String(), nullable=False),
         sa.Column("user_id", sa.BigInteger(), nullable=False),
         sa.Column("query", sa.String(), nullable=False),
-        sa.Column(
-            "chosen_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("chosen_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.ForeignKeyConstraint(
             ["user_id"],
             ["user.id"],
             name=op.f("inline_search_chosen_result_logs_user_id_fkey"),
             ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint(
-            "id", name=op.f("inline_search_chosen_result_logs_pkey")
-        ),
+        sa.PrimaryKeyConstraint("id", name=op.f("inline_search_chosen_result_logs_pkey")),
     )
     op.create_table(
         "inline_search_logs",

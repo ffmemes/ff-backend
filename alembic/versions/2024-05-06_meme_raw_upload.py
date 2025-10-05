@@ -5,10 +5,10 @@ Revises: b2e46e6fed7f
 Create Date: 2024-05-06 17:34:39.289802
 
 """
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
+import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "5313c3b2301e"
@@ -25,14 +25,10 @@ def upgrade() -> None:
         sa.Column("user_id", sa.BigInteger(), nullable=False),
         sa.Column("message_id", sa.Integer(), nullable=False),
         sa.Column("date", sa.DateTime(), nullable=False),
-        sa.Column(
-            "forward_origin", postgresql.JSONB(astext_type=sa.Text()), nullable=True
-        ),
+        sa.Column("forward_origin", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("media", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column("language_code", sa.String(), nullable=True),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(
             ["user_id"],

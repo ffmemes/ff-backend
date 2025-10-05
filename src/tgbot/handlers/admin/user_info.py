@@ -14,9 +14,7 @@ from src.tgbot.user_info import get_user_info, update_user_info_cache
 DELETE_USER_DATA_CONFIRMATION_CALLBACK = "user_delete_confirm"
 
 
-async def handle_show_user_info(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def handle_show_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await context.bot.send_chat_action(
         chat_id=update.effective_user.id,
         action="typing",
@@ -79,6 +77,4 @@ async def delete_user_data(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     # TODO: "are you sure" button + callback
     await delete_user(update.effective_user.id)
-    await update.effective_user.send_message(
-        "Ciao 👋\n\n --> press /start to try again 👾"
-    )
+    await update.effective_user.send_message("Ciao 👋\n\n --> press /start to try again 👾")

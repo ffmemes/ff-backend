@@ -23,11 +23,7 @@ async def send_tokens_to_reply(update: Update, context: ContextTypes.DEFAULT_TYP
     Explain a tg channel post to the user
     Handle message from channel in a chat
     """
-    if (
-        not update.message
-        or not update.message.text
-        or not update.message.reply_to_message
-    ):
+    if not update.message or not update.message.text or not update.message.reply_to_message:
         return
 
     if not update.message.text[1:].isdigit():
@@ -123,9 +119,7 @@ def get_html_user_tag(u: dict):
     if u.get("username"):
         return "@" + u["username"]
     elif u.get("first_name"):
-        return (
-            f"""<a href="tg://user?id={u["user_id"]}">{escape(u["first_name"])}</a>"""
-        )
+        return f"""<a href="tg://user?id={u["user_id"]}">{escape(u["first_name"])}</a>"""
     else:
         raise Exception(f"Can't tag user: {u}")
 

@@ -2,7 +2,10 @@ import logging
 from math import ceil
 from typing import Any, Optional
 
+from sqlalchemy import text
+
 from src import redis
+from src.database import fetch_all
 from src.recommendations.blender import blend
 from src.recommendations.candidates import (
     CandidatesRetriever,
@@ -10,11 +13,8 @@ from src.recommendations.candidates import (
     get_lr_smoothed,
     get_selected_sources,
 )
-from src.storage.schemas import MemeData
-from sqlalchemy import text
-
-from src.database import fetch_all
 from src.recommendations.utils import exclude_meme_ids_sql_filter
+from src.storage.schemas import MemeData
 from src.tgbot.constants import UserType
 from src.tgbot.user_info import get_user_info
 
@@ -66,9 +66,7 @@ async def generate_cold_start_recommendations(user_id, limit=10):
         )
 
     if len(candidates) == 0:
-        candidates = await get_lr_smoothed(
-            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-        )
+        candidates = await get_lr_smoothed(user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue)
 
     if len(candidates) == 0:
         return

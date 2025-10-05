@@ -29,9 +29,7 @@ async def insert_parsed_posts_from_telegram(
     result = await fetch_all(
         select(meme_raw_telegram.c.post_id)
         .where(meme_raw_telegram.c.meme_source_id == meme_source_id)
-        .where(
-            meme_raw_telegram.c.post_id.in_([post.post_id for post in telegram_posts])
-        )
+        .where(meme_raw_telegram.c.post_id.in_([post.post_id for post in telegram_posts]))
     )
     post_ids_in_db = {row["post_id"] for row in result}
 
@@ -306,8 +304,7 @@ async def update_or_create_memes(transformed_memes, memes_not_in_memes_table):
         await execute(insert(meme).values(create_these_memes))
 
     update_these_memes = [
-        m
-        | {"status": "created" if m["status"] == "broken_content_link" else m["status"]}
+        m | {"status": "created" if m["status"] == "broken_content_link" else m["status"]}
         for m in transformed_memes
         if {"meme_source_id": m["meme_source_id"], "raw_meme_id": m["raw_meme_id"]}
         not in memes_not_in_memes_table

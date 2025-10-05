@@ -3,9 +3,7 @@ from sqlalchemy import text
 from src.database import execute
 
 
-async def calculate_meme_reactions_stats(
-    min_user_reactions=10, min_meme_reactions=3
-) -> None:
+async def calculate_meme_reactions_stats(min_user_reactions=10, min_meme_reactions=3) -> None:
     """
     lr_smoothed algorithm
 

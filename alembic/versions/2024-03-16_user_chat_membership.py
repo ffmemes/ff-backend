@@ -5,8 +5,8 @@ Revises: d881b503c0ae
 Create Date: 2024-03-16 11:09:22.515742
 
 """
-import sqlalchemy as sa
 
+import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -34,9 +34,7 @@ def upgrade() -> None:
             name=op.f("user_tg_chat_membership_user_tg_id_fkey"),
             ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint(
-            "user_tg_id", "chat_id", name=op.f("user_tg_chat_membership_pkey")
-        ),
+        sa.PrimaryKeyConstraint("user_tg_id", "chat_id", name=op.f("user_tg_chat_membership_pkey")),
     )
     # ### end Alembic commands ###
 

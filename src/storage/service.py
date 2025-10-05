@@ -60,9 +60,7 @@ async def update_meme_source(meme_source_id: int, **kwargs) -> dict[str, Any] | 
 
 
 async def update_meme(meme_id: int, **kwargs) -> dict[str, Any] | None:
-    update_query = (
-        meme.update().where(meme.c.id == meme_id).values(**kwargs).returning(meme)
-    )
+    update_query = meme.update().where(meme.c.id == meme_id).values(**kwargs).returning(meme)
     return await fetch_one(update_query)
 
 

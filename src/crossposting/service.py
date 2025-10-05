@@ -8,9 +8,7 @@ from src.database import crossposting, execute, fetch_one
 
 
 async def log_meme_sent(meme_id: int, channel: Channel) -> None:
-    insert_statement = insert(crossposting).values(
-        meme_id=meme_id, channel=channel.value
-    )
+    insert_statement = insert(crossposting).values(meme_id=meme_id, channel=channel.value)
 
     await execute(insert_statement)
 

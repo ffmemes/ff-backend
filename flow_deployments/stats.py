@@ -22,9 +22,7 @@ deployment_user_meme_source_stats = Deployment.build_from_flow(
     name="Calculate user_meme_source_stats",
     work_pool_name=settings.ENVIRONMENT,
     schedules=[
-        CronSchedule(
-            cron="3,8,13,18,23,28,33,38,43,48,53,58 * * * *", timezone="Europe/London"
-        )
+        CronSchedule(cron="3,8,13,18,23,28,33,38,43,48,53,58 * * * *", timezone="Europe/London")
     ],
 )
 

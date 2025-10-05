@@ -14,9 +14,7 @@ from src.tgbot.service import update_user
 from src.tgbot.user_info import get_user_info, update_user_info_cache
 
 
-async def handle_waitlist_invite(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def handle_waitlist_invite(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends you the meme by it's id"""
     user = await get_user_info(update.effective_user.id)
     if user["type"] != UserType.ADMIN:

@@ -27,9 +27,7 @@ from src.tgbot.service import (
 from src.tgbot.user_info import update_user_info_cache
 
 
-async def save_user_data(
-    user_id: int, update: Update, deep_link: str | None
-) -> tuple[dict, bool]:
+async def save_user_data(user_id: int, update: Update, deep_link: str | None) -> tuple[dict, bool]:
     tg_user = await get_tg_user_by_id(user_id)
     language_code = update.effective_user.language_code
 

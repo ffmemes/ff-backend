@@ -1,4 +1,3 @@
-
 import asyncio
 
 import pytest
@@ -12,8 +11,8 @@ async def test_add_memes_to_queue_by_key_ok():
     queue_key = redis.get_meme_queue_key(user_id)
 
     memes = [
-        {'id': 1, 'recommended_by': 'best_algo'},
-        {'id': 2, 'recommended_by': 'best_algo'},
+        {"id": 1, "recommended_by": "best_algo"},
+        {"id": 2, "recommended_by": "best_algo"},
     ]
 
     await redis.add_memes_to_queue_by_key(queue_key, memes, expire=1)

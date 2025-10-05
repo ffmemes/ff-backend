@@ -10,9 +10,7 @@ from src.tgbot.constants import UserType
 from src.tgbot.user_info import get_user_info
 
 
-async def handle_broadcast_text_ru(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def handle_broadcast_text_ru(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Receives a forward from tgchannelru
     And forwards it to all users who

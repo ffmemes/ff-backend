@@ -3,16 +3,6 @@ line-length = 100
 src = ["src"]
 target-version = "py311"
 
-# Enable only style-related checks by default.
-select = [
-    # Pycodestyle
-    "E",
-    "W",
-    # isort
-    "I001",
-]
-ignore = []
-
 # Exclude a variety of commonly ignored directories.
 exclude = [
     ".bzr",
@@ -36,20 +26,12 @@ exclude = [
     "venv",
 ]
 
-# Allow unused variables when underscore-prefixed.
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-
-[tool.ruff.mccabe]
-# Unlike Flake8, default to a complexity level of 10.
-max-complexity = 10
-
-[tool.ruff.isort]
-known-first-party = ["src"]
-
 [tool.ruff.lint]
 select = [
+    # Pycodestyle
     "E",
     "W",
+    # isort
     "I001",
 ]
 ignore = []

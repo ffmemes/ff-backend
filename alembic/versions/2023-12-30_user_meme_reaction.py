@@ -5,8 +5,8 @@ Revises: 5fd5afd414e8
 Create Date: 2023-12-30 20:14:00.158675
 
 """
-import sqlalchemy as sa
 
+import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -23,9 +23,7 @@ def upgrade() -> None:
         sa.Column("user_id", sa.BigInteger(), nullable=False),
         sa.Column("meme_id", sa.Integer(), nullable=False),
         sa.Column("recommended_by", sa.String(), nullable=False),
-        sa.Column(
-            "sent_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("sent_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.Column("reaction_id", sa.Integer(), nullable=True),
         sa.Column("reacted_at", sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(
@@ -40,9 +38,7 @@ def upgrade() -> None:
             name=op.f("user_meme_reaction_user_id_fkey"),
             ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint(
-            "user_id", "meme_id", name=op.f("user_meme_reaction_pkey")
-        ),
+        sa.PrimaryKeyConstraint("user_id", "meme_id", name=op.f("user_meme_reaction_pkey")),
     )
     # ### end Alembic commands ###
 

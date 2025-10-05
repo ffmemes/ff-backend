@@ -106,12 +106,8 @@ def draw_corner_watermark(
         font = check_font(fonts_files_dir, font_family, base, width_ratio)
         text_bbox = d.textbbox((0, 0), text, font=font)
         text_position, text_colour = find_least_detailed_corner(base, text_bbox, margin)
-        outline_colour = (
-            (0, 0, 0, 255) if text_colour == (255, 255, 255) else (255, 255, 255, 255)
-        )
-        draw_text_with_outline(
-            d, text_position, text, font, text_colour, outline_colour
-        )
+        outline_colour = (0, 0, 0, 255) if text_colour == (255, 255, 255) else (255, 255, 255, 255)
+        draw_text_with_outline(d, text_position, text, font, text_colour, outline_colour)
         # text opacity
         txt.putalpha(txt.getchannel("A").point(lambda x: x * text_opacity))
         return Image.alpha_composite(base, txt).convert("RGB")

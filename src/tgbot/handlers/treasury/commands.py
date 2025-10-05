@@ -24,9 +24,7 @@ from src.tgbot.user_info import update_user_info_cache
 
 
 # command: /b / /balance
-async def handle_show_balance(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def handle_show_balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     balance = await get_user_balance(update.effective_user.id)
 
     reply_markup = InlineKeyboardMarkup(
@@ -34,25 +32,19 @@ async def handle_show_balance(
             [
                 InlineKeyboardButton(
                     "buy 100 🍔",
-                    callback_data=PURCHASE_TOKEN_CALLBACK_DATA_PATTERN.format(
-                        tokens_to_buy=100
-                    ),
+                    callback_data=PURCHASE_TOKEN_CALLBACK_DATA_PATTERN.format(tokens_to_buy=100),
                 ),
             ],
             [
                 InlineKeyboardButton(
                     "buy 1000 🍔",
-                    callback_data=PURCHASE_TOKEN_CALLBACK_DATA_PATTERN.format(
-                        tokens_to_buy=1000
-                    ),
+                    callback_data=PURCHASE_TOKEN_CALLBACK_DATA_PATTERN.format(tokens_to_buy=1000),
                 ),
             ],
             [
                 InlineKeyboardButton(
                     "buy 10000 🍔",
-                    callback_data=PURCHASE_TOKEN_CALLBACK_DATA_PATTERN.format(
-                        tokens_to_buy=10000
-                    ),
+                    callback_data=PURCHASE_TOKEN_CALLBACK_DATA_PATTERN.format(tokens_to_buy=10000),
                 ),
             ],
         ]
@@ -72,9 +64,7 @@ Get more 🍔: /kitchen
 
 # command: /kitchen
 # shows all possible ways to earn / to mine 🍔
-async def handle_show_kitchen(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def handle_show_kitchen(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends you the meme by it's id"""
     await update.message.reply_text(
         f"""
@@ -108,9 +98,7 @@ Soon:
 
 
 # command: /leaderboard /l
-async def handle_show_leaderbaord(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def handle_show_leaderbaord(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     emoji = get_random_emoji()
     leaderboard = await get_leaderboard()
 
@@ -139,9 +127,7 @@ You:
 /kitchen /uploads /chat
         """
         else:
-            LEADERBOARD_TEXT += (
-                "\nTo see your place in the leaderboard, set your /nickname ⬅️\n\n"
-            )
+            LEADERBOARD_TEXT += "\nTo see your place in the leaderboard, set your /nickname ⬅️\n\n"
 
     return await update.message.reply_text(
         LEADERBOARD_TEXT,
@@ -150,9 +136,7 @@ You:
     )
 
 
-async def handle_change_nickname(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def handle_change_nickname(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if len(context.args) == 0:
         return await update.message.reply_text(
             """
@@ -167,9 +151,7 @@ To update your public nickname, use the following command:
 
     nickname = context.args[0].strip()
     if len(nickname) > 32:
-        return await update.message.reply_text(
-            "Nickname should be less than 32 characters 🤷‍♂️"
-        )
+        return await update.message.reply_text("Nickname should be less than 32 characters 🤷‍♂️")
 
     stop_characters = ["<", ">"]
     for stop_c in stop_characters:

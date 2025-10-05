@@ -153,9 +153,7 @@ async def test_generate_above_100():
             "lr_smoothed": get_lr_smoothed,
         }
 
-    candidates = await generate_recommendations(
-        1, 10, 200, TestRetriever(), random_seed=102
-    )
+    candidates = await generate_recommendations(1, 10, 200, TestRetriever(), random_seed=102)
     assert len(candidates) == 10
     assert candidates[0]["id"] in [7, 8, 9, 10]
 

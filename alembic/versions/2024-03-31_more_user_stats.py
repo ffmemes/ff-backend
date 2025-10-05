@@ -5,8 +5,8 @@ Revises: 79a270a02fd1
 Create Date: 2024-03-31 12:30:18.118101
 
 """
-import sqlalchemy as sa
 
+import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -22,12 +22,8 @@ def upgrade() -> None:
         "user_stats",
         sa.Column("time_spent_sec", sa.Integer(), server_default="0", nullable=False),
     )
-    op.add_column(
-        "user_stats", sa.Column("first_reaction_at", sa.DateTime(), nullable=True)
-    )
-    op.add_column(
-        "user_stats", sa.Column("last_reaction_at", sa.DateTime(), nullable=True)
-    )
+    op.add_column("user_stats", sa.Column("first_reaction_at", sa.DateTime(), nullable=True))
+    op.add_column("user_stats", sa.Column("last_reaction_at", sa.DateTime(), nullable=True))
     op.add_column(
         "user_stats",
         sa.Column("invited_users", sa.Integer(), server_default="0", nullable=False),

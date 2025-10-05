@@ -120,16 +120,16 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
     channel_text = f"""
 🏆 <code>ТОП-5 загруженных мемов недели</code>
 
-🥇 - {top_memes[0]["nickname"] or '???'}
-🥈 - {top_memes[1]["nickname"] or '???'}
-🥉 - {top_memes[2]["nickname"] or '???'}
-🏅 - {top_memes[3]["nickname"] or '???'}
-🏅 - {top_memes[4]["nickname"] or '???'}
+🥇 - {top_memes[0]["nickname"] or "???"}
+🥈 - {top_memes[1]["nickname"] or "???"}
+🥉 - {top_memes[2]["nickname"] or "???"}
+🏅 - {top_memes[3]["nickname"] or "???"}
+🏅 - {top_memes[4]["nickname"] or "???"}
 
 📥 Загружено мемов: <b>{nuploaded}</b>
 👤 Пользователями: <b>{nusers}</b>
 👁️ Просмотры: <b>{views}</b>
-👍 Доля лайков: <b>{round(likes * 100. / (likes + dislikes))}%</b>
+👍 Доля лайков: <b>{round(likes * 100.0 / (likes + dislikes))}%</b>
 
 Перешли топ мем в бота → <a href="https://t.me/ffmemesbot?start=kitchen">выиграй до 500 🍔</a>
     """  # noqa
@@ -233,16 +233,16 @@ async def reward_en_users_for_weekly_top_uploaded_memes():
     channel_text = f"""
 🏆 <code>Best uploaded memes of a week</code>
 
-🥇 - {top_memes[0]["nickname"] or '???'}
-🥈 - {top_memes[1]["nickname"] or '???'}
-🥉 - {top_memes[2]["nickname"] or '???'}
-🏅 - {top_memes[3]["nickname"] or '???'}
-🏅 - {top_memes[4]["nickname"] or '???'}
+🥇 - {top_memes[0]["nickname"] or "???"}
+🥈 - {top_memes[1]["nickname"] or "???"}
+🥉 - {top_memes[2]["nickname"] or "???"}
+🏅 - {top_memes[3]["nickname"] or "???"}
+🏅 - {top_memes[4]["nickname"] or "???"}
 
 📥 uploaded memes: <b>{nuploaded}</b>
 👤 by users: <b>{nusers}</b>
 👁️ views: <b>{views}</b>
-👍 like %: <b>{round(likes * 100. / (likes + dislikes))}%</b>
+👍 like %: <b>{round(likes * 100.0 / (likes + dislikes))}%</b>
 
 Forward top meme to our bot → <a href="https://t.me/ffmemesbot?start=kitchen">win up to 500 🍔</a>
     """  # noqa

@@ -5,8 +5,8 @@ Revises: b845d8e244f5
 Create Date: 2024-02-24 15:04:20.927744
 
 """
-import sqlalchemy as sa
 
+import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -22,9 +22,7 @@ def upgrade() -> None:
         "crossposting",
         sa.Column("channel", sa.String(), nullable=False),
         sa.Column("meme_id", sa.Integer(), nullable=False),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.ForeignKeyConstraint(
             ["meme_id"],
             ["meme.id"],

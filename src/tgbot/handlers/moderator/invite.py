@@ -21,7 +21,6 @@ from src.tgbot.service import (
 )
 from src.tgbot.user_info import update_user_info_cache
 
-
 INVITE_MESSAGE_TEMPLATE = (
     "🥳 Ты посмотрел {nmemes_sent} мемов! Нам очень нужна помощь модераторов "
     "в русской ленте Fast Food & Memes. Нажми кнопку ниже, чтобы получить "

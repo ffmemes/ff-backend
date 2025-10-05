@@ -27,9 +27,7 @@ class VkGroupScraper(Scraper):
         self.VK_TOKEN = settings.VK_TOKEN
         self.base_url = "https://api.vk.com/method/wall.get?access_token={vk_token}&v={v}&domain={domain}&count=100&offset={offset}"
 
-    async def get_items(
-        self, num_of_posts: Optional[int] = None
-    ) -> list[VkGroupPostParsingResult]:
+    async def get_items(self, num_of_posts: Optional[int] = None) -> list[VkGroupPostParsingResult]:
         logger.info(f"Going to parse VK: {self.source_link}")
         vk_source = _extract_username_from_url(self.source_link)
         self.vk_source_link = "https://vk.com/%s" % vk_source
@@ -65,9 +63,7 @@ class VkGroupScraper(Scraper):
             logger.error("Can't parse vk without VK_TOKEN")
             return None
         req = await self._request(
-            self.base_url.format(
-                vk_token=self.VK_TOKEN, v="5.92", domain=vk_source, offset=offset
-            )
+            self.base_url.format(vk_token=self.VK_TOKEN, v="5.92", domain=vk_source, offset=offset)
         )
         if req.status_code != 200:
             raise ScraperException(f"Got status code {req.status_code}")
@@ -89,7 +85,7 @@ class VkGroupScraper(Scraper):
 
         images = get_best_img(post)
         return VkGroupPostParsingResult(
-            post_id=f'{post["from_id"]}_{post["id"]}',
+            post_id=f"{post['from_id']}_{post['id']}",
             content=post["text"],
             date=datetime.datetime.fromtimestamp(post["date"]),
             media=images,

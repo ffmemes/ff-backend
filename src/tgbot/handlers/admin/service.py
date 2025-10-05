@@ -23,24 +23,16 @@ from src.tgbot.constants import UserType
 async def delete_user(user_id: int) -> None:
     await execute(user.delete().where(user.c.id == user_id))
     await execute(user_tg.delete().where(user_tg.c.id == user_id))
+    await execute(user_meme_reaction.delete().where(user_meme_reaction.c.user_id == user_id))
     await execute(
-        user_meme_reaction.delete().where(user_meme_reaction.c.user_id == user_id)
-    )
-    await execute(
-        user_meme_source_stats.delete().where(
-            user_meme_source_stats.c.user_id == user_id
-        )
+        user_meme_source_stats.delete().where(user_meme_source_stats.c.user_id == user_id)
     )
     await execute(user_language.delete().where(user_language.c.user_id == user_id))
     await execute(user_stats.delete().where(user_stats.c.user_id == user_id))
     await execute(
-        user_tg_chat_membership.delete().where(
-            user_tg_chat_membership.c.user_tg_id == user_id
-        )
+        user_tg_chat_membership.delete().where(user_tg_chat_membership.c.user_tg_id == user_id)
     )
-    await execute(
-        user_deep_link_log.delete().where(user_deep_link_log.c.user_id == user_id)
-    )
+    await execute(user_deep_link_log.delete().where(user_deep_link_log.c.user_id == user_id))
     await execute(user_popup_logs.delete().where(user_popup_logs.c.user_id == user_id))
 
 

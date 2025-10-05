@@ -1,7 +1,6 @@
 import logging
 
 import redis.asyncio as aioredis
-
 from src import localizer, redis
 from src.config import settings
 from src.tgbot import app
@@ -18,7 +17,7 @@ if __name__ == "__main__":
     pool = aioredis.ConnectionPool.from_url(
         str(settings.REDIS_URL),
         max_connections=settings.REDIS_MAX_CONNECTIONS,
-        decode_responses=True
+        decode_responses=True,
     )
     redis.redis_client = aioredis.Redis(connection_pool=pool)
 

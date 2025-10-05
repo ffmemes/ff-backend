@@ -71,4 +71,4 @@ class Scraper:
                 await asyncio.sleep(sleep_time)
         msg = f"{self._retries + 1} requests to {url} failed, giving up."
         logger.fatal(msg)
-        logger.fatal(f'Errors: {", ".join(errors)}')
+        logger.fatal(f"Errors: {', '.join(errors)}")

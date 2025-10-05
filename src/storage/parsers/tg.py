@@ -31,9 +31,7 @@ class TelegramChannelScraper(Scraper):
         self.base_url = "https://t.me"
 
     async def _initial_page(self):
-        req = await self._request(
-            f"{self.base_url}/s/{self._name}", headers=self._headers
-        )
+        req = await self._request(f"{self.base_url}/s/{self._name}", headers=self._headers)
         if req.status_code != 200:
             raise ScraperException(f"Got status code {req.status_code}")
         r = await req.aread()
@@ -58,32 +56,22 @@ class TelegramChannelScraper(Scraper):
             )
         for _ in range(total_posts // 10):
             raw_posts.extend(
-                soup.find_all(
-                    "div", attrs={"class": "tgme_widget_message", "data-post": True}
-                )
+                soup.find_all("div", attrs={"class": "tgme_widget_message", "data-post": True})
             )
-            page_link = soup.find(
-                "a", attrs={"class": "tme_messages_more", "data-before": True}
-            )
+            page_link = soup.find("a", attrs={"class": "tme_messages_more", "data-before": True})
             if not page_link:
                 if "=" not in next_page_url:
-                    next_page_url = soup.find(
-                        "link", attrs={"rel": "canonical"}, href=True
-                    )["href"]
+                    next_page_url = soup.find("link", attrs={"rel": "canonical"}, href=True)["href"]
                 next_post_index = int(next_page_url.split("=")[-1]) - 20
                 if next_post_index > 20:
-                    page_link = {
-                        "href": next_page_url.split("=")[0] + f"={next_post_index}"
-                    }
+                    page_link = {"href": next_page_url.split("=")[0] + f"={next_post_index}"}
                 else:
                     break
             next_page_url = urllib.parse.urljoin(self.base_url, page_link["href"])
             req = await self._request(next_page_url, headers=self._headers)
             r = await req.aread()
             if req.status_code != 200:
-                logger.fatal(
-                    f"Status: {req.status_code}. Got {len(raw_posts)} / {total_posts}."
-                )
+                logger.fatal(f"Status: {req.status_code}. Got {len(raw_posts)} / {total_posts}.")
                 break
             soup = bs4.BeautifulSoup(r.decode("utf-8"), "lxml")
         raw_posts = reversed(raw_posts)
@@ -128,9 +116,7 @@ class TelegramChannelScraper(Scraper):
         forwarded = None
         forwarded_url = None
 
-        if forward_tag := post.find(
-            "a", class_="tgme_widget_message_forwarded_from_name"
-        ):
+        if forward_tag := post.find("a", class_="tgme_widget_message_forwarded_from_name"):
             forwarded_url = forward_tag["href"]
             forwarded_name = forwarded_url.split("t.me/")[1].split("/")[0]
             forwarded = {"username": forwarded_name}
@@ -175,9 +161,7 @@ class TelegramChannelScraper(Scraper):
             if (href not in outlinks) and (href != raw_url) and (href != forwarded_url):
                 outlinks.append(href)
 
-        for videoplayer in post.find_all(
-            "a", {"class": "tgme_widget_message_video_player"}
-        ):
+        for videoplayer in post.find_all("a", {"class": "tgme_widget_message_video_player"}):
             itag = videoplayer.find("i")
             if itag is None:
                 video_url = None
@@ -194,33 +178,23 @@ class TelegramChannelScraper(Scraper):
             }
             time_tag = videoplayer.find("time")
             if time_tag is not None:
-                video_data["duration"] = _duration_str_to_seconds(
-                    videoplayer.find("time").text
-                )
+                video_data["duration"] = _duration_str_to_seconds(videoplayer.find("time").text)
 
             media.append(video_data)
 
         link_preview = {}
         if link_preview_a := post.find("a", class_="tgme_widget_message_link_preview"):
             link_preview = {}
-            link_preview["href"] = urllib.parse.urljoin(
-                self.base_url, link_preview_a["href"]
-            )
-            if site_name_div := link_preview_a.find(
-                "div", class_="link_preview_site_name"
-            ):
+            link_preview["href"] = urllib.parse.urljoin(self.base_url, link_preview_a["href"])
+            if site_name_div := link_preview_a.find("div", class_="link_preview_site_name"):
                 link_preview["siteName"] = site_name_div.text
             if title_div := link_preview_a.find("div", class_="link_preview_title"):
                 link_preview["title"] = title_div.text
-            if description_div := link_preview_a.find(
-                "div", class_="link_preview_description"
-            ):
+            if description_div := link_preview_a.find("div", class_="link_preview_description"):
                 link_preview["description"] = description_div.text
             if image_i := link_preview_a.find("i", class_="link_preview_image"):
                 if image_i["style"].startswith("background-image:url('"):
-                    link_preview["image"] = image_i["style"][
-                        22 : image_i["style"].index("'", 22)
-                    ]
+                    link_preview["image"] = image_i["style"][22 : image_i["style"].index("'", 22)]
                 else:
                     logger.warning(f"Could not process link preview image on {url}")
             if link_preview["href"] in outlinks:
@@ -247,9 +221,7 @@ class TelegramChannelScraper(Scraper):
 
 def _duration_str_to_seconds(duration_str: str):
     duration_list = duration_str.split(":")
-    return sum(
-        [int(s) * int(g) for s, g in zip([1, 60, 3600], reversed(duration_list))]
-    )
+    return sum([int(s) * int(g) for s, g in zip([1, 60, 3600], reversed(duration_list))])
 
 
 def _parse_num(s: str):

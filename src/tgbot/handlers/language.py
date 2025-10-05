@@ -38,9 +38,7 @@ async def init_user_languages_from_tg_user(tg_user: User):
     if len(set(tg_user.full_name) & set(RUSSIAN_ALPHABET)) > 0:
         languages_to_add.add("ru")
 
-    languages_to_add.add(
-        "ru" if tg_user.language_code in localizer.ALMOST_CIS_LANGUAGES else "en"
-    )
+    languages_to_add.add("ru" if tg_user.language_code in localizer.ALMOST_CIS_LANGUAGES else "en")
 
     if tg_user.language_code:
         languages_to_add.add(tg_user.language_code)
@@ -48,9 +46,7 @@ async def init_user_languages_from_tg_user(tg_user: User):
     await add_user_languages(tg_user.id, languages_to_add)
 
 
-def create_language_button(
-    lang: str, lang_text: str, is_selected: bool
-) -> InlineKeyboardButton:
+def create_language_button(lang: str, lang_text: str, is_selected: bool) -> InlineKeyboardButton:
     """Create a language selection button."""
     if is_selected:
         callback_data = f"l:{lang}:del"
@@ -62,18 +58,14 @@ def create_language_button(
     return InlineKeyboardButton(button_text, callback_data=callback_data)
 
 
-def create_language_keyboard(
-    user_languages: set, interface_lang: str
-) -> InlineKeyboardMarkup:
+def create_language_keyboard(user_languages: set, interface_lang: str) -> InlineKeyboardMarkup:
     """Create the language selection keyboard."""
     all_lang_buttons = [
         create_language_button(lang, lang_text, lang in user_languages)
         for lang, lang_text in SUPPORTED_MEME_LANGUAGES.items()
     ]
 
-    lang_keyboard = [
-        all_lang_buttons[i : i + 2] for i in range(0, len(all_lang_buttons), 2)
-    ]
+    lang_keyboard = [all_lang_buttons[i : i + 2] for i in range(0, len(all_lang_buttons), 2)]
 
     if user_languages & set(SUPPORTED_MEME_LANGUAGES):
         end_button = InlineKeyboardButton(
@@ -95,9 +87,7 @@ async def handle_language_settings(
 
     keyboard = create_language_keyboard(user_languages, user_info["interface_lang"])
 
-    message_text = localizer.t(
-        "onboarding.language_settings", user_info["interface_lang"]
-    )
+    message_text = localizer.t("onboarding.language_settings", user_info["interface_lang"])
     send_message_kwargs = {
         "text": message_text,
         "parse_mode": ParseMode.HTML,

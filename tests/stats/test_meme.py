@@ -21,9 +21,7 @@ from src.stats.meme import calculate_meme_reactions_stats
 @pytest_asyncio.fixture()
 async def conn():
     async with engine.connect() as conn:
-        await conn.execute(
-            insert(user), [{"id": 1, "type": "user"}, {"id": 2, "type": "user"}]
-        )
+        await conn.execute(insert(user), [{"id": 1, "type": "user"}, {"id": 2, "type": "user"}])
         await conn.execute(
             insert(meme_source),
             {
@@ -47,10 +45,7 @@ async def conn():
         meme_ids = [1, 2, 3, 4, 5, 6]
         await conn.execute(
             insert(meme),
-            [
-                {"id": meme_id, "raw_meme_id": meme_id, **meme_common}
-                for meme_id in meme_ids
-            ],
+            [{"id": meme_id, "raw_meme_id": meme_id, **meme_common} for meme_id in meme_ids],
         )
 
         u_common = {"language_code": "ru", "created_at": datetime(2024, 1, 1)}

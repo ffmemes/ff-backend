@@ -1,5 +1,5 @@
 """
-    Additional layer of control for treasury payments
+Additional layer of control for treasury payments
 """
 
 import asyncio
@@ -69,9 +69,7 @@ async def mint_tokens(
     amount: int,
     external_id: str,
 ):
-    if await check_if_treasury_trx_exists(
-        user_id, TrxType.PURCHASE_TOKEN, external_id=external_id
-    ):
+    if await check_if_treasury_trx_exists(user_id, TrxType.PURCHASE_TOKEN, external_id=external_id):
         return
 
     _ = await create_treasury_trx(
@@ -108,9 +106,7 @@ async def pay_if_not_paid_with_alert(
 
         # ruff: noqa
         asyncio.create_task(
-            log(
-                f"💳 {user_name}/{user_id}: +{PAYOUTS[type]} 🍔 for {TRX_TYPE_DESCRIPTIONS[type]}"
-            )
+            log(f"💳 {user_name}/{user_id}: +{PAYOUTS[type]} 🍔 for {TRX_TYPE_DESCRIPTIONS[type]}")
         )
 
     return res

@@ -5,10 +5,10 @@ Revises: 4a4b3b418d3b
 Create Date: 2023-12-28 12:19:04.443577
 
 """
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
+import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "2db6d161b5e9"
@@ -31,9 +31,7 @@ def upgrade() -> None:
         sa.Column("language_code", sa.String(), nullable=True),
         sa.Column("ocr_result", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("duplicate_of", sa.Integer(), nullable=True),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(
             ["duplicate_of"],
@@ -54,9 +52,7 @@ def upgrade() -> None:
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("meme_pkey")),
-        sa.UniqueConstraint(
-            "meme_source_id", "raw_meme_id", name="meme_source_id_raw_meme_id_key"
-        ),
+        sa.UniqueConstraint("meme_source_id", "raw_meme_id", name="meme_source_id_raw_meme_id_key"),
     )
     op.create_index(op.f("meme_raw_meme_id_idx"), "meme", ["raw_meme_id"], unique=False)
     # ### end Alembic commands ###

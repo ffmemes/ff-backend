@@ -5,8 +5,8 @@ Revises: deda3740d7bf
 Create Date: 2024-05-26 15:26:47.164974
 
 """
-import sqlalchemy as sa
 
+import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -25,9 +25,7 @@ def upgrade() -> None:
         sa.Column("type", sa.String(), nullable=False),
         sa.Column("amount", sa.Integer(), nullable=False),
         sa.Column("external_id", sa.String(), nullable=True),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.ForeignKeyConstraint(
             ["user_id"],
             ["user.id"],
@@ -36,13 +34,9 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("treasury_trx_pkey")),
     )
-    op.create_index(
-        op.f("treasury_trx_type_idx"), "treasury_trx", ["type"], unique=False
-    )
+    op.create_index(op.f("treasury_trx_type_idx"), "treasury_trx", ["type"], unique=False)
     op.add_column("user", sa.Column("nickname", sa.String(), nullable=True))
-    op.add_column(
-        "user", sa.Column("balance", sa.Integer(), server_default="0", nullable=False)
-    )
+    op.add_column("user", sa.Column("balance", sa.Integer(), server_default="0", nullable=False))
     # ### end Alembic commands ###
 
 

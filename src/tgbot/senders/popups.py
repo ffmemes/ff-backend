@@ -19,9 +19,7 @@ def _get_popup(popup_id: str, user_info: dict) -> Popup:
                 [
                     InlineKeyboardButton(
                         get_random_emoji() * 3,
-                        callback_data=POPUP_BUTTON_CALLBACK_DATA_PATTERN.format(
-                            popup_id=popup_id
-                        ),
+                        callback_data=POPUP_BUTTON_CALLBACK_DATA_PATTERN.format(popup_id=popup_id),
                     )
                 ]
             ]

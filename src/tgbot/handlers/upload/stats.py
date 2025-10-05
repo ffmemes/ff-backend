@@ -1,10 +1,9 @@
 """
-    a command /uploads shows latest uploaded memes with stats:
-    - views, likes, like%
+a command /uploads shows latest uploaded memes with stats:
+- views, likes, like%
 
-    and total stats across all uploaded memes
+and total stats across all uploaded memes
 """
-
 
 from telegram import (
     InputMediaPhoto,
@@ -21,9 +20,7 @@ from src.tgbot.handlers.upload.service import (
 )
 
 
-async def handle_uploaded_memes_stats(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def handle_uploaded_memes_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Shows stats for uploaded memes"""
     # user_info = await get_user_info(update.effective_user.id)
 

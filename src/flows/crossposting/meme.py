@@ -140,9 +140,7 @@ async def post_meme_to_tgchannelen():
     next_meme = MemeData(**meme_data)
     logger.info(f"Next meme for TG Channel EN: {next_meme.id}")
 
-    next_meme.caption = _get_en_caption_for_crossposting_meme(
-        next_meme, Channel.TG_CHANNEL_EN
-    )
+    next_meme.caption = _get_en_caption_for_crossposting_meme(next_meme, Channel.TG_CHANNEL_EN)
     msg = await send_new_message_with_meme(
         bot, TELEGRAM_CHANNEL_EN_CHAT_ID, next_meme, reply_markup=None
     )
@@ -152,9 +150,7 @@ async def post_meme_to_tgchannelen():
 
     uploader_user_id = await get_meme_uploader_user_id(next_meme.id)
     if uploader_user_id:
-        balance = await pay_if_not_paid(
-            uploader_user_id, TrxType.MEME_PUBLISHED, next_meme.id
-        )
+        balance = await pay_if_not_paid(uploader_user_id, TrxType.MEME_PUBLISHED, next_meme.id)
         if balance:
             link = TELEGRAM_CHANNEL_EN_LINK + "/" + str(msg.message_id)
             await bot.send_message(
@@ -175,9 +171,7 @@ async def post_meme_to_tgchannelru():
     next_meme = MemeData(**meme_data)
     logger.info(f"Next meme for TG Channel RU: {next_meme.id}")
 
-    next_meme.caption = _get_ru_caption_for_crossposting_meme(
-        next_meme, Channel.TG_CHANNEL_RU
-    )
+    next_meme.caption = _get_ru_caption_for_crossposting_meme(next_meme, Channel.TG_CHANNEL_RU)
 
     msg = await send_new_message_with_meme(
         bot, TELEGRAM_CHANNEL_RU_CHAT_ID, next_meme, reply_markup=None
@@ -188,9 +182,7 @@ async def post_meme_to_tgchannelru():
 
     uploader_user_id = await get_meme_uploader_user_id(next_meme.id)
     if uploader_user_id:
-        balance = await pay_if_not_paid(
-            uploader_user_id, TrxType.MEME_PUBLISHED, next_meme.id
-        )
+        balance = await pay_if_not_paid(uploader_user_id, TrxType.MEME_PUBLISHED, next_meme.id)
         if balance:
             link = TELEGRAM_CHANNEL_RU_LINK + "/" + str(msg.message_id)
             await bot.send_message(

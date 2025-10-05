@@ -32,8 +32,7 @@ async def explain_meme_ru(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # check that the meme was sent by our bot or the correct user
 
     our_channel = (
-        update.message.sender_chat
-        and update.message.sender_chat.id == TELEGRAM_CHANNEL_RU_CHAT_ID
+        update.message.sender_chat and update.message.sender_chat.id == TELEGRAM_CHANNEL_RU_CHAT_ID
     )
     if our_channel:
         return await generate_and_send_meme_explanation(update.message)
@@ -46,9 +45,7 @@ async def explain_meme_ru(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not active_in_bot:
         # await update.message.set_reaction(reaction=)
 
-        return await update.message.reply_text(
-            "🙈 Не вижу тебя в боте. Надо зайти -> @ffmemesbot"
-        )
+        return await update.message.reply_text("🙈 Не вижу тебя в боте. Надо зайти -> @ffmemesbot")
 
     # check that user subscribed to a channel
     subscribed_to_channel = await check_if_user_chat_member(
@@ -81,9 +78,7 @@ async def generate_and_send_meme_explanation(message: Message):
     if message.reply_to_message:
         text = message.reply_to_message.text
         if text and len(text) > 3:
-            prompt += (
-                f"Эту картинку прислали в ответ на сообщение с таким текстом: '{text}'"
-            )
+            prompt += f"Эту картинку прислали в ответ на сообщение с таким текстом: '{text}'"
 
     vision_result = await call_chatgpt_vision(image_bytes, prompt)
 

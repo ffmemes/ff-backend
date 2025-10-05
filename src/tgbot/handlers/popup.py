@@ -1,6 +1,7 @@
 """
-    Handle reactions on sent memes
+Handle reactions on sent memes
 """
+
 import asyncio
 
 from telegram import Update

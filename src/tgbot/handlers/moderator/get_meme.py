@@ -1,5 +1,5 @@
 """
-    Handle /meme <meme_id> admin/mod command
+Handle /meme <meme_id> admin/mod command
 """
 
 import asyncio
@@ -41,7 +41,7 @@ async def send_meme_info(bot: Bot, update: Update, meme_id: int):
         await update.message.reply_text(
             f"""
 Meme #{meme_id} wasn't uploaded to telegram.
-Status: {meme_data['status']}
+Status: {meme_data["status"]}
         """
         )
         return
@@ -67,11 +67,11 @@ Meme #{meme_id}
     if meme_stats:
         info += f"""
 Stats:
-- likes: {meme_stats['nlikes']}
-- dislikes: {meme_stats['ndislikes']}
-- sent times: {meme_stats['nmemes_sent']}
-- age days: {meme_stats['age_days']}
-- rank in source: {meme_stats['raw_impr_rank']}/4
+- likes: {meme_stats["nlikes"]}
+- dislikes: {meme_stats["ndislikes"]}
+- sent times: {meme_stats["nmemes_sent"]}
+- age days: {meme_stats["age_days"]}
+- rank in source: {meme_stats["raw_impr_rank"]}/4
 """
 
     meme_data["caption"] = info
@@ -110,9 +110,7 @@ async def handle_get_meme(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if len(meme_ids) == 1:
         return await send_meme_info(context.bot, update, meme_ids[0])
 
-    memes_data = await asyncio.gather(
-        *[get_meme_by_id(meme_id) for meme_id in meme_ids]
-    )
+    memes_data = await asyncio.gather(*[get_meme_by_id(meme_id) for meme_id in meme_ids])
     memes = [
         MemeData(**meme)
         for meme in memes_data

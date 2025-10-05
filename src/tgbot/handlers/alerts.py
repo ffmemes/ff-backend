@@ -1,5 +1,5 @@
 """
-    Handle old callback queries from old bot version
+Handle old callback queries from old bot version
 """
 
 import random
@@ -15,9 +15,7 @@ from src.tgbot.senders.next_message import next_message
 
 
 # callback_data: MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA
-async def handle_empty_meme_queue_alert(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def handle_empty_meme_queue_alert(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     emoji = random.choice(LOADING_EMOJIS)
     await update.callback_query.answer(emoji)
 

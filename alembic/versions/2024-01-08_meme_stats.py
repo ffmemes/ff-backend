@@ -5,10 +5,10 @@ Revises: e49c184f5f54
 Create Date: 2024-01-08 20:31:56.316058
 
 """
+
 from datetime import datetime
 
 import sqlalchemy as sa
-
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -27,9 +27,7 @@ def upgrade() -> None:
         sa.Column("ndislikes", sa.Integer(), server_default="0", nullable=False),
         sa.Column("nmemes_sent", sa.Integer(), server_default="0", nullable=False),
         sa.Column("age_days", sa.Integer(), server_default="0", nullable=False),
-        sa.Column(
-            "updated_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("updated_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.ForeignKeyConstraint(
             ["meme_id"],
             ["meme.id"],

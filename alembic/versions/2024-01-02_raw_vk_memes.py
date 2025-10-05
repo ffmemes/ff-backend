@@ -5,10 +5,10 @@ Revises: 163eaed85741
 Create Date: 2024-01-02 15:12:12.206200
 
 """
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
+import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "8d8d6708794d"
@@ -32,9 +32,7 @@ def upgrade() -> None:
         sa.Column("likes", sa.Integer(), nullable=False),
         sa.Column("reposts", sa.Integer(), nullable=False),
         sa.Column("comments", sa.Integer(), nullable=False),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(
             ["meme_source_id"],
@@ -51,9 +49,7 @@ def upgrade() -> None:
     op.create_unique_constraint(
         "meme_meme_source_id_raw_meme_id_key", "meme", ["meme_source_id", "raw_meme_id"]
     )
-    op.drop_constraint(
-        "meme_source_id_post_id_key", "meme_raw_telegram", type_="unique"
-    )
+    op.drop_constraint("meme_source_id_post_id_key", "meme_raw_telegram", type_="unique")
     op.create_unique_constraint(
         "meme_raw_telegram_meme_source_id_post_id_key",
         "meme_raw_telegram",

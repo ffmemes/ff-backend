@@ -5,10 +5,10 @@ Revises:
 Create Date: 2023-12-27 17:09:05.578955
 
 """
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
+import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "4a4b3b418d3b"
@@ -33,9 +33,7 @@ def upgrade() -> None:
         sa.Column("status", sa.String(), nullable=False),
         sa.Column("language_code", sa.String(), nullable=True),
         sa.Column("parsed_at", sa.DateTime(), nullable=True),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(
             ["language_code"],
@@ -60,12 +58,8 @@ def upgrade() -> None:
         sa.Column("media", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("views", sa.Integer(), nullable=False),
         sa.Column("forwarded_url", sa.String(), nullable=True),
-        sa.Column(
-            "link_preview", postgresql.JSONB(astext_type=sa.Text()), nullable=True
-        ),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("link_preview", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(
             ["meme_source_id"],
@@ -74,9 +68,7 @@ def upgrade() -> None:
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("meme_raw_telegram_pkey")),
-        sa.UniqueConstraint(
-            "meme_source_id", "post_id", name="meme_source_id_post_id_key"
-        ),
+        sa.UniqueConstraint("meme_source_id", "post_id", name="meme_source_id_post_id_key"),
     )
     # ### end Alembic commands ###
 

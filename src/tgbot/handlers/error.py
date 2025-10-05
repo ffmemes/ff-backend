@@ -12,9 +12,7 @@ from src.tgbot.service import update_user
 from src.tgbot.user_info import update_user_info_cache
 
 
-async def send_stacktrace_to_tg_chat(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-):
+async def send_stacktrace_to_tg_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.effective_user:
         pass
 
@@ -30,18 +28,14 @@ async def send_stacktrace_to_tg_chat(
         await update_user_info_cache(user_id)
         return
 
-    tb_list = traceback.format_exception(
-        None, context.error, context.error.__traceback__
-    )
+    tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
     tb_string = html.escape("".join(tb_list))
 
     # cut first lines to fit tg msg len limit
     if len(tb_string) > 3000:
         tb_string = tb_string[-3000:]
 
-    message = (
-        f"An exception was raised while handling an update\n" f"<pre>{tb_string}</pre>"
-    )
+    message = f"An exception was raised while handling an update\n<pre>{tb_string}</pre>"
 
     await context.bot.send_message(
         text="""

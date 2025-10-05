@@ -5,8 +5,8 @@ Revises: 4b8328f00221
 Create Date: 2024-03-02 13:00:33.792448
 
 """
-import sqlalchemy as sa
 
+import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -22,9 +22,7 @@ def upgrade() -> None:
         "user_popup_logs",
         sa.Column("user_id", sa.BigInteger(), nullable=False),
         sa.Column("popup_id", sa.String(), nullable=False),
-        sa.Column(
-            "sent_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("sent_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.Column("reacted_at", sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(
             ["user_id"],
@@ -32,24 +30,18 @@ def upgrade() -> None:
             name=op.f("user_popup_logs_user_id_fkey"),
             ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint(
-            "user_id", "popup_id", name=op.f("user_popup_logs_pkey")
-        ),
+        sa.PrimaryKeyConstraint("user_id", "popup_id", name=op.f("user_popup_logs_pkey")),
     )
     op.create_table(
         "meme_source_stats",
         sa.Column("meme_source_id", sa.Integer(), nullable=False),
         sa.Column("nlikes", sa.Integer(), server_default="0", nullable=False),
         sa.Column("ndislikes", sa.Integer(), server_default="0", nullable=False),
-        sa.Column(
-            "nmemes_sent_events", sa.Integer(), server_default="0", nullable=False
-        ),
+        sa.Column("nmemes_sent_events", sa.Integer(), server_default="0", nullable=False),
         sa.Column("nmemes_parsed", sa.Integer(), server_default="0", nullable=False),
         sa.Column("nmemes_sent", sa.Integer(), server_default="0", nullable=False),
         sa.Column("latest_meme_age", sa.Integer(), server_default="0", nullable=False),
-        sa.Column(
-            "updated_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("updated_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.ForeignKeyConstraint(
             ["meme_source_id"],
             ["meme_source.id"],

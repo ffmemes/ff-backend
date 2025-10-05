@@ -1,6 +1,5 @@
-from collections.abc import Mapping
-
 import logging
+from collections.abc import Mapping
 
 from telegram import Update
 from telegram.error import TelegramError
@@ -28,9 +27,7 @@ async def _is_admin(user_info: Mapping[str, object] | None) -> bool:
         return False
 
 
-async def handle_promote_moderator(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def handle_promote_moderator(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     if message is None or message.text is None:
         return
@@ -58,9 +55,7 @@ async def handle_promote_moderator(
         try:
             telegram_id = int(identifier)
         except ValueError:
-            await message.reply_text(
-                "🚫 Identifier must be a Telegram ID or @username."
-            )
+            await message.reply_text("🚫 Identifier must be a Telegram ID or @username.")
             return
         target = await get_user_by_id(telegram_id)
 
@@ -96,9 +91,7 @@ async def handle_promote_moderator(
         )
     except TelegramError:
         logging.exception("Failed to send moderator invite to user_id=%s", target_id)
-        await message.reply_text(
-            "⚠️ Promotion updated, but sending the invite link failed."
-        )
+        await message.reply_text("⚠️ Promotion updated, but sending the invite link failed.")
         return
 
     await message.reply_text("✅ User promoted to moderator and invite link sent.")

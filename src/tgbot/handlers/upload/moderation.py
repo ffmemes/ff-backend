@@ -38,7 +38,9 @@ from src.tgbot.user_info import get_user_info
 UPLOADED_MEME_REIVIEW_CALLBACK_DATA_PATTERN = "upload:{upload_id}:review:{action}"
 UPLOADED_MEME_REVIEW_CALLBACK_DATA_REGEXP = r"upload:(\d+):review:(\w+)"
 
-LEADERBOARD_URL = "https://metabase.okhlopkov.com/public/question/663c4def-4b42-4303-aa3b-73ab5bfa677a"
+LEADERBOARD_URL = (
+    "https://metabase.okhlopkov.com/public/question/663c4def-4b42-4303-aa3b-73ab5bfa677a"
+)
 
 
 async def uploaded_meme_auto_review(
@@ -65,9 +67,7 @@ async def uploaded_meme_auto_review(
     #         )
 
     logging.info(f"Adding watermark to meme {meme['id']} content")
-    watermarked_meme_content = await add_watermark_to_meme_content(
-        image_bytes, meme["type"]
-    )
+    watermarked_meme_content = await add_watermark_to_meme_content(image_bytes, meme["type"])
     if watermarked_meme_content is None:
         return await bot.send_message(
             chat_id=meme_upload["user_id"],
@@ -217,9 +217,7 @@ async def handle_uploaded_meme_review_button(
 
     await update.callback_query.answer()
 
-    reg = re.match(
-        UPLOADED_MEME_REVIEW_CALLBACK_DATA_REGEXP, update.callback_query.data
-    )
+    reg = re.match(UPLOADED_MEME_REVIEW_CALLBACK_DATA_REGEXP, update.callback_query.data)
     upload_id, action = int(reg.group(1)), reg.group(2)
     meme_upload = await get_meme_raw_upload_by_id(upload_id)
     prev_caption = update.callback_query.message.caption
@@ -242,8 +240,7 @@ async def handle_uploaded_meme_review_button(
 
     if action == "approve":
         await update.callback_query.message.edit_caption(
-            caption=prev_caption
-            + "\n✅ Approved by {}".format(update.effective_user.name),
+            caption=prev_caption + "\n✅ Approved by {}".format(update.effective_user.name),
             reply_markup=None,
         )
 
@@ -300,8 +297,7 @@ See realtime stats of your uploaded memes: /uploads
     else:
         await update_meme_by_upload_id(upload_id, status=MemeStatus.REJECTED)
         await update.callback_query.message.edit_caption(
-            caption=prev_caption
-            + "\n❌ Rejected by {}".format(update.effective_user.name),
+            caption=prev_caption + "\n❌ Rejected by {}".format(update.effective_user.name),
             reply_markup=None,
         )
         try:

@@ -62,9 +62,7 @@ async def get_meme_queue_length_by_key(key: str) -> int:
     return await redis_client.scard(key)
 
 
-async def add_memes_to_queue_by_key(
-    key: str, memes: list[dict], expire: int = 3600
-) -> None:
+async def add_memes_to_queue_by_key(key: str, memes: list[dict], expire: int = 3600) -> None:
     jsoned_memes = [orjson.dumps(meme) for meme in memes]
     async with redis_client.pipeline(transaction=True) as pipe:
         await pipe.sadd(key, *jsoned_memes)
@@ -100,4 +98,3 @@ async def get_user_wrapped(user_id: str) -> dict | None:
 
 async def set_user_wrapped(user_id: str, data: dict) -> None:
     await redis_client.set(get_user_wrapped_key(user_id), orjson.dumps(data))
-

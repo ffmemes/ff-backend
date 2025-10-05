@@ -63,9 +63,7 @@ async def handle_chat_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         await give_random_reaction(update, context)
 
 
-async def generate_ai_reply_to_a_message(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-):
+async def generate_ai_reply_to_a_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
     balance = await get_user_balance(user_id)

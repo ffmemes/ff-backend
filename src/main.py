@@ -14,9 +14,7 @@ from src.tgbot.router import router as tgbot_router
 @asynccontextmanager
 async def lifespan(_application: FastAPI) -> AsyncGenerator:
     # Startup
-    tgbot_app.application = tgbot_app.setup_application(
-        settings.ENVIRONMENT.is_deployed
-    )
+    tgbot_app.application = tgbot_app.setup_application(settings.ENVIRONMENT.is_deployed)
     await tgbot_app.application.initialize()
 
     # flush all redis keys on startup for debug

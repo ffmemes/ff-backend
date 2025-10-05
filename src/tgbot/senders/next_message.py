@@ -37,9 +37,7 @@ async def get_next_meme_for_user(
         if not meme:
             await meme_queue.generate_recommendations(user_id, limit=7)
 
-    logging.warning(
-        f"Failed to find unseen meme for user {user_id} after {max_attempts} attempts"
-    )
+    logging.warning(f"Failed to find unseen meme for user {user_id} after {max_attempts} attempts")
     return None
 
 

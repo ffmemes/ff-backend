@@ -185,9 +185,7 @@ def add_handlers(application: Application) -> None:
     )
 
     application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
-    application.add_handler(
-        MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback)
-    )
+    application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
 
     application.add_handler(
         CommandHandler(
@@ -207,9 +205,7 @@ def add_handlers(application: Application) -> None:
         )
     )
 
-    application.add_handler(
-        CallbackQueryHandler(handle_wrapped_button, pattern=r"^wrapped_\d")
-    )
+    application.add_handler(CallbackQueryHandler(handle_wrapped_button, pattern=r"^wrapped_\d"))
 
     ####################
     # user stats
@@ -232,7 +228,7 @@ def add_handlers(application: Application) -> None:
     application.add_handler(
         CallbackQueryHandler(
             handle_moderator_invite_callback,
-            pattern=fr"^{MODERATOR_INVITE_CALLBACK_DATA}$",
+            pattern=rf"^{MODERATOR_INVITE_CALLBACK_DATA}$",
         )
     )
 
@@ -324,8 +320,7 @@ def add_handlers(application: Application) -> None:
     # log new messages in chat
     application.add_handler(
         MessageHandler(
-            filters=filters.Chat([TELEGRAM_CHAT_RU_CHAT_ID])
-            & filters.UpdateType.MESSAGE,
+            filters=filters.Chat([TELEGRAM_CHAT_RU_CHAT_ID]) & filters.UpdateType.MESSAGE,
             callback=handle_chat_message,
         )
     )
@@ -376,9 +371,7 @@ def add_handlers(application: Application) -> None:
         [
             MessageHandler(
                 filters=filters.ChatType.PRIVATE
-                & filters.Regex(
-                    "^(https://t.me|https://vk.com|https://www.instagram.com)"
-                ),
+                & filters.Regex("^(https://t.me|https://vk.com|https://www.instagram.com)"),
                 callback=meme_source.handle_meme_source_link,
             ),
             CallbackQueryHandler(
@@ -462,9 +455,7 @@ def add_handlers(application: Application) -> None:
     )
 
     # handle all old & broken callback queries
-    application.add_handler(
-        CallbackQueryHandler(broken.handle_broken_callback_query, pattern="^")
-    )
+    application.add_handler(CallbackQueryHandler(broken.handle_broken_callback_query, pattern="^"))
 
 
 async def process_event(payload: dict) -> None:

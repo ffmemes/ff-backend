@@ -15,9 +15,7 @@ def extract_status_change(
     Returns None, if the status didn't change.
     """
     status_change = chat_member_update.difference().get("status")
-    old_is_member, new_is_member = chat_member_update.difference().get(
-        "is_member", (None, None)
-    )
+    old_is_member, new_is_member = chat_member_update.difference().get("is_member", (None, None))
 
     if status_change is None:
         return None

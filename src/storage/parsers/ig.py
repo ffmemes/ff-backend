@@ -6,7 +6,6 @@ import httpx
 from src.config import settings
 from src.storage.parsers.schemas import IgPostParsingResult
 
-
 HIKERAPI_BASE_URL = "https://api.hikerapi.com/v2"
 HIKERAPI_HEADERS = {
     "accept": "application/json",

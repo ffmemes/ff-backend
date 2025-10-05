@@ -74,9 +74,7 @@ async def send_album_with_memes(
         elif meme.type == MemeType.ANIMATION:
             raise NotImplementedError("Can't send animation in album")
         else:
-            raise NotImplementedError(
-                f"Can't send meme. Unknown meme type: {meme.type}"
-            )
+            raise NotImplementedError(f"Can't send meme. Unknown meme type: {meme.type}")
         media.append(input_media)
 
     return await bot.send_media_group(
@@ -117,9 +115,7 @@ async def send_new_message_with_meme(
                 parse_mode=ParseMode.HTML,
             )
         else:
-            raise NotImplementedError(
-                f"Can't send meme. Unknown meme type: {meme.type}"
-            )
+            raise NotImplementedError(f"Can't send meme. Unknown meme type: {meme.type}")
     except Forbidden:
         await update_user(user_id, type=UserType.BLOCKED_BOT)
 

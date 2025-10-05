@@ -1,6 +1,7 @@
 """
-    Cache user info in redis
+Cache user info in redis
 """
+
 from collections import defaultdict
 
 from src import redis

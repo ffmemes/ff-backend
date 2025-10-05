@@ -5,8 +5,8 @@ Revises: bc43e9755fd6
 Create Date: 2024-01-08 19:12:41.894196
 
 """
-import sqlalchemy as sa
 
+import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -25,12 +25,8 @@ def upgrade() -> None:
         sa.Column("ndislikes", sa.Integer(), server_default="0", nullable=False),
         sa.Column("nmemes_sent", sa.Integer(), server_default="0", nullable=False),
         sa.Column("nsessions", sa.Integer(), server_default="0", nullable=False),
-        sa.Column(
-            "active_days_count", sa.Integer(), server_default="0", nullable=False
-        ),
-        sa.Column(
-            "updated_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("active_days_count", sa.Integer(), server_default="0", nullable=False),
+        sa.Column("updated_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.ForeignKeyConstraint(
             ["user_id"],
             ["user.id"],
@@ -45,9 +41,7 @@ def upgrade() -> None:
         sa.Column("meme_source_id", sa.Integer(), nullable=False),
         sa.Column("nlikes", sa.Integer(), server_default="0", nullable=False),
         sa.Column("ndislikes", sa.Integer(), server_default="0", nullable=False),
-        sa.Column(
-            "updated_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("updated_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.ForeignKeyConstraint(
             ["meme_source_id"],
             ["meme_source.id"],

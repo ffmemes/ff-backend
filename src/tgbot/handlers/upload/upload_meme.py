@@ -1,7 +1,7 @@
 """
-    Methods for Meme uploading via bot:
-    - user forwards a message
-    - user sends a new message
+Methods for Meme uploading via bot:
+- user forwards a message
+- user sends a new message
 """
 
 import asyncio
@@ -74,22 +74,16 @@ def get_meme_language_selector_keyboard(upload_id: int) -> list[list[dict]]:
     return lang_keyboard
 
 
-async def handle_message_with_meme(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def handle_message_with_meme(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """When a user sends a message with a meme"""
     user = await get_user_info(update.effective_user.id)
     if not UserType(user["type"]).is_moderator:
         if user["nmemes_sent"] < 10:
             return await update.message.reply_text(
-                localizer.t(
-                    "upload.watch_memes_to_unblock_upload", user["interface_lang"]
-                ),
+                localizer.t("upload.watch_memes_to_unblock_upload", user["interface_lang"]),
             )
 
-        uploaded_today = await count_24h_uploaded_not_approved_memes(
-            update.effective_user.id
-        )
+        uploaded_today = await count_24h_uploaded_not_approved_memes(update.effective_user.id)
         if uploaded_today >= 5:
             return await update.message.reply_text(
                 """
@@ -160,16 +154,12 @@ async def handle_rules_accepted_callback(
     user_info = await get_user_info(update.effective_user.id)
 
     upload_id = int(
-        re.match(RULES_ACCEPTED_CALLBACK_DATA_REGEXP, update.callback_query.data).group(
-            1
-        )
+        re.match(RULES_ACCEPTED_CALLBACK_DATA_REGEXP, update.callback_query.data).group(1)
     )
 
     await update.callback_query.message.edit_caption(
         localizer.t("upload.select_language", user_info["interface_lang"]),
-        reply_markup=InlineKeyboardMarkup(
-            get_meme_language_selector_keyboard(upload_id)
-        ),
+        reply_markup=InlineKeyboardMarkup(get_meme_language_selector_keyboard(upload_id)),
         parse_mode=ParseMode.HTML,
     )
 
@@ -200,9 +190,7 @@ async def handle_meme_upload_lang_selected(
     meme_upload = await update_meme_raw_upload(upload_id, language_code=lang)
     meme = await create_meme_from_meme_raw_upload(meme_upload)
 
-    await log(
-        f"""📥 Meme {meme["id"]} uploaded by #{update.effective_user.id}""", context.bot
-    )
+    await log(f"""📥 Meme {meme["id"]} uploaded by #{update.effective_user.id}""", context.bot)
 
     # TODO: create a meme object from meme_raw_upload
 

@@ -35,9 +35,7 @@ from src.tgbot.handlers.upload.service import (
 )
 
 
-async def ocr_meme_content(
-    meme_id: int, content: bytes, language: str
-) -> dict[str, Any] | None:
+async def ocr_meme_content(meme_id: int, content: bytes, language: str) -> dict[str, Any] | None:
     logger = get_run_logger()
     if not settings.OCR_ENABLED:
         logger.info(
@@ -81,9 +79,7 @@ async def analyse_meme_caption(meme: dict[str, Any]) -> None:
             return
 
 
-async def add_watermark_to_meme_content(
-    meme_content: bytes, meme_type: MemeType
-) -> bytes:
+async def add_watermark_to_meme_content(meme_content: bytes, meme_type: MemeType) -> bytes:
     if meme_type == MemeType.IMAGE:
         # we can add watermark only to photos right now
         return add_watermark(meme_content)
@@ -177,7 +173,7 @@ async def vk_meme_pipeline() -> None:
 
     logger.info("Getting unloaded memes to upload to Telegram.")
     unloaded_memes = await get_unloaded_vk_memes(limit=100)
-    logger.info(f"Received {len(unloaded_memes)}" " memes to upload to Telegram.")
+    logger.info(f"Received {len(unloaded_memes)} memes to upload to Telegram.")
     if not settings.OCR_ENABLED:
         logger.info(
             "OCR is currently disabled. Memes will be processed without OCR. "
@@ -221,7 +217,7 @@ async def ig_meme_pipeline() -> None:
 
     logger.info("Getting unloaded memes to upload to Telegram.")
     unloaded_memes = await get_unloaded_ig_memes(limit=100)
-    logger.info(f"Received {len(unloaded_memes)}" " memes to upload to Telegram.")
+    logger.info(f"Received {len(unloaded_memes)} memes to upload to Telegram.")
     if not settings.OCR_ENABLED:
         logger.info(
             "OCR is currently disabled. Memes will be processed without OCR. "
@@ -275,11 +271,9 @@ async def ocr_uploaded_memes(limit=100):
 
     for meme in memes:
         if meme["content_url"] is not None:
-            meme_original_content = await download_meme_content_file(
-                meme["content_url"]
-            )
+            meme_original_content = await download_meme_content_file(meme["content_url"])
             await asyncio.sleep(2)  # flood control
-            
+
         elif meme["meme_source_type"] == MemeSourceType.USER_UPLOAD:
             meme_raw_upload = await get_meme_raw_upload_by_id(meme["raw_meme_id"])
             meme_original_file_id = meme_raw_upload["media"]["file_id"]
@@ -332,9 +326,7 @@ async def final_meme_pipeline() -> None:
 
         # it's ok if there is no OCR result for videos
         if meme["ocr_result"]:
-            duplicate_meme_id = await find_meme_duplicate(
-                meme["id"], meme["ocr_result"]["text"]
-            )
+            duplicate_meme_id = await find_meme_duplicate(meme["id"], meme["ocr_result"]["text"])
             if duplicate_meme_id:
                 await update_meme(
                     meme["id"],

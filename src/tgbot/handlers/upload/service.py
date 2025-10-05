@@ -71,24 +71,17 @@ async def create_meme_from_meme_raw_upload(
     meme_upload: dict[str, Any],
 ) -> dict[str, Any]:
     published_at = (
-        datetime.fromtimestamp(meme_upload["forward_origin"]["date"]).replace(
-            tzinfo=None
-        )
+        datetime.fromtimestamp(meme_upload["forward_origin"]["date"]).replace(tzinfo=None)
         if meme_upload["forward_origin"]
         else meme_upload["date"]
     )
 
-    if (
-        meme_upload["media"].get("duration")
-        and meme_upload["media"].get("duration") > 0
-    ):
+    if meme_upload["media"].get("duration") and meme_upload["media"].get("duration") > 0:
         meme_type = MemeType.VIDEO
     else:
         meme_type = MemeType.IMAGE
 
-    meme_source_for_meme_upload = await get_or_create_meme_source_for_meme_upload(
-        meme_upload
-    )
+    meme_source_for_meme_upload = await get_or_create_meme_source_for_meme_upload(meme_upload)
 
     query = (
         insert(meme)

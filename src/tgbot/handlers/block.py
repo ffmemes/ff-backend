@@ -1,7 +1,6 @@
 """
-    Handles user blocking the bot
+Handles user blocking the bot
 """
-
 
 from datetime import datetime
 
@@ -17,9 +16,7 @@ from src.tgbot.logs import log
 from src.tgbot.service import get_user_languages, update_user
 
 
-async def handle_user_blocked_bot(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def handle_user_blocked_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle an event when user blocks us"""
     user_tg = update.my_chat_member.from_user
     user_id = user_tg.id
@@ -31,9 +28,7 @@ async def handle_user_blocked_bot(
         )
         return
 
-    user = await update_user(
-        user_id, blocked_bot_at=datetime.utcnow(), type=UserType.BLOCKED_BOT
-    )
+    user = await update_user(user_id, blocked_bot_at=datetime.utcnow(), type=UserType.BLOCKED_BOT)
 
     if user is None:
         # user wasn't in our db

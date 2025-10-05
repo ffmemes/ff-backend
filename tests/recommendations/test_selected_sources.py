@@ -22,9 +22,7 @@ from src.recommendations.meme_queue import generate_cold_start_recommendations
 @pytest_asyncio.fixture()
 async def conn():
     async with engine.connect() as conn:
-        await conn.execute(
-            insert(user), [{"id": 1, "type": "user"}, {"id": 21, "type": "user"}]
-        )
+        await conn.execute(insert(user), [{"id": 1, "type": "user"}, {"id": 21, "type": "user"}])
         await conn.execute(
             insert(meme_source),
             {
@@ -53,10 +51,7 @@ async def conn():
 
         await conn.execute(
             insert(meme),
-            [
-                meme_basic.copy() | {"id": meme_id, "raw_meme_id": meme_id}
-                for meme_id in meme_ids
-            ],
+            [meme_basic.copy() | {"id": meme_id, "raw_meme_id": meme_id} for meme_id in meme_ids],
         )
         await conn.execute(
             insert(meme_stats),

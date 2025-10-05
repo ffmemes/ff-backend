@@ -50,17 +50,13 @@ async def broadcast_next_meme_to_active_1w_ago():
 
 @flow
 async def broadcast_next_meme_to_active_2w_ago():
-    user_ids = await get_user_ids_active_minutes_ago(
-        2 * 7 * 24 * 60, 2 * 7 * 24 * 60 + 60
-    )
+    user_ids = await get_user_ids_active_minutes_ago(2 * 7 * 24 * 60, 2 * 7 * 24 * 60 + 60)
     await broadcast_next_meme_to_users(user_ids)
 
 
 @flow
 async def broadcast_next_meme_to_active_4w_ago():
-    user_ids = await get_user_ids_active_minutes_ago(
-        4 * 7 * 24 * 60, 4 * 7 * 24 * 60 + 60
-    )
+    user_ids = await get_user_ids_active_minutes_ago(4 * 7 * 24 * 60, 4 * 7 * 24 * 60 + 60)
     await broadcast_next_meme_to_users(user_ids)
 
 

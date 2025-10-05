@@ -5,8 +5,8 @@ Revises: 2db6d161b5e9
 Create Date: 2023-12-29 16:10:43.374841
 
 """
-import sqlalchemy as sa
 
+import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -22,9 +22,7 @@ def upgrade() -> None:
         "user",
         sa.Column("id", sa.BigInteger(), nullable=False),
         sa.Column("type", sa.String(), nullable=False),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.Column("last_active_at", sa.DateTime(), nullable=True),
         sa.Column("blocked_bot_at", sa.DateTime(), nullable=True),
         sa.PrimaryKeyConstraint("id", name=op.f("user_pkey")),
@@ -38,9 +36,7 @@ def upgrade() -> None:
         sa.Column("is_premium", sa.Boolean(), nullable=True),
         sa.Column("language_code", sa.String(), nullable=True),
         sa.Column("deep_link", sa.String(), nullable=True),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=True),
         sa.PrimaryKeyConstraint("id", name=op.f("user_tg_pkey")),
     )
@@ -48,9 +44,7 @@ def upgrade() -> None:
         "user_language",
         sa.Column("user_id", sa.BigInteger(), nullable=False),
         sa.Column("language_code", sa.String(), nullable=False),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.ForeignKeyConstraint(
             ["language_code"],
             ["language.code"],
@@ -63,9 +57,7 @@ def upgrade() -> None:
             name=op.f("user_language_user_id_fkey"),
             ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint(
-            "user_id", "language_code", name=op.f("user_language_pkey")
-        ),
+        sa.PrimaryKeyConstraint("user_id", "language_code", name=op.f("user_language_pkey")),
     )
     # ### end Alembic commands ###
 

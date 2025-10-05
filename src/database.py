@@ -217,9 +217,7 @@ user_tg = Table(
 user_tg_chat_membership = Table(
     "user_tg_chat_membership",
     metadata,
-    Column(
-        "user_tg_id", ForeignKey("user_tg.id", ondelete="CASCADE"), primary_key=True
-    ),
+    Column("user_tg_id", ForeignKey("user_tg.id", ondelete="CASCADE"), primary_key=True),
     Column("chat_id", BigInteger, primary_key=True),
     Column(
         "last_seen_at",
@@ -409,9 +407,7 @@ user_deep_link_log = Table(
     "user_deep_link_log",
     metadata,
     Column("id", Integer, Identity(), primary_key=True),
-    Column(
-        "user_id", BigInteger, ForeignKey("user.id", ondelete="CASCADE"), nullable=False
-    ),
+    Column("user_id", BigInteger, ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
     Column("deep_link", String),
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
 )

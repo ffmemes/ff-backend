@@ -5,10 +5,10 @@ Revises: f58d305bf511
 Create Date: 2024-03-09 19:25:48.570114
 
 """
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
+import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "d881b503c0ae"
@@ -35,9 +35,7 @@ def upgrade() -> None:
         sa.Column("media_type", sa.Integer(), nullable=True),
         sa.Column("video_duration", sa.Float(), nullable=True),
         sa.Column("product_type", sa.String(), nullable=True),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
-        ),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(
             ["meme_source_id"],
