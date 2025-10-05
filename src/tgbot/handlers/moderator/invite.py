@@ -106,7 +106,12 @@ async def handle_moderator_invite_callback(
         try:
             await query.edit_message_reply_markup(reply_markup=None)
         except BadRequest as exc:
-            if exc.message != "Message is not modified":
+            if exc.message and "Message is not modified" in exc.message:
+                logging.debug(
+                    "Moderator invite message for user_id=%s already had reply markup removed",
+                    user_id,
+                )
+            else:
                 raise
 
     await context.bot.send_message(
