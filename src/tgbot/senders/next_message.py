@@ -1,12 +1,8 @@
 import asyncio
 import logging
 
-from telegram import (
-    Bot,
-    Message,
-    Update,
-)
-from telegram.error import BadRequest
+from telegram import Bot, InlineKeyboardMarkup, Message, Update
+from telegram.error import BadRequest, Forbidden
 
 from src.recommendations import meme_queue
 from src.recommendations.service import (
@@ -14,7 +10,10 @@ from src.recommendations.service import (
     user_meme_reaction_exists,
 )
 from src.storage.schemas import MemeData
+from src.storage.constants import MemeStatus
+from src.storage.service import update_meme
 from src.tgbot.constants import Reaction
+from src.tgbot.logs import log
 from src.tgbot.senders.alerts import send_queue_preparing_alert
 from src.tgbot.senders.keyboards import meme_reaction_keyboard
 from src.tgbot.senders.meme import (
@@ -54,37 +53,89 @@ async def next_message(
     if popup:
         return await send_popup(user_id, popup)
 
-    meme = await get_next_meme_for_user(user_id)
-    if not meme:
-        asyncio.create_task(meme_queue.check_queue(user_id))
-        # TODO: also edit / delete previous message
-        return await send_queue_preparing_alert(bot, user_id)
-
-    reply_markup = meme_reaction_keyboard(meme.id, user_id)
-    meme.caption = await get_meme_caption_for_user_id(meme, user_id, user_info)
-
-    should_edit = (
+    previous_callback = prev_update.callback_query
+    previous_message: Message | None = previous_callback.message if previous_callback else None
+    should_replace_previous = (
         prev_reaction_id is not None
         and not Reaction(prev_reaction_id).is_positive
-        and prev_update.callback_query
-        and prev_update.callback_query.message.effective_attachment
+        and previous_message is not None
+        and previous_message.effective_attachment is not None
     )
 
-    if should_edit:
-        try:
-            msg = await edit_last_message_with_meme(
-                prev_update.callback_query.message, meme, reply_markup
-            )
-        except BadRequest:
-            # logging.error(f"Failed to edit message: {e}")
-            msg = await send_new_message_with_meme(bot, user_id, meme, reply_markup)
-    else:
-        try:
-            msg = await send_new_message_with_meme(bot, user_id, meme, reply_markup)
-        except BadRequest as e:
-            logging.error(f"Failed to send new message with meme {meme.id}: {e}")
-            raise  # Re-raise the exception if sending a new message fails
+    attempt = 0
+    max_attempts = 5
+    no_memes_left = False
 
-    await create_user_meme_reaction(user_id, meme.id, meme.recommended_by)
+    while attempt < max_attempts:
+        meme = await get_next_meme_for_user(user_id)
+        if not meme:
+            no_memes_left = True
+            break
+
+        reply_markup = meme_reaction_keyboard(meme.id, user_id)
+        meme.caption = await get_meme_caption_for_user_id(meme, user_id, user_info)
+
+        try:
+            if should_replace_previous and previous_message is not None:
+                msg = await _replace_previous_message(
+                    bot, previous_message, meme, reply_markup
+                )
+            else:
+                msg = await send_new_message_with_meme(
+                    bot, user_id, meme, reply_markup
+                )
+        except BadRequest as error:
+            await _disable_broken_meme(meme, error)
+            attempt += 1
+            continue
+
+        await create_user_meme_reaction(user_id, meme.id, meme.recommended_by)
+        asyncio.create_task(meme_queue.check_queue(user_id))
+        return msg
+
     asyncio.create_task(meme_queue.check_queue(user_id))
-    return msg
+
+    if no_memes_left:
+        return await send_queue_preparing_alert(bot, user_id)
+
+    logging.error(f"Failed to deliver meme to user {user_id} after {attempt} attempts")
+    return await send_queue_preparing_alert(bot, user_id)
+
+
+async def _replace_previous_message(
+    bot: Bot,
+    previous_message: Message,
+    meme: MemeData,
+    reply_markup: InlineKeyboardMarkup | None,
+) -> Message:
+    try:
+        edited_message = await edit_last_message_with_meme(
+            previous_message, meme, reply_markup
+        )
+    except BadRequest as error:
+        if "Message to edit not found" in str(error):
+            edited_message = None
+        else:
+            raise
+
+    if edited_message is not None:
+        return edited_message
+
+    try:
+        await previous_message.delete()
+    except (BadRequest, Forbidden):
+        pass
+
+    return await send_new_message_with_meme(
+        bot,
+        previous_message.chat_id,
+        meme,
+        reply_markup,
+    )
+
+
+async def _disable_broken_meme(meme: MemeData, error: BadRequest) -> None:
+    await update_meme(meme.id, status=MemeStatus.BROKEN_CONTENT_LINK)
+    await log(
+        f"meme {meme.id} is disabled now because of: {error.__class__.__name__}: {error}"
+    )

@@ -124,27 +124,19 @@ async def edit_last_message_with_meme(
     message: Message,
     meme: MemeData,
     reply_markup: InlineKeyboardMarkup | None = None,
-):
+) -> Message | None:
     try:
         await message.edit_media(
             media=get_input_media(meme),
             reply_markup=reply_markup,
-            # parse_mode=ParseMode.HTML,
-            # caption=meme.caption,
         )
-    except BadRequest as e:
-        if "Message to edit not found" in str(e):
-            return
+    except BadRequest as error:
+        if "Message to edit not found" in str(error):
+            return None
         raise
 
-    # INFO: current TG BOT API doesn't support media + caption edit
-    # in 1 API call. Also edit_message_media clears caption.
-    # So we need to make 2 API calls...
-
-    await message.edit_caption(
+    return await message.edit_caption(
         caption=meme.caption,
         parse_mode=ParseMode.HTML,
         reply_markup=reply_markup,
     )
-
-    # UPD: telegram introduced a new method, I'm testing it now
