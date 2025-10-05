@@ -113,7 +113,13 @@ async def _replace_previous_message(
             previous_message, meme, reply_markup
         )
     except BadRequest as error:
-        if "Message to edit not found" in str(error):
+        if _is_missing_message_error(error):
+            logging.info(
+                "Previous message for meme %s is missing (error: %s). "
+                "Sending new message instead.",
+                meme.id,
+                error,
+            )
             edited_message = None
         else:
             raise
@@ -139,3 +145,8 @@ async def _disable_broken_meme(meme: MemeData, error: BadRequest) -> None:
     await log(
         f"meme {meme.id} is disabled now because of: {error.__class__.__name__}: {error}"
     )
+
+
+def _is_missing_message_error(error: BadRequest) -> bool:
+    message = str(error).lower()
+    return "message to edit not found" in message or "message_id_invalid" in message
