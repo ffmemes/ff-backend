@@ -80,7 +80,7 @@ async def create_meme_from_meme_raw_upload(
         meme_upload["media"].get("duration")
         and meme_upload["media"].get("duration") > 0
         or meme_upload["media"].get("mime_type", "") == "video/mp4"
-        or meme_upload["media"].get("file_name", "").contains(".mp4")
+        or ".mp4" in meme_upload["media"].get("file_name", "")
     ):
         meme_type = MemeType.VIDEO
     else:
