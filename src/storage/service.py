@@ -1,6 +1,6 @@
 from typing import Any
 
-from sqlalchemy import nulls_first, or_, select, text
+from sqlalchemy import nulls_first, select, text
 
 from src.database import (
     fetch_all,
@@ -71,12 +71,6 @@ async def get_pending_memes() -> list[dict[str, Any]]:
         select(meme)
         .where(meme.c.status == MemeStatus.CREATED)
         .where(meme.c.telegram_file_id.is_not(None))
-        .where(
-            or_(
-                meme.c.ocr_result.is_not(None),
-                meme.c.type != MemeType.IMAGE,
-            )
-        )
         .order_by(nulls_first(meme.c.created_at))
     )
     return await fetch_all(select_query)
@@ -203,12 +197,6 @@ async def update_meme_status_of_ready_memes() -> list[dict[str, Any]]:
         meme.update()
         .where(meme.c.status == MemeStatus.CREATED)
         .where(meme.c.telegram_file_id.is_not(None))
-        .where(
-            or_(
-                meme.c.ocr_result.is_not(None),
-                meme.c.type != MemeType.IMAGE,
-            )
-        )
         .where(meme.c.duplicate_of.is_(None))
         .values(status=MemeStatus.OK)
         .returning(meme)

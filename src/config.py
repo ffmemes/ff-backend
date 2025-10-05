@@ -44,6 +44,8 @@ class Config(BaseSettings):
 
     OPENAI_API_KEY: str | None = None
 
+    OCR_ENABLED: bool = False
+
     # @model_validator(mode="after")
     # def validate_sentry_non_local(self) -> "Config":
     #     if self.ENVIRONMENT.is_deployed and not self.SENTRY_DSN:
