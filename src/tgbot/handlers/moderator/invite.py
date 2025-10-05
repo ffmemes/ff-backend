@@ -9,7 +9,7 @@ from telegram import (
     InlineKeyboardMarkup,
     Update,
 )
-from telegram.error import TelegramError
+from telegram.error import BadRequest, TelegramError
 from telegram.ext import ContextTypes
 
 from src.tgbot.constants import TELEGRAM_MODERATOR_CHAT_ID, UserType
@@ -102,7 +102,12 @@ async def handle_moderator_invite_callback(
         await query.answer(text="Не получилось выдать ссылку, попробуй позже", show_alert=True)
         return
 
-    await query.edit_message_reply_markup(reply_markup=None)
+    if query.message and query.message.reply_markup is not None:
+        try:
+            await query.edit_message_reply_markup(reply_markup=None)
+        except BadRequest as exc:
+            if exc.message != "Message is not modified":
+                raise
 
     await context.bot.send_message(
         chat_id=user_id,
