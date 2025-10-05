@@ -239,10 +239,19 @@ async def handle_uploaded_meme_review_button(
     )
 
     if action == "approve":
-        await update.callback_query.message.edit_caption(
-            caption=prev_caption + "\n✅ Approved by {}".format(update.effective_user.name),
-            reply_markup=None,
-        )
+        new_caption = prev_caption + "\n✅ Approved by {}".format(update.effective_user.name)
+        if (
+            update.callback_query.message.caption != new_caption
+            or update.callback_query.message.reply_markup is not None
+        ):
+            try:
+                await update.callback_query.message.edit_caption(
+                    caption=new_caption,
+                    reply_markup=None,
+                )
+            except BadRequest as exc:
+                if exc.message != "Message is not modified":
+                    raise
 
         await create_user_meme_reaction(  # author auto like for the uploaded meme
             meme_upload["user_id"],
@@ -296,10 +305,19 @@ See realtime stats of your uploaded memes: /uploads
 
     else:
         await update_meme_by_upload_id(upload_id, status=MemeStatus.REJECTED)
-        await update.callback_query.message.edit_caption(
-            caption=prev_caption + "\n❌ Rejected by {}".format(update.effective_user.name),
-            reply_markup=None,
-        )
+        new_caption = prev_caption + "\n❌ Rejected by {}".format(update.effective_user.name)
+        if (
+            update.callback_query.message.caption != new_caption
+            or update.callback_query.message.reply_markup is not None
+        ):
+            try:
+                await update.callback_query.message.edit_caption(
+                    caption=new_caption,
+                    reply_markup=None,
+                )
+            except BadRequest as exc:
+                if exc.message != "Message is not modified":
+                    raise
         try:
             await context.bot.send_message(
                 chat_id=meme_upload["user_id"],
