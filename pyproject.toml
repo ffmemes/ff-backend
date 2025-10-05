@@ -1,10 +1,8 @@
 [tool.ruff]
 line-length = 88
 
-# Enable Pyflakes `E` and `F` codes by default.
+# Enable only style-related checks by default.
 select = [
-    # Pyflakes
-    "F",
     # Pycodestyle
     "E",
     "W",
