@@ -2,8 +2,8 @@ from datetime import timedelta
 from typing import Optional
 
 import orjson
-import redis.asyncio as aioredis
 
+import redis.asyncio as aioredis
 from src.config import settings
 from src.models import CustomModel
 
