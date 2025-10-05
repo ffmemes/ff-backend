@@ -84,7 +84,7 @@ async def next_message(
         try:
             msg = await send_new_message_with_meme(bot, user_id, meme, reply_markup)
         except BadRequest as e:
-            logging.error(f"Failed to send new message: {e}")
+            logging.error(f"Failed to send new message with meme {meme.id}: {e}")
             raise  # Re-raise the exception if sending a new message fails
 
     await create_user_meme_reaction(user_id, meme.id, meme.recommended_by)

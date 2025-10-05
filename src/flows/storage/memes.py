@@ -279,6 +279,7 @@ async def ocr_uploaded_memes(limit=100):
                 meme["content_url"]
             )
             await asyncio.sleep(2)  # flood control
+            
         elif meme["meme_source_type"] == MemeSourceType.USER_UPLOAD:
             meme_raw_upload = await get_meme_raw_upload_by_id(meme["raw_meme_id"])
             meme_original_file_id = meme_raw_upload["media"]["file_id"]
