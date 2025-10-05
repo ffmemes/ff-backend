@@ -22,7 +22,7 @@ async def parse_ig_source(
     logger.info(f"Going to parse feed ig user id {instagram_user_id}")
 
     medias = await get_user_medias(instagram_user_id)
-    if len(medias) > 0:
+    if medias:
         await insert_parsed_posts_from_ig(meme_source_id, medias)
 
     await update_meme_source(meme_source_id=meme_source_id, parsed_at=datetime.utcnow())
