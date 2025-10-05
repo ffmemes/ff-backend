@@ -4,13 +4,7 @@ import logging
 from typing import Optional, Tuple
 
 from telegram import Chat, ChatMember, ChatMemberUpdated, Update
-from telegram.ext import (
-    ContextTypes,
-)
-
-from src.tgbot.handlers import (
-    block,
-)
+from telegram.ext import ContextTypes
 
 
 def extract_status_change(

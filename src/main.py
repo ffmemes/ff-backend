@@ -19,7 +19,7 @@ async def lifespan(_application: FastAPI) -> AsyncGenerator:
     )
     await tgbot_app.application.initialize()
 
-    # flush all redis keys on startup for debug 
+    # flush all redis keys on startup for debug
     # await redis.redis_client.flushall()
 
     # if is_webhook:  # all gunicorn workers will call this and hit rate limit

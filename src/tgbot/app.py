@@ -1,7 +1,6 @@
-from telegram import (
-    Update,
-)
+from telegram import Update
 from telegram.ext import (
+    AIORateLimiter,
     Application,
     CallbackQueryHandler,
     ChatBoostHandler,
@@ -11,7 +10,6 @@ from telegram.ext import (
     InlineQueryHandler,
     MessageHandler,
     PreCheckoutQueryHandler,
-    AIORateLimiter,
     filters,
 )
 
@@ -24,12 +22,9 @@ from src.tgbot.constants import (
     MEME_SOURCE_SET_LANG_REGEXP,
     MEME_SOURCE_SET_STATUS_REGEXP,
     POPUP_BUTTON_CALLBACK_DATA_REGEXP,
-    TELEGRAM_CHANNEL_EN_CHAT_ID,
     TELEGRAM_CHANNEL_RU_CHAT_ID,
-    TELEGRAM_CHAT_EN_CHAT_ID,
     TELEGRAM_CHAT_RU_CHAT_ID,
     TELEGRAM_FEEDBACK_CHAT_ID,
-    TELEGRAM_MODERATOR_CHAT_ID,
 )
 from src.tgbot.handlers import (
     alerts,
@@ -55,6 +50,7 @@ from src.tgbot.handlers.admin.user_info import (
 )
 from src.tgbot.handlers.chat.chat import handle_chat_message
 from src.tgbot.handlers.chat.chat_member import handle_chat_member_update
+
 # from src.tgbot.handlers.chat.explain_meme import explain_meme_en, explain_meme_ru
 from src.tgbot.handlers.chat.feedback import (
     handle_feedback_message,
@@ -267,7 +263,10 @@ def add_handlers(application: Application) -> None:
     # TODO: turn in when I'll have more free ChatGPT credits (probably never)
     # application.add_handler(
     #     MessageHandler(
-    #         filters=filters.Chat([TELEGRAM_CHAT_RU_CHAT_ID, TELEGRAM_MODERATOR_CHAT_ID])
+    #         filters=filters.Chat([
+    #             TELEGRAM_CHAT_RU_CHAT_ID,
+    #             TELEGRAM_MODERATOR_CHAT_ID,
+    #         ])
     #         & filters.PHOTO
     #         & filters.UpdateType.MESSAGE,
     #         callback=explain_meme_ru,
