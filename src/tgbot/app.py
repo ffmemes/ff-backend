@@ -62,6 +62,10 @@ from src.tgbot.handlers.chat.send_tokens import (
     send_tokens_to_reply,
 )
 from src.tgbot.handlers.moderator import get_meme, meme_source
+from src.tgbot.handlers.moderator.invite import (
+    MODERATOR_INVITE_CALLBACK_DATA,
+    handle_moderator_invite_callback,
+)
 from src.tgbot.handlers.payments.purchase import (
     PURCHASE_TOKEN_CALLBACK_DATA_REGEXP,
     handle_new_token_purchase_request_callback,
@@ -221,6 +225,13 @@ def add_handlers(application: Application) -> None:
         CallbackQueryHandler(
             reaction.handle_reaction,
             pattern=MEME_BUTTON_CALLBACK_DATA_REGEXP,
+        )
+    )
+
+    application.add_handler(
+        CallbackQueryHandler(
+            handle_moderator_invite_callback,
+            pattern=fr"^{MODERATOR_INVITE_CALLBACK_DATA}$",
         )
     )
 

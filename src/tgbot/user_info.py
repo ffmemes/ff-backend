@@ -40,8 +40,9 @@ async def get_user_info(user_id: int) -> defaultdict:
     return defaultdict(lambda: None, **user_info)
 
 
-async def update_user_info_counters(user_id: int):
+async def update_user_info_counters(user_id: int) -> defaultdict:
     user_info = await get_user_info(user_id)
     user_info["nmemes_sent"] += 1
     user_info["memes_watched_today"] += 1
     await cache_user_info(user_id, user_info)
+    return user_info

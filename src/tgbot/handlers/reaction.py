@@ -16,6 +16,7 @@ from src.recommendations.service import (
     update_user_meme_reaction,
 )
 from src.tgbot.senders.next_message import next_message
+from src.tgbot.handlers.moderator.invite import maybe_send_moderator_invite
 from src.tgbot.user_info import update_user_info_counters
 
 
@@ -27,7 +28,8 @@ async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     )
 
     # do that in sync since we'll use counters in next_message
-    await update_user_info_counters(user_id)
+    user_info = await update_user_info_counters(user_id)
+    await maybe_send_moderator_invite(context.bot, user_id, user_info)
     asyncio.create_task(update_user_last_active_at(user_id))
     asyncio.create_task(reward_user_for_daily_activity(user_id))
 
