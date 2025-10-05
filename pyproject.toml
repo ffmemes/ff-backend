@@ -1,10 +1,10 @@
 [tool.ruff]
-line-length = 88
+line-length = 100
+src = ["src"]
+target-version = "py311"
 
-# Enable Pyflakes `E` and `F` codes by default.
+# Enable only style-related checks by default.
 select = [
-    # Pyflakes
-    "F",
     # Pycodestyle
     "E",
     "W",
@@ -35,16 +35,30 @@ exclude = [
     "node_modules",
     "venv",
 ]
-per-file-ignores = {}
 
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-# Assume Python 3.11.
-target-version = "py311"
-
 [tool.ruff.mccabe]
 # Unlike Flake8, default to a complexity level of 10.
 max-complexity = 10
+
+[tool.ruff.isort]
+known-first-party = ["src"]
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "W",
+    "I001",
+]
+ignore = []
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
 
 [tool.poetry.dependencies]

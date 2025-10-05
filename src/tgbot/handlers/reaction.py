@@ -1,14 +1,10 @@
-"""
-    Handle reactions on sent memes
-"""
+"""Handle reactions on sent memes."""
 
 import asyncio
 import logging
 
 from telegram import Update
-from telegram.ext import (
-    ContextTypes,
-)
+from telegram.ext import ContextTypes
 
 from src.flows.rewards.daily import reward_user_for_daily_activity
 from src.recommendations.service import (
