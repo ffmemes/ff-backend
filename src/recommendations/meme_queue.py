@@ -1,3 +1,5 @@
+import logging
+from math import ceil
 from typing import Any, Optional
 
 from src import redis
@@ -9,6 +11,11 @@ from src.recommendations.candidates import (
     get_selected_sources,
 )
 from src.storage.schemas import MemeData
+from sqlalchemy import text
+
+from src.database import fetch_all
+from src.recommendations.utils import exclude_meme_ids_sql_filter
+from src.tgbot.constants import UserType
 from src.tgbot.user_info import get_user_info
 
 
@@ -84,8 +91,8 @@ async def generate_recommendations(
     Will be refactored
     """
 
+    user_info = await get_user_info(user_id)
     if nmemes_sent is None:
-        user_info = await get_user_info(user_id)
         nmemes_sent = user_info["nmemes_sent"]
 
     queue_key = redis.get_meme_queue_key(user_id)
@@ -96,6 +103,38 @@ async def generate_recommendations(
 
     if retriever is None:
         retriever = CandidatesRetriever()
+
+    async def get_low_sent_candidates(
+        user_id: int, limit: int, exclude_ids: list[int]
+    ) -> list[dict[str, Any]]:
+        if limit <= 0:
+            return []
+
+        query = f"""
+            SELECT
+                M.id,
+                M.type,
+                M.telegram_file_id,
+                M.caption,
+                'low_sent_pool' AS recommended_by
+            FROM meme M
+            LEFT JOIN meme_stats MS
+                ON MS.meme_id = M.id
+            LEFT JOIN user_meme_reaction R
+                ON R.user_id = {user_id}
+                AND R.meme_id = M.id
+            INNER JOIN user_language UL
+                ON UL.user_id = {user_id}
+                AND UL.language_code = M.language_code
+            WHERE 1=1
+                AND M.status = 'ok'
+                AND R.meme_id IS NULL
+                {exclude_meme_ids_sql_filter(exclude_ids)}
+            ORDER BY COALESCE(MS.nmemes_sent, 0), M.id
+            LIMIT {limit}
+        """
+
+        return await fetch_all(text(query))
 
     async def get_candidates(user_id, limit):
         """A helper function to avoid copy-paste"""
@@ -158,7 +197,37 @@ async def generate_recommendations(
 
         return candidates
 
-    candidates = await get_candidates(user_id, limit)
+    user_type_value = user_info.get("type")
+    user_type = None
+    if user_type_value:
+        try:
+            user_type = UserType(str(user_type_value))
+        except ValueError:
+            logging.warning(
+                "Unknown user type '%s' for user_id=%s during queue generation",
+                user_type_value,
+                user_id,
+            )
+
+    candidates: list[dict[str, Any]] = []
+
+    if user_type in (UserType.MODERATOR, UserType.ADMIN):
+        low_sent_quota = ceil(limit * 0.75)
+        low_sent_candidates = await get_low_sent_candidates(
+            user_id,
+            low_sent_quota,
+            meme_ids_in_queue,
+        )
+        candidates.extend(low_sent_candidates)
+        meme_ids_in_queue.extend(candidate["id"] for candidate in low_sent_candidates)
+
+        remaining_limit = max(0, limit - len(candidates))
+        if remaining_limit > 0:
+            extra_candidates = await get_candidates(user_id, remaining_limit)
+            candidates.extend(extra_candidates)
+    else:
+        candidates = await get_candidates(user_id, limit)
+
     if len(candidates) > 0:
         await redis.add_memes_to_queue_by_key(queue_key, candidates)
 
