@@ -42,6 +42,7 @@ from src.tgbot.handlers.admin.broadcast_text import (
     handle_broadcast_text_ru_trigger,
 )
 from src.tgbot.handlers.admin.forward_channel import handle_forwarded_from_tgchannelru
+from src.tgbot.handlers.admin.promote_moderator import handle_promote_moderator
 from src.tgbot.handlers.admin.user_info import (
     DELETE_USER_DATA_CONFIRMATION_CALLBACK,
     delete_user_data,
@@ -249,6 +250,14 @@ def add_handlers(application: Application) -> None:
             filters=filters.ChatType.PRIVATE
             & filters.ForwardedFrom(chat_id=TELEGRAM_CHANNEL_RU_CHAT_ID),
             callback=handle_forwarded_from_tgchannelru,
+        )
+    )
+
+    application.add_handler(
+        CommandHandler(
+            "promotemod",
+            handle_promote_moderator,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
         )
     )
 
