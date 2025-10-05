@@ -86,8 +86,31 @@ async def get_user_medias(user_id: int) -> list[IgPostParsingResult]:
     user_medias_response = await _get_user_medias(user_id)
     if not user_medias_response:
         return None
-    if user_medias_response["response"]["status"] != "ok":
-        logging.warning(f"Failed to get {user_id} medias: {user_medias_response}")
+
+    response_payload = user_medias_response.get("response")
+    if not isinstance(response_payload, dict):
+        logging.warning(
+            "Failed to get %s medias: unexpected payload %s",
+            user_id,
+            user_medias_response,
+        )
+        return None
+
+    if response_payload.get("status") != "ok":
+        logging.warning(
+            "Failed to get %s medias: %s",
+            user_id,
+            user_medias_response,
+        )
+        return None
+
+    medias = response_payload.get("items") or []
+    if not isinstance(medias, list):
+        logging.warning(
+            "Failed to get %s medias: unexpected items payload %s",
+            user_id,
+            medias,
+        )
         return None
 
     logging.info("Received %s medias for %s", len(medias), user_id)
