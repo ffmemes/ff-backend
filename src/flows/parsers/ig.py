@@ -47,29 +47,51 @@ async def parse_ig_sources(
 
         # receiving
         data = ig_source["data"] or {}
-        if not data or data.get("pk") is None:
-            logger.info(f"Getting user info for @{ig_username}")
-            user_info = await get_user_info(ig_username)
+        user_info = data.get("ig_user_info")
 
-            data = (ig_source["data"] or {}) | {
-                "ig_user_info": {
-                    "pk": user_info["pk"],
-                    "full_name": user_info["full_name"],
-                    "is_private": user_info["is_private"],
-                    "username": user_info["username"],
-                    "biography": user_info["biography"],
-                    "category": user_info["category"],
-                    "follower_count": user_info["follower_count"],
-                    "following_count": user_info["following_count"],
-                    "media_count": user_info["media_count"],
-                    "external_url": user_info["external_url"],
+        if not user_info or user_info.get("pk") is None:
+            logger.info(f"Getting user info for @{ig_username}")
+            fetched_user_info = await get_user_info(ig_username)
+
+            if not fetched_user_info or fetched_user_info.get("pk") is None:
+                logger.warning(
+                    f"Could not retrieve user info for @{ig_username}, skipping source"
+                )
+                user_info = {
+                    "username": ig_username,
+                    "not_found": True,
                     "parsed_at": str(datetime.utcnow()),
                 }
-            }
+            else:
+                user_info = {
+                    "pk": fetched_user_info.get("pk"),
+                    "full_name": fetched_user_info.get("full_name"),
+                    "is_private": fetched_user_info.get("is_private"),
+                    "username": fetched_user_info.get("username"),
+                    "biography": fetched_user_info.get("biography"),
+                    "category": fetched_user_info.get("category"),
+                    "follower_count": fetched_user_info.get("follower_count"),
+                    "following_count": fetched_user_info.get("following_count"),
+                    "media_count": fetched_user_info.get("media_count"),
+                    "external_url": fetched_user_info.get("external_url"),
+                    "parsed_at": str(datetime.utcnow()),
+                }
+
+            data = data | {"ig_user_info": user_info}
             await update_meme_source(ig_source["id"], data=data)
 
-        user_info = data["ig_user_info"]
-        if user_info["is_private"]:
+        user_info = data.get("ig_user_info")
+        if not user_info:
+            logger.warning(
+                f"Instagram user info missing for source {ig_source['id']}, skipping"
+            )
+            continue
+
+        if user_info.get("not_found"):
+            logger.warning(f"Instagram user @{ig_username} not found, skipping")
+            continue
+
+        if user_info.get("is_private"):
             logger.warning(f"@{ig_username} is private, skipping")
             continue
 
