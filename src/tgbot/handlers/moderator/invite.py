@@ -1,6 +1,7 @@
 """Utilities and handlers for promoting power users to moderators."""
 
 import logging
+import random
 from collections.abc import Mapping
 
 from telegram import (
@@ -21,13 +22,55 @@ from src.tgbot.service import (
 )
 from src.tgbot.user_info import update_user_info_cache
 
-INVITE_MESSAGE_TEMPLATE = (
-    "🥳 Ты посмотрел {nmemes_sent} мемов! Нам очень нужна помощь модераторов "
-    "в русской ленте Fast Food & Memes. Нажми кнопку ниже, чтобы получить "
-    "одноразовую ссылку и присоединиться к нашему модераторскому чату."
+INVITE_VARIANTS = (
+    {
+        "message": (
+            "🥳 Ты посмотрел {nmemes_sent_formatted} мемов! Нам очень нужна помощь модераторов "
+            "в русской ленте Fast Food & Memes. Нажми кнопку ниже, чтобы получить "
+            "одноразовую ссылку и присоединиться к нашему модераторскому чату."
+        ),
+        "button": "Хочу модерировать 🇷🇺",
+    },
+    {
+        "message": (
+            "Ты — легенда, посмотревший {nmemes_sent_formatted} мемов! 🏆 "
+            "Нужна твоя помощь в модерации русского раздела Fast Food & Memes. "
+            "Жми «Войти» — и добро пожаловать в команду!"
+        ),
+        "button": "Войти в чат",
+    },
+    {
+        "message": (
+            "Система зафиксировала: {nmemes_sent_formatted} мемов на твоём счету. 📊 "
+            "Такой эксперт нужен нам в модераторах русской ленты Fast Food & Memes! "
+            "Нажми на кнопку, получи секретную ссылку и залетай в нашу команду."
+        ),
+        "button": "Получить ссылку",
+    },
+    {
+        "message": (
+            "Ваша активность ({nmemes_sent_formatted} просмотренных мемов) говорит о вашей высокой квалификации. "
+            "Приглашаем вас помочь с модерацией русскоязычной ленты сообщества Fast Food & Memes. "
+            "Для присоединения к чату модераторов нажмите на кнопку ниже."
+        ),
+        "button": "Присоединиться к команде",
+    },
+    {
+        "message": (
+            "Эй, мы видели, сколько мемов ты прошёл — целых {nmemes_sent_formatted}! "
+            "Решишься помочь с порядком в русской ленте Fast Food & Memes? "
+            "Жми на кнопку, кину одноразовый инвайт в наш модераторский чат."
+        ),
+        "button": "Помочь",
+    },
 )
-INVITE_BUTTON_TEXT = "Хочу модерировать 🇷🇺"
 MODERATOR_INVITE_CALLBACK_DATA = "moderator_invite:join"
+
+
+def _format_nmemes(nmemes_sent: int) -> str:
+    """Return a human-friendly representation of the viewed memes count."""
+
+    return f"{nmemes_sent:,}".replace(",", " ")
 
 
 async def maybe_send_moderator_invite(
@@ -58,11 +101,13 @@ async def maybe_send_moderator_invite(
     if "ru" not in user_languages:
         return
 
+    variant = random.choice(INVITE_VARIANTS)
+
     keyboard = InlineKeyboardMarkup(
         [
             [
                 InlineKeyboardButton(
-                    text=INVITE_BUTTON_TEXT,
+                    text=variant["button"],
                     callback_data=MODERATOR_INVITE_CALLBACK_DATA,
                 )
             ]
@@ -71,7 +116,10 @@ async def maybe_send_moderator_invite(
 
     await bot.send_message(
         chat_id=user_id,
-        text=INVITE_MESSAGE_TEMPLATE.format(nmemes_sent=nmemes_sent),
+        text=variant["message"].format(
+            nmemes_sent=nmemes_sent,
+            nmemes_sent_formatted=_format_nmemes(nmemes_sent),
+        ),
         reply_markup=keyboard,
         disable_web_page_preview=True,
     )
