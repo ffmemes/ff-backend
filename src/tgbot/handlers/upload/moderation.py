@@ -250,7 +250,7 @@ async def handle_uploaded_meme_review_button(
                     reply_markup=None,
                 )
             except BadRequest as exc:
-                if exc.message != "Message is not modified":
+                if "Message is not modified" not in str(exc):
                     raise
 
         await create_user_meme_reaction(  # author auto like for the uploaded meme
@@ -316,7 +316,7 @@ See realtime stats of your uploaded memes: /uploads
                     reply_markup=None,
                 )
             except BadRequest as exc:
-                if exc.message != "Message is not modified":
+                if "Message is not modified" not in str(exc):
                     raise
         try:
             await context.bot.send_message(
