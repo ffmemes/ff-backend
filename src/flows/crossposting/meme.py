@@ -117,7 +117,7 @@ def _get_ru_caption_for_crossposting_meme(meme: MemeData, channel: Channel) -> s
     # caption = escape(meme.caption, quote=False) if meme.caption else ""
     # text = caption + "\n\n" + referral_html
 
-    text = cta + ": " + f"""<a href="{ref_link}">🍔🍔🍔</a>"""
+    text = cta + ": " + f"""<a href="{ref_link}">@ffmemesbot</a>"""
 
     return text
 
