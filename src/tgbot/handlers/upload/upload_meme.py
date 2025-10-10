@@ -6,6 +6,8 @@ Methods for Meme uploading via bot:
 
 import asyncio
 import re
+from datetime import datetime
+from html import escape
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
@@ -15,6 +17,11 @@ from src import localizer
 from src.recommendations.meme_queue import check_queue
 from src.tgbot.constants import UserType
 from src.tgbot.handlers.upload.constants import SUPPORTED_LANGUAGES
+from src.tgbot.handlers.upload.forwarded_meme import (
+    extract_meme_id_from_message,
+    format_age,
+    was_forwarded_from_bot,
+)
 from src.tgbot.handlers.upload.moderation import uploaded_meme_auto_review
 from src.tgbot.handlers.upload.service import (
     count_24h_uploaded_not_approved_memes,
@@ -24,6 +31,12 @@ from src.tgbot.handlers.upload.service import (
 )
 from src.tgbot.logs import log
 from src.tgbot.senders.next_message import next_message
+from src.tgbot.service import (
+    get_meme_by_id,
+    get_meme_source_by_id,
+    get_meme_source_stats_by_id,
+    get_meme_stats,
+)
 from src.tgbot.user_info import get_user_info
 from src.tgbot.utils import (
     check_if_user_follows_related_channel,
@@ -38,6 +51,73 @@ LANGUAGE_SELECTED_CALLBACK_DATA_REGEXP = r"upload:(\d+):lang:(\w+)"
 
 LANGUAGE_SELECTED_OTHER_CALLBACK_DATA_PATTERN = "upload:{upload_id}:lang:other"
 LANGUAGE_SELECTED_OTHER_CALLBACK_DATA_REGEXP = r"upload:(\d+):lang:other"
+
+
+async def _reply_with_forwarded_meme_stats(
+    update: Update,
+    meme_id: int,
+) -> bool:
+    meme = await get_meme_by_id(meme_id)
+    if not meme:
+        await update.message.reply_text(
+            f"Не нашёл информацию по мему #{meme_id}.",
+        )
+        return True
+
+    meme_source = await get_meme_source_by_id(meme["meme_source_id"])
+    if not meme_source:
+        await update.message.reply_text(
+            f"Источник мема #{meme_id} не найден.",
+        )
+        return True
+    meme_stats = await get_meme_stats(meme_id)
+    meme_source_stats = await get_meme_source_stats_by_id(meme_source["id"])
+
+    meme_nlikes = meme_stats["nlikes"] if meme_stats else 0
+    meme_ndislikes = meme_stats["ndislikes"] if meme_stats else 0
+    meme_views = meme_stats["nmemes_sent"] if meme_stats else 0
+
+    source_nlikes = meme_source_stats["nlikes"] if meme_source_stats else 0
+    source_ndislikes = meme_source_stats["ndislikes"] if meme_source_stats else 0
+    source_views = meme_source_stats["nmemes_sent"] if meme_source_stats else 0
+
+    published_at = meme.get("published_at")
+    published_text = ""
+    if isinstance(published_at, datetime):
+        age_text = format_age(published_at)
+        published_text = (
+            f"🗓 Добавлен: <b>{published_at:%Y-%m-%d %H:%M}</b> ({age_text} ago)\n"
+        )
+
+    source_url = meme_source.get("url") if meme_source else None
+    source_url_html = (
+        f'<a href="{escape(source_url, quote=True)}">{escape(source_url, quote=False)}</a>'
+        if source_url
+        else "—"
+    )
+
+    info_lines = [
+        f"<b>📊 Мем #{meme_id}</b>",
+        published_text.strip(),
+        f"👁️ Показов: <b>{meme_views}</b>",
+        f"👍 Лайков: <b>{meme_nlikes}</b>",
+        f"👎 Дизлайков: <b>{meme_ndislikes}</b>",
+        "",
+        "<b>📡 Источник</b>",
+        f"🔗 {source_url_html}",
+        f"👍 Лайков: <b>{source_nlikes}</b>",
+        f"👎 Дизлайков: <b>{source_ndislikes}</b>",
+        f"📨 Отправлено мемов: <b>{source_views}</b>",
+    ]
+
+    info_text = "\n".join(line for line in info_lines if line)
+
+    await update.message.reply_text(
+        info_text,
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True,
+    )
+    return True
 
 
 def get_meme_language_selector_keyboard(upload_id: int) -> list[list[dict]]:
@@ -76,6 +156,13 @@ def get_meme_language_selector_keyboard(upload_id: int) -> list[list[dict]]:
 
 async def handle_message_with_meme(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """When a user sends a message with a meme"""
+    if was_forwarded_from_bot(update.message, context.bot.id):
+        meme_id = extract_meme_id_from_message(update.message)
+        if meme_id is not None:
+            handled = await _reply_with_forwarded_meme_stats(update, meme_id)
+            if handled:
+                return
+
     user = await get_user_info(update.effective_user.id)
     if not UserType(user["type"]).is_moderator:
         if user["nmemes_sent"] < 10:
