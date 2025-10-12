@@ -1,9 +1,11 @@
 from random import choice
+from typing import Iterable
 
 from telegram import Message, Update
 from telegram.constants import ParseMode
 
 from src.config import settings
+from src.tgbot.service import get_user_languages
 
 
 def get_random_emoji() -> str:
@@ -76,6 +78,21 @@ def get_referral_html(user_id: int, meme_id: int) -> str:
     emoji = get_random_emoji()
     ref_link = get_referral_link(user_id, meme_id)
     return f"""{emoji} <i><a href="{ref_link}">Fast Food Memes</a></i>"""
+
+
+async def collect_user_languages(
+    user_id: int,
+    *additional_languages: str | None,
+) -> set[str]:
+    languages = set(await get_user_languages(user_id))
+    for language in additional_languages:
+        if language:
+            languages.add(language)
+    return languages
+
+
+def has_russian_language(languages: Iterable[str]) -> bool:
+    return any(language and language.startswith("ru") for language in languages)
 
 
 async def send_or_edit(

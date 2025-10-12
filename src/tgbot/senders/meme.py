@@ -1,3 +1,4 @@
+import logging
 from typing import Tuple
 
 from telegram import (
@@ -16,15 +17,35 @@ from src.storage.constants import MemeType
 from src.storage.schemas import MemeData
 from src.tgbot.bot import bot
 from src.tgbot.constants import UserType
-from src.tgbot.senders.keyboards import meme_reaction_keyboard
+from src.tgbot.senders.keyboards import (
+    meme_reaction_keyboard,
+    select_referral_button_text,
+)
 from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
+from src.tgbot.senders.utils import collect_user_languages, has_russian_language
 from src.tgbot.service import update_user
 from src.tgbot.user_info import get_user_info
+
+logger = logging.getLogger(__name__)
 
 
 async def send_meme_to_user(bot: Bot, user_id: int, meme: MemeData):
     user_info = await get_user_info(user_id)
-    reply_markup = meme_reaction_keyboard(meme.id, user_id)
+    languages = await collect_user_languages(user_id, user_info["interface_lang"])
+    has_russian = has_russian_language(languages)
+    referral_button_text = select_referral_button_text(has_russian)
+    logger.debug(
+        "Sending meme %s to user %s with referral button '%s' (languages=%s)",
+        meme.id,
+        user_id,
+        referral_button_text,
+        sorted(languages),
+    )
+    reply_markup = meme_reaction_keyboard(
+        meme.id,
+        user_id,
+        referral_button_text,
+    )
     meme.caption = await get_meme_caption_for_user_id(meme, user_id, user_info)
 
     await send_new_message_with_meme(bot, user_id, meme, reply_markup)
