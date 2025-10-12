@@ -15,14 +15,20 @@ from src.storage.service import update_meme
 from src.tgbot.constants import Reaction
 from src.tgbot.logs import log
 from src.tgbot.senders.alerts import send_queue_preparing_alert
-from src.tgbot.senders.keyboards import meme_reaction_keyboard
+from src.tgbot.senders.keyboards import (
+    meme_reaction_keyboard,
+    select_referral_button_text,
+)
 from src.tgbot.senders.meme import (
     edit_last_message_with_meme,
     send_new_message_with_meme,
 )
 from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
 from src.tgbot.senders.popups import get_popup_to_send, send_popup
+from src.tgbot.senders.utils import collect_user_languages, has_russian_language
 from src.tgbot.user_info import get_user_info
+
+logger = logging.getLogger(__name__)
 
 
 async def get_next_meme_for_user(
@@ -36,7 +42,11 @@ async def get_next_meme_for_user(
         if not meme:
             await meme_queue.generate_recommendations(user_id, limit=7)
 
-    logging.warning(f"Failed to find unseen meme for user {user_id} after {max_attempts} attempts")
+    logger.warning(
+        "Failed to find unseen meme for user %s after %s attempts",
+        user_id,
+        max_attempts,
+    )
     return None
 
 
@@ -47,6 +57,8 @@ async def next_message(
     prev_reaction_id: int | None = None,
 ) -> Message:
     user_info = await get_user_info(user_id)
+    languages = await collect_user_languages(user_id, user_info["interface_lang"])
+    has_russian = has_russian_language(languages)
     # TODO: if watched > 30 memes / day show paywall / tasks / donate
 
     popup = await get_popup_to_send(user_id, user_info)
@@ -72,7 +84,19 @@ async def next_message(
             no_memes_left = True
             break
 
-        reply_markup = meme_reaction_keyboard(meme.id, user_id)
+        referral_button_text = select_referral_button_text(has_russian)
+        logger.debug(
+            "Next meme %s for user %s uses referral button '%s' (languages=%s)",
+            meme.id,
+            user_id,
+            referral_button_text,
+            sorted(languages),
+        )
+        reply_markup = meme_reaction_keyboard(
+            meme.id,
+            user_id,
+            referral_button_text,
+        )
         meme.caption = await get_meme_caption_for_user_id(meme, user_id, user_info)
 
         try:
@@ -98,7 +122,11 @@ async def next_message(
     if no_memes_left:
         return await send_queue_preparing_alert(bot, user_id)
 
-    logging.error(f"Failed to deliver meme to user {user_id} after {attempt} attempts")
+    logger.error(
+        "Failed to deliver meme to user %s after %s attempts",
+        user_id,
+        attempt,
+    )
     return await send_queue_preparing_alert(bot, user_id)
 
 
@@ -114,7 +142,7 @@ async def _replace_previous_message(
         )
     except BadRequest as error:
         if _is_missing_message_error(error):
-            logging.info(
+            logger.info(
                 "Previous message for meme %s is missing (error: %s). "
                 "Sending new message instead.",
                 meme.id,

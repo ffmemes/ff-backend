@@ -2,6 +2,10 @@
 
 ➡️ https://t.me/ffmemesbot ⬅️
 
+## Product Notes
+
+- 2025-10-12 — Added a persistent "share" button under every meme that links back to the bot via the same deep link we place in the caption. Hypothesis: when users forward a meme, Telegram strips callback buttons (like/dislike) but keeps external links, so this extra button should survive forwards and convert more viewers back into bot sessions. Monitor engagement and roll back if the button hurts the meme experience.
+
 ## Local Development
 
 ### First Build Only

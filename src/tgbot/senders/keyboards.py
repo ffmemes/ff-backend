@@ -1,9 +1,6 @@
 import random
 
-from telegram import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-)
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from src.storage.constants import (
     MemeSourceStatus,
@@ -14,19 +11,66 @@ from src.tgbot.constants import (
     MEME_SOURCE_SET_LANG_PATTERN,
     Reaction,
 )
+from src.tgbot.senders.utils import get_referral_link
 
 # IDEA: use sometimes another emoji pair like 🤣/🤮
 
 HEART_EMOJI = ["❤️", "♥️", "💙", "💜", "💛", "🧡", "💚", "🩵"]
 
+RUSSIAN_REFERRAL_BUTTON_TEXTS = [
+    "Мемы для тебя",
+    "Твои мемы",
+    "Еще мемы",
+    "Бот с мемами",
+    "За мемами",
+    "Свежие мемы",
+    "Мемы тут",
+    "Мемная лента",
+    "Мемы рядом",
+    "Лови мемы",
+]
 
-def meme_reaction_keyboard(meme_id: int, user_id: int):
+ENGLISH_REFERRAL_BUTTON_TEXTS = [
+    "Memes for you",
+    "Your memes",
+    "More memes",
+    "Meme bot",
+    "Grab memes",
+    "Fresh memes",
+    "Meme feed",
+    "Daily memes",
+    "Tap memes",
+    "Memes inside",
+]
+
+
+def select_referral_button_text(has_russian_language: bool) -> str:
+    texts = (
+        RUSSIAN_REFERRAL_BUTTON_TEXTS
+        if has_russian_language
+        else ENGLISH_REFERRAL_BUTTON_TEXTS
+    )
+    return random.choice(texts)
+
+
+def meme_reaction_keyboard(
+    meme_id: int,
+    user_id: int,
+    referral_button_text: str,
+):
     heart = random.choice(HEART_EMOJI)
     like, dislike = heart, "⏬"
     # like, dislike = "👍", "👎"
 
+    referral_link = get_referral_link(user_id, meme_id)
     return InlineKeyboardMarkup(
         [
+            [
+                InlineKeyboardButton(
+                    referral_button_text,
+                    url=referral_link,
+                ),
+            ],
             [
                 InlineKeyboardButton(
                     like,
