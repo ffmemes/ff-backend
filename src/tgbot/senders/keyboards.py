@@ -67,12 +67,6 @@ def meme_reaction_keyboard(
         [
             [
                 InlineKeyboardButton(
-                    referral_button_text,
-                    url=referral_link,
-                ),
-            ],
-            [
-                InlineKeyboardButton(
                     like,
                     callback_data=MEME_BUTTON_CALLBACK_DATA_PATTERN.format(
                         meme_id=meme_id, reaction_id=Reaction.LIKE.value
@@ -83,6 +77,12 @@ def meme_reaction_keyboard(
                     callback_data=MEME_BUTTON_CALLBACK_DATA_PATTERN.format(
                         meme_id=meme_id, reaction_id=Reaction.DISLIKE.value
                     ),
+                ),
+            ],
+                        [
+                InlineKeyboardButton(
+                    referral_button_text,
+                    url=referral_link,
                 ),
             ],
         ]
