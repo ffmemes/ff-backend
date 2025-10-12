@@ -79,12 +79,13 @@ def meme_reaction_keyboard(
                     ),
                 ),
             ],
-                        [
-                InlineKeyboardButton(
-                    referral_button_text,
-                    url=referral_link,
-                ),
-            ],
+            # doesn't work: Telegram removes this link
+            #             [
+            #     InlineKeyboardButton(
+            #         referral_button_text,
+            #         url=referral_link,
+            #     ),
+            # ],
         ]
     )
 
