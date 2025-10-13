@@ -7,10 +7,9 @@ Methods for Meme uploading via bot:
 import asyncio
 import re
 from datetime import datetime
-from html import escape
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.constants import ParseMode
+from telegram.constants import ChatType, ParseMode
 from telegram.ext import ContextTypes
 
 from src import localizer
@@ -57,17 +56,30 @@ async def _reply_with_forwarded_meme_stats(
     update: Update,
     meme_id: int,
 ) -> bool:
+    message = update.message
+    if not message:
+        return False
+
+    reply_kwargs = {
+        "reply_to_message_id": message.message_id,
+        "allow_sending_without_reply": True,
+    }
+
     meme = await get_meme_by_id(meme_id)
     if not meme:
-        await update.message.reply_text(
+        await message.reply_text(
             f"Не нашёл информацию по мему #{meme_id}.",
+            disable_web_page_preview=True,
+            **reply_kwargs,
         )
         return True
 
     meme_source = await get_meme_source_by_id(meme["meme_source_id"])
     if not meme_source:
-        await update.message.reply_text(
+        await message.reply_text(
             f"Источник мема #{meme_id} не найден.",
+            disable_web_page_preview=True,
+            **reply_kwargs,
         )
         return True
     meme_stats = await get_meme_stats(meme_id)
@@ -79,43 +91,50 @@ async def _reply_with_forwarded_meme_stats(
 
     source_nlikes = meme_source_stats["nlikes"] if meme_source_stats else 0
     source_ndislikes = meme_source_stats["ndislikes"] if meme_source_stats else 0
-    source_views = meme_source_stats["nmemes_sent"] if meme_source_stats else 0
+    source_memes_sent = meme_source_stats["nmemes_sent"] if meme_source_stats else 0
+    source_memes_sent_events = (
+        meme_source_stats["nmemes_sent_events"] if meme_source_stats else 0
+    )
+    source_memes_parsed = meme_source_stats["nmemes_parsed"] if meme_source_stats else 0
 
     published_at = meme.get("published_at")
-    published_text = ""
+    published_line = ""
     if isinstance(published_at, datetime):
         age_text = format_age(published_at)
-        published_text = (
-            f"🗓 Добавлен: <b>{published_at:%Y-%m-%d %H:%M}</b> ({age_text} ago)\n"
-        )
+        published_line = f"added {age_text} ago"
 
     source_url = meme_source.get("url") if meme_source else None
-    source_url_html = (
-        f'<a href="{escape(source_url, quote=True)}">{escape(source_url, quote=False)}</a>'
-        if source_url
-        else "—"
-    )
+    source_url_text = source_url or "—"
 
     info_lines = [
-        f"<b>📊 Мем #{meme_id}</b>",
-        published_text.strip(),
-        f"👁️ Показов: <b>{meme_views}</b>",
-        f"👍 Лайков: <b>{meme_nlikes}</b>",
-        f"👎 Дизлайков: <b>{meme_ndislikes}</b>",
-        "",
-        "<b>📡 Источник</b>",
-        f"🔗 {source_url_html}",
-        f"👍 Лайков: <b>{source_nlikes}</b>",
-        f"👎 Дизлайков: <b>{source_ndislikes}</b>",
-        f"📨 Отправлено мемов: <b>{source_views}</b>",
+        f"#{meme_id}",
+        f"{meme_nlikes} 👍 {meme_ndislikes} 👎  {meme_views} 👁️",
     ]
 
-    info_text = "\n".join(line for line in info_lines if line)
+    if published_line:
+        info_lines.append(published_line)
 
-    await update.message.reply_text(
+    valid_sent_ratio = (
+        int(source_memes_sent / source_memes_parsed * 100)
+        if source_memes_parsed
+        else 0
+    )
+
+    info_lines.extend(
+        [
+            "",
+            f"source: {source_url_text}",
+            f"{source_nlikes} 👍 {source_ndislikes} 👎",
+            f"{source_memes_sent_events} 👁️ / {source_memes_sent} memes ({valid_sent_ratio}% valid)",
+        ]
+    )
+
+    info_text = "\n".join(info_lines)
+
+    await message.reply_text(
         info_text,
-        parse_mode=ParseMode.HTML,
         disable_web_page_preview=True,
+        **reply_kwargs,
     )
     return True
 
@@ -156,23 +175,30 @@ def get_meme_language_selector_keyboard(upload_id: int) -> list[list[dict]]:
 
 async def handle_message_with_meme(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """When a user sends a message with a meme"""
-    if was_forwarded_from_bot(update.message, context.bot.id):
-        meme_id = extract_meme_id_from_message(update.message)
+    message = update.message
+    if not message:
+        return
+
+    if was_forwarded_from_bot(message, context.bot.id):
+        meme_id = extract_meme_id_from_message(message)
         if meme_id is not None:
             handled = await _reply_with_forwarded_meme_stats(update, meme_id)
             if handled:
                 return
 
+    if update.effective_chat and update.effective_chat.type != ChatType.PRIVATE:
+        return
+
     user = await get_user_info(update.effective_user.id)
     if not UserType(user["type"]).is_moderator:
         if user["nmemes_sent"] < 10:
-            return await update.message.reply_text(
+            return await message.reply_text(
                 localizer.t("upload.watch_memes_to_unblock_upload", user["interface_lang"]),
             )
 
         uploaded_today = await count_24h_uploaded_not_approved_memes(update.effective_user.id)
         if uploaded_today >= 5:
-            return await update.message.reply_text(
+            return await message.reply_text(
                 """
 You already uploaded lots of memes today. Try again tomorrow.
 Think about quality, not quantity: your goal is to get as many likes as possible.
@@ -180,12 +206,12 @@ Analyse your /uploads
                 """
             )
 
-    meme_upload = await create_meme_raw_upload(update.message)
+    meme_upload = await create_meme_raw_upload(message)
 
     if not await check_if_user_follows_related_channel(
         context.bot, update.effective_user.id, user["interface_lang"]
     ):
-        return await update.message.reply_text(
+        return await message.reply_text(
             f"""
 You need to follow our channel to upload memes and try again:
 
