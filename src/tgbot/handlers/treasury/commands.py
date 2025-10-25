@@ -11,6 +11,7 @@ from telegram.ext import (
 from src.tgbot.handlers.payments.purchase import PURCHASE_TOKEN_CALLBACK_DATA_PATTERN
 from src.tgbot.handlers.treasury.constants import PAYOUTS, TrxType
 from src.tgbot.handlers.treasury.service import (
+    LEADERBOARD_WINDOW_DAYS,
     get_leaderboard,
     get_token_supply,
     get_user_balance,
@@ -102,27 +103,30 @@ async def handle_show_leaderbaord(update: Update, context: ContextTypes.DEFAULT_
     emoji = get_random_emoji()
     leaderboard = await get_leaderboard()
 
-    LEADERBOARD_TEXT = f"{emoji} Leaderboard {emoji}\n\n"
+    LEADERBOARD_TEXT = (
+        f"{emoji} Leaderboard (last {LEADERBOARD_WINDOW_DAYS} days) {emoji}\n\n"
+    )
     for i, user in enumerate(leaderboard):
         icon = "🏆" if i == 0 else "🥈" if i == 1 else "🥉" if i == 2 else "🏅"
         nick = user["nickname"] or get_random_emoji() * 3
-        LEADERBOARD_TEXT += f"{icon} - {nick} - {user['balance']} 🍔\n"
+        weekly_earned = user.get("weekly_earned", 0)
+        LEADERBOARD_TEXT += f"{icon} - {nick} - {weekly_earned} 🍔\n"
 
     tokens = await get_token_supply()
     LEADERBOARD_TEXT += f"\nTotal supply: {tokens} 🍔"
 
     user_lb_data = await get_user_place_in_leaderboard(update.effective_user.id)
     if user_lb_data:
-        place, nickname, balance = (
+        place, nickname, weekly_earned = (
             user_lb_data["place"],
             user_lb_data["nickname"],
-            user_lb_data["balance"],
+            user_lb_data.get("weekly_earned", 0),
         )
         if nickname:
             LEADERBOARD_TEXT += f"""
 
 You:
-#{place} - {nickname} - {balance} 🍔
+#{place} - {nickname} - {weekly_earned} 🍔
 
 /kitchen /uploads /chat
         """
