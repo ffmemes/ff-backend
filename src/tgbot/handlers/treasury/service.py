@@ -7,6 +7,9 @@ from src.database import execute, fetch_all, fetch_one, treasury_trx, user
 from src.tgbot.handlers.treasury.constants import TrxType
 
 
+LEADERBOARD_WINDOW_DAYS = 7
+
+
 async def calculate_user_balance(user_id: int):
     select_statement = select(func.sum(treasury_trx.c.amount)).where(
         treasury_trx.c.user_id == user_id
@@ -27,8 +30,31 @@ async def get_user_balance(user_id: int) -> int:
     return user_balance or 0
 
 
+def _recent_earnings_subquery():
+    window_start = func.now() - text(f"INTERVAL '{LEADERBOARD_WINDOW_DAYS} days'")
+
+    return (
+        select(
+            treasury_trx.c.user_id.label("user_id"),
+            func.sum(treasury_trx.c.amount).label("weekly_earned"),
+        )
+        .where(treasury_trx.c.created_at >= window_start)
+        .where(treasury_trx.c.amount > 0)
+        .group_by(treasury_trx.c.user_id)
+        .subquery()
+    )
+
+
 async def get_leaderboard(limit=10) -> list[dict[str, Any]]:
-    select_statement = select(user).order_by(user.c.balance.desc()).limit(limit)
+    recent_earnings = _recent_earnings_subquery()
+
+    select_statement = (
+        select(user, recent_earnings.c.weekly_earned)
+        .join(recent_earnings, recent_earnings.c.user_id == user.c.id)
+        .order_by(recent_earnings.c.weekly_earned.desc(), user.c.id.asc())
+        .limit(limit)
+    )
+
     return await fetch_all(select_statement)
 
 
@@ -39,24 +65,30 @@ async def get_token_supply() -> int:
 
 
 async def get_user_place_in_leaderboard(user_id: int) -> int:
-    return await fetch_one(
-        text(
-            f"""
-                SELECT
-                    id, nickname, place, balance
-                FROM (
-                    SELECT
-                        ROW_NUMBER() OVER (ORDER BY balance DESC) place,
-                        id,
-                        nickname,
-                        balance
-                    FROM
-                        "user"
-                ) with_row_number
-                WHERE id = {user_id}
-            """
+    recent_earnings = _recent_earnings_subquery()
+
+    ranked_users = (
+        select(
+            user.c.id.label("id"),
+            user.c.nickname.label("nickname"),
+            user.c.balance.label("balance"),
+            recent_earnings.c.weekly_earned.label("weekly_earned"),
+            func.row_number()
+            .over(
+                order_by=(
+                    recent_earnings.c.weekly_earned.desc(),
+                    user.c.id.asc(),
+                )
+            )
+            .label("place"),
         )
+        .join(recent_earnings, recent_earnings.c.user_id == user.c.id)
+        .subquery()
     )
+
+    select_statement = select(ranked_users).where(ranked_users.c.id == user_id)
+
+    return await fetch_one(select_statement)
 
 
 async def create_treasury_trx(
