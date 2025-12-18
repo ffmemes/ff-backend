@@ -30,7 +30,7 @@ deployment_ig = Deployment.build_from_flow(
     flow=parse_ig_sources,
     name="Parse Instgram Sources",
     work_pool_name=settings.ENVIRONMENT,
-    schedules=[CronSchedule(cron="30 */5 * * *", timezone="Europe/London")],
+    schedules=[CronSchedule(cron="30 0 * * *", timezone="Europe/London")],
 )
 
 deployment_ig.apply()

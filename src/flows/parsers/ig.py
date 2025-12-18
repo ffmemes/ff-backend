@@ -34,7 +34,7 @@ async def parse_ig_source(
     description="Flow for parsing instagram profiles to get posts",
 )
 async def parse_ig_sources(
-    sources_batch_size=10,
+    sources_batch_size=5,
     # nposts=10,
 ) -> None:
     logger = get_run_logger()
