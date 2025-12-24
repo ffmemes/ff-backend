@@ -90,9 +90,17 @@ async def _upload_meme_content_to_tg(
         except telegram.error.TimedOut:
             return None
 
+        animation = msg.animation or msg.video or msg.document
+        if not animation:
+            logging.warning(
+                "Telegram did not return animation/video/document for meme %s upload.",
+                meme_id,
+            )
+            return None
+
         meme = await update_meme(
             meme_id=meme_id,
-            telegram_file_id=msg.animation.file_id,
+            telegram_file_id=animation.file_id,
         )
 
     return meme
