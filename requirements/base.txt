@@ -11,7 +11,7 @@ asyncpg==0.30.*
 fastapi==0.115.*
 uvicorn[standard]==0.32.*
 
-# sentry-sdk==2.39.*
+sentry-sdk==2.39.*
 
 # prefect + worker
 prefect==3.4.17
