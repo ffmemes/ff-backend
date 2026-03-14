@@ -9,7 +9,7 @@ def blend(
     weights_dict: dict[str, float],
     fixed_pos: dict[int, str] = None,
     limit: int = 0,
-    random_seed: int = 42,
+    random_seed: int | None = None,
 ) -> list[dict[str, Any]]:
     """
     Blends candidates from multiple recommendation engines. Blending is implemented
@@ -27,7 +27,7 @@ def blend(
     - random_seed
     """
 
-    random.seed(random_seed)
+    rng = random.Random(random_seed)
 
     # input validation and processing
     if set(candidates_dict.keys()) != set(weights_dict.keys()):
@@ -65,7 +65,7 @@ def blend(
 
         # sample engine
         if engine is None:
-            engine = random.choices(population=engines, weights=weights)[0]
+            engine = rng.choices(population=engines, weights=weights)[0]
 
         next_item = candidates_dict[engine][0].copy()
         res.append(next_item)

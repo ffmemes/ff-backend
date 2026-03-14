@@ -79,7 +79,7 @@ async def generate_recommendations(
     limit: int,
     nmemes_sent: Optional[int] = None,
     retriever: Optional[CandidatesRetriever] = None,
-    random_seed: int = 42,
+    random_seed: int | None = None,
 ) -> list[dict[str, Any]]:
     """Uses blender to mix candidates from different engines
 

@@ -633,17 +633,15 @@ async def goat(
         WITH SCORES AS (
             SELECT
                 MS.meme_id,
-                1
-                    * (MS.nlikes - MS.ndislikes) / (MS.nmemes_sent + 1)
+                1.0
+                    * (MS.nlikes - MS.ndislikes)::float / (MS.nmemes_sent + 1)
                     * MS.lr_smoothed
-                    * (MS.nlikes + MS.ndislikes) / (MS.nmemes_sent + 1)
+                    * (MS.nlikes + MS.ndislikes)::float / (MS.nmemes_sent + 1)
                     * CASE WHEN MS.sec_to_react BETWEEN 2 AND 10 THEN 1 ELSE 0.6 END
                     * CASE WHEN MS.invited_count > 0 THEN 1 ELSE 0.8 END
-        --			* CASE WHEN MS.age_days < 30 THEN 1 ELSE 0.5 END
                     * CASE WHEN MS.raw_impr_rank < 1 THEN 1 ELSE 0.8 END
-        --			* MSS.nlikes / (MSS.nmemes_sent_events + 1.)
-                    * (MSS.nlikes + MSS.ndislikes) / (MSS.nmemes_sent_events + 1.)
-                    * UMSS.nlikes * UMSS.nlikes / (UMSS.nlikes + UMSS.ndislikes)
+                    * (MSS.nlikes + MSS.ndislikes)::float / (MSS.nmemes_sent_events + 1.)
+                    * UMSS.nlikes::float * UMSS.nlikes / (UMSS.nlikes + UMSS.ndislikes)
                 AS score
             FROM meme M
             INNER JOIN meme_stats MS

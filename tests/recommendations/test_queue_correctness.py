@@ -229,7 +229,7 @@ async def test_generate_excludes_already_queued(queue_user):
     first = await generate_recommendations(QUEUE_USER, limit=5, nmemes_sent=10, retriever=stub)
     second = await generate_recommendations(QUEUE_USER, limit=5, nmemes_sent=10, retriever=stub)
 
-    # Redis uses SADD (set), so no true duplicates even if returned
+    # generate_recommendations reads existing queue and excludes those IDs
     queue_key = redis.get_meme_queue_key(QUEUE_USER)
     all_memes = await redis.get_all_memes_in_queue_by_key(queue_key)
     ids = [m["id"] for m in all_memes]

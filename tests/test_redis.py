@@ -17,10 +17,10 @@ async def test_add_memes_to_queue_by_key_ok():
 
     await redis.add_memes_to_queue_by_key(queue_key, memes, expire=1)
 
-    stored = await redis.redis_client.smembers(queue_key)
+    stored = await redis.redis_client.lrange(queue_key, 0, -1)
     assert len(stored) == 2
 
     await asyncio.sleep(3)
 
-    stored = await redis.redis_client.smembers(queue_key)
+    stored = await redis.redis_client.lrange(queue_key, 0, -1)
     assert len(stored) == 0

@@ -1,11 +1,15 @@
+import logging
 from datetime import timedelta
 from typing import Optional
 
 import orjson
 
 from redis import asyncio as aioredis
+from redis.exceptions import ResponseError
 from src.config import settings
 from src.models import CustomModel
+
+logger = logging.getLogger(__name__)
 
 pool = aioredis.ConnectionPool.from_url(
     str(settings.REDIS_URL),
@@ -44,13 +48,29 @@ def get_meme_queue_key(user_id: int) -> str:
     return f"meme_queue:{user_id}"
 
 
+async def _delete_if_wrong_type(key: str) -> None:
+    """Delete a key if it exists with wrong type (SET->LIST migration)."""
+    try:
+        await redis_client.delete(key)
+    except Exception:
+        pass
+
+
 async def get_all_memes_in_queue_by_key(key: str) -> list[dict]:
-    memes = await redis_client.smembers(key)
+    try:
+        memes = await redis_client.lrange(key, 0, -1)
+    except ResponseError:
+        await _delete_if_wrong_type(key)
+        return []
     return [orjson.loads(meme) for meme in memes]
 
 
 async def pop_meme_from_queue_by_key(key: str) -> dict | None:
-    meme = await redis_client.spop(key)
+    try:
+        meme = await redis_client.lpop(key)
+    except ResponseError:
+        await _delete_if_wrong_type(key)
+        return None
     return orjson.loads(meme) if meme else None
 
 
@@ -59,15 +79,26 @@ async def clear_meme_queue_by_key(key: str) -> None:
 
 
 async def get_meme_queue_length_by_key(key: str) -> int:
-    return await redis_client.scard(key)
+    try:
+        return await redis_client.llen(key)
+    except ResponseError:
+        await _delete_if_wrong_type(key)
+        return 0
 
 
 async def add_memes_to_queue_by_key(key: str, memes: list[dict], expire: int = 3600) -> None:
     jsoned_memes = [orjson.dumps(meme) for meme in memes]
-    async with redis_client.pipeline(transaction=True) as pipe:
-        await pipe.sadd(key, *jsoned_memes)
-        await pipe.expire(key, expire)
-        await pipe.execute(raise_on_error=True)
+    try:
+        async with redis_client.pipeline(transaction=True) as pipe:
+            await pipe.rpush(key, *jsoned_memes)
+            await pipe.expire(key, expire)
+            await pipe.execute(raise_on_error=True)
+    except ResponseError:
+        await _delete_if_wrong_type(key)
+        async with redis_client.pipeline(transaction=True) as pipe:
+            await pipe.rpush(key, *jsoned_memes)
+            await pipe.expire(key, expire)
+            await pipe.execute(raise_on_error=True)
 
 
 def get_user_info_key(user_id: int) -> str:
