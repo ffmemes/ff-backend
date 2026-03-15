@@ -1,0 +1,48 @@
+# TODOS
+
+## P1 — High Priority
+
+### Remove bad engines from user traffic
+**What:** Remove `goat`, `less_seen_meme_and_source` from regular user blender weights. Keep `low_sent_pool` for moderators only.
+**Why:** These engines have 6-31% like rate vs 47% for top engines. 14% of traffic serves bad memes.
+**Context:** Wait for experiment results (goat integer division fix deployed 2026-03-14, measure by 2026-03-21). Goat may recover after the fix. See `specs/data-hypotheses.md` H6 and `specs/experiment-2026-03-14.md`.
+**Depends on:** Experiment results from 2026-03-21.
+
+## P2 — Medium Priority
+
+### Per-engine session continuation rate
+**What:** SQL query that computes, for each engine: % of times user continued scrolling after seeing a meme from that engine.
+**Why:** Replaces per-engine like rate as the engine evaluation metric. Directly aligned with session length north star.
+**Context:** Can start with ad-hoc SQL queries. Later, add to a Prefect monitoring flow.
+**Depends on:** Session gap standardization (done: 30 min).
+
+### Incremental engagement_score computation
+**What:** Add `WHERE user_id IN (SELECT DISTINCT user_id FROM user_meme_reaction WHERE sent_at > NOW() - INTERVAL '2 hours')` to limit the full-table scan.
+**Why:** If the hourly full scan becomes slow as data grows beyond 22M rows.
+**Context:** V1 uses full scan (same approach as lr_smoothed). Monitor query time during shadow mode. If >30s, add this.
+**Depends on:** V1 engagement_score being deployed.
+
+### Add share bonus to engagement_score V2
+**What:** Include `invited_count` as a bonus signal in engagement_score (e.g. flat +0.3 if shared).
+**Why:** Shares are the highest-intent positive signal but were dropped from V1 because the per-reaction weight (+3.0) doesn't map cleanly to the per-meme `invited_count`.
+**Context:** Engines can already boost by `invited_count` independently via `ORDER BY engagement_score * CASE WHEN MS.invited_count > 0 THEN 1.3 ELSE 1 END`.
+**Depends on:** V1 shadow mode validation.
+
+### Skip rate alerting
+**What:** Flag memes with >50% skip rate (sent but unreacted while user continues) for manual review.
+**Why:** These memes are actively boring users — auto-demoting or flagging them improves feed quality.
+**Context:** Depends on skip detection being validated in engagement_score V1.
+**Depends on:** V1 engagement_score validation.
+
+### Cold start quality score
+**What:** Compute engagement_score specifically for the first 10 memes each new user sees.
+**Why:** 25% of users leave within first 5 memes (H4). This metric tells you if cold start is hooking users.
+**Context:** See `specs/data-hypotheses.md` H4.
+**Depends on:** V1 engagement_score validation.
+
+## P3 — Nice to Have
+
+### Daily north star log message
+**What:** Log line printed hourly: "Session length: median=22, avg=45, WAU=530, share_rate=16.8%".
+**Why:** Quick pulse of the product without running queries manually.
+**Context:** Could be a simple Prefect flow or a log statement in the existing stats flow.

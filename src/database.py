@@ -277,6 +277,7 @@ user_stats = Table(
     Column("first_reaction_at", DateTime),
     Column("last_reaction_at", DateTime),
     Column("invited_users", Integer, nullable=False, server_default="0"),
+    Column("median_session_length", Integer, nullable=False, server_default="0"),
     Column(
         "updated_at",
         DateTime,
@@ -320,6 +321,7 @@ meme_stats = Table(
     Column("sec_to_react", Float, nullable=False, server_default="99999"),  # median
     Column("invited_count", Integer, nullable=False, server_default="0"),
     Column("lr_smoothed", Float, nullable=False, server_default="0"),
+    Column("engagement_score", Float, nullable=False, server_default="0"),
     Column(
         "updated_at",
         DateTime,

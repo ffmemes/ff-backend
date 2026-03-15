@@ -146,6 +146,103 @@ async def calculate_meme_raw_impressions_stats() -> None:
     await execute(text(insert_query))
 
 
+async def calculate_engagement_score(
+    min_user_reactions: int = 10,
+    min_meme_reactions: int = 3,
+) -> None:
+    """
+    Engagement score: a composite per-meme quality metric that replaces
+    binary like rate with timing-weighted reaction values and skip detection.
+
+    Reaction values:
+        Like                          → +1.0
+        Dislike, slow (>3s)           → -1.0  (genuine rejection)
+        Dislike, fast (≤3s)           → -0.5  (uncertain: lazy or bad?)
+        Dislike, timing unknown       → -1.0  (default conservative)
+        Skip (sent, no reaction,
+              but user continued)     → -0.3  (didn't even engage)
+        Last meme in session          → NULL  (excluded, unknowable)
+
+    Smoothing: same running-average user-bias correction as lr_smoothed.
+        smoothed = engagement_value - running_avg(engagement_value per user)
+        engagement_score = avg(smoothed) per meme
+
+    Data flow:
+        user_meme_reaction
+            → window: detect skips (user has later reactions?)
+            → CASE: assign engagement_value per reaction
+            → window: running avg per user (bias correction)
+            → subtract user bias
+            → aggregate per meme
+            → upsert into meme_stats.engagement_score
+    """
+
+    query = f"""
+        INSERT INTO meme_stats (meme_id, engagement_score)
+
+        WITH REACTIONS_WITH_CONTEXT AS (
+            SELECT
+                R.user_id,
+                R.meme_id,
+                R.reaction_id,
+                R.sent_at,
+                R.reacted_at,
+                EXTRACT(EPOCH FROM R.reacted_at - R.sent_at) AS sec_to_react,
+                -- Last sent_at where this user actually reacted to a meme
+                MAX(CASE WHEN R.reaction_id IS NOT NULL THEN R.sent_at END)
+                    OVER (PARTITION BY R.user_id) AS user_last_reaction_sent_at
+            FROM user_meme_reaction R
+        ),
+
+        ENGAGEMENT_VALUES AS (
+            SELECT
+                user_id, meme_id, sent_at,
+                CASE
+                    WHEN reaction_id = 1 THEN 1.0
+                    WHEN reaction_id = 2
+                        AND sec_to_react BETWEEN 0.5 AND 60
+                        AND sec_to_react > 3 THEN -1.0
+                    WHEN reaction_id = 2
+                        AND sec_to_react BETWEEN 0.5 AND 60
+                        AND sec_to_react <= 3 THEN -0.5
+                    WHEN reaction_id = 2 THEN -1.0
+                    WHEN reaction_id IS NULL
+                        AND sent_at < user_last_reaction_sent_at THEN -0.3
+                    ELSE NULL
+                END AS engagement_value
+            FROM REACTIONS_WITH_CONTEXT
+        ),
+
+        USER_SMOOTHED AS (
+            SELECT
+                user_id,
+                meme_id,
+                engagement_value,
+                engagement_value
+                    - AVG(engagement_value)
+                        OVER (PARTITION BY user_id ORDER BY sent_at)
+                    AS smoothed_value,
+                COUNT(engagement_value)
+                    OVER (PARTITION BY user_id ORDER BY sent_at)
+                    AS n_user_reactions
+            FROM ENGAGEMENT_VALUES
+            WHERE engagement_value IS NOT NULL
+        )
+
+        SELECT
+            meme_id,
+            AVG(smoothed_value) AS engagement_score
+        FROM USER_SMOOTHED
+        WHERE n_user_reactions >= {min_user_reactions}
+        GROUP BY meme_id
+        HAVING COUNT(*) >= {min_meme_reactions}
+
+        ON CONFLICT (meme_id) DO UPDATE SET
+            engagement_score = EXCLUDED.engagement_score
+    """
+    await execute(text(query))
+
+
 async def calculate_meme_invited_count():
     # ruff: noqa: W605
     insert_query = """
