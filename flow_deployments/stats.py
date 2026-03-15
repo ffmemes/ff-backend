@@ -29,14 +29,14 @@ deployment_user_meme_source_stats = Deployment.build_from_flow(
 deployment_user_meme_source_stats.apply()
 
 
-deployment_user_stats = Deployment.build_from_flow(
+deployment_meme_stats = Deployment.build_from_flow(
     flow=calculate_meme_stats,
     name="Calculate meme_stats",
     work_pool_name=settings.ENVIRONMENT,
     schedules=[CronSchedule(cron="3,18,33,48 * * * *", timezone="Europe/London")],
 )
 
-deployment_user_stats.apply()
+deployment_meme_stats.apply()
 
 
 deployment_meme_source_stats = Deployment.build_from_flow(

@@ -78,7 +78,7 @@ async def filter_unseen_memes(
     query = """
         SELECT
             M.id, M.type, M.telegram_file_id, M.caption,
-            'test' as recommended_by
+            'uploaded_meme' as recommended_by
         FROM meme M
         LEFT JOIN user_meme_reaction R
             ON R.meme_id = M.id

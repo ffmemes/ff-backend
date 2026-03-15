@@ -83,7 +83,7 @@ async def like_spread_and_recent_memes(
 
             AND MS.nlikes > MS.ndislikes
             AND MS.raw_impr_rank = 0
-            AND age_days < 30
+            AND MS.age_days < 30
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
         ORDER BY -1
             * (MS.nlikes - MS.ndislikes) / (MS.nmemes_sent + 1.)
@@ -160,7 +160,7 @@ async def goat(
                     * CASE WHEN MS.invited_count > 0 THEN 1 ELSE 0.8 END
                     * CASE WHEN MS.raw_impr_rank < 1 THEN 1 ELSE 0.8 END
                     * (MSS.nlikes + MSS.ndislikes)::float / (MSS.nmemes_sent_events + 1.)
-                    * UMSS.nlikes::float * UMSS.nlikes / (UMSS.nlikes + UMSS.ndislikes)
+                    * (UMSS.nlikes + 1.)::float / (UMSS.nlikes + UMSS.ndislikes + 1.)
                 AS score
             FROM meme M
             INNER JOIN meme_stats MS
