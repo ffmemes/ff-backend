@@ -9,7 +9,7 @@ from src.database import fetch_all
 from src.recommendations.blender import blend
 from src.recommendations.candidates import (
     CandidatesRetriever,
-    get_fast_dopamine,
+    best_uploaded_memes,
     get_lr_smoothed,
     get_selected_sources,
 )
@@ -58,7 +58,7 @@ async def generate_cold_start_recommendations(user_id, limit=10):
     )
 
     if len(candidates) == 0:
-        candidates = await get_fast_dopamine(
+        candidates = await best_uploaded_memes(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
 

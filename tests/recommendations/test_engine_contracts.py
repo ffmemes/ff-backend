@@ -199,36 +199,6 @@ async def test_goat_empty_without_user_source_stats(base_data):
     assert len(results) == 0
 
 
-@pytest.mark.asyncio
-async def test_fast_dopamine_needs_fast_reactions(base_data):
-    """fast_dopamine requires >= 3 fast like reactions per meme."""
-    # Without fast reactions, should return nothing
-    results = await retriever.get_candidates("fast_dopamine", USER_ID, limit=50)
-    assert len(results) == 0
-
-
-@pytest.mark.asyncio
-async def test_fast_dopamine_with_reactions(base_data):
-    """Add fast like reactions, then fast_dopamine should return results."""
-    sent_time = FIXED_DT
-    react_time = FIXED_DT + timedelta(seconds=5)
-
-    async with engine.connect() as conn:
-        for uid in (10002, 10003, 10004):
-            await create_reaction(
-                conn,
-                user_id=uid,
-                meme_id=10001,
-                reaction_id=1,
-                sent_at=sent_time,
-                reacted_at=react_time,
-            )
-        await conn.commit()
-
-    results = await retriever.get_candidates("fast_dopamine", USER_ID, limit=50)
-    assert len(results) > 0
-    assert any(r["id"] == 10001 for r in results)
-
 
 @pytest.mark.asyncio
 async def test_recently_liked_with_likes(base_data):

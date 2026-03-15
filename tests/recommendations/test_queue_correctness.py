@@ -135,10 +135,10 @@ async def test_growing_30_to_100(queue_user):
     stub = _make_stub_retriever(
         {
             "best_uploaded_memes": [_meme(20001)],
-            "fast_dopamine": [_meme(20002)],
             "lr_smoothed": [_meme(20003)],
             "recently_liked": [_meme(20004)],
             "goat": [_meme(20005)],
+            "like_spread_and_recent_memes": [_meme(20006)],
         }
     )
     candidates = await generate_recommendations(QUEUE_USER, limit=5, nmemes_sent=50, retriever=stub)
