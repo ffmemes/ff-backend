@@ -53,7 +53,9 @@ async def generate_cold_start_recommendations(user_id, limit=10):
     memes_in_queue = await redis.get_all_memes_in_queue_by_key(queue_key)
     meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
 
-    candidates = []
+    candidates = await get_lr_smoothed(
+        user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+    )
 
     if len(candidates) == 0:
         candidates = await get_fast_dopamine(
@@ -64,9 +66,6 @@ async def generate_cold_start_recommendations(user_id, limit=10):
         candidates = await get_selected_sources(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
-
-    if len(candidates) == 0:
-        candidates = await get_lr_smoothed(user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue)
 
     if len(candidates) == 0:
         return
@@ -140,7 +139,7 @@ async def generate_recommendations(
         # <30 is treated as cold start. no blending
         if nmemes_sent < 30:
             candidates = await retriever.get_candidates(
-                "best_uploaded_memes",
+                "lr_smoothed",
                 user_id,
                 limit,
                 exclude_mem_ids=meme_ids_in_queue,
@@ -148,7 +147,7 @@ async def generate_recommendations(
 
             if len(candidates) == 0:
                 candidates = await retriever.get_candidates(
-                    "fast_dopamine", user_id, limit, exclude_mem_ids=meme_ids_in_queue
+                    "best_uploaded_memes", user_id, limit, exclude_mem_ids=meme_ids_in_queue
                 )
 
             return candidates

@@ -519,7 +519,7 @@ async def get_lr_smoothed(
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
 
         ORDER BY -1
-            * (UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.)
+            * COALESCE((UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.), 0.5)
             * MS.lr_smoothed
         LIMIT {limit}
     """

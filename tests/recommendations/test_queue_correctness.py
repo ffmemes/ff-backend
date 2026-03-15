@@ -101,11 +101,11 @@ async def _clean_queue_between_tests():
 
 @pytest.mark.asyncio
 async def test_cold_start_below_30(queue_user):
-    """nmemes_sent < 30 -> uses best_uploaded_memes first, then fast_dopamine."""
+    """nmemes_sent < 30 -> uses lr_smoothed first, then best_uploaded_memes."""
     stub = _make_stub_retriever(
         {
-            "best_uploaded_memes": [_meme(20001), _meme(20002)],
-            "fast_dopamine": [_meme(20003), _meme(20004)],
+            "lr_smoothed": [_meme(20001), _meme(20002)],
+            "best_uploaded_memes": [_meme(20003), _meme(20004)],
         }
     )
     candidates = await generate_recommendations(QUEUE_USER, limit=5, nmemes_sent=10, retriever=stub)
@@ -115,12 +115,12 @@ async def test_cold_start_below_30(queue_user):
 
 
 @pytest.mark.asyncio
-async def test_cold_start_fallback_to_fast_dopamine(queue_user):
-    """If best_uploaded_memes is empty, falls back to fast_dopamine."""
+async def test_cold_start_fallback_to_best_uploaded(queue_user):
+    """If lr_smoothed is empty, falls back to best_uploaded_memes."""
     stub = _make_stub_retriever(
         {
-            "best_uploaded_memes": [],
-            "fast_dopamine": [_meme(20003), _meme(20004)],
+            "lr_smoothed": [],
+            "best_uploaded_memes": [_meme(20003), _meme(20004)],
         }
     )
     candidates = await generate_recommendations(QUEUE_USER, limit=5, nmemes_sent=10, retriever=stub)
@@ -205,8 +205,8 @@ async def test_queue_memes_have_required_fields(queue_user):
     """Memes in queue should have id, type, telegram_file_id, recommended_by."""
     stub = _make_stub_retriever(
         {
-            "best_uploaded_memes": [_meme(20001, "best_uploaded_memes")],
-            "fast_dopamine": [_meme(20002, "fast_dopamine")],
+            "lr_smoothed": [_meme(20001, "lr_smoothed")],
+            "best_uploaded_memes": [_meme(20002, "best_uploaded_memes")],
         }
     )
     candidates = await generate_recommendations(QUEUE_USER, limit=5, nmemes_sent=10, retriever=stub)
@@ -221,8 +221,8 @@ async def test_generate_excludes_already_queued(queue_user):
     """Second generate should not duplicate memes already in queue."""
     stub = _make_stub_retriever(
         {
-            "best_uploaded_memes": [_meme(20001), _meme(20002), _meme(20003)],
-            "fast_dopamine": [],
+            "lr_smoothed": [_meme(20001), _meme(20002), _meme(20003)],
+            "best_uploaded_memes": [],
         }
     )
 
