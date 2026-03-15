@@ -47,7 +47,7 @@ async def update_user_meme_reaction(
     res = await execute(update_query)
     reaction_is_new = res.rowcount > 0
     if not reaction_is_new:
-        logging.warning(f"User {user_id} already reacted to meme {meme_id}!")
+        logging.debug(f"User {user_id} already reacted to meme {meme_id}!")
     return reaction_is_new  # I can filter double clicks
 
 
