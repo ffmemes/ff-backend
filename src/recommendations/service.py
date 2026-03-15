@@ -69,29 +69,29 @@ async def update_user_last_active_at(
     await execute(update_query)
 
 
-# test handler, will be removed
 async def filter_unseen_memes(
     user_id: int,
     meme_ids: list[int],
 ) -> list[dict[str, Any]]:
-    meme_ids_str = ", ".join(map(str, meme_ids))
-    query = f"""
+    if not meme_ids:
+        return []
+    query = """
         SELECT
             M.id, M.type, M.telegram_file_id, M.caption,
             'test' as recommended_by
         FROM meme M
         LEFT JOIN user_meme_reaction R
             ON R.meme_id = M.id
-            AND R.user_id = {user_id}
+            AND R.user_id = :user_id
         INNER JOIN user_language L
-            ON L.user_id = {user_id}
+            ON L.user_id = :user_id
             AND L.language_code = M.language_code
         WHERE 1=1
             AND M.status = 'ok'
             AND R.meme_id IS NULL
-            AND M.id IN ({meme_ids_str})
+            AND M.id = ANY(:meme_ids)
     """
-    res = await fetch_all(text(query))
+    res = await fetch_all(text(query), {"user_id": user_id, "meme_ids": meme_ids})
     return res
 
 

@@ -96,7 +96,6 @@ async def base_data():
 
 # Engines that use LEFT JOIN on user_meme_source_stats (work without it)
 ENGINES_LEFT_JOIN_UMSS = [
-    "less_seen_meme_and_source",
     "best_uploaded_memes",
     "lr_smoothed",
     "like_spread_and_recent_memes",
@@ -107,7 +106,6 @@ ENGINES_INNER_JOIN_UMSS = [
     "goat",
 ]
 
-# All engines except selected_sources (uses hardcoded production IDs)
 ALL_TESTABLE_ENGINES = ENGINES_LEFT_JOIN_UMSS + ENGINES_INNER_JOIN_UMSS
 
 

@@ -11,7 +11,6 @@ from src.recommendations.candidates import (
     CandidatesRetriever,
     best_uploaded_memes,
     get_lr_smoothed,
-    get_selected_sources,
 )
 from src.recommendations.utils import exclude_meme_ids_sql_filter
 from src.storage.schemas import MemeData
@@ -59,11 +58,6 @@ async def generate_cold_start_recommendations(user_id, limit=10):
 
     if len(candidates) == 0:
         candidates = await best_uploaded_memes(
-            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-        )
-
-    if len(candidates) == 0:
-        candidates = await get_selected_sources(
             user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
         )
 
@@ -183,14 +177,6 @@ async def generate_recommendations(
 
         fixed_pos = {0: "lr_smoothed"}
         candidates = blend(candidates_dict, weights, fixed_pos, limit, random_seed)
-
-        if len(candidates) == 0 and nmemes_sent > 1000:
-            candidates = await retriever.get_candidates(
-                "less_seen_meme_and_source",
-                user_id,
-                limit,
-                exclude_mem_ids=meme_ids_in_queue,
-            )
 
         return candidates
 

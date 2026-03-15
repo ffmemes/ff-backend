@@ -1,6 +1,7 @@
 from datetime import datetime
 
-from sqlalchemy import delete, insert
+from sqlalchemy import delete
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from src.database import (
@@ -25,7 +26,7 @@ async def create_user(
     type: str = "user",
 ) -> dict:
     row = {"id": id, "type": type}
-    await conn.execute(insert(user).values(row))
+    await conn.execute(insert(user).values(row).on_conflict_do_nothing())
     return row
 
 
@@ -35,7 +36,7 @@ async def create_user_language(
     language_code: str = "ru",
 ) -> dict:
     row = {"user_id": user_id, "language_code": language_code}
-    await conn.execute(insert(user_language).values(row))
+    await conn.execute(insert(user_language).values(row).on_conflict_do_nothing())
     return row
 
 
@@ -57,7 +58,7 @@ async def create_meme_source(
         "language_code": language_code,
         "created_at": FIXED_DT,
     }
-    await conn.execute(insert(meme_source).values(row))
+    await conn.execute(insert(meme_source).values(row).on_conflict_do_nothing())
     return row
 
 
@@ -88,7 +89,7 @@ async def create_meme(
         "caption": caption,
         "published_at": published_at,
     }
-    await conn.execute(insert(meme).values(row))
+    await conn.execute(insert(meme).values(row).on_conflict_do_nothing())
     return row
 
 
@@ -116,7 +117,7 @@ async def create_meme_stats(
         "invited_count": invited_count,
         "updated_at": FIXED_DT,
     }
-    await conn.execute(insert(meme_stats).values(row))
+    await conn.execute(insert(meme_stats).values(row).on_conflict_do_nothing())
     return row
 
 
@@ -140,7 +141,7 @@ async def create_meme_source_stats(
         "latest_meme_age": latest_meme_age,
         "updated_at": FIXED_DT,
     }
-    await conn.execute(insert(meme_source_stats).values(row))
+    await conn.execute(insert(meme_source_stats).values(row).on_conflict_do_nothing())
     return row
 
 
@@ -158,7 +159,7 @@ async def create_user_meme_source_stats(
         "ndislikes": ndislikes,
         "updated_at": FIXED_DT,
     }
-    await conn.execute(insert(user_meme_source_stats).values(row))
+    await conn.execute(insert(user_meme_source_stats).values(row).on_conflict_do_nothing())
     return row
 
 
@@ -181,7 +182,7 @@ async def create_reaction(
         "sent_at": sent_at,
         "reacted_at": reacted_at,
     }
-    await conn.execute(insert(user_meme_reaction).values(row))
+    await conn.execute(insert(user_meme_reaction).values(row).on_conflict_do_nothing())
     return row
 
 
@@ -198,7 +199,7 @@ async def create_user_stats(
         "nlikes": nlikes,
         "ndislikes": ndislikes,
     }
-    await conn.execute(insert(user_stats).values(row))
+    await conn.execute(insert(user_stats).values(row).on_conflict_do_nothing())
     return row
 
 

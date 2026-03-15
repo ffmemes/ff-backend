@@ -276,17 +276,6 @@ async def test_generate_empty_above_100():
     ) -> list[dict[str, Any]]:
         return []
 
-    async def top_memes_from_less_seen_sources(
-        self,
-        user_id: int,
-        limit: int = 10,
-        exclude_meme_ids: list[int] = [],
-    ) -> list[dict[str, Any]]:
-        return [
-            {"id": 1},
-            {"id": 2},
-        ]
-
     class TestRetriever(CandidatesRetriever):
         engine_map = {
             "best_uploaded_memes": best_uploaded_memes,
@@ -294,14 +283,12 @@ async def test_generate_empty_above_100():
             "lr_smoothed": get_lr_smoothed,
             "recently_liked": get_recently_liked,
             "goat": goat,
-            "less_seen_meme_and_source": top_memes_from_less_seen_sources,
         }
 
-    # All engines empty, nmemes_sent=200 < 1000 → no fallback, empty result
+    # All engines empty → empty result
     candidates = await generate_recommendations(TEST_USER_ID, 10, 200, TestRetriever())
     assert len(candidates) == 0
 
-    # All engines empty, nmemes_sent=1200 > 1000 → fallback to less_seen_meme_and_source
+    # Same for high meme count — no fallback engine anymore
     candidates = await generate_recommendations(TEST_USER_ID, 10, 1200, TestRetriever())
-    assert len(candidates) == 2
-    assert candidates[0]["id"] in [1, 2]
+    assert len(candidates) == 0
