@@ -99,7 +99,6 @@ ENGINES_LEFT_JOIN_UMSS = [
     "less_seen_meme_and_source",
     "best_uploaded_memes",
     "lr_smoothed",
-    "most_shared",
     "like_spread_and_recent_memes",
 ]
 
