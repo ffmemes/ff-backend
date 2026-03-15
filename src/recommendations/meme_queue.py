@@ -155,10 +155,10 @@ async def generate_recommendations(
         if nmemes_sent < 100:
             weights = {
                 "best_uploaded_memes": 0.1,
-                "fast_dopamine": 0.2,
-                "lr_smoothed": 0.2,
+                "lr_smoothed": 0.3,
                 "recently_liked": 0.2,
                 "goat": 0.2,
+                "like_spread_and_recent_memes": 0.2,
             }
 
             candidates_dict = await retriever.get_candidates_dict(

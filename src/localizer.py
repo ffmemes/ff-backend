@@ -38,7 +38,7 @@ def load():
         with open(localization_file, "r") as f:
             localizations |= yaml.safe_load(f)
 
-    logging.info(f"Loaded {len(localizations)} localization strings.")
+    logging.debug(f"Loaded {len(localizations)} localization strings.")
     return localizations
 
 
