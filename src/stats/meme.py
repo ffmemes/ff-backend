@@ -167,14 +167,11 @@ async def calculate_engagement_score(
         smoothed = engagement_value - running_avg(engagement_value per user)
         engagement_score = avg(smoothed) per meme
 
-    Data flow:
-        user_meme_reaction
-            → window: detect skips (user has later reactions?)
-            → CASE: assign engagement_value per reaction
-            → window: running avg per user (bias correction)
-            → subtract user bias
-            → aggregate per meme
-            → upsert into meme_stats.engagement_score
+    Performance: ~80s full scan of 22M rows (same as lr_smoothed at 75s).
+    Incremental would need a meme_id index on user_meme_reaction to fetch
+    all reactions per meme efficiently. Without it, any approach that needs
+    "all reactions to meme X" falls back to a full table scan. Acceptable
+    for now since this runs alongside lr_smoothed in the same flow.
     """
 
     query = f"""
@@ -188,7 +185,6 @@ async def calculate_engagement_score(
                 R.sent_at,
                 R.reacted_at,
                 EXTRACT(EPOCH FROM R.reacted_at - R.sent_at) AS sec_to_react,
-                -- Last sent_at where this user actually reacted to a meme
                 MAX(CASE WHEN R.reaction_id IS NOT NULL THEN R.sent_at END)
                     OVER (PARTITION BY R.user_id) AS user_last_reaction_sent_at
             FROM user_meme_reaction R
