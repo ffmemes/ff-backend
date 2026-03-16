@@ -2,7 +2,7 @@ from prefect.client.schemas.schedules import CronSchedule
 from prefect.deployments import Deployment
 
 from src.config import settings
-from src.flows.stats.meme import calculate_engagement_score, calculate_meme_stats
+from src.flows.stats.meme import calculate_meme_stats
 from src.flows.stats.meme_source import calculate_meme_source_stats
 from src.flows.stats.user import calculate_user_stats
 from src.flows.stats.user_meme_source import calculate_user_meme_source_stats
@@ -47,13 +47,3 @@ deployment_meme_source_stats = Deployment.build_from_flow(
 )
 
 deployment_meme_source_stats.apply()
-
-
-deployment_engagement_score = Deployment.build_from_flow(
-    flow=calculate_engagement_score,
-    name="Calculate engagement_score",
-    work_pool_name=settings.ENVIRONMENT,
-    schedules=[CronSchedule(cron="10 * * * *", timezone="Europe/London")],
-)
-
-deployment_engagement_score.apply()

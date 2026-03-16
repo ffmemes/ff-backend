@@ -5,8 +5,14 @@
 ### Remove bad engines from user traffic
 **What:** Remove `goat`, `less_seen_meme_and_source` from regular user blender weights. Keep `low_sent_pool` for moderators only.
 **Why:** These engines have 6-31% like rate vs 47% for top engines. 14% of traffic serves bad memes.
-**Context:** Wait for experiment results (goat integer division fix deployed 2026-03-14, measure by 2026-03-21). Goat may recover after the fix. See `specs/data-hypotheses.md` H6 and `specs/experiment-2026-03-14.md`.
+**Context:** Goat integer division fix deployed 2026-03-14. Early signal (2 days): goat LR went from 6.6% to 43.1% — the fix worked. Wait for full 7-day measurement on 2026-03-21 before deciding whether to keep or remove goat. Dead engines already removed (less_seen_meme_and_source, fast_dopamine, etc.). See `specs/experiment-2026-03-14.md`.
 **Depends on:** Experiment results from 2026-03-21.
+
+### Unstarve like_spread_and_recent engine
+**What:** Relax filters on `like_spread_and_recent_memes` engine — remove `age_days < 30` constraint.
+**Why:** Best engine (50.7% LR) has only 72 candidates due to restrictive filters. Serves only 1% of traffic despite 0.3 blender weight. H3 proved freshness doesn't correlate with quality.
+**Context:** The `raw_impr_rank = 0` filter already limits to top-quartile viral memes. `age_days < 30` is redundant and starves the engine.
+**Depends on:** Nothing — quick fix.
 
 ## P2 — Medium Priority
 
