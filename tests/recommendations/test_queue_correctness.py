@@ -139,6 +139,7 @@ async def test_growing_30_to_100(queue_user):
             "recently_liked": [_meme(20004)],
             "goat": [_meme(20005)],
             "like_spread_and_recent_memes": [_meme(20006)],
+            "es_ranked": [_meme(20007)],
         }
     )
     candidates = await generate_recommendations(QUEUE_USER, limit=5, nmemes_sent=50, retriever=stub)
@@ -157,6 +158,7 @@ async def test_mature_above_100(queue_user):
             "lr_smoothed": [_meme(20005), _meme(20006)],
             "recently_liked": [_meme(20007)],
             "goat": [_meme(20008)],
+            "es_ranked": [_meme(20009)],
         }
     )
     candidates = await generate_recommendations(
@@ -189,6 +191,7 @@ async def test_moderator_gets_low_sent_pool(queue_user):
             "lr_smoothed": [_meme(20003)],
             "recently_liked": [_meme(20004)],
             "goat": [_meme(20005)],
+            "es_ranked": [_meme(20006)],
         }
     )
     candidates = await generate_recommendations(

@@ -143,6 +143,55 @@ async def get_lr_smoothed(
 
 
 
+async def get_es_ranked(
+    user_id: int,
+    limit: int = 10,
+    exclude_meme_ids: list[int] = [],
+):
+    """Ranks memes by engagement_score * user-source affinity.
+
+    Same structure as lr_smoothed but uses engagement_score which
+    accounts for reaction timing (fast skip = -0.5, slow dislike = -1.0)
+    and skip detection (-0.3).
+    """
+
+    query = f"""
+        SELECT
+            M.id
+            , M.type, M.telegram_file_id, M.caption
+            , 'es_ranked' AS recommended_by
+
+        FROM meme M
+        INNER JOIN meme_stats MS
+            ON MS.meme_id = M.id
+
+        INNER JOIN user_language L
+            ON L.language_code = M.language_code
+            AND L.user_id = {user_id}
+
+        LEFT JOIN user_meme_reaction R
+            ON R.meme_id = M.id
+            AND R.user_id = {user_id}
+
+        LEFT JOIN user_meme_source_stats UMSS
+            ON UMSS.meme_source_id = M.meme_source_id
+            AND UMSS.user_id = {user_id}
+
+        WHERE 1=1
+            AND M.status = 'ok'
+            AND R.meme_id IS NULL
+            AND MS.engagement_score > 0
+            {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+
+        ORDER BY -1
+            * COALESCE((UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.), 0.5)
+            * MS.engagement_score
+        LIMIT {limit}
+    """
+    res = await fetch_all(text(query))
+    return res
+
+
 async def goat(
     user_id: int,
     limit: int = 10,
@@ -257,6 +306,7 @@ class CandidatesRetriever:
         "like_spread_and_recent_memes": like_spread_and_recent_memes,
         "recently_liked": get_recently_liked,
         "goat": goat,
+        "es_ranked": get_es_ranked,
     }
 
     async def get_candidates(

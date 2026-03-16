@@ -99,6 +99,7 @@ ENGINES_LEFT_JOIN_UMSS = [
     "best_uploaded_memes",
     "lr_smoothed",
     "like_spread_and_recent_memes",
+    "es_ranked",
 ]
 
 # Engines that require user_meme_source_stats via INNER JOIN

@@ -151,7 +151,8 @@ async def generate_recommendations(
                 "best_uploaded_memes": 0.1,
                 "lr_smoothed": 0.3,
                 "recently_liked": 0.2,
-                "goat": 0.2,
+                "goat": 0.1,
+                "es_ranked": 0.1,
                 "like_spread_and_recent_memes": 0.2,
             }
 
@@ -168,7 +169,8 @@ async def generate_recommendations(
             "like_spread_and_recent_memes": 0.3,
             "lr_smoothed": 0.4,
             "recently_liked": 0.2,
-            "goat": 0.2,
+            "goat": 0.1,
+            "es_ranked": 0.1,
         }
 
         candidates_dict = await retriever.get_candidates_dict(

@@ -143,6 +143,17 @@ async def test_generate_below_100():
             {"id": 12},
         ]
 
+    async def es_ranked(
+        self,
+        user_id: int,
+        limit: int = 10,
+        exclude_meme_ids: list[int] = [],
+    ) -> list[dict[str, Any]]:
+        return [
+            {"id": 13},
+            {"id": 14},
+        ]
+
     class TestRetriever(CandidatesRetriever):
         engine_map = {
             "best_uploaded_memes": best_uploaded_memes,
@@ -150,6 +161,7 @@ async def test_generate_below_100():
             "lr_smoothed": get_lr_smoothed,
             "recently_liked": get_recently_liked,
             "goat": goat,
+            "es_ranked": es_ranked,
         }
 
     candidates = await generate_recommendations(TEST_USER_ID, 10, 40, TestRetriever())
@@ -219,6 +231,17 @@ async def test_generate_above_100():
             {"id": 14},
         ]
 
+    async def es_ranked(
+        self,
+        user_id: int,
+        limit: int = 10,
+        exclude_meme_ids: list[int] = [],
+    ) -> list[dict[str, Any]]:
+        return [
+            {"id": 15},
+            {"id": 16},
+        ]
+
     class TestRetriever(CandidatesRetriever):
         engine_map = {
             "best_uploaded_memes": best_uploaded_memes,
@@ -226,6 +249,7 @@ async def test_generate_above_100():
             "lr_smoothed": get_lr_smoothed,
             "recently_liked": get_recently_liked,
             "goat": goat,
+            "es_ranked": es_ranked,
         }
 
     candidates = await generate_recommendations(TEST_USER_ID, 10, 200, TestRetriever(), random_seed=102)
@@ -276,6 +300,14 @@ async def test_generate_empty_above_100():
     ) -> list[dict[str, Any]]:
         return []
 
+    async def es_ranked(
+        self,
+        user_id: int,
+        limit: int = 10,
+        exclude_meme_ids: list[int] = [],
+    ) -> list[dict[str, Any]]:
+        return []
+
     class TestRetriever(CandidatesRetriever):
         engine_map = {
             "best_uploaded_memes": best_uploaded_memes,
@@ -283,6 +315,7 @@ async def test_generate_empty_above_100():
             "lr_smoothed": get_lr_smoothed,
             "recently_liked": get_recently_liked,
             "goat": goat,
+            "es_ranked": es_ranked,
         }
 
     # All engines empty → empty result
