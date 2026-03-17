@@ -4,7 +4,8 @@ from src.database import execute
 
 
 async def calculate_user_meme_source_stats() -> None:
-    # TODO: update only recently active users
+    # Full scan (~6s). Incremental update needs an index on reacted_at
+    # which isn't worth the storage cost (indexes already 1.9GB > table 1.8GB).
     insert_query = """
         INSERT INTO user_meme_source_stats (
             user_id,
@@ -22,7 +23,7 @@ async def calculate_user_meme_source_stats() -> None:
         FROM user_meme_reaction R
         INNER JOIN meme M
             ON M.id = R.meme_id
-        WHERE reaction_id IS NOT NULL  -- only reacted
+        WHERE reaction_id IS NOT NULL
         GROUP BY 1,2
         ON CONFLICT (user_id, meme_source_id) DO
         UPDATE SET
