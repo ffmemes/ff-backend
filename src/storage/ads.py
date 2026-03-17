@@ -67,6 +67,35 @@ def text_is_adverisement(original_text: str | None) -> bool:
     return False
 
 
+def post_is_likely_ad(
+    caption: str | None,
+    out_links: list[str] | None,
+    views: int,
+    median_views: float | None,
+) -> bool:
+    """Detect ads using engagement signals on top of text analysis.
+
+    A post is likely an ad if it has external links AND below-median views.
+    Ad posts typically get less organic engagement than regular content.
+    """
+    if text_is_adverisement(caption):
+        return True
+
+    has_outlinks = bool(out_links and len(out_links) > 0)
+    if not has_outlinks:
+        return False
+
+    # Outlinks + below-median views = strong ad signal
+    if median_views and views > 0 and views < median_views * 0.5:
+        return True
+
+    # Outlinks + long caption = likely sponsored content
+    if caption and len(caption.strip()) > 150 and has_outlinks:
+        return True
+
+    return False
+
+
 def filter_caption(original_text: str | None) -> str | None:
     """removes links from caption"""
     if original_text is None:

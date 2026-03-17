@@ -149,9 +149,22 @@ async def etl_memes_from_raw_telegram_posts() -> None:
     # get transformed posts
     # find ones that are already in the database
     # create rows and update rows
+    #
+    # Engagement filter: skip posts with views < 30% of their source's median.
+    # This filters low-quality posts (likely ads or junk) before they enter the
+    # meme table. Posts with 0 views (views not available) are kept.
     transformed_memes = await fetch_all(
         text(
             """
+                WITH source_medians AS (
+                    SELECT
+                        meme_source_id,
+                        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY views) AS median_views
+                    FROM meme_raw_telegram
+                    WHERE COALESCE(updated_at, created_at) >= NOW() - INTERVAL '24 hours'
+                      AND views > 0
+                    GROUP BY meme_source_id
+                )
                 SELECT
                     DISTINCT ON (COALESCE(MRT.forwarded_url, random()::text))
                     MRT.meme_source_id,
@@ -168,9 +181,23 @@ async def etl_memes_from_raw_telegram_posts() -> None:
                 FROM meme_raw_telegram MRT
                 INNER JOIN meme_source MS
                     ON MS.id = MRT.meme_source_id
+                LEFT JOIN source_medians SM
+                    ON SM.meme_source_id = MRT.meme_source_id
                 WHERE 1=1
                     AND JSONB_ARRAY_LENGTH(MRT.media) = 1 -- only one attachment
                     AND COALESCE(MRT.updated_at, MRT.created_at) >= NOW() - INTERVAL '24 hours'
+                    AND (
+                        MRT.views = 0
+                        OR SM.median_views IS NULL
+                        OR MRT.views >= SM.median_views * 0.3
+                    )
+                    -- Ad filter: skip posts with outlinks + below-median views
+                    AND NOT (
+                        JSONB_ARRAY_LENGTH(COALESCE(MRT.out_links, '[]'::jsonb)) > 0
+                        AND MRT.views > 0
+                        AND SM.median_views IS NOT NULL
+                        AND MRT.views < SM.median_views * 0.5
+                    )
             """  # noqa: E501
         )
     )

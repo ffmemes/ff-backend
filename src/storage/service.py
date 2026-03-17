@@ -16,15 +16,25 @@ from src.storage.constants import (
 )
 
 
-async def get_telegram_sources_to_parse(limit=10) -> list[dict[str, Any]]:
-    select_query = (
-        select(meme_source)
-        .where(meme_source.c.type == MemeSourceType.TELEGRAM)
-        .where(meme_source.c.status == MemeSourceStatus.PARSING_ENABLED)
-        .order_by(nulls_first(meme_source.c.parsed_at))
-        .limit(limit)
-    )
-    return await fetch_all(select_query)
+async def get_telegram_sources_to_parse(limit=25) -> list[dict[str, Any]]:
+    # Quality-weighted selection: best sources parse first.
+    # Sources with no stats get neutral score (0.5) so they still parse.
+    # NULLS FIRST on parsed_at ensures never-parsed sources get priority.
+    query = f"""
+        SELECT ms.*
+        FROM meme_source ms
+        LEFT JOIN meme_source_stats mss ON mss.meme_source_id = ms.id
+        WHERE ms.type = '{MemeSourceType.TELEGRAM}'
+          AND ms.status = '{MemeSourceStatus.PARSING_ENABLED}'
+        ORDER BY
+            ms.parsed_at IS NOT NULL,
+            ms.parsed_at ASC,
+            COALESCE(
+                mss.nlikes::float / NULLIF(mss.nlikes + mss.ndislikes, 0), 0.5
+            ) * LN(COALESCE(mss.nmemes_sent, 0) + 2) DESC
+        LIMIT {int(limit)}
+    """
+    return await fetch_all(text(query))
 
 
 async def get_vk_sources_to_parse(limit=10) -> list[dict[str, Any]]:

@@ -78,13 +78,22 @@ class TelegramChannelScraper(Scraper):
         if num_of_posts:
             counter = 0
             for post in raw_posts:
-                posts.append(await self.get_post_details(post))
+                try:
+                    posts.append(await self.get_post_details(post))
+                except Exception as e:
+                    post_id = post.get("data-post", "unknown")
+                    logger.warning(f"Failed to parse post {post_id}: {e}")
+                    continue
                 counter += 1
                 if counter == num_of_posts:
                     break
         else:
             for post in raw_posts:
-                posts.append(await self.get_post_details(post))
+                try:
+                    posts.append(await self.get_post_details(post))
+                except Exception as e:
+                    post_id = post.get("data-post", "unknown")
+                    logger.warning(f"Failed to parse post {post_id}: {e}")
         return posts
 
     async def get_post_details(self, post) -> TgChannelPostParsingResult:

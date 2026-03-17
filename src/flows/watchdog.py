@@ -45,14 +45,14 @@ async def watchdog() -> None:
     if row is None or row["last_update"] is None:
         alerts.append("meme_stats not updated in the last hour")
 
-    # Check parser freshness (TG sources should parse every hour)
+    # Check parser freshness (TG sources parse every hour, batch of 25)
     row = await fetch_one(text("""
         SELECT MAX(created_at) AS last_parse
         FROM meme_raw_telegram
-        WHERE created_at > NOW() - INTERVAL '3 hours'
+        WHERE created_at > NOW() - INTERVAL '90 minutes'
     """))
     if row is None or row["last_parse"] is None:
-        alerts.append("No new meme_raw_telegram rows in 3 hours")
+        alerts.append("No new meme_raw_telegram rows in 90 minutes")
 
     # Check meme pipeline: any memes stuck in 'created' for too long
     row = await fetch_one(text("""

@@ -1,4 +1,5 @@
 import asyncio
+import time
 from datetime import datetime
 
 from prefect import flow, get_run_logger
@@ -38,18 +39,34 @@ async def parse_telegram_source(
     description="Flow for parsing telegram channels to get posts",
     retries=2,
     retry_delay_seconds=60,
-    timeout_seconds=900,
+    timeout_seconds=1800,
     on_failure=[notify_telegram_on_failure],
 )
 async def parse_telegram_sources(
-    sources_batch_size=10,
+    sources_batch_size=25,
     nposts=10,
 ) -> None:
     logger = get_run_logger()
+    t0 = time.monotonic()
     tg_sources = await get_telegram_sources_to_parse(limit=sources_batch_size)
     logger.info(f"Received {len(tg_sources)} tg sources to scrape.")
 
+    ok_count = 0
+    fail_count = 0
     for tg_source in tg_sources:
-        await parse_telegram_source(tg_source["id"], tg_source["url"], nposts=nposts)
+        try:
+            await parse_telegram_source(tg_source["id"], tg_source["url"], nposts=nposts)
+            ok_count += 1
+        except Exception as e:
+            fail_count += 1
+            logger.error(
+                f"Source {tg_source['id']} ({tg_source['url']}) failed: {e}"
+            )
+
+    elapsed = time.monotonic() - t0
+    logger.info(
+        f"Parsing done: {ok_count} ok, {fail_count} failed "
+        f"out of {len(tg_sources)} sources in {elapsed:.0f}s"
+    )
 
     await tg_meme_pipeline()
