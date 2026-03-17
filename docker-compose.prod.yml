@@ -32,6 +32,7 @@ services:
       - .env
     environment:
       PREFECT_API_URL: "http://prefect-server:4200/api"
+      PREFECT_API_AUTH_STRING: "${PREFECT_AUTH_STRING}"
       PYTHONPATH: "/src"
     build:
       context: .
