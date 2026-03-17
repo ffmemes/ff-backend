@@ -24,8 +24,8 @@ async def get_telegram_sources_to_parse(limit=25) -> list[dict[str, Any]]:
         SELECT ms.*
         FROM meme_source ms
         LEFT JOIN meme_source_stats mss ON mss.meme_source_id = ms.id
-        WHERE ms.type = '{MemeSourceType.TELEGRAM}'
-          AND ms.status = '{MemeSourceStatus.PARSING_ENABLED}'
+        WHERE ms.type = '{MemeSourceType.TELEGRAM.value}'
+          AND ms.status = '{MemeSourceStatus.PARSING_ENABLED.value}'
         ORDER BY
             ms.parsed_at IS NOT NULL,
             ms.parsed_at ASC,
