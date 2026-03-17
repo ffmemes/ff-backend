@@ -43,6 +43,7 @@ class Config(BaseSettings):
     REDIS_MAX_CONNECTIONS: int = 128
 
     OPENAI_API_KEY: str | None = None
+    OPENROUTER_API_KEY: str | None = None
 
     OCR_ENABLED: bool = False
 
