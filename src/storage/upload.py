@@ -19,15 +19,16 @@ from src.tgbot.bot import bot
 
 async def download_meme_content_file(
     url: AnyHttpUrl,
+    timeout: float = 20.0,
 ) -> bytes | None:
-    async with httpx.AsyncClient(timeout=20.0) as client:
+    async with httpx.AsyncClient(timeout=timeout) as client:
         try:
             response = await client.get(
                 url,
                 headers={"User-Agent": USER_AGENT},
                 follow_redirects=True,
             )
-        except httpx.ConnectTimeout:
+        except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.ConnectError):
             return None
 
         if response.status_code in (400, 403, 404, 500):

@@ -115,139 +115,113 @@ async def upload_meme_to_telegram(
     return meme_result
 
 
-@flow(
-    name="Memes from Telegram Pipeline",
-    description="Process raw memes parsed from Telegram",
-    version="0.1.0",
-    log_prints=True,
-)
-async def tg_meme_pipeline() -> None:
+async def _process_unloaded_memes(
+    unloaded_memes: list[dict[str, Any]],
+    source_name: str,
+) -> None:
+    """Shared pipeline: download, watermark, upload to TG storage.
+
+    Resilient per-meme: a single download/upload failure doesn't kill the batch.
+    Stops early if too many consecutive failures (likely systemic issue).
+    """
     logger = get_run_logger()
+    total = len(unloaded_memes)
+    logger.info(f"Processing {total} unloaded {source_name} memes.")
 
-    logger.info("ETLing memes from 'meme_raw_telegram' table.")
-    await etl_memes_from_raw_telegram_posts()
-
-    logger.info("Getting unloaded memes to upload to Telegram.")
-    unloaded_memes = await get_unloaded_tg_memes(limit=100)
-    logger.info(f"Received {len(unloaded_memes)} memes to upload to Telegram.")
     if not settings.OCR_ENABLED:
-        logger.info(
-            "OCR is currently disabled. Memes will be processed without OCR. "
-            "Set OCR_ENABLED=true to resume OCR checks."
-        )
-    for unloaded_meme in unloaded_memes:
-        meme = await upload_meme_to_telegram(unloaded_meme)
-        if not meme or meme["type"] != MemeType.IMAGE:
+        logger.info("OCR disabled. Memes processed without OCR.")
+
+    ok_count = 0
+    fail_count = 0
+    consecutive_fails = 0
+
+    for i, unloaded_meme in enumerate(unloaded_memes):
+        try:
+            meme = await upload_meme_to_telegram(unloaded_meme)
+        except Exception as e:
+            logger.warning(f"Meme {unloaded_meme['id']}: upload error: {e}")
+            fail_count += 1
+            consecutive_fails += 1
+            if consecutive_fails >= 5:
+                logger.error(
+                    f"5 consecutive failures — stopping batch. "
+                    f"Processed {i + 1}/{total}, {ok_count} ok, {fail_count} failed."
+                )
+                break
             continue
 
-        if settings.OCR_ENABLED:
+        if not meme:
+            fail_count += 1
+            consecutive_fails += 1
+            if consecutive_fails >= 5:
+                logger.error(
+                    f"5 consecutive failures — stopping batch. "
+                    f"Processed {i + 1}/{total}, {ok_count} ok, {fail_count} failed."
+                )
+                break
+            continue
+
+        ok_count += 1
+        consecutive_fails = 0
+
+        if settings.OCR_ENABLED and meme["type"] == MemeType.IMAGE:
             res = await ocr_meme_content(
                 meme["id"],
                 meme["__original_content"],
                 meme["language_code"],
             )
-
             if res is None:
-                logger.warning(
-                    """
-org_meme_content returned NULL, meaning OCR doesn't work.
-To save on quota I quit from tg_meme_pipeline
-"""
-                )
-                return
+                logger.warning("OCR service unavailable, skipping OCR for rest of batch.")
+                break
 
-    # next step of a pipeline
+    logger.info(
+        f"Batch done: {ok_count} uploaded, {fail_count} failed out of {total}."
+    )
+
     await final_meme_pipeline()
+
+
+@flow(
+    name="Memes from Telegram Pipeline",
+    description="Process raw memes parsed from Telegram",
+    version="0.2.0",
+    log_prints=True,
+)
+async def tg_meme_pipeline() -> None:
+    logger = get_run_logger()
+    logger.info("ETLing memes from 'meme_raw_telegram' table.")
+    await etl_memes_from_raw_telegram_posts()
+
+    unloaded_memes = await get_unloaded_tg_memes(limit=100)
+    await _process_unloaded_memes(unloaded_memes, "Telegram")
 
 
 @flow(
     name="Memes from VK Pipeline",
     description="Process raw memes parsed from VK",
-    version="0.1.0",
+    version="0.2.0",
 )
 async def vk_meme_pipeline() -> None:
     logger = get_run_logger()
-
     logger.info("ETLing memes from 'meme_raw_vk' table.")
     await etl_memes_from_raw_vk_posts()
 
-    logger.info("Getting unloaded memes to upload to Telegram.")
     unloaded_memes = await get_unloaded_vk_memes(limit=100)
-    logger.info(f"Received {len(unloaded_memes)} memes to upload to Telegram.")
-    if not settings.OCR_ENABLED:
-        logger.info(
-            "OCR is currently disabled. Memes will be processed without OCR. "
-            "Set OCR_ENABLED=true to resume OCR checks."
-        )
-    for unloaded_meme in unloaded_memes:
-        meme = await upload_meme_to_telegram(unloaded_meme)
-        if not meme or meme["type"] != MemeType.IMAGE:
-            continue
-
-        if settings.OCR_ENABLED:
-            res = await ocr_meme_content(
-                meme["id"],
-                meme["__original_content"],
-                meme["language_code"],
-            )
-
-            if res is None:
-                logger.warning(
-                    """
-org_meme_content returned NULL, meaning OCR doesn't work.
-To save on quota I quit from tg_meme_pipeline
-"""
-                )
-                return
-
-    # next step of a pipeline
-    await final_meme_pipeline()
+    await _process_unloaded_memes(unloaded_memes, "VK")
 
 
 @flow(
     name="Memes from Instagram Pipeline",
     description="Process raw memes parsed from IG",
-    version="0.1.0",
+    version="0.2.0",
 )
 async def ig_meme_pipeline() -> None:
     logger = get_run_logger()
-
-    logger.info("ETLing memes from 'meme_raw_vk' table.")
+    logger.info("ETLing memes from 'meme_raw_ig' table.")
     await etl_memes_from_raw_ig_posts()
 
-    logger.info("Getting unloaded memes to upload to Telegram.")
     unloaded_memes = await get_unloaded_ig_memes(limit=100)
-    logger.info(f"Received {len(unloaded_memes)} memes to upload to Telegram.")
-    if not settings.OCR_ENABLED:
-        logger.info(
-            "OCR is currently disabled. Memes will be processed without OCR. "
-            "Set OCR_ENABLED=true to resume OCR checks."
-        )
-    for unloaded_meme in unloaded_memes:
-        meme = await upload_meme_to_telegram(unloaded_meme)
-        if not meme or meme["type"] != MemeType.IMAGE:
-            continue
-
-        if settings.OCR_ENABLED:
-            res = await ocr_meme_content(
-                meme["id"],
-                meme["__original_content"],
-                meme["language_code"],
-            )
-
-            if res is None:
-                logger.warning(
-                    """
-org_meme_content returned NULL, meaning OCR doesn't work.
-To save on quota I quit from tg_meme_pipeline
-"""
-                )
-                return
-
-        await asyncio.sleep(3)  # flood control
-
-    # next step of a pipeline
-    await final_meme_pipeline()
+    await _process_unloaded_memes(unloaded_memes, "Instagram")
 
 
 @flow

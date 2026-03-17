@@ -1,6 +1,7 @@
 """
 Watchdog flow: checks that critical data pipelines ran recently.
 Sends a Telegram alert if data is stale.
+Only alerts once per issue (avoids spam every 5 min).
 """
 
 import httpx
@@ -9,6 +10,9 @@ from sqlalchemy import text
 
 from src.config import settings
 from src.database import fetch_one
+
+# Track last alert state to avoid repeating the same alert
+_last_alerts: set[str] = set()
 
 
 def _send_alert(msg: str) -> None:
@@ -28,6 +32,7 @@ def _send_alert(msg: str) -> None:
 
 @flow(name="Watchdog", log_prints=True)
 async def watchdog() -> None:
+    global _last_alerts
     logger = get_run_logger()
     alerts = []
 
@@ -47,11 +52,48 @@ async def watchdog() -> None:
         WHERE created_at > NOW() - INTERVAL '3 hours'
     """))
     if row is None or row["last_parse"] is None:
-        alerts.append("No new meme_raw_telegram rows in the last 3 hours")
+        alerts.append("No new meme_raw_telegram rows in 3 hours")
 
-    if alerts:
-        msg = "Watchdog alerts:\n" + "\n".join(f"- {a}" for a in alerts)
+    # Check meme pipeline: any memes stuck in 'created' for too long
+    row = await fetch_one(text("""
+        SELECT COUNT(*) AS cnt
+        FROM meme
+        WHERE status = 'created'
+          AND telegram_file_id IS NULL
+          AND created_at < NOW() - INTERVAL '2 hours'
+          AND created_at > NOW() - INTERVAL '24 hours'
+    """))
+    if row and row["cnt"] > 50:
+        alerts.append(f"{row['cnt']} memes stuck without telegram_file_id for 2h+")
+
+    # Check recommendation queues: are users getting memes?
+    row = await fetch_one(text("""
+        SELECT COUNT(*) AS cnt
+        FROM user_meme_reaction
+        WHERE reacted_at > NOW() - INTERVAL '30 minutes'
+    """))
+    if row and row["cnt"] == 0:
+        alerts.append("Zero reactions in the last 30 minutes")
+
+    current_alerts = set(alerts)
+
+    # Only send NEW alerts (not already reported)
+    new_alerts = current_alerts - _last_alerts
+    if new_alerts:
+        msg = "Watchdog:\n" + "\n".join(f"- {a}" for a in sorted(new_alerts))
         logger.warning(msg)
         _send_alert(msg)
-    else:
+
+    # Send recovery notification if issues resolved
+    resolved = _last_alerts - current_alerts
+    if resolved and _last_alerts:
+        msg = "Watchdog recovered:\n" + "\n".join(
+            f"- {a}" for a in sorted(resolved)
+        )
+        logger.info(msg)
+        _send_alert(msg)
+
+    _last_alerts = current_alerts
+
+    if not current_alerts:
         logger.info("All systems healthy")
