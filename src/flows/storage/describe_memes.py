@@ -149,6 +149,9 @@ async def call_openrouter_vision(image_b64: str) -> dict | None:
                 continue
 
             content = data["choices"][0]["message"]["content"]
+            if not content:
+                logger.warning("Model %s returned empty content", model_id)
+                continue
             result = _parse_vision_response(content)
 
             # Validate expected keys
