@@ -15,7 +15,6 @@ Runs every 30 min via Prefect cron, ~30 memes per batch.
 import asyncio
 import base64
 import json
-import logging
 from datetime import datetime, timezone
 
 import httpx
@@ -25,8 +24,6 @@ from src.config import settings
 from src.database import fetch_all, fetch_one, meme
 from src.flows.hooks import notify_telegram_on_failure
 from src.storage.upload import download_meme_content_from_tg
-
-logger = logging.getLogger(__name__)
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
@@ -52,6 +49,10 @@ DESCRIBE_PROMPT = (
     "Respond with ONLY valid JSON, no markdown fences:\n"
     '{"ocr_text": "...", "description": "...", "language": "..."}'
 )
+
+# Sentinel return values from call_openrouter_vision
+RATE_LIMITED = "__rate_limited"
+ALL_FAILED = "__all_failed"
 
 
 async def get_memes_to_describe(limit: int = 30) -> list[dict]:
@@ -94,12 +95,18 @@ def _parse_vision_response(raw_content: str) -> dict:
     return json.loads(content)
 
 
-async def call_openrouter_vision(image_b64: str) -> dict | None:
-    """Call OpenRouter vision model with fallback chain on 429 errors."""
+async def call_openrouter_vision(image_b64: str, log) -> dict:
+    """Call OpenRouter vision model with fallback chain.
+
+    Returns:
+        dict with result on success, or {RATE_LIMITED: True} / {ALL_FAILED: True}
+    """
     headers = {
         "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
     }
+
+    rate_limited_count = 0
 
     for model_id in VISION_MODELS:
         payload = {
@@ -123,7 +130,7 @@ async def call_openrouter_vision(image_b64: str) -> dict | None:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     f"{OPENROUTER_BASE_URL}/chat/completions",
                     headers=headers,
@@ -131,54 +138,61 @@ async def call_openrouter_vision(image_b64: str) -> dict | None:
                 )
 
             if response.status_code == 429:
-                logger.info("Model %s rate-limited, trying next...", model_id)
-                await asyncio.sleep(2)
+                log.debug("Model %s rate-limited, trying next...", model_id)
+                rate_limited_count += 1
+                await asyncio.sleep(1)
                 continue
 
             response.raise_for_status()
 
-            # Parse response body (may have leading whitespace from streaming)
             body = response.text.strip()
             json_start = body.find("{")
             if json_start < 0:
-                logger.warning("Model %s returned no JSON: %s", model_id, body[:100])
+                log.warning("Model %s returned no JSON: %s", model_id, body[:100])
                 continue
             data = json.loads(body[json_start:])
 
             if "choices" not in data:
-                logger.warning("Model %s returned no choices: %s", model_id, str(data)[:200])
+                log.warning("Model %s no choices: %s", model_id, str(data)[:200])
                 continue
 
             content = data["choices"][0]["message"]["content"]
             if not content:
-                logger.warning("Model %s returned empty content", model_id)
+                log.warning("Model %s empty content", model_id)
                 continue
             result = _parse_vision_response(content)
 
-            # Validate expected keys
             if "description" not in result and "ocr_text" not in result:
-                logger.warning("Model %s returned unexpected JSON: %s", model_id, str(result)[:200])
+                log.warning("Model %s bad JSON: %s", model_id, str(result)[:200])
                 continue
 
             result["__model"] = model_id
             return result
 
         except json.JSONDecodeError as e:
-            logger.warning("Model %s returned invalid JSON: %s", model_id, e)
+            log.warning("Model %s invalid JSON: %s", model_id, e)
             continue
         except httpx.HTTPStatusError as e:
-            logger.warning("Model %s HTTP error: %s", model_id, e)
+            log.warning("Model %s HTTP %s", model_id, e.response.status_code)
+            continue
+        except (httpx.ReadTimeout, httpx.ConnectTimeout) as e:
+            log.warning("Model %s timeout: %s", model_id, type(e).__name__)
             continue
         except Exception as e:
-            logger.warning("Model %s unexpected error: %s", model_id, e)
+            log.warning("Model %s error: %s", model_id, e)
             continue
 
     # All models exhausted
-    return {"__rate_limited": True}
+    if rate_limited_count == len(VISION_MODELS):
+        return {RATE_LIMITED: True}
+    return {ALL_FAILED: True}
 
 
-async def describe_single_meme(meme_row: dict) -> bool:
-    """Download, analyze, and update a single meme. Returns True on success."""
+async def describe_single_meme(meme_row: dict, log) -> str:
+    """Download, analyze, and update a single meme.
+
+    Returns: "ok", "rate_limited", "failed"
+    """
     meme_id = meme_row["id"]
     file_id = meme_row["telegram_file_id"]
     existing_ocr = meme_row["ocr_result"] or {}
@@ -187,33 +201,28 @@ async def describe_single_meme(meme_row: dict) -> bool:
     try:
         image_bytes = await download_meme_content_from_tg(file_id)
     except Exception as e:
-        logger.warning("Failed to download meme %s from TG: %s", meme_id, e)
-        return False
+        log.warning("Meme %s: download failed: %s", meme_id, e)
+        return "failed"
 
-    # Base64 encode
     image_b64 = base64.b64encode(image_bytes).decode("utf-8")
 
     # Call vision model
     try:
-        result = await call_openrouter_vision(image_b64)
-    except json.JSONDecodeError as e:
-        logger.warning("Meme %s: model returned invalid JSON: %s", meme_id, e)
-        return False
-    except httpx.HTTPStatusError as e:
-        logger.warning("Meme %s: OpenRouter API error: %s", meme_id, e)
-        return False
+        result = await call_openrouter_vision(image_b64, log)
     except Exception as e:
-        logger.warning("Meme %s: unexpected error calling OpenRouter: %s", meme_id, e)
-        return False
+        log.warning("Meme %s: OpenRouter error: %s", meme_id, e)
+        return "failed"
 
     if result is None:
-        return False
+        return "failed"
 
-    if result.get("__rate_limited"):
-        return False  # caller should stop the batch
+    if result.get(RATE_LIMITED):
+        return "rate_limited"
 
-    # Merge with existing ocr_result, matching OcrResult schema:
-    # {"text": "...", "model": "...", "raw_result": {...}, "calculated_at": "..."}
+    if result.get(ALL_FAILED):
+        return "failed"
+
+    # Merge with existing ocr_result
     ocr_text = result.get("ocr_text", "")
     description = result.get("description", "")
     language = result.get("language", "")
@@ -231,30 +240,30 @@ async def describe_single_meme(meme_row: dict) -> bool:
         "description": description,
     }
 
-    # Only overwrite "text" if there was no existing OCR text.
-    # "text" is the canonical key used by all SQL queries and the GIN index.
     if not existing_ocr.get("text"):
         merged["text"] = ocr_text
 
-    # Update meme
     update_kwargs = {"ocr_result": merged}
 
-    # Update language_code if we detected one and meme had none
     if language and not meme_row.get("language_code"):
         update_kwargs["language_code"] = language
 
-    update_query = meme.update().where(meme.c.id == meme_id).values(**update_kwargs).returning(meme)
+    update_query = (
+        meme.update()
+        .where(meme.c.id == meme_id)
+        .values(**update_kwargs)
+        .returning(meme)
+    )
     await fetch_one(update_query)
-    return True
+    return "ok"
 
 
 @flow(
     name="Describe Memes (OpenRouter Vision)",
     description="Analyze meme images with free vision models.",
-    version="0.1.0",
+    version="0.2.0",
     log_prints=True,
-    retries=1,
-    retry_delay_seconds=60,
+    retries=0,
     timeout_seconds=900,
     on_failure=[notify_telegram_on_failure],
 )
@@ -262,7 +271,7 @@ async def describe_memes_flow(batch_size: int = 30) -> None:
     log = get_run_logger()
 
     if not settings.OPENROUTER_API_KEY:
-        log.warning("OPENROUTER_API_KEY not set. Skipping meme description flow.")
+        log.warning("OPENROUTER_API_KEY not set. Skipping.")
         return
 
     memes = await get_memes_to_describe(limit=batch_size)
@@ -271,32 +280,36 @@ async def describe_memes_flow(batch_size: int = 30) -> None:
     if not memes:
         return
 
-    success_count = 0
-    error_count = 0
+    ok = 0
+    failed = 0
+    consecutive_fails = 0
 
     for i, meme_row in enumerate(memes):
-        ok = await describe_single_meme(meme_row)
+        status = await describe_single_meme(meme_row, log)
 
-        if ok:
-            success_count += 1
-            log.info(
-                "Described meme %d (%d/%d)",
-                meme_row["id"],
-                i + 1,
-                len(memes),
+        if status == "ok":
+            ok += 1
+            consecutive_fails = 0
+            log.info("Described meme %d (%d/%d)", meme_row["id"], i + 1, len(memes))
+        elif status == "rate_limited":
+            log.warning(
+                "All models rate-limited at meme %d (%d/%d). "
+                "Stopping batch — quota exhausted.",
+                meme_row["id"], i + 1, len(memes),
             )
+            break
         else:
-            error_count += 1
-            # Check if rate limited — stop the entire batch
-            log.warning("Failed to describe meme %d (%d/%d)", meme_row["id"], i + 1, len(memes))
+            failed += 1
+            consecutive_fails += 1
+            log.warning(
+                "Failed meme %d (%d/%d, %d consecutive)",
+                meme_row["id"], i + 1, len(memes), consecutive_fails,
+            )
+            if consecutive_fails >= 3:
+                log.warning("3 consecutive failures — stopping batch.")
+                break
 
-        # Rate limit: ~15 req/min = 4 sec between requests
         if i < len(memes) - 1:
             await asyncio.sleep(4)
 
-    log.info(
-        "Batch complete: %d described, %d errors, %d total.",
-        success_count,
-        error_count,
-        len(memes),
-    )
+    log.info("Batch: %d described, %d failed out of %d.", ok, failed, len(memes))
