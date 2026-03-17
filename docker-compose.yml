@@ -17,7 +17,7 @@ services:
       - app_db
 
   prefect-server:
-    image: prefecthq/prefect:3.4-latest
+    image: prefecthq/prefect:3.4.17-python3.12
     container_name: prefect_server
     command: prefect server start --host 0.0.0.0
     ports:
