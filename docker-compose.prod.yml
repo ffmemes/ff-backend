@@ -13,14 +13,13 @@ services:
       - "9898:9000"
 
   prefect-server:
-    image: prefecthq/prefect:3-latest
+    image: prefecthq/prefect:3.4-latest
     container_name: prefect_server
     command: prefect server start --host 0.0.0.0
     ports:
       - "127.0.0.1:4200:4200"
     environment:
       PREFECT_SERVER_DATABASE_CONNECTION_URL: "${PREFECT_DB_URL}"
-      PREFECT_SERVER_API_AUTH_STRING: "${PREFECT_AUTH_STRING}"
       PREFECT_SERVER_SERVICES_DB_VACUUM_ENABLED: "true"
       PREFECT_SERVER_SERVICES_DB_VACUUM_RETENTION_PERIOD: "7776000"
     restart: unless-stopped
@@ -32,7 +31,6 @@ services:
       - .env
     environment:
       PREFECT_API_URL: "http://prefect-server:4200/api"
-      PREFECT_API_AUTH_STRING: "${PREFECT_AUTH_STRING}"
       PYTHONPATH: "/src"
     build:
       context: .
