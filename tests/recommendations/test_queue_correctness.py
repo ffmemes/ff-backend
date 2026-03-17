@@ -34,6 +34,7 @@ def _make_stub_retriever(candidates_by_engine: dict[str, list[dict]]):
             user_id: int,
             limit: int = 10,
             exclude_mem_ids: list[int] = [],
+            **kwargs,
         ) -> list[dict[str, Any]]:
             all_candidates = candidates_by_engine.get(engine_name, [])
             exclude_set = set(exclude_mem_ids)

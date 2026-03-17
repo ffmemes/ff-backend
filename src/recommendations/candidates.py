@@ -98,12 +98,19 @@ async def get_lr_smoothed(
     user_id: int,
     limit: int = 10,
     exclude_meme_ids: list[int] = [],
+    min_sends: int = 0,
 ):
     """
     Uses the following score to rank memes
 
     score = Like Rate Smoothed * User-Source Like Rate
+
+    Args:
+        min_sends: minimum nmemes_sent to filter for statistical confidence.
+            Use min_sends=10 for cold start to ensure battle-tested memes.
     """
+
+    min_sends_filter = f"AND MS.nmemes_sent >= {int(min_sends)}" if min_sends > 0 else ""
 
     query = f"""
         SELECT
@@ -131,6 +138,7 @@ async def get_lr_smoothed(
             AND M.status = 'ok'
             AND R.meme_id IS NULL
             AND MS.nlikes > 1
+            {min_sends_filter}
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
 
         ORDER BY -1
@@ -315,11 +323,12 @@ class CandidatesRetriever:
         user_id: int,
         limit: int = 10,
         exclude_mem_ids: list[int] = [],
+        **kwargs,
     ) -> list[dict[str, Any]]:
         if engine not in self.engine_map:
             raise ValueError(f"engine {engine} is not supported")
 
-        return await self.engine_map[engine](user_id, limit, exclude_mem_ids)
+        return await self.engine_map[engine](user_id, limit, exclude_mem_ids, **kwargs)
 
     async def get_candidates_dict(
         self,

@@ -53,7 +53,8 @@ async def generate_cold_start_recommendations(user_id, limit=10):
     meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
 
     candidates = await get_lr_smoothed(
-        user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
+        user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue,
+        min_sends=10,
     )
 
     if len(candidates) == 0:
@@ -137,6 +138,7 @@ async def generate_recommendations(
                 user_id,
                 limit,
                 exclude_mem_ids=meme_ids_in_queue,
+                min_sends=10,
             )
 
             if len(candidates) == 0:
