@@ -8,7 +8,7 @@ from src.stats import user
     name="Calculate user_stats",
     retries=2,
     retry_delay_seconds=30,
-    timeout_seconds=120,
+    timeout_seconds=300,
     on_failure=[notify_telegram_on_failure],
 )
 async def calculate_user_stats() -> None:
