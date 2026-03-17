@@ -32,6 +32,7 @@ services:
       - .env
     environment:
       PREFECT_API_URL: "http://prefect-server:4200/api"
+      PYTHONPATH: "/src"
     build:
       context: .
       dockerfile: Dockerfile.prod
