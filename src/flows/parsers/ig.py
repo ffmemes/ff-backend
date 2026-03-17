@@ -3,6 +3,7 @@ from datetime import datetime
 
 from prefect import flow, get_run_logger
 
+from src.flows.hooks import notify_telegram_on_failure
 from src.flows.storage.memes import ig_meme_pipeline
 from src.storage.etl import insert_parsed_posts_from_ig
 from src.storage.parsers.ig import get_user_info, get_user_medias
@@ -12,7 +13,7 @@ from src.storage.service import (
 )
 
 
-@flow(name="Parse IG Source")
+@flow(name="Parse IG Source", timeout_seconds=300)
 async def parse_ig_source(
     meme_source_id: int,
     instagram_user_id: int,
@@ -32,6 +33,10 @@ async def parse_ig_source(
 @flow(
     name="Parse Instagram Groups",
     description="Flow for parsing instagram profiles to get posts",
+    retries=2,
+    retry_delay_seconds=60,
+    timeout_seconds=900,
+    on_failure=[notify_telegram_on_failure],
 )
 async def parse_ig_sources(
     sources_batch_size=5,

@@ -10,6 +10,7 @@ from src.crossposting.service import (
     get_next_meme_for_tgchannelru,
     log_meme_sent,
 )
+from src.flows.hooks import notify_telegram_on_failure
 from src.storage.constants import MemeStatus
 from src.storage.schemas import MemeData
 from src.storage.service import update_meme
@@ -132,7 +133,12 @@ def _get_en_caption_for_crossposting_meme(meme: MemeData, channel: Channel) -> s
     return text
 
 
-@flow
+@flow(
+    retries=2,
+    retry_delay_seconds=30,
+    timeout_seconds=300,
+    on_failure=[notify_telegram_on_failure],
+)
 async def post_meme_to_tgchannelen():
     logger = get_run_logger()
 
@@ -163,7 +169,12 @@ async def post_meme_to_tgchannelen():
             )
 
 
-@flow
+@flow(
+    retries=2,
+    retry_delay_seconds=30,
+    timeout_seconds=300,
+    on_failure=[notify_telegram_on_failure],
+)
 async def post_meme_to_tgchannelru():
     logger = get_run_logger()
 

@@ -3,6 +3,7 @@ from datetime import datetime
 
 from prefect import flow, get_run_logger
 
+from src.flows.hooks import notify_telegram_on_failure
 from src.flows.storage.memes import vk_meme_pipeline
 from src.storage.etl import insert_parsed_posts_from_vk
 from src.storage.parsers.vk import VkGroupScraper
@@ -12,7 +13,7 @@ from src.storage.service import (
 )
 
 
-@flow(name="Parse VK Source")
+@flow(name="Parse VK Source", timeout_seconds=300)
 async def parse_vk_source(
     meme_source_id: int,
     meme_source_url: str,
@@ -34,6 +35,10 @@ async def parse_vk_source(
 @flow(
     name="Parse VK Groups",
     description="Flow for parsing vk groups to get posts",
+    retries=2,
+    retry_delay_seconds=60,
+    timeout_seconds=900,
+    on_failure=[notify_telegram_on_failure],
 )
 async def parse_vk_sources(
     sources_batch_size=10,

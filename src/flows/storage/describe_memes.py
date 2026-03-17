@@ -23,6 +23,7 @@ from prefect import flow, get_run_logger
 
 from src.config import settings
 from src.database import fetch_all, fetch_one, meme
+from src.flows.hooks import notify_telegram_on_failure
 from src.storage.upload import download_meme_content_from_tg
 
 logger = logging.getLogger(__name__)
@@ -252,6 +253,10 @@ async def describe_single_meme(meme_row: dict) -> bool:
     description="Analyze meme images with free vision models.",
     version="0.1.0",
     log_prints=True,
+    retries=1,
+    retry_delay_seconds=60,
+    timeout_seconds=900,
+    on_failure=[notify_telegram_on_failure],
 )
 async def describe_memes_flow(batch_size: int = 30) -> None:
     log = get_run_logger()

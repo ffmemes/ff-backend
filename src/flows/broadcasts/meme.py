@@ -6,9 +6,17 @@ from src.broadcasts.service import (
     get_user_ids_active_minutes_ago,
     get_users_active_more_than_days_ago,
 )
+from src.flows.hooks import notify_telegram_on_failure
 from src.recommendations.meme_queue import check_queue, get_next_meme_for_user
 from src.tgbot.bot import bot
 from src.tgbot.senders.meme import send_meme_to_user
+
+_BROADCAST_FLOW_OPTS = dict(
+    retries=1,
+    retry_delay_seconds=30,
+    timeout_seconds=600,
+    on_failure=[notify_telegram_on_failure],
+)
 
 
 async def broadcast_next_meme_to_users(user_ids: list[int]):
@@ -24,43 +32,43 @@ async def broadcast_next_meme_to_users(user_ids: list[int]):
             await asyncio.sleep(0.2)  # flood control
 
 
-@flow
+@flow(**_BROADCAST_FLOW_OPTS)
 async def broadcast_next_meme_to_active_15m_ago():
     user_ids = await get_user_ids_active_minutes_ago(15, 30)
     await broadcast_next_meme_to_users(user_ids)
 
 
-@flow
+@flow(**_BROADCAST_FLOW_OPTS)
 async def broadcast_next_meme_to_active_24h_ago():
     user_ids = await get_user_ids_active_minutes_ago(24 * 60, 24 * 60 + 60)
     await broadcast_next_meme_to_users(user_ids)
 
 
-@flow
+@flow(**_BROADCAST_FLOW_OPTS)
 async def broadcast_next_meme_to_active_48h_ago():
     user_ids = await get_user_ids_active_minutes_ago(48 * 60, 48 * 60 + 60)
     await broadcast_next_meme_to_users(user_ids)
 
 
-@flow
+@flow(**_BROADCAST_FLOW_OPTS)
 async def broadcast_next_meme_to_active_1w_ago():
     user_ids = await get_user_ids_active_minutes_ago(7 * 24 * 60, 7 * 24 * 60 + 60)
     await broadcast_next_meme_to_users(user_ids)
 
 
-@flow
+@flow(**_BROADCAST_FLOW_OPTS)
 async def broadcast_next_meme_to_active_2w_ago():
     user_ids = await get_user_ids_active_minutes_ago(2 * 7 * 24 * 60, 2 * 7 * 24 * 60 + 60)
     await broadcast_next_meme_to_users(user_ids)
 
 
-@flow
+@flow(**_BROADCAST_FLOW_OPTS)
 async def broadcast_next_meme_to_active_4w_ago():
     user_ids = await get_user_ids_active_minutes_ago(4 * 7 * 24 * 60, 4 * 7 * 24 * 60 + 60)
     await broadcast_next_meme_to_users(user_ids)
 
 
-@flow
+@flow(**_BROADCAST_FLOW_OPTS)
 async def broadcast_next_meme_to_active_more_than_days_ago(days: int = 3):
     """To call manually sometimes"""
     user_ids = await get_users_active_more_than_days_ago(days)

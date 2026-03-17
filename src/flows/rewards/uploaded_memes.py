@@ -8,6 +8,7 @@ from src.crossposting.constants import Channel
 from src.crossposting.service import (
     log_meme_sent,
 )
+from src.flows.hooks import notify_telegram_on_failure
 from src.flows.rewards.service import (
     get_all_uploaded_memes_weekly_en,
     get_all_uploaded_memes_weekly_ru,
@@ -57,7 +58,13 @@ def _meme_dict_to_input_media(m: dict):
     raise Exception(f"Can't get meme type from: {m}")
 
 
-@flow(name="Reward RU users for weekly top uploaded memes")
+@flow(
+    name="Reward RU users for weekly top uploaded memes",
+    retries=1,
+    retry_delay_seconds=60,
+    timeout_seconds=300,
+    on_failure=[notify_telegram_on_failure],
+)
 async def reward_ru_users_for_weekly_top_uploaded_memes():
     logger = get_run_logger()
     logger.info("Going to reward users for weekly top uploaded memes")
@@ -170,7 +177,13 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
         await asyncio.sleep(2)
 
 
-@flow(name="Reward EN users for weekly top uploaded memes")
+@flow(
+    name="Reward EN users for weekly top uploaded memes",
+    retries=1,
+    retry_delay_seconds=60,
+    timeout_seconds=300,
+    on_failure=[notify_telegram_on_failure],
+)
 async def reward_en_users_for_weekly_top_uploaded_memes():
     logger = get_run_logger()
     logger.info("Going to reward users for weekly top uploaded memes")
