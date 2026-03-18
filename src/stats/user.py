@@ -1,3 +1,5 @@
+import logging
+
 from sqlalchemy import text
 
 from src.database import execute
@@ -95,12 +97,18 @@ _USER_STATS_SQL = """
 
 
 async def update_single_user_stats(user_id: int) -> None:
-    """Tier 1: Recompute stats for a single user (called inline on reaction)."""
-    query = _USER_STATS_SQL.format(
-        user_filter="WHERE user_id = :user_id",
-        having_filter="",
-    )
-    await execute(text(query), {"user_id": user_id})
+    """Tier 1: Recompute stats for a single user (called inline on reaction).
+
+    Best-effort: silently catches deadlocks since Tier 2 batch will catch up.
+    """
+    try:
+        query = _USER_STATS_SQL.format(
+            user_filter="WHERE user_id = :user_id",
+            having_filter="",
+        )
+        await execute(text(query), {"user_id": user_id})
+    except Exception:
+        logging.debug(f"Tier 1 user_stats skipped for user {user_id} (likely deadlock)")
 
 
 async def calculate_user_stats() -> None:
