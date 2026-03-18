@@ -87,9 +87,13 @@ src/
 │   ├── watermark.py     # Image watermarking (Pillow)
 │   └── service.py       # Upload to TG storage chat -> telegram_file_id
 ├── flows/               # Prefect workflows (ETL, stats, crossposting)
+│   ├── events.py        # safe_emit() wrapper for Prefect events
+│   └── hooks.py         # on_failure Telegram alert hook
 ├── stats/               # Stats computation SQL queries
 └── crossposting/        # Auto-post to public channels
-flow_deployments/        # Prefect deployment definitions + cron schedules
+scripts/
+├── serve_flows.py       # Prefect .serve() entry point (23 deployments)
+└── setup_automations.py # Creates Prefect automations (run once after deploy)
 alembic/versions/        # 32 migration files
 ```
 
@@ -104,9 +108,11 @@ alembic/versions/        # 32 migration files
 
 ```
 Sources -> Parsers (hourly cron) -> meme_raw_* tables
+-> [automation: parser completes -> triggers pipeline]
 -> ETL (filter single-media, detect type) -> meme table (status=created)
 -> Download + Watermark + Upload to TG storage -> telegram_file_id
--> OCR -> Ad filter -> Dedup -> status='ok'
+-> [automation: pipeline completes -> triggers final_pipeline]
+-> Ad filter -> Dedup -> status='ok'
 -> Recommendation (9 engines) -> Blender -> Redis queue -> User
 -> Like/Dislike -> user_meme_reaction -> Stats aggregation (every 15 min)
 ```
@@ -165,7 +171,13 @@ Optional: `OCR_ENABLED` (default false), `VK_TOKEN`, `OPENAI_API_KEY`, `SENTRY_D
 
 - **Sentry**: configured, CLI (`sentry`) is logged in
 - **Logs**: server logs available via Coolify
-- **Prefect**: orchestrates periodic tasks; owner considers it heavy/problematic
+- **Prefect automations** (13 total, self-hosted):
+  - **Chain triggers** (6): parser -> pipeline -> final_pipeline (per platform)
+  - **Proactive monitors** (4): auto-retrigger stats/parser/pipeline if not completed on time
+  - **Circuit breakers** (3): pause deployment after 3 failures (parsers, describe_memes)
+  - All flows emit custom events (`ff.parser.*`, `ff.pipeline.*`, `ff.stats.*`) via `safe_emit()`
+  - Automations managed via `scripts/setup_automations.py` (run once after deploy)
+  - Resume paused deployments: `prefect deployment resume "<name>"`
 
 ## gstack
 
