@@ -22,6 +22,7 @@ from prefect import flow, get_run_logger
 
 from src.config import settings
 from src.database import fetch_all, fetch_one, meme
+from src.flows.events import safe_emit
 from src.flows.hooks import notify_telegram_on_failure
 from src.storage.upload import download_meme_content_from_tg
 
@@ -313,3 +314,9 @@ async def describe_memes_flow(batch_size: int = 30) -> None:
             await asyncio.sleep(4)
 
     log.info("Batch: %d described, %d failed out of %d.", ok, failed, len(memes))
+
+    safe_emit(
+        "ff.describe_memes.completed",
+        "ff.describe_memes",
+        {"described": ok, "failed": failed},
+    )

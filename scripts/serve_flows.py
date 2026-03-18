@@ -46,9 +46,12 @@ from src.flows.stats.user_meme_source import calculate_user_meme_source_stats
 
 # Storage
 from src.flows.storage.describe_memes import describe_memes_flow
-
-# Watchdog
-from src.flows.watchdog import watchdog
+from src.flows.storage.memes import (
+    final_meme_pipeline,
+    ig_meme_pipeline,
+    tg_meme_pipeline,
+    vk_meme_pipeline,
+)
 
 LON = "Europe/London"
 MSK = "Europe/Moscow"
@@ -90,6 +93,11 @@ if __name__ == "__main__":
             name="Parse Instagram Sources",
             schedules=[CronSchedule(cron="30 0 * * *", timezone=LON)],
         ),
+        # ── Pipelines (no cron — triggered by automations) ──
+        tg_meme_pipeline.to_deployment(name="TG Meme Pipeline"),
+        vk_meme_pipeline.to_deployment(name="VK Meme Pipeline"),
+        ig_meme_pipeline.to_deployment(name="IG Meme Pipeline"),
+        final_meme_pipeline.to_deployment(name="Final Meme Pipeline"),
         # ── Broadcasts ──
         broadcast_next_meme_to_active_15m_ago.to_deployment(
             name="Broadcast 15m",
@@ -141,10 +149,5 @@ if __name__ == "__main__":
         describe_memes_flow.to_deployment(
             name="Describe Memes (OpenRouter)",
             schedules=[CronSchedule(cron="*/30 * * * *", timezone=LON)],
-        ),
-        # ── Monitoring ──
-        watchdog.to_deployment(
-            name="Watchdog",
-            schedules=[CronSchedule(cron="*/5 * * * *", timezone=LON)],
         ),
     )

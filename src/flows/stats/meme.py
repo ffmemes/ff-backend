@@ -1,5 +1,6 @@
 from prefect import flow
 
+from src.flows.events import safe_emit
 from src.flows.hooks import notify_telegram_on_failure
 from src.stats import meme
 
@@ -17,3 +18,5 @@ async def calculate_meme_stats() -> None:
     await meme.calculate_meme_raw_impressions_stats()
 
     await meme.calculate_meme_invited_count()
+
+    safe_emit("ff.stats.meme.completed", "ff.stats.meme")

@@ -3,8 +3,8 @@ from datetime import datetime
 
 from prefect import flow, get_run_logger
 
+from src.flows.events import safe_emit
 from src.flows.hooks import notify_telegram_on_failure
-from src.flows.storage.memes import ig_meme_pipeline
 from src.storage.etl import insert_parsed_posts_from_ig
 from src.storage.parsers.ig import get_user_info, get_user_medias
 from src.storage.service import (
@@ -98,4 +98,8 @@ async def parse_ig_sources(
 
         await parse_ig_source(ig_source["id"], user_info["pk"])
 
-    await ig_meme_pipeline()
+    safe_emit(
+        "ff.parser.ig.completed",
+        "ff.parser.ig",
+        {"sources_parsed": len(ig_sources)},
+    )

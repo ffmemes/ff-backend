@@ -5,6 +5,8 @@ from typing import Any
 from prefect import flow, get_run_logger
 
 from src.config import settings
+from src.flows.events import safe_emit
+from src.flows.hooks import notify_telegram_on_failure
 from src.storage import ads
 from src.storage.constants import MemeSourceType, MemeStatus, MemeType
 from src.storage.etl import (
@@ -178,14 +180,16 @@ async def _process_unloaded_memes(
         f"Batch done: {ok_count} uploaded, {fail_count} failed out of {total}."
     )
 
-    await final_meme_pipeline()
-
 
 @flow(
     name="Memes from Telegram Pipeline",
     description="Process raw memes parsed from Telegram",
-    version="0.2.0",
+    version="0.3.0",
     log_prints=True,
+    retries=1,
+    retry_delay_seconds=60,
+    timeout_seconds=1800,
+    on_failure=[notify_telegram_on_failure],
 )
 async def tg_meme_pipeline() -> None:
     logger = get_run_logger()
@@ -195,11 +199,17 @@ async def tg_meme_pipeline() -> None:
     unloaded_memes = await get_unloaded_tg_memes(limit=100)
     await _process_unloaded_memes(unloaded_memes, "Telegram")
 
+    safe_emit("ff.pipeline.telegram.completed", "ff.pipeline.telegram")
+
 
 @flow(
     name="Memes from VK Pipeline",
     description="Process raw memes parsed from VK",
-    version="0.2.0",
+    version="0.3.0",
+    retries=1,
+    retry_delay_seconds=60,
+    timeout_seconds=1800,
+    on_failure=[notify_telegram_on_failure],
 )
 async def vk_meme_pipeline() -> None:
     logger = get_run_logger()
@@ -209,11 +219,17 @@ async def vk_meme_pipeline() -> None:
     unloaded_memes = await get_unloaded_vk_memes(limit=100)
     await _process_unloaded_memes(unloaded_memes, "VK")
 
+    safe_emit("ff.pipeline.vk.completed", "ff.pipeline.vk")
+
 
 @flow(
     name="Memes from Instagram Pipeline",
     description="Process raw memes parsed from IG",
-    version="0.2.0",
+    version="0.3.0",
+    retries=1,
+    retry_delay_seconds=60,
+    timeout_seconds=1800,
+    on_failure=[notify_telegram_on_failure],
 )
 async def ig_meme_pipeline() -> None:
     logger = get_run_logger()
@@ -222,6 +238,8 @@ async def ig_meme_pipeline() -> None:
 
     unloaded_memes = await get_unloaded_ig_memes(limit=100)
     await _process_unloaded_memes(unloaded_memes, "Instagram")
+
+    safe_emit("ff.pipeline.ig.completed", "ff.pipeline.ig")
 
 
 @flow
@@ -283,7 +301,13 @@ To save on quota I quit from tg_meme_pipeline
     await final_meme_pipeline()
 
 
-@flow(name="Final Memes Pipeline")
+@flow(
+    name="Final Memes Pipeline",
+    retries=1,
+    retry_delay_seconds=30,
+    timeout_seconds=300,
+    on_failure=[notify_telegram_on_failure],
+)
 async def final_meme_pipeline() -> None:
     logger = get_run_logger()
 
@@ -311,3 +335,9 @@ async def final_meme_pipeline() -> None:
 
     # next step of a pipeline
     await update_meme_status_of_ready_memes()
+
+    safe_emit(
+        "ff.pipeline.final.completed",
+        "ff.pipeline.final",
+        {"memes_processed": len(memes)},
+    )

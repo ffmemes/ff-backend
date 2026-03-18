@@ -3,8 +3,8 @@ from datetime import datetime
 
 from prefect import flow, get_run_logger
 
+from src.flows.events import safe_emit
 from src.flows.hooks import notify_telegram_on_failure
-from src.flows.storage.memes import vk_meme_pipeline
 from src.storage.etl import insert_parsed_posts_from_vk
 from src.storage.parsers.vk import VkGroupScraper
 from src.storage.service import (
@@ -48,7 +48,18 @@ async def parse_vk_sources(
     vk_sources = await get_vk_sources_to_parse(limit=sources_batch_size)
     logger.info(f"Received {len(vk_sources)} vk sources to scrape.")
 
+    ok_count = 0
+    fail_count = 0
     for vk_source in vk_sources:
-        await parse_vk_source(vk_source["id"], vk_source["url"], nposts=nposts)
+        try:
+            await parse_vk_source(vk_source["id"], vk_source["url"], nposts=nposts)
+            ok_count += 1
+        except Exception as e:
+            fail_count += 1
+            logger.error(f"Source {vk_source['id']} ({vk_source['url']}) failed: {e}")
 
-    await vk_meme_pipeline()
+    safe_emit(
+        "ff.parser.vk.completed",
+        "ff.parser.vk",
+        {"sources_ok": ok_count, "sources_failed": fail_count},
+    )

@@ -4,8 +4,8 @@ from datetime import datetime
 
 from prefect import flow, get_run_logger
 
+from src.flows.events import safe_emit
 from src.flows.hooks import notify_telegram_on_failure
-from src.flows.storage.memes import tg_meme_pipeline
 from src.storage.etl import insert_parsed_posts_from_telegram
 from src.storage.parsers.tg import TelegramChannelScraper
 from src.storage.service import (
@@ -69,4 +69,8 @@ async def parse_telegram_sources(
         f"out of {len(tg_sources)} sources in {elapsed:.0f}s"
     )
 
-    await tg_meme_pipeline()
+    safe_emit(
+        "ff.parser.telegram.completed",
+        "ff.parser.telegram",
+        {"sources_ok": ok_count, "sources_failed": fail_count},
+    )
