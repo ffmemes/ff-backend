@@ -11,7 +11,7 @@ import sys
 from datetime import timedelta
 
 from prefect.automations import Automation, EventTrigger, Posture
-from prefect.client import get_client
+from prefect.client.orchestration import get_client
 from prefect.events.actions import PauseDeployment, RunDeployment
 
 # Full deployment names: "flow_name/deployment_name"
