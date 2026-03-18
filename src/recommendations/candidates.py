@@ -7,6 +7,19 @@ from src.database import fetch_all
 from src.recommendations.utils import exclude_meme_ids_sql_filter
 
 
+def _build_params(
+    user_id: int,
+    limit: int,
+    exclude_meme_ids: list[int],
+    **extra,
+) -> dict[str, Any]:
+    """Build the standard params dict for candidate queries."""
+    params: dict[str, Any] = {"user_id": user_id, "limit": limit, **extra}
+    if exclude_meme_ids:
+        params["exclude_meme_ids"] = exclude_meme_ids
+    return params
+
+
 async def best_uploaded_memes(
     user_id: int,
     limit: int = 10,
@@ -27,15 +40,15 @@ async def best_uploaded_memes(
 
         INNER JOIN user_language L
             ON L.language_code = M.language_code
-            AND L.user_id = {user_id}
+            AND L.user_id = :user_id
 
         LEFT JOIN user_meme_reaction R
             ON R.meme_id = M.id
-            AND R.user_id = {user_id}
+            AND R.user_id = :user_id
 
         LEFT JOIN user_meme_source_stats UMSS
             ON UMSS.meme_source_id = M.meme_source_id
-            AND UMSS.user_id = {user_id}
+            AND UMSS.user_id = :user_id
 
         WHERE 1=1
             AND M.status = 'ok'
@@ -47,10 +60,9 @@ async def best_uploaded_memes(
             * COALESCE((UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.), 0.5)
             * (MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1.)
         NULLS LAST
-        LIMIT {limit}
+        LIMIT :limit
     """
-    res = await fetch_all(text(query))
-    return res
+    return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
 
 
 async def like_spread_and_recent_memes(
@@ -64,18 +76,17 @@ async def like_spread_and_recent_memes(
             , M.type, M.telegram_file_id, M.caption
             , 'like_spread_and_recent' AS recommended_by
 
-            -- , MS.nlikes, MS.ndislikes
         FROM meme M
         INNER JOIN meme_stats MS
             ON MS.meme_id = M.id
 
         INNER JOIN user_language L
-            ON L.user_id = {user_id}
+            ON L.user_id = :user_id
             AND L.language_code = M.language_code
 
         LEFT JOIN user_meme_reaction R
                 ON R.meme_id = M.id
-                AND R.user_id = {user_id}
+                AND R.user_id = :user_id
 
         WHERE 1=1
             AND M.status = 'ok'
@@ -88,10 +99,9 @@ async def like_spread_and_recent_memes(
         ORDER BY -1
             * (MS.nlikes - MS.ndislikes) / (MS.nmemes_sent + 1.)
             * CASE WHEN MS.age_days < 30 THEN 1 ELSE 0.5 END
-        LIMIT {limit}
+        LIMIT :limit
     """
-    res = await fetch_all(text(query))
-    return res
+    return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
 
 
 async def get_lr_smoothed(
@@ -110,7 +120,7 @@ async def get_lr_smoothed(
             Use min_sends=10 for cold start to ensure battle-tested memes.
     """
 
-    min_sends_filter = f"AND MS.nmemes_sent >= {int(min_sends)}" if min_sends > 0 else ""
+    min_sends_filter = "AND MS.nmemes_sent >= :min_sends" if min_sends > 0 else ""
 
     query = f"""
         SELECT
@@ -124,15 +134,15 @@ async def get_lr_smoothed(
 
         INNER JOIN user_language L
             ON L.language_code = M.language_code
-            AND L.user_id = {user_id}
+            AND L.user_id = :user_id
 
         LEFT JOIN user_meme_reaction R
             ON R.meme_id = M.id
-            AND R.user_id = {user_id}
+            AND R.user_id = :user_id
 
         LEFT JOIN user_meme_source_stats UMSS
             ON UMSS.meme_source_id = M.meme_source_id
-            AND UMSS.user_id = {user_id}
+            AND UMSS.user_id = :user_id
 
         WHERE 1=1
             AND M.status = 'ok'
@@ -144,11 +154,12 @@ async def get_lr_smoothed(
         ORDER BY -1
             * COALESCE((UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.), 0.5)
             * MS.lr_smoothed
-        LIMIT {limit}
+        LIMIT :limit
     """
-    res = await fetch_all(text(query))
-    return res
-
+    params = _build_params(user_id, limit, exclude_meme_ids)
+    if min_sends > 0:
+        params["min_sends"] = int(min_sends)
+    return await fetch_all(text(query), params)
 
 
 async def get_es_ranked(
@@ -175,15 +186,15 @@ async def get_es_ranked(
 
         INNER JOIN user_language L
             ON L.language_code = M.language_code
-            AND L.user_id = {user_id}
+            AND L.user_id = :user_id
 
         LEFT JOIN user_meme_reaction R
             ON R.meme_id = M.id
-            AND R.user_id = {user_id}
+            AND R.user_id = :user_id
 
         LEFT JOIN user_meme_source_stats UMSS
             ON UMSS.meme_source_id = M.meme_source_id
-            AND UMSS.user_id = {user_id}
+            AND UMSS.user_id = :user_id
 
         WHERE 1=1
             AND M.status = 'ok'
@@ -194,10 +205,9 @@ async def get_es_ranked(
         ORDER BY -1
             * COALESCE((UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.), 0.5)
             * MS.engagement_score
-        LIMIT {limit}
+        LIMIT :limit
     """
-    res = await fetch_all(text(query))
-    return res
+    return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
 
 
 async def goat(
@@ -225,7 +235,7 @@ async def goat(
             INNER JOIN meme_source_stats MSS
                 ON MSS.meme_source_id = M.meme_source_id
             INNER JOIN user_meme_source_stats UMSS
-                ON UMSS.user_id = {user_id}
+                ON UMSS.user_id = :user_id
                 AND UMSS.meme_source_id = M.meme_source_id
             WHERE M.status = 'ok'
         )
@@ -240,21 +250,20 @@ async def goat(
             ON SCORES.meme_id = M.id
 
         INNER JOIN user_language L
-            ON L.user_id = {user_id}
+            ON L.user_id = :user_id
             AND L.language_code = M.language_code
 
         LEFT JOIN user_meme_reaction R
                 ON R.meme_id = M.id
-                AND R.user_id = {user_id}
+                AND R.user_id = :user_id
 
         WHERE 1=1
             AND R.meme_id IS NULL
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
         ORDER BY SCORES.score DESC NULLS LAST
-        LIMIT {limit}
+        LIMIT :limit
     """
-    res = await fetch_all(text(query))
-    return res
+    return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
 
 
 async def get_recently_liked(
@@ -289,20 +298,19 @@ async def get_recently_liked(
 
         INNER JOIN user_language L
             ON L.language_code = M.language_code
-            AND L.user_id = {user_id}
+            AND L.user_id = :user_id
 
         LEFT JOIN user_meme_reaction R
             ON R.meme_id = M.id
-            AND R.user_id = {user_id}
+            AND R.user_id = :user_id
 
         WHERE 1=1
             AND M.status = 'ok'
             AND R.meme_id IS NULL
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
-        LIMIT {limit}
+        LIMIT :limit
     """
-    res = await fetch_all(text(query))
-    return res
+    return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
 
 
 class CandidatesRetriever:

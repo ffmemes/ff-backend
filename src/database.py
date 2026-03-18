@@ -259,7 +259,7 @@ user_meme_reaction = Table(
     Column("meme_id", ForeignKey("meme.id", ondelete="CASCADE"), primary_key=True),
     Column("recommended_by", String, nullable=False),
     Column("sent_at", DateTime, server_default=func.now(), nullable=False),
-    Column("reaction_id", Integer, index=True),
+    Column("reaction_id", Integer),
     Column("reacted_at", DateTime),
 )
 
@@ -434,12 +434,18 @@ async def fetch_one(select_query: Select | Insert | Update) -> dict[str, Any] | 
         return cursor.first()._asdict() if cursor.rowcount > 0 else None
 
 
-async def fetch_all(select_query: Select | Insert | Update) -> list[dict[str, Any]]:
+async def fetch_all(
+    select_query: Select | Insert | Update,
+    params: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     async with engine.begin() as conn:
-        cursor: CursorResult = await conn.execute(select_query)
+        cursor: CursorResult = await conn.execute(select_query, params or {})
         return [r._asdict() for r in cursor.all()]
 
 
-async def execute(select_query: Insert | Update) -> CursorResult:
+async def execute(
+    select_query: Insert | Update,
+    params: dict[str, Any] | None = None,
+) -> CursorResult:
     async with engine.begin() as conn:
-        return await conn.execute(select_query)
+        return await conn.execute(select_query, params or {})

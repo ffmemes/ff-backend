@@ -15,7 +15,7 @@ from src.database import (
     user_language,
     user_meme_reaction,
 )
-from src.stats.meme import calculate_meme_reactions_stats
+from src.stats.meme import calculate_meme_reactions_and_engagement
 
 
 @pytest_asyncio.fixture()
@@ -93,7 +93,7 @@ async def conn():
 
 @pytest.mark.asyncio
 async def test_calculate_meme_reactions_stats(conn: AsyncConnection):
-    await calculate_meme_reactions_stats(min_meme_reactions=0, min_user_reactions=0)
+    await calculate_meme_reactions_and_engagement(min_meme_reactions=0, min_user_reactions=0)
 
     res = await fetch_all(select(meme_stats))
     assert len(res) == 6

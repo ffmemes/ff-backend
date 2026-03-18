@@ -12,10 +12,8 @@ from src.stats import meme
     on_failure=[notify_telegram_on_failure],
 )
 async def calculate_meme_stats() -> None:
-    await meme.calculate_meme_reactions_stats()
+    await meme.calculate_meme_reactions_and_engagement()
 
     await meme.calculate_meme_raw_impressions_stats()
 
     await meme.calculate_meme_invited_count()
-
-    await meme.calculate_engagement_score()

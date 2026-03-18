@@ -53,7 +53,9 @@ async def generate_cold_start_recommendations(user_id, limit=10):
     meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
 
     candidates = await get_lr_smoothed(
-        user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue,
+        user_id,
+        limit=limit,
+        exclude_meme_ids=meme_ids_in_queue,
         min_sends=10,
     )
 
@@ -113,20 +115,23 @@ async def generate_recommendations(
             LEFT JOIN meme_stats MS
                 ON MS.meme_id = M.id
             LEFT JOIN user_meme_reaction R
-                ON R.user_id = {user_id}
+                ON R.user_id = :user_id
                 AND R.meme_id = M.id
             INNER JOIN user_language UL
-                ON UL.user_id = {user_id}
+                ON UL.user_id = :user_id
                 AND UL.language_code = M.language_code
             WHERE 1=1
                 AND M.status = 'ok'
                 AND R.meme_id IS NULL
                 {exclude_meme_ids_sql_filter(exclude_ids)}
             ORDER BY COALESCE(MS.nmemes_sent, 0), M.id
-            LIMIT {limit}
+            LIMIT :limit
         """
+        params: dict = {"user_id": user_id, "limit": limit}
+        if exclude_ids:
+            params["exclude_meme_ids"] = exclude_ids
 
-        return await fetch_all(text(query))
+        return await fetch_all(text(query), params)
 
     async def get_candidates(user_id, limit):
         """A helper function to avoid copy-paste"""

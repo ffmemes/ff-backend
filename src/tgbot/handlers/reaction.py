@@ -11,6 +11,8 @@ from src.recommendations.service import (
     update_user_last_active_at,
     update_user_meme_reaction,
 )
+from src.stats.user import update_single_user_stats
+from src.stats.user_meme_source import update_single_user_meme_source_stats
 from src.tgbot.handlers.moderator.invite import maybe_send_moderator_invite
 from src.tgbot.senders.next_message import next_message
 from src.tgbot.user_info import update_user_info_counters
@@ -34,6 +36,11 @@ async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     )
 
     if reaction_is_new:
+        # Tier 1: update per-user stats inline (fire-and-forget)
+        # These don't block meme delivery — periodic Tier 2 catches up if they fail
+        asyncio.create_task(update_single_user_stats(user_id))
+        asyncio.create_task(update_single_user_meme_source_stats(user_id))
+
         return await next_message(
             context.bot,
             user_id,
