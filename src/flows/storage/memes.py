@@ -305,7 +305,7 @@ To save on quota I quit from tg_meme_pipeline
     name="Final Memes Pipeline",
     retries=1,
     retry_delay_seconds=30,
-    timeout_seconds=300,
+    timeout_seconds=1800,
     on_failure=[notify_telegram_on_failure],
 )
 async def final_meme_pipeline() -> None:
