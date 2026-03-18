@@ -14,6 +14,18 @@
 **Context:** The `raw_impr_rank = 0` filter already limits to top-quartile viral memes. `age_days < 30` is redundant and starves the engine.
 **Depends on:** Nothing — quick fix.
 
+### Auto-discover new TG channels from forwarded messages
+**What:** When the TG scraper parses a forwarded post, extract the source channel URL. Store discovered channels in a new `meme_source_candidate` table with status='discovered'. Admin/moderator approval flow to promote to `meme_source`.
+**Why:** Meme channels frequently forward from other meme channels. This creates a self-growing pipeline of source candidates without manual discovery. Currently all sources are added manually.
+**Context:** The scraper already extracts `forwarded_url` per post. Needs: (1) new DB table + migration, (2) dedup logic (don't re-discover known sources), (3) approval UX — could start admin-only, later add moderator voting with time-gated polls. Quality filtering TBD: some forwarded channels may not be meme channels.
+**Depends on:** Nothing technically — design decision on approval UX.
+
+### Auto-snooze broken/dead sources
+**What:** If a TG source returns 0 posts for 3 consecutive parse attempts, or its `meme_source_stats` like_rate drops below 10%, auto-set status to 'snoozed' and alert admins via Telegram.
+**Why:** Dead/broken sources waste parsing slots (currently 25/hour). With 108 enabled sources, each dead source delays the cycle for all others.
+**Context:** Need a `consecutive_empty_parses` counter (could be stored in `meme_source.data` JSONB). The watchdog or the parser flow itself can check and snooze. Admin alert allows manual review before permanent disable.
+**Depends on:** Nothing — small, self-contained change.
+
 ## P2 — Medium Priority
 
 ### Per-engine session continuation rate
