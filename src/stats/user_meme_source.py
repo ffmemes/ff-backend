@@ -5,7 +5,9 @@ from sqlalchemy import text
 from src.database import execute
 
 # Shared SQL template for user-meme-source stats.
-# {user_filter} is "WHERE R.user_id = :user_id" for single-user or "" for batch.
+# {user_filter} is "AND R.user_id = :user_id" for single-user or "" for batch.
+# ORDER BY ensures consistent lock ordering to prevent deadlocks between
+# Tier 1 (per-user) and Tier 2 (batch) running concurrently.
 _USER_MEME_SOURCE_STATS_SQL = """
     INSERT INTO user_meme_source_stats (
         user_id,
@@ -26,6 +28,7 @@ _USER_MEME_SOURCE_STATS_SQL = """
     WHERE reaction_id IS NOT NULL
     {user_filter}
     GROUP BY 1,2
+    ORDER BY 1,2
     ON CONFLICT (user_id, meme_source_id) DO
     UPDATE SET
         nlikes = EXCLUDED.nlikes,
@@ -37,7 +40,7 @@ _USER_MEME_SOURCE_STATS_SQL = """
 async def update_single_user_meme_source_stats(user_id: int) -> None:
     """Tier 1: Recompute source stats for a single user (called inline on reaction).
 
-    Best-effort: silently catches deadlocks since Tier 2 batch will catch up.
+    Best-effort: silently catches errors since Tier 2 batch will catch up.
     """
     try:
         query = _USER_MEME_SOURCE_STATS_SQL.format(

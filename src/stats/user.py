@@ -81,6 +81,7 @@ _USER_STATS_SQL = """
     ) SL ON SL.user_id = E.user_id
     GROUP BY E.user_id, SL.median_session_length
     {having_filter}
+    ORDER BY E.user_id
     ON CONFLICT (user_id) DO
     UPDATE SET
         nlikes = EXCLUDED.nlikes,
