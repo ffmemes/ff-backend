@@ -328,7 +328,10 @@ async def update_or_create_memes(transformed_memes, memes_not_in_memes_table):
         in memes_not_in_memes_table
     ]
     if len(create_these_memes):
-        await execute(insert(meme).values(create_these_memes))
+        stmt = insert(meme).values(create_these_memes).on_conflict_do_nothing(
+            index_elements=["meme_source_id", "raw_meme_id"],
+        )
+        await execute(stmt)
 
     update_these_memes = [
         m

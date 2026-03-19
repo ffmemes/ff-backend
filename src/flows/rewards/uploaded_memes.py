@@ -73,7 +73,7 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
     logger.info(f"Received {len(uploaded_memes)} uploaded memes")
 
     if len(uploaded_memes) < 5:
-        await log("Not enough memes to reward users: only {len(uploaded_memes)}")
+        await log(f"Not enough memes to reward users: only {len(uploaded_memes)}")
         return
 
     nuploaded = len(uploaded_memes)
@@ -192,7 +192,7 @@ async def reward_en_users_for_weekly_top_uploaded_memes():
     logger.info(f"Received {len(uploaded_memes)} uploaded memes")
 
     if len(uploaded_memes) < 5:
-        await log("Not enough memes to reward users: only {len(uploaded_memes)}")
+        await log(f"Not enough memes to reward users: only {len(uploaded_memes)}")
         return
 
     nuploaded = len(uploaded_memes)

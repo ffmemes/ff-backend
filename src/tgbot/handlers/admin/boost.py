@@ -15,7 +15,7 @@ from src.tgbot.handlers.treasury.payments import TrxType, pay_if_not_paid_with_a
 from src.tgbot.logs import log
 
 
-async def _chat_name(chat: Chat) -> str:
+def _chat_name(chat: Chat) -> str:
     if chat.username:
         return "@" + chat.username
 
