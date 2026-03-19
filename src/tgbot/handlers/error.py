@@ -17,7 +17,7 @@ from src.tgbot.user_info import get_user_info, update_user_info_cache
 
 
 async def send_stacktrace_to_tg_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.effective_user:
+    if not update or not update.effective_user:
         logging.error("Exception without effective_user:", exc_info=context.error)
         return
 

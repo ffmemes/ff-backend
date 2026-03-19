@@ -156,7 +156,7 @@ async def post_meme_to_tgchannelen():
 
     uploader_user_id = await get_meme_uploader_user_id(next_meme.id)
     if uploader_user_id:
-        balance = await pay_if_not_paid(uploader_user_id, TrxType.MEME_PUBLISHED, next_meme.id)
+        balance = await pay_if_not_paid(uploader_user_id, TrxType.MEME_PUBLISHED, str(next_meme.id))
         if balance:
             link = TELEGRAM_CHANNEL_EN_LINK + "/" + str(msg.message_id)
             await bot.send_message(
@@ -193,7 +193,7 @@ async def post_meme_to_tgchannelru():
 
     uploader_user_id = await get_meme_uploader_user_id(next_meme.id)
     if uploader_user_id:
-        balance = await pay_if_not_paid(uploader_user_id, TrxType.MEME_PUBLISHED, next_meme.id)
+        balance = await pay_if_not_paid(uploader_user_id, TrxType.MEME_PUBLISHED, str(next_meme.id))
         if balance:
             link = TELEGRAM_CHANNEL_RU_LINK + "/" + str(msg.message_id)
             await bot.send_message(

@@ -234,19 +234,18 @@ async def find_meme_duplicate(meme_id: int, imagetext: str) -> int | None:
     if len(imagetext) <= 11:  # skip all memes with less than 11 letters
         return None
 
-    select_query = f"""
+    select_query = text("""
         SELECT
             M.id
         FROM meme M
-        WHERE M.id < {meme_id}
+        WHERE M.id < :meme_id
             AND M.status = 'ok'
             AND M.type = 'image'
             AND M.ocr_result IS NOT NULL
-            AND (M.ocr_result ->> 'text') % '{imagetext}'
+            AND (M.ocr_result ->> 'text') % :imagetext
         ORDER BY M.id ASC
         LIMIT 1
-    """
-    select_query = text(select_query)
+    """).bindparams(meme_id=meme_id, imagetext=imagetext)
 
     res = await fetch_one(select_query)
     if res:
