@@ -112,17 +112,32 @@ async def update_single_user_stats(user_id: int) -> None:
         logging.debug(f"Tier 1 user_stats skipped for user {user_id} (likely deadlock)")
 
 
-async def calculate_user_stats() -> None:
+async def calculate_user_stats(max_retries: int = 3) -> None:
     """Tier 2: Batch recompute stats for recently active users.
 
     Scans the full table but only upserts users who reacted in the last day.
     With Tier 1 handling inline updates, this serves as a consistency catch-up.
+
+    Retries on deadlock since concurrent Tier 1 per-user upserts can conflict.
     """
+    import asyncio
+
     query = _USER_STATS_SQL.format(
         user_filter="",
         having_filter="HAVING MAX(reacted_at) > NOW() - INTERVAL '1 day'",
     )
-    await execute(text(query))
+    for attempt in range(max_retries):
+        try:
+            await execute(text(query))
+            return
+        except Exception as e:
+            if "deadlock" in str(e).lower() and attempt < max_retries - 1:
+                logging.warning(
+                    f"Tier 2 user_stats deadlock (attempt {attempt + 1}/{max_retries}), retrying..."
+                )
+                await asyncio.sleep(2 * (attempt + 1))
+            else:
+                raise
 
 
 async def calculate_inviter_stats():
