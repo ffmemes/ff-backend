@@ -428,9 +428,12 @@ message_tg = Table(
 )
 
 
-async def fetch_one(select_query: Select | Insert | Update) -> dict[str, Any] | None:
+async def fetch_one(
+    select_query: Select | Insert | Update,
+    params: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
     async with engine.begin() as conn:
-        cursor: CursorResult = await conn.execute(select_query)
+        cursor: CursorResult = await conn.execute(select_query, params or {})
         return cursor.first()._asdict() if cursor.rowcount > 0 else None
 
 
