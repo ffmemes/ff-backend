@@ -331,16 +331,30 @@ async def update_or_create_memes(transformed_memes, memes_not_in_memes_table):
         await execute(insert(meme).values(create_these_memes))
 
     update_these_memes = [
-        m | {"status": "created" if m["status"] == "broken_content_link" else m["status"]}
+        m
         for m in transformed_memes
         if {"meme_source_id": m["meme_source_id"], "raw_meme_id": m["raw_meme_id"]}
         not in memes_not_in_memes_table
     ]
 
+    # Only update metadata — never overwrite status on existing memes.
+    # This prevents resetting ok/duplicate memes back to 'created'.
     for m in update_these_memes:
         await execute(
             meme.update()
             .where(meme.c.meme_source_id == m["meme_source_id"])
             .where(meme.c.raw_meme_id == m["raw_meme_id"])
-            .values(m),
+            .values(
+                caption=m.get("caption"),
+                language_code=m.get("language_code"),
+                published_at=m.get("published_at"),
+            ),
         )
+
+    # Retry broken uploads: reset broken_content_link → created
+    # so the upload pipeline picks them up again.
+    await execute(
+        meme.update()
+        .where(meme.c.status == "broken_content_link")
+        .values(status="created"),
+    )
