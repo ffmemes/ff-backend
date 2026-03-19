@@ -212,6 +212,24 @@ async def update_meme_status_of_ready_memes() -> list[dict[str, Any]]:
     return await fetch_all(update_query)
 
 
+async def find_meme_duplicate_by_file_id(
+    meme_id: int, telegram_file_id: str
+) -> int | None:
+    """Find an existing ok meme with the same telegram_file_id."""
+    query = text("""
+        SELECT id FROM meme
+        WHERE telegram_file_id = :file_id
+          AND status = 'ok'
+          AND id < :meme_id
+        ORDER BY id ASC
+        LIMIT 1
+    """)
+    res = await fetch_one(query, {"file_id": telegram_file_id, "meme_id": meme_id})
+    if res:
+        return res["id"]
+    return None
+
+
 async def find_meme_duplicate(meme_id: int, imagetext: str) -> int | None:
     if len(imagetext) <= 11:  # skip all memes with less than 11 letters
         return None

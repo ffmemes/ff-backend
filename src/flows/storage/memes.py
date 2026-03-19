@@ -18,6 +18,7 @@ from src.storage.ocr.modal import ocr_content
 from src.storage.schemas import OcrResult
 from src.storage.service import (
     find_meme_duplicate,
+    find_meme_duplicate_by_file_id,
     get_memes_to_ocr,
     get_pending_memes,
     get_unloaded_ig_memes,
@@ -165,6 +166,10 @@ async def _process_unloaded_memes(
 
         ok_count += 1
         consecutive_fails = 0
+
+        # Skip OCR for memes already marked as duplicate at upload time
+        if meme.get("status") == MemeStatus.DUPLICATE:
+            continue
 
         if settings.OCR_ENABLED and meme["type"] == MemeType.IMAGE:
             res = await ocr_meme_content(
@@ -321,6 +326,19 @@ async def final_meme_pipeline() -> None:
 
     for meme in memes:
         await analyse_meme_caption(meme)
+
+        # exact file_id dedup: catches cross-source reposts of identical files
+        if meme["telegram_file_id"]:
+            dup_id = await find_meme_duplicate_by_file_id(
+                meme["id"], meme["telegram_file_id"]
+            )
+            if dup_id:
+                await update_meme(
+                    meme["id"],
+                    status=MemeStatus.DUPLICATE,
+                    duplicate_of=dup_id,
+                )
+                continue
 
         # it's ok if there is no OCR result for videos
         if meme["ocr_result"]:

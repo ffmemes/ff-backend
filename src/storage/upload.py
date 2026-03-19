@@ -12,6 +12,7 @@ from src.config import settings
 from src.storage.constants import MemeStatus, MemeType
 from src.storage.parsers.constants import USER_AGENT
 from src.storage.service import (
+    find_meme_duplicate_by_file_id,
     update_meme,
 )
 from src.tgbot.bot import bot
@@ -51,6 +52,8 @@ async def _upload_meme_content_to_tg(
     meme_type: MemeType,
     content: bytes,  # ??
 ) -> dict[str, Any] | None:
+    file_id = None
+
     if meme_type == MemeType.IMAGE:
         try:
             msg = await bot.send_photo(
@@ -58,13 +61,7 @@ async def _upload_meme_content_to_tg(
             )
         except telegram.error.TimedOut:
             return None
-
-        meme = await update_meme(
-            meme_id=meme_id,
-            telegram_file_id=msg.photo[-1].file_id,
-            # change status to fix possible BROKEN_CONTENT_LINK
-            status=MemeStatus.CREATED,  # or add new status "Uploaded?"
-        )
+        file_id = msg.photo[-1].file_id
 
     if meme_type == MemeType.VIDEO:
         try:
@@ -73,11 +70,7 @@ async def _upload_meme_content_to_tg(
             )
         except telegram.error.TimedOut:
             return None
-
-        meme = await update_meme(
-            meme_id=meme_id,
-            telegram_file_id=msg.video.file_id,
-        )
+        file_id = msg.video.file_id
 
     if meme_type == MemeType.ANIMATION:
         try:
@@ -98,10 +91,30 @@ async def _upload_meme_content_to_tg(
                 meme_id,
             )
             return None
+        file_id = animation.file_id
 
+    if not file_id:
+        return None
+
+    # Check if this file_id already exists on another ok meme (cross-source dupe)
+    duplicate_of = await find_meme_duplicate_by_file_id(meme_id, file_id)
+    if duplicate_of:
+        logging.info(
+            "Meme %s is a file_id duplicate of meme %s, marking as duplicate.",
+            meme_id,
+            duplicate_of,
+        )
         meme = await update_meme(
             meme_id=meme_id,
-            telegram_file_id=animation.file_id,
+            telegram_file_id=file_id,
+            status=MemeStatus.DUPLICATE,
+            duplicate_of=duplicate_of,
+        )
+    else:
+        meme = await update_meme(
+            meme_id=meme_id,
+            telegram_file_id=file_id,
+            status=MemeStatus.CREATED,
         )
 
     return meme
