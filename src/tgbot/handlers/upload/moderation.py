@@ -6,7 +6,7 @@ from typing import Any
 
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
-from telegram.error import BadRequest
+from telegram.error import BadRequest, Forbidden
 from telegram.ext import ContextTypes
 
 from src.config import settings
@@ -294,14 +294,19 @@ See realtime stats of your uploaded memes: /uploads
                 text=text,
                 parse_mode=ParseMode.HTML,
             )
+        except Forbidden:
+            logging.warning(f"Can't notify uploader #{meme_upload['user_id']}: blocked bot")
         except BadRequest:
             # messsage was deleted ??
             # trying again withount reply_message_id
-            await context.bot.send_message(
-                chat_id=meme_upload["user_id"],
-                text=text,
-                parse_mode=ParseMode.HTML,
-            )
+            try:
+                await context.bot.send_message(
+                    chat_id=meme_upload["user_id"],
+                    text=text,
+                    parse_mode=ParseMode.HTML,
+                )
+            except Forbidden:
+                logging.warning(f"Can't notify uploader #{meme_upload['user_id']}: blocked bot")
 
     else:
         await update_meme_by_upload_id(upload_id, status=MemeStatus.REJECTED)
@@ -328,14 +333,19 @@ See realtime stats of your uploaded memes: /uploads
 Your meme was rejected by our moderators. Send us something else!
             """,
             )
+        except Forbidden:
+            logging.warning(f"Can't notify uploader #{meme_upload['user_id']}: blocked bot")
         except BadRequest:
             # messsage was deleted ??
             # trying again withount reply_message_id
-            await context.bot.send_message(
-                chat_id=meme_upload["user_id"],
-                text="""
+            try:
+                await context.bot.send_message(
+                    chat_id=meme_upload["user_id"],
+                    text="""
 😢😢😢
 
 Your meme was rejected by our moderators. Send us something else!
             """,
-            )
+                )
+            except Forbidden:
+                logging.warning(f"Can't notify uploader #{meme_upload['user_id']}: blocked bot")

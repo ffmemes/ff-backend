@@ -58,6 +58,12 @@
 **Context:** See `specs/data-hypotheses.md` H4.
 **Depends on:** V1 engagement_score validation.
 
+### Audit all handlers for unhandled Forbidden that could demote privileged users
+**What:** Review all handlers that send messages to users (forward_channel.py, waitlist.py, explain_meme.py, etc.) and ensure `Forbidden` exceptions are caught at the call site, not left to bubble to the global error handler.
+**Why:** The same bug that demoted @rinreiss (moderator → blocked_bot) can happen in any handler that sends a message to a different user than `effective_user`. The error handler now protects moderators/admins, but the unhandled Forbidden is still messy (logs a false "blocked the bot" warning for regular users in some cases).
+**Context:** Fixed the critical path in moderation.py (2026-03-19). Error handler now skips demotion for privileged users. But other handlers still let Forbidden bubble up. Low urgency since the error handler protection is in place.
+**Depends on:** Nothing.
+
 ## P3 — Nice to Have
 
 ### Daily north star log message

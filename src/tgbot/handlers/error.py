@@ -13,7 +13,7 @@ from src.tgbot.constants import (
 )
 from src.tgbot.logs import log
 from src.tgbot.service import get_user_languages, update_user
-from src.tgbot.user_info import update_user_info_cache
+from src.tgbot.user_info import get_user_info, update_user_info_cache
 
 
 async def send_stacktrace_to_tg_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -28,6 +28,14 @@ async def send_stacktrace_to_tg_chat(update: Update, context: ContextTypes.DEFAU
     # if the error is that we can't send them a message,
     #  then handle it as not a real error.
     if isinstance(context.error, Forbidden):
+        user_info = await get_user_info(user_id)
+        user_type = UserType(user_info["type"]) if user_info["type"] else None
+        if user_type and user_type.is_moderator:
+            logging.warning(
+                f"Forbidden for privileged user #{user_id} (type={user_type.value}), "
+                "NOT demoting to blocked_bot"
+            )
+            return
         await log(f"User #{user_id} blocked the bot", context.bot)
         await update_user(user_id, type=UserType.BLOCKED_BOT)
         await update_user_info_cache(user_id)
