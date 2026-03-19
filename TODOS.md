@@ -40,6 +40,12 @@
 **Context:** V1 uses full scan (same approach as lr_smoothed). Monitor query time during shadow mode. If >30s, add this.
 **Depends on:** V1 engagement_score being deployed.
 
+### Incremental user_stats scan
+**What:** Add `WHERE reacted_at > NOW() - INTERVAL '2 days'` to the EVENTS CTE in `calculate_user_stats()` to avoid scanning the full `user_meme_reaction` table.
+**Why:** The query scans all rows then filters with HAVING to only upsert users active in the last day. With 22M+ rows, a bounded scan would be much faster.
+**Context:** Use a 2-day window (wider than the 1-day HAVING) to avoid edge cases with sessions spanning the boundary. Same pattern as the engagement_score TODO above.
+**Depends on:** Nothing — but test that session boundary detection (30-min gap) still works correctly when the scan window clips old reactions.
+
 ### Add share bonus to engagement_score V2
 **What:** Include `invited_count` as a bonus signal in engagement_score (e.g. flat +0.3 if shared).
 **Why:** Shares are the highest-intent positive signal but were dropped from V1 because the per-reaction weight (+3.0) doesn't map cleanly to the per-meme `invited_count`.
