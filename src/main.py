@@ -46,6 +46,9 @@ if settings.ENVIRONMENT.is_deployed:
     sentry_sdk.init(
         dsn=settings.SENTRY_DSN,
         environment=settings.ENVIRONMENT.value,
+        ignore_errors=[
+            "telegram.error.Forbidden",  # handled by error.py → marks user as blocked_bot
+        ],
     )
 
 
