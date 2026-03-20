@@ -74,12 +74,13 @@ async def update_meme(meme_id: int, **kwargs) -> dict[str, Any] | None:
     return await fetch_one(update_query)
 
 
-async def get_pending_memes() -> list[dict[str, Any]]:
+async def get_pending_memes(limit: int = 500) -> list[dict[str, Any]]:
     select_query = (
         select(meme)
         .where(meme.c.status == MemeStatus.CREATED)
         .where(meme.c.telegram_file_id.is_not(None))
-        .order_by(nulls_first(meme.c.created_at))
+        .order_by(meme.c.created_at.desc())
+        .limit(limit)
     )
     return await fetch_all(select_query)
 
