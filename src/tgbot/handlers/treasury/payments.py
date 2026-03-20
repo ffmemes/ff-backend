@@ -3,8 +3,10 @@ Additional layer of control for treasury payments
 """
 
 import asyncio
+import logging
 
 from telegram import Bot
+from telegram.error import Forbidden
 
 from src.tgbot.handlers.treasury.constants import (
     PAYOUTS,
@@ -91,13 +93,17 @@ async def pay_if_not_paid_with_alert(
     # TODO: atomic?
     res = await pay_if_not_paid(user_id, type, external_id)
     if res:
-        msg = await bot.send_message(
-            chat_id=user_id,
-            text=f"""
+        try:
+            msg = await bot.send_message(
+                chat_id=user_id,
+                text=f"""
     💳 /b: +<b>{PAYOUTS[type]} 🍔</b> for <b>{TRX_TYPE_DESCRIPTIONS[type]}</b>!
-            """,
-            parse_mode="HTML",
-        )
+                """,
+                parse_mode="HTML",
+            )
+        except Forbidden:
+            logging.info("Payment alert skipped: user %s blocked the bot", user_id)
+            return res
 
         if msg.chat.username:
             user_name = "@" + msg.chat.username

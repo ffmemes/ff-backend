@@ -1,7 +1,7 @@
 import telegram
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, User
 from telegram.constants import ParseMode
-from telegram.error import BadRequest
+from telegram.error import BadRequest, Forbidden
 from telegram.ext import ContextTypes
 
 from src import localizer
@@ -94,16 +94,19 @@ async def handle_language_settings(
         "reply_markup": keyboard,
     }
 
-    if update.callback_query:
-        await update.callback_query.answer()
-        try:
-            await update.callback_query.message.edit_text(**send_message_kwargs)
-        except BadRequest:
-            pass  # Message content unchanged
-    elif update.message:
-        await update.message.reply_text(**send_message_kwargs)
-    else:
-        await update.effective_chat.send_message(**send_message_kwargs)
+    try:
+        if update.callback_query:
+            await update.callback_query.answer()
+            try:
+                await update.callback_query.message.edit_text(**send_message_kwargs)
+            except BadRequest:
+                pass  # Message content unchanged
+        elif update.message:
+            await update.message.reply_text(**send_message_kwargs)
+        else:
+            await update.effective_chat.send_message(**send_message_kwargs)
+    except Forbidden:
+        pass  # User blocked the bot
 
 
 async def handle_language_settings_button(

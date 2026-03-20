@@ -5,7 +5,7 @@ from html import escape
 
 from telegram import Bot, Update
 from telegram.constants import ParseMode
-from telegram.error import BadRequest
+from telegram.error import BadRequest, Forbidden
 from telegram.ext import ContextTypes
 
 from src.tgbot.constants import UserType
@@ -84,23 +84,29 @@ async def send_tokens_to_reply(update: Update, context: ContextTypes.DEFAULT_TYP
     from_user_balance = await get_user_balance(from_user_id)
     to_user_balance = await get_user_balance(to_user_id)
 
-    msend = await context.bot.send_message(
-        chat_id=from_user_id,
-        text=f"""
+    try:
+        msend = await context.bot.send_message(
+            chat_id=from_user_id,
+            text=f"""
 Отправил {to_user_tg.name}: -{to_send} 🍔
 
 Твой новый баланс: {from_user_balance} 🍔
-        """,
-    )
+            """,
+        )
+    except Forbidden:
+        pass  # Sender blocked the bot
 
-    mreceive = await context.bot.send_message(
-        chat_id=to_user_id,
-        text=f"""
+    try:
+        mreceive = await context.bot.send_message(
+            chat_id=to_user_id,
+            text=f"""
 Вам бургеры от {from_user_tg.name}: +{to_send} 🍔
 
 Новый баланс {to_user_balance} 🍔
-        """,
-    )
+            """,
+        )
+    except Forbidden:
+        pass  # Recipient blocked the bot
 
     # update balances
 

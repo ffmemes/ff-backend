@@ -1,7 +1,7 @@
 import random
 
 from telegram import Update
-from telegram.error import BadRequest
+from telegram.error import BadRequest, Forbidden
 from telegram.ext import ContextTypes
 
 from src.tgbot.constants import TELEGRAM_FEEDBACK_CHAT_ID
@@ -46,10 +46,14 @@ async def handle_feedback_reply(update: Update, context: ContextTypes.DEFAULT_TY
             text=reply_text,
             reply_to_message_id=int(message_id),
         )
+    except Forbidden:
+        pass  # User blocked the bot
     except BadRequest:
-        # message was deleted ??
-        # trying again without reply_message_id
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=reply_text,
-        )
+        # message was deleted — trying again without reply_message_id
+        try:
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=reply_text,
+            )
+        except Forbidden:
+            pass  # User blocked the bot
