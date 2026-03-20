@@ -169,7 +169,7 @@ Optional: `OCR_ENABLED` (default false), `VK_TOKEN`, `OPENAI_API_KEY`, `SENTRY_D
 
 ## Monitoring
 
-- **Sentry**: configured, CLI (`sentry`) is logged in
+- **Sentry**: configured, CLI (`sentry`) is logged in. `Forbidden` errors are filtered (handled by error handler)
 - **Logs**: server logs available via Coolify
 - **Prefect automations** (13 total, self-hosted):
   - **Chain triggers** (6): parser -> pipeline -> final_pipeline (per platform)
@@ -178,6 +178,30 @@ Optional: `OCR_ENABLED` (default false), `VK_TOKEN`, `OPENAI_API_KEY`, `SENTRY_D
   - All flows emit custom events (`ff.parser.*`, `ff.pipeline.*`, `ff.stats.*`) via `safe_emit()`
   - Automations managed via `scripts/setup_automations.py` (run once after deploy)
   - Resume paused deployments: `prefect deployment resume "<name>"`
+
+### Production Health Checklist
+
+After every deploy or when checking system health, verify:
+
+1. **Sentry**: `sentry issue list` — should have 0 recent events
+2. **Docker**: `ssh root@65.108.127.32 "docker ps"` — app, prefect-runner, prefect-server all Up
+3. **App logs**: `ssh root@65.108.127.32 "docker logs <app-container> --since 10m 2>&1"` — no errors
+4. **Prefect logs**: `ssh root@65.108.127.32 "docker logs <prefect-runner> --since 10m 2>&1"` — flows Completed
+5. **DB health query** (run via psql against prod):
+```sql
+SELECT
+  (SELECT count(*) FROM meme WHERE created_at > now() - interval '24 hours') AS new_memes_24h,
+  (SELECT round(100.0 * count(*) FILTER (WHERE status = 'ok') / NULLIF(count(*), 0))
+   FROM meme WHERE created_at > now() - interval '24 hours') AS ok_pct,
+  (SELECT count(DISTINCT user_id) FROM user_meme_reaction
+   WHERE reacted_at > now() - interval '24 hours') AS active_users_24h,
+  (SELECT count(*) FROM user_meme_reaction
+   WHERE reacted_at > now() - interval '24 hours') AS reactions_24h,
+  (SELECT max(updated_at) FROM user_stats) AS user_stats_updated,
+  (SELECT max(updated_at) FROM meme_stats) AS meme_stats_updated;
+```
+
+**Expected healthy values**: new_memes > 100, ok_pct ~15-25%, active_users > 100, reactions > 5000, stats updated within last 15 min
 
 ## gstack
 
