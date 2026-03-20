@@ -57,7 +57,10 @@ ALL_FAILED = "__all_failed"
 
 
 async def get_memes_to_describe(limit: int = 30) -> list[dict]:
-    """Get image memes without descriptions, ordered by popularity."""
+    """Get image memes without descriptions, ordered by popularity.
+
+    Skips memes that have failed 3+ times (tracked in ocr_result.describe_failures).
+    """
     from sqlalchemy import text
 
     query = text("""
@@ -75,6 +78,7 @@ async def get_memes_to_describe(limit: int = 30) -> list[dict]:
                 M.ocr_result IS NULL
                 OR M.ocr_result->>'description' IS NULL
             )
+            AND COALESCE((M.ocr_result->>'describe_failures')::int, 0) < 3
         ORDER BY COALESCE(MS.nmemes_sent, 0) DESC, M.id DESC
         LIMIT :limit
     """).bindparams(limit=limit)
@@ -189,6 +193,14 @@ async def call_openrouter_vision(image_b64: str, log) -> dict:
     return {ALL_FAILED: True}
 
 
+async def _increment_describe_failures(meme_id: int, existing_ocr: dict, reason: str):
+    """Track describe failures in ocr_result so permanently broken memes get skipped."""
+    failures = int(existing_ocr.get("describe_failures", 0)) + 1
+    merged = {**existing_ocr, "describe_failures": failures, "last_failure_reason": reason}
+    update_query = meme.update().where(meme.c.id == meme_id).values(ocr_result=merged)
+    await fetch_one(update_query)
+
+
 async def describe_single_meme(meme_row: dict, log) -> str:
     """Download, analyze, and update a single meme.
 
@@ -203,6 +215,7 @@ async def describe_single_meme(meme_row: dict, log) -> str:
         image_bytes = await download_meme_content_from_tg(file_id)
     except Exception as e:
         log.warning("Meme %s: download failed: %s", meme_id, e)
+        await _increment_describe_failures(meme_id, existing_ocr, str(e))
         return "failed"
 
     image_b64 = base64.b64encode(image_bytes).decode("utf-8")
@@ -212,15 +225,18 @@ async def describe_single_meme(meme_row: dict, log) -> str:
         result = await call_openrouter_vision(image_b64, log)
     except Exception as e:
         log.warning("Meme %s: OpenRouter error: %s", meme_id, e)
+        await _increment_describe_failures(meme_id, existing_ocr, str(e))
         return "failed"
 
     if result is None:
+        await _increment_describe_failures(meme_id, existing_ocr, "no result")
         return "failed"
 
     if result.get(RATE_LIMITED):
         return "rate_limited"
 
     if result.get(ALL_FAILED):
+        await _increment_describe_failures(meme_id, existing_ocr, "all models failed")
         return "failed"
 
     # Merge with existing ocr_result
