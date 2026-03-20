@@ -9,8 +9,8 @@ from src.recommendations.service import (
     create_user_meme_reaction,
     user_meme_reaction_exists,
 )
-from src.storage.schemas import MemeData
 from src.storage.constants import MemeStatus
+from src.storage.schemas import MemeData
 from src.storage.service import update_meme
 from src.tgbot.constants import Reaction
 from src.tgbot.logs import log
@@ -40,7 +40,7 @@ async def get_next_meme_for_user(
         if meme and not await user_meme_reaction_exists(user_id, meme.id):
             return meme
         if not meme:
-            await meme_queue.generate_recommendations(user_id, limit=7)
+            await meme_queue.generate_recommendations(user_id, limit=15)
 
     logger.warning(
         "Failed to find unseen meme for user %s after %s attempts",

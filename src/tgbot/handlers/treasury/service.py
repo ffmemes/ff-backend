@@ -6,7 +6,6 @@ from sqlalchemy import exists, func, select, text
 from src.database import execute, fetch_all, fetch_one, treasury_trx, user
 from src.tgbot.handlers.treasury.constants import TrxType
 
-
 LEADERBOARD_WINDOW_DAYS = 7
 
 

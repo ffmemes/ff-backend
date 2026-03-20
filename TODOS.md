@@ -2,11 +2,20 @@
 
 ## P1 — High Priority
 
-### Remove bad engines from user traffic
-**What:** Remove `goat`, `less_seen_meme_and_source` from regular user blender weights. Keep `low_sent_pool` for moderators only.
-**Why:** These engines have 6-31% like rate vs 47% for top engines. 14% of traffic serves bad memes.
-**Context:** Goat integer division fix deployed 2026-03-14. Early signal (2 days): goat LR went from 6.6% to 43.1% — the fix worked. Wait for full 7-day measurement on 2026-03-21 before deciding whether to keep or remove goat. Dead engines already removed (less_seen_meme_and_source, fast_dopamine, etc.). See `specs/experiment-2026-03-14.md`.
-**Depends on:** Experiment results from 2026-03-21.
+### Create read-only PostgreSQL user for AI agents — DONE
+**What:** `CREATE USER analyst_readonly WITH PASSWORD '...'; GRANT SELECT ON ALL TABLES IN SCHEMA public TO analyst_readonly;` Add `ANALYST_DATABASE_URL` to `.env`.
+**Why:** Security boundary — AI agents (Paperclip Analyst) can query prod data but never modify it. Essential for public repo where agents run with `dangerouslySkipPermissions`.
+**Context:** Done 2026-03-20. Read-only user created with 30s statement_timeout. ANALYST_DATABASE_URL in .env.
+
+### Remove fast_dopamine_20240804 from blender — DONE
+**What:** Remove `fast_dopamine_20240804` from blender weights. It has 15.4% LR AND 94.2% continuation rate — worst on both metrics.
+**Context:** Done. Engine no longer appears in any source file.
+
+### Add per-user recency filter to goat engine
+**What:** In the goat SQL query, add a filter to exclude memes the user saw recently (e.g., `sent_at > now() - interval '30 days'` via `user_meme_reaction`). This rotates the GOAT pool per-user.
+**Why:** Goat LR declined from 44% → 16% over 6 days post-fix due to pool exhaustion — the same top-ranked GOATs are served repeatedly to users who already saw them. Goat has 98% continuation rate (best engine) so the pool exhaustion is the only issue.
+**Context:** Experiment `experiments/completed/2026-03-20-goat-engine-investigation.md` concluded: keep goat, fix pool rotation. The goat query already excludes reacted memes (LEFT JOIN user_meme_reaction WHERE R.meme_id IS NULL). But there's no recency constraint — a user who reacted 6 months ago still excludes those memes, but users who haven't reacted yet keep getting the same stale top GOATs.
+**Depends on:** Nothing — targeted SQL change in `candidates.py` goat query.
 
 ### Unstarve like_spread_and_recent engine
 **What:** Relax filters on `like_spread_and_recent_memes` engine — remove `age_days < 30` constraint.
@@ -27,6 +36,12 @@
 **Depends on:** Nothing — small, self-contained change.
 
 ## P2 — Medium Priority
+
+### Upgrade pre-commit secrets scanner to detect-secrets
+**What:** Replace the shell script `.git/hooks/pre-commit` with Yelp's `detect-secrets` framework (`.pre-commit-config.yaml`). Catches high-entropy strings, more secret patterns, and reduces false negatives.
+**Why:** Shell script covers common patterns (`postgresql://`, `sk-*`, bot tokens) but can miss novel secrets. When Engineer agent starts pushing code autonomously (Phase 2), comprehensive coverage becomes critical for a public repo.
+**Context:** Part of Autonomous AI PoC safety rails. Current shell script is installed as `.git/hooks/pre-commit` (local, not committed). `detect-secrets` adds `.pre-commit-config.yaml` to the repo (committed).
+**Depends on:** Phase 2 (Engineer agent pushing code).
 
 ### Per-engine session continuation rate
 **What:** SQL query that computes, for each engine: % of times user continued scrolling after seeing a meme from that engine.

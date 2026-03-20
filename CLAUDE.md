@@ -201,7 +201,7 @@ SELECT
   (SELECT max(updated_at) FROM meme_stats) AS meme_stats_updated;
 ```
 
-**Expected healthy values**: new_memes > 100, ok_pct ~15-25%, active_users > 100, reactions > 5000, stats updated within last 15 min
+**Expected healthy values**: new_memes > 100, ok_pct ~90-96%, active_users > 100, reactions > 5000, stats updated within last 15 min
 
 ## gstack
 

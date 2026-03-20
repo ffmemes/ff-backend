@@ -94,11 +94,9 @@ async def like_spread_and_recent_memes(
 
             AND MS.nlikes > MS.ndislikes
             AND MS.raw_impr_rank = 0
-            AND MS.age_days < 30
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
         ORDER BY -1
             * (MS.nlikes - MS.ndislikes) / (MS.nmemes_sent + 1.)
-            * CASE WHEN MS.age_days < 30 THEN 1 ELSE 0.5 END
         LIMIT :limit
     """
     return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
@@ -313,6 +311,124 @@ async def get_recently_liked(
     return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
 
 
+async def cold_start_explore(
+    user_id: int,
+    limit: int = 15,
+    exclude_meme_ids: list[int] = [],
+):
+    """Phase 1 cold start: diverse high-quality memes from different sources.
+
+    Selects the best meme from each top source (DISTINCT ON meme_source_id)
+    to guarantee source diversity. Data-driven source selection — top sources
+    by average like rate for the user's language. No hardcoded source list.
+
+    Used for memes 1-5 (first impression).
+    """
+
+    query = f"""
+        SELECT id, type, telegram_file_id, caption, recommended_by
+        FROM (
+            SELECT DISTINCT ON (M.meme_source_id)
+                M.id
+                , M.type, M.telegram_file_id, M.caption
+                , 'cold_start_explore' AS recommended_by
+                , MSS.nlikes::float / NULLIF(MSS.nlikes + MSS.ndislikes, 0) AS source_lr
+                , MS.lr_smoothed
+
+            FROM meme M
+            INNER JOIN meme_stats MS
+                ON MS.meme_id = M.id
+            INNER JOIN meme_source_stats MSS
+                ON MSS.meme_source_id = M.meme_source_id
+            INNER JOIN user_language L
+                ON L.language_code = M.language_code
+                AND L.user_id = :user_id
+            LEFT JOIN user_meme_reaction R
+                ON R.meme_id = M.id
+                AND R.user_id = :user_id
+
+            WHERE 1=1
+                AND M.status = 'ok'
+                AND R.meme_id IS NULL
+                AND MS.nmemes_sent >= 20
+                AND MS.lr_smoothed > 0.3
+                AND MSS.nlikes + MSS.ndislikes > 50
+                {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+
+            ORDER BY M.meme_source_id, MS.lr_smoothed DESC
+        ) sub
+        ORDER BY source_lr DESC, lr_smoothed DESC
+        LIMIT :limit
+    """
+    return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
+
+
+async def cold_start_adapt(
+    user_id: int,
+    limit: int = 15,
+    exclude_meme_ids: list[int] = [],
+):
+    """Phase 2 cold start: adapt to user's reactions in real-time.
+
+    Reads raw user_meme_reaction (bypasses 15-min stats delay) to calculate
+    per-source weights. Liked source gets boosted, disliked gets penalized
+    (floor weight 0.1 — never zero). Memes ranked by lr_smoothed * source_weight.
+
+    30% exploration: sources with no reactions get neutral weight (0.5).
+
+    Used for memes 6-15 (early personalization).
+    """
+
+    query = f"""
+        WITH recent_reactions AS (
+            SELECT
+                M.meme_source_id,
+                SUM(CASE WHEN UMR.reaction_id = 1 THEN 1.0 ELSE -0.5 END) AS raw_weight
+            FROM (
+                SELECT meme_id, reaction_id
+                FROM user_meme_reaction
+                WHERE user_id = :user_id
+                ORDER BY sent_at DESC
+                LIMIT 15
+            ) UMR
+            INNER JOIN meme M ON M.id = UMR.meme_id
+            GROUP BY M.meme_source_id
+        )
+        SELECT
+            M.id
+            , M.type, M.telegram_file_id, M.caption
+            , 'cold_start_adapt' AS recommended_by
+
+        FROM meme M
+        INNER JOIN meme_stats MS
+            ON MS.meme_id = M.id
+
+        INNER JOIN user_language L
+            ON L.language_code = M.language_code
+            AND L.user_id = :user_id
+
+        LEFT JOIN user_meme_reaction R
+            ON R.meme_id = M.id
+            AND R.user_id = :user_id
+
+        LEFT JOIN recent_reactions RR
+            ON RR.meme_source_id = M.meme_source_id
+
+        WHERE 1=1
+            AND M.status = 'ok'
+            AND R.meme_id IS NULL
+            AND MS.nlikes > 1
+            AND MS.nmemes_sent >= 10
+            {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+
+        ORDER BY -1
+            * GREATEST(COALESCE(RR.raw_weight, 0) + 0.5, 0.1)
+            * MS.lr_smoothed
+        LIMIT :limit
+    """
+    return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
+
+
 class CandidatesRetriever:
     """CandidatesRetriever class is used for unit testing"""
 
@@ -323,6 +439,8 @@ class CandidatesRetriever:
         "recently_liked": get_recently_liked,
         "goat": goat,
         "es_ranked": get_es_ranked,
+        "cold_start_explore": cold_start_explore,
+        "cold_start_adapt": cold_start_adapt,
     }
 
     async def get_candidates(

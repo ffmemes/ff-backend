@@ -143,3 +143,9 @@ backup.dump.gz
 
 # для локальных шалостей
 test.py
+.gstack/
+
+# AI agent experiment log (machine-generated, append-only)
+experiments/log.jsonl
+# Agent daily reports (generated per heartbeat, can be large)
+experiments/reports/

@@ -43,8 +43,8 @@ async def check_queue(user_id: int):
     queue_key = redis.get_meme_queue_key(user_id)
     queue_length = await redis.get_meme_queue_length_by_key(queue_key)
 
-    if queue_length <= 2:
-        await generate_recommendations(user_id, limit=5)
+    if queue_length <= 8:
+        await generate_recommendations(user_id, limit=15)
 
 
 async def generate_cold_start_recommendations(user_id, limit=10):
@@ -134,17 +134,55 @@ async def generate_recommendations(
         return await fetch_all(text(query), params)
 
     async def get_candidates(user_id, limit):
-        """A helper function to avoid copy-paste"""
+        """Route to the right engine mix based on user maturity.
 
-        # <30 is treated as cold start. no blending
+        Cold start (<30 memes) uses 3-phase adaptive approach:
+          Phase 1 (0-5):  Diverse explore — best meme from each top source
+          Phase 2 (6-15): Adapt — weight sources by user's raw reactions
+          Phase 3 (16-30): Transition — blend adapt + growing engines
+
+        Fallback chain: phase engine -> lr_smoothed -> best_uploaded_memes
+        """
+
+        # Cold start: 3-phase adaptive
         if nmemes_sent < 30:
+            if nmemes_sent < 6:
+                # Phase 1: diverse exploration from top sources
+                engine = "cold_start_explore"
+            elif nmemes_sent < 16:
+                # Phase 2: adapt to user's reactions in real-time
+                engine = "cold_start_adapt"
+            else:
+                # Phase 3: transition — blend adapt with growing engines
+                weights = {
+                    "cold_start_adapt": 0.5,
+                    "lr_smoothed": 0.3,
+                    "like_spread_and_recent_memes": 0.2,
+                }
+                candidates_dict = await retriever.get_candidates_dict(
+                    weights.keys(), user_id, limit, exclude_mem_ids=meme_ids_in_queue
+                )
+                fixed_pos = {0: "cold_start_adapt"}
+                blended = blend(candidates_dict, weights, fixed_pos, limit, random_seed)
+                if blended:
+                    return blended
+                # fallback if blend is empty
+                engine = "cold_start_adapt"
+
             candidates = await retriever.get_candidates(
-                "lr_smoothed",
-                user_id,
-                limit,
-                exclude_mem_ids=meme_ids_in_queue,
-                min_sends=10,
+                engine, user_id, limit, exclude_mem_ids=meme_ids_in_queue
             )
+
+            # Fallback chain: -> lr_smoothed -> best_uploaded_memes
+            if len(candidates) == 0:
+                logging.info(
+                    "Cold start %s empty for user %s, falling back to lr_smoothed",
+                    engine, user_id,
+                )
+                candidates = await retriever.get_candidates(
+                    "lr_smoothed", user_id, limit,
+                    exclude_mem_ids=meme_ids_in_queue, min_sends=10,
+                )
 
             if len(candidates) == 0:
                 candidates = await retriever.get_candidates(
