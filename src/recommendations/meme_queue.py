@@ -1,4 +1,5 @@
 import logging
+import uuid
 from math import ceil
 from typing import Any, Optional
 
@@ -39,12 +40,34 @@ async def clear_meme_queue_for_user(user_id: int) -> None:
     await redis.delete_by_key(queue_key)
 
 
-async def check_queue(user_id: int):
-    queue_key = redis.get_meme_queue_key(user_id)
-    queue_length = await redis.get_meme_queue_length_by_key(queue_key)
+async def check_queue(user_id: int) -> bool:
+    """Refill queue if low. Returns True if lock was acquired (work done or skipped).
 
-    if queue_length <= 8:
-        await generate_recommendations(user_id, limit=15)
+    Uses a tokenized Redis lock to prevent concurrent generation for the
+    same user. Without this, fast users trigger multiple fire-and-forget
+    tasks that read the same queue snapshot, generate identical candidates,
+    and add duplicates to the Redis list.
+    """
+    lock_key = f"meme_queue_lock:{user_id}"
+    token = str(uuid.uuid4())
+    acquired = await redis.redis_client.set(lock_key, token, nx=True, ex=30)
+    if not acquired:
+        return False
+
+    try:
+        queue_key = redis.get_meme_queue_key(user_id)
+        queue_length = await redis.get_meme_queue_length_by_key(queue_key)
+
+        if queue_length <= 8:
+            await generate_recommendations(user_id, limit=15)
+    finally:
+        # Only release if we still own the lock (token match).
+        # If TTL expired and another task acquired it, don't delete theirs.
+        current = await redis.redis_client.get(lock_key)
+        if current == token:
+            await redis.redis_client.delete(lock_key)
+
+    return True
 
 
 async def generate_cold_start_recommendations(user_id, limit=10):

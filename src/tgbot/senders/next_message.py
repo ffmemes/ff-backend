@@ -30,6 +30,8 @@ from src.tgbot.user_info import get_user_info
 
 logger = logging.getLogger(__name__)
 
+QUEUE_REFILL_BACKOFF = 0.3  # seconds to wait when queue refill is in progress
+
 
 async def get_next_meme_for_user(
     user_id: int,
@@ -39,8 +41,13 @@ async def get_next_meme_for_user(
         meme = await meme_queue.get_next_meme_for_user(user_id)
         if meme and not await user_meme_reaction_exists(user_id, meme.id):
             return meme
-        if not meme:
-            await meme_queue.generate_recommendations(user_id, limit=15)
+        # Queue empty OR popped an already-reacted meme (duplicate).
+        # Either way, try to refill. check_queue returns False if another
+        # task is already refilling — in that case, wait briefly for it
+        # to finish rather than burning through attempts.
+        acquired = await meme_queue.check_queue(user_id)
+        if not acquired:
+            await asyncio.sleep(QUEUE_REFILL_BACKOFF)
 
     logger.warning(
         "Failed to find unseen meme for user %s after %s attempts",
