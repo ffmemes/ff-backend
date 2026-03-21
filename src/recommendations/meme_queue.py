@@ -255,6 +255,40 @@ async def generate_recommendations(
         if remaining_limit > 0:
             extra_candidates = await get_candidates(user_id, remaining_limit)
             candidates.extend(extra_candidates)
+
+        # Last resort: if both pools are empty, fetch ANY unseen meme
+        if len(candidates) == 0:
+            exclude_ids = meme_ids_in_queue
+            fallback_query = f"""
+                SELECT
+                    M.id,
+                    M.type,
+                    M.telegram_file_id,
+                    M.caption,
+                    'last_resort' AS recommended_by
+                FROM meme M
+                LEFT JOIN user_meme_reaction R
+                    ON R.user_id = :user_id
+                    AND R.meme_id = M.id
+                INNER JOIN user_language UL
+                    ON UL.user_id = :user_id
+                    AND UL.language_code = M.language_code
+                WHERE M.status = 'ok'
+                    AND R.meme_id IS NULL
+                    {exclude_meme_ids_sql_filter(exclude_ids)}
+                ORDER BY M.id DESC
+                LIMIT :limit
+            """
+            params: dict = {"user_id": user_id, "limit": limit}
+            if exclude_ids:
+                params["exclude_meme_ids"] = exclude_ids
+            candidates = await fetch_all(text(fallback_query), params)
+            if candidates:
+                logging.info(
+                    "Moderator user %s: low_sent + blender empty, "
+                    "last_resort found %d memes",
+                    user_id, len(candidates),
+                )
     else:
         candidates = await get_candidates(user_id, limit)
 

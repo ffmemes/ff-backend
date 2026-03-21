@@ -21,7 +21,7 @@ import httpx
 from prefect import flow, get_run_logger
 
 from src.config import settings
-from src.database import fetch_all, fetch_one, meme
+from src.database import execute, fetch_all, fetch_one, meme
 from src.flows.events import safe_emit
 from src.flows.hooks import notify_telegram_on_failure
 from src.storage.upload import download_meme_content_from_tg
@@ -198,7 +198,7 @@ async def _increment_describe_failures(meme_id: int, existing_ocr: dict, reason:
     failures = int(existing_ocr.get("describe_failures", 0)) + 1
     merged = {**existing_ocr, "describe_failures": failures, "last_failure_reason": reason}
     update_query = meme.update().where(meme.c.id == meme_id).values(ocr_result=merged)
-    await fetch_one(update_query)
+    await execute(update_query)
 
 
 async def describe_single_meme(meme_row: dict, log) -> str:
