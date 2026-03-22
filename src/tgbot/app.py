@@ -50,7 +50,7 @@ from src.tgbot.handlers.admin.user_info import (
     delete_user_data_confirmation_page,
     handle_show_user_info,
 )
-from src.tgbot.handlers.chat.chat import handle_chat_message
+from src.tgbot.handlers.chat.chat import handle_group_message
 from src.tgbot.handlers.chat.chat_member import handle_chat_member_update
 
 # from src.tgbot.handlers.chat.explain_meme import explain_meme_en, explain_meme_ru
@@ -58,7 +58,10 @@ from src.tgbot.handlers.chat.feedback import (
     handle_feedback_message,
     handle_feedback_reply,
 )
-from src.tgbot.handlers.chat.reaction import give_random_reaction
+from src.tgbot.handlers.chat.group_meme_reaction import (
+    CHAT_MEME_REACTION_CALLBACK_PATTERN,
+    handle_chat_meme_reaction,
+)
 from src.tgbot.handlers.chat.send_tokens import (
     reward_active_chat_users,
     send_tokens_to_reply,
@@ -318,19 +321,20 @@ def add_handlers(application: Application) -> None:
     )
 
     ######################
-    # log new messages in chat
+    # chat meme reactions (like/dislike buttons in groups)
     application.add_handler(
-        MessageHandler(
-            filters=filters.Chat([TELEGRAM_CHAT_RU_CHAT_ID]) & filters.UpdateType.MESSAGE,
-            callback=handle_chat_message,
+        CallbackQueryHandler(
+            handle_chat_meme_reaction,
+            pattern=CHAT_MEME_REACTION_CALLBACK_PATTERN,
         )
     )
 
-    # set reaction to a reply
+    ######################
+    # handle all group messages (persist + agent triggers)
     application.add_handler(
         MessageHandler(
-            filters=filters.REPLY & filters.ChatType.GROUPS,
-            callback=give_random_reaction,
+            filters=filters.ChatType.GROUPS & filters.UpdateType.MESSAGE,
+            callback=handle_group_message,
         )
     )
 

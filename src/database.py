@@ -15,6 +15,7 @@ from sqlalchemy import (
     Integer,
     MetaData,
     Select,
+    SmallInteger,
     String,
     Table,
     UniqueConstraint,
@@ -425,6 +426,32 @@ message_tg = Table(
     Column("text", String),
     Column("reply_to_message_id", BigInteger),
     # attachment?
+)
+
+chat_meme_reaction = Table(
+    "chat_meme_reaction",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("chat_id", BigInteger, nullable=False),
+    Column("meme_id", Integer, ForeignKey("meme.id", ondelete="CASCADE"), nullable=False),
+    Column("user_id", BigInteger, nullable=False),
+    Column("reaction", SmallInteger, nullable=False),  # 1 = like, 2 = dislike
+    Column("reacted_at", DateTime, server_default=func.now(), nullable=False),
+    UniqueConstraint("chat_id", "meme_id", "user_id", name="uq_chat_meme_reaction"),
+)
+
+chat_agent_usage = Table(
+    "chat_agent_usage",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("chat_id", BigInteger, nullable=False),
+    Column("user_id", BigInteger, nullable=False),
+    Column("prompt_tokens", Integer, nullable=False, server_default="0"),
+    Column("completion_tokens", Integer, nullable=False, server_default="0"),
+    Column("tool_calls", Integer, nullable=False, server_default="0"),
+    Column("response_time_ms", Integer),
+    Column("trigger_type", String),  # mention, reply, activity
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
 )
 
 

@@ -1,10 +1,13 @@
 # https://docs.python-telegram-bot.org/en/stable/examples.chatmemberbot.html
 
+import asyncio
 import logging
 from typing import Optional, Tuple
 
-from telegram import Chat, ChatMember, ChatMemberUpdated, Update
+from telegram import Bot, Chat, ChatMember, ChatMemberUpdated, Update
 from telegram.ext import ContextTypes
+
+from src.config import settings
 
 
 def extract_status_change(
@@ -66,6 +69,11 @@ async def handle_chat_member_update(
         if not was_member and is_member:
             logging.info("%s added the bot to the group %s", cause_name, chat.title)
             context.bot_data.setdefault("group_ids", set()).add(chat.id)
+            # Onboarding: welcome message + demo meme
+            try:
+                await _send_group_onboarding(context.bot, chat.id)
+            except Exception as e:
+                logging.warning("Onboarding failed for chat %s: %s", chat.id, e)
         elif was_member and not is_member:
             logging.info("%s removed the bot from the group %s", cause_name, chat.title)
 
@@ -74,3 +82,51 @@ async def handle_chat_member_update(
 
     elif was_member and not is_member:
         logging.info("%s removed the bot from the channel %s", cause_name, chat.title)
+
+
+async def _send_group_onboarding(bot: Bot, chat_id: int) -> None:
+    """Send welcome message + demo meme when bot is added to a group."""
+    if not settings.CHAT_AGENT_ENABLED:
+        return
+
+    await bot.send_message(
+        chat_id=chat_id,
+        text=(
+            "Привет! Я мем-сомелье 🎩\n\n"
+            "Упомяните меня или ответьте на мое сообщение, и я найду идеальный мем.\n\n"
+            "Чтобы я мог читать сообщения и лучше шутить, "
+            "дайте мне права администратора 🙏"
+        ),
+    )
+
+    await asyncio.sleep(2)
+
+    # Send a demo meme with like/dislike buttons
+    try:
+        from sqlalchemy import text
+
+        from src.database import fetch_one
+        from src.tgbot.handlers.chat.group_meme_reaction import build_meme_reaction_keyboard
+
+        row = await fetch_one(text("""
+            SELECT m.id, m.type, m.telegram_file_id
+            FROM meme m
+            INNER JOIN meme_stats ms ON ms.meme_id = m.id
+            WHERE m.status = 'ok'
+              AND m.telegram_file_id IS NOT NULL
+              AND ms.nlikes > 20
+            ORDER BY random()
+            LIMIT 1
+        """))
+
+        if row:
+            keyboard = build_meme_reaction_keyboard(row["id"])
+            file_id = row["telegram_file_id"]
+            if row["type"] == "animation":
+                await bot.send_animation(chat_id=chat_id, animation=file_id, reply_markup=keyboard)
+            elif row["type"] == "video":
+                await bot.send_video(chat_id=chat_id, video=file_id, reply_markup=keyboard)
+            else:
+                await bot.send_photo(chat_id=chat_id, photo=file_id, reply_markup=keyboard)
+    except Exception as e:
+        logging.warning("Failed to send demo meme in onboarding: %s", e)

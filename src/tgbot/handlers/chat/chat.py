@@ -2,10 +2,10 @@ import logging
 import random
 
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
+from telegram.error import BadRequest, Forbidden
 from telegram.ext import ContextTypes
 
-from src.tgbot.constants import TELEGRAM_CHANNEL_RU_CHAT_ID, TELEGRAM_CHAT_RU_CHAT_ID
-from src.tgbot.handlers.chat.ai import AI_PROMPT_RU, _messages_to_text, call_chatgpt
+from src.config import settings
 from src.tgbot.handlers.chat.reaction import give_random_reaction
 from src.tgbot.handlers.chat.service import (
     get_latest_chat_messages,
@@ -19,58 +19,62 @@ from src.tgbot.handlers.treasury.service import get_user_balance
 logger = logging.getLogger(__name__)
 
 
-def if_bot_was_mentioned(msg: Message) -> bool:
-    print(msg.to_json())
-    if msg.text and "@ffmemesbot" in msg.text.lower():
+def is_bot_mentioned(msg: Message, bot_id: int, bot_username: str) -> bool:
+    """Check if the bot was mentioned or replied to."""
+    if msg.text and f"@{bot_username}" in msg.text.lower():
         return True
 
     if msg.reply_to_message and msg.reply_to_message.from_user:
-        user_id = msg.reply_to_message.from_user.id
-        if user_id in (
-            1123681771,
-            TELEGRAM_CHANNEL_RU_CHAT_ID,
-            TELEGRAM_CHAT_RU_CHAT_ID,
-        ):
+        if msg.reply_to_message.from_user.id == bot_id:
             return True
 
     return False
 
 
-async def handle_chat_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle all group messages: persist, detect triggers, run agent or react."""
     msg = update.message
-    await save_telegram_message(msg)
+    if not msg:
+        return
 
-    # Check if message is a reply to bot's message
-    # if if_bot_was_mentioned(msg):
-    #     if random.random() < 0.3:  # free generation
-    #         return await send_ai_message_to_chat(
-    #             context.bot,
-    #             chat_id=update.effective_chat.id,
-    #             reply_to_message_id=msg.id,
-    #         )
+    # Persist all group messages for AI context
+    try:
+        await save_telegram_message(msg)
+    except Exception as e:
+        logger.warning("Failed to save message: %s", e)
 
-    #     return await generate_ai_reply_to_a_message(update, context)
-    # elif random.random() < 0.1:
-    #     return await send_ai_message_to_chat(
-    #         context.bot,
-    #         chat_id=update.effective_chat.id,
-    #         reply_to_message_id=msg.id,
-    #     )
-    # else:
-    #     await give_random_reaction(update, context)
+    # Check if chat agent is enabled
+    if not settings.CHAT_AGENT_ENABLED:
+        if random.random() < 0.05:
+            await give_random_reaction(update, context)
+        return
 
+    bot_id = context.bot.id
+    bot_username = context.bot.username or settings.TELEGRAM_BOT_USERNAME or ""
+
+    # Check if bot was mentioned or replied to
+    if is_bot_mentioned(msg, bot_id, bot_username):
+        return await handle_agent_trigger(update, context)
+
+    # Random reaction (5% chance, free)
     if random.random() < 0.05:
         await give_random_reaction(update, context)
 
 
-async def generate_ai_reply_to_a_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_agent_trigger(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle a direct mention/reply trigger — charge 1 burger and run agent."""
     user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    msg = update.message
 
+    # Check balance
     balance = await get_user_balance(user_id)
-    if balance < PAYOUTS[TrxType.BOT_REPLY_PAYMENT] * (-1):
-        text = "Я отвечаю только за бургеры, а у тебя их нет!"
+    cost = PAYOUTS[TrxType.BOT_REPLY_PAYMENT] * (-1)  # 1
+
+    if balance < cost:
+        text = "У меня есть мемы на любой вкус, но сначала нужны бургеры 🍔"
         return await _reply_and_delete(
-            update.message,
+            msg,
             text,
             sleep_sec=10,
             delete_original=False,
@@ -86,40 +90,73 @@ async def generate_ai_reply_to_a_message(update: Update, context: ContextTypes.D
             ),
         )
 
+    # Charge 1 burger
     await charge_user(
         user_id,
         TrxType.BOT_REPLY_PAYMENT,
-        external_id=str(update.message.id),
+        external_id=f"chat_agent:{chat_id}:{msg.message_id}",
     )
 
-    return await send_ai_message_to_chat(
-        context.bot, update.effective_chat.id, reply_to_message_id=update.message.id
-    )
+    # Show typing indicator
+    try:
+        await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+    except (BadRequest, Forbidden):
+        return
+
+    # Run the agent
+    try:
+        from src.tgbot.handlers.chat.agent.runner import run_chat_agent
+
+        response = await run_chat_agent(
+            bot=context.bot,
+            chat_id=chat_id,
+            user_id=user_id,
+            reply_to_message_id=msg.message_id,
+        )
+
+        if response:
+            sent_msg = await context.bot.send_message(
+                chat_id=chat_id,
+                text=response,
+                reply_to_message_id=msg.message_id,
+            )
+            await save_telegram_message(sent_msg)
+    except Exception as e:
+        logger.error("Agent error in chat %s: %s", chat_id, e, exc_info=True)
+        # Fallback: send a random popular meme
+        try:
+            await _send_fallback_meme(context.bot, chat_id, msg.message_id)
+        except Exception:
+            pass
 
 
-async def send_ai_message_to_chat(
-    bot: Bot,
-    chat_id: int,
-    reply_to_message_id: int | None = None,
-):
-    pass
+async def _send_fallback_meme(bot: Bot, chat_id: int, reply_to_message_id: int):
+    """Send a random popular meme as fallback when the agent fails."""
+    from sqlalchemy import text as sql_text
 
-    await bot.send_chat_action(
-        chat_id=chat_id,
-        action="typing",
-    )
+    from src.database import fetch_one
 
-    messages = await get_latest_chat_messages(chat_id=chat_id)
-    messages_text = _messages_to_text(messages)
+    row = await fetch_one(sql_text("""
+        SELECT m.id, m.type, m.telegram_file_id
+        FROM meme m
+        INNER JOIN meme_stats ms ON ms.meme_id = m.id
+        WHERE m.status = 'ok'
+          AND m.telegram_file_id IS NOT NULL
+          AND ms.nlikes > 10
+        ORDER BY random()
+        LIMIT 1
+    """))
 
-    res = await call_chatgpt(AI_PROMPT_RU.format(messages=messages_text))
-    logger.info(f"AI REPLY:\n{res}")
+    if not row:
+        return
 
-    msg = await bot.send_message(
-        chat_id=chat_id,
-        text=res,
-        parse_mode="HTML",
-        reply_to_message_id=reply_to_message_id,
-    )
+    from src.tgbot.handlers.chat.group_meme_reaction import build_meme_reaction_keyboard
+    keyboard = build_meme_reaction_keyboard(row["id"])
 
-    await save_telegram_message(msg)
+    file_id = row["telegram_file_id"]
+    if row["type"] == "animation":
+        await bot.send_animation(chat_id=chat_id, animation=file_id, reply_markup=keyboard, reply_to_message_id=reply_to_message_id)
+    elif row["type"] == "video":
+        await bot.send_video(chat_id=chat_id, video=file_id, reply_markup=keyboard, reply_to_message_id=reply_to_message_id)
+    else:
+        await bot.send_photo(chat_id=chat_id, photo=file_id, reply_markup=keyboard, reply_to_message_id=reply_to_message_id)
