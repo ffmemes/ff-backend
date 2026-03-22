@@ -17,6 +17,14 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Add unique constraint to message_tg to prevent duplicates
+    op.execute("COMMIT")
+    op.execute(
+        "CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "
+        "uq_message_tg ON message_tg (chat_id, message_id)"
+    )
+    op.execute("BEGIN")
+
     op.create_table(
         "chat_meme_reaction",
         sa.Column("id", sa.Integer(), sa.Identity(), primary_key=True),

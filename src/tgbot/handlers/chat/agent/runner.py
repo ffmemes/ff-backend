@@ -15,6 +15,7 @@ from src.tgbot.handlers.chat.service import get_latest_chat_messages
 logger = logging.getLogger(__name__)
 
 MAX_TURNS = 8
+MAX_TOOL_CALLS = 15
 
 
 async def run_chat_agent(
@@ -86,6 +87,9 @@ async def run_chat_agent(
                     tool_args = {}
 
                 tool_calls_count += 1
+                if tool_calls_count > MAX_TOOL_CALLS:
+                    logger.warning("Agent exceeded max tool calls in chat %s", chat_id)
+                    break
                 logger.info("Agent tool: %s(%s)", tool_name, tool_args)
 
                 result = await dispatch_tool(

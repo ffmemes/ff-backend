@@ -425,7 +425,7 @@ message_tg = Table(
     Column("user_id", BigInteger, nullable=False),
     Column("text", String),
     Column("reply_to_message_id", BigInteger),
-    # attachment?
+    UniqueConstraint("chat_id", "message_id", name="uq_message_tg"),
 )
 
 chat_meme_reaction = Table(

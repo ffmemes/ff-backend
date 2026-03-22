@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 def is_bot_mentioned(msg: Message, bot_id: int, bot_username: str) -> bool:
     """Check if the bot was mentioned or replied to."""
-    if msg.text and f"@{bot_username}" in msg.text.lower():
+    if msg.text and f"@{bot_username.lower()}" in msg.text.lower():
         return True
 
     if msg.reply_to_message and msg.reply_to_message.from_user:
@@ -63,6 +63,8 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def handle_agent_trigger(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle a direct mention/reply trigger — charge 1 burger and run agent."""
+    if not update.effective_user:
+        return
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     msg = update.message
@@ -121,9 +123,11 @@ async def handle_agent_trigger(update: Update, context: ContextTypes.DEFAULT_TYP
                 reply_to_message_id=msg.message_id,
             )
             await save_telegram_message(sent_msg)
+        else:
+            # Agent returned None (API down, max turns, etc.) — send fallback
+            await _send_fallback_meme(context.bot, chat_id, msg.message_id)
     except Exception as e:
         logger.error("Agent error in chat %s: %s", chat_id, e, exc_info=True)
-        # Fallback: send a random popular meme
         try:
             await _send_fallback_meme(context.bot, chat_id, msg.message_id)
         except Exception:

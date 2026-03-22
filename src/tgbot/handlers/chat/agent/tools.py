@@ -91,6 +91,8 @@ TOOL_SCHEMAS = [
 
 async def execute_search_memes(query: str, limit: int = 5) -> str:
     query = query[:100]
+    # Escape ILIKE wildcards to prevent pattern abuse
+    query = query.replace("%", r"\%").replace("_", r"\_")
     limit = min(limit, 10)
     rows = await fetch_all(
         text("""
