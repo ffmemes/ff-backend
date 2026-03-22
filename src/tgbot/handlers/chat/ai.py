@@ -41,13 +41,14 @@ def _messages_to_text(messages: list[dict]) -> str:
 
     text = ""
     for m in messages:
+        msg_text = m["text"] or "[media]"
         header = f"""FROM: {m["from_name"]}"""
         if m["reply_to_name"]:
             header += f""", Reply To: {m["reply_to_name"]}"""
 
         message_text = f"""
 {header}
-{m["text"]}
+{msg_text}
         """
 
         text += message_text.strip() + "\n"
