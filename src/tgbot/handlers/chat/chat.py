@@ -14,7 +14,10 @@ from src.tgbot.handlers.chat.service import (
 from src.tgbot.handlers.chat.utils import _reply_and_delete
 from src.tgbot.handlers.treasury.constants import PAYOUTS, TrxType
 from src.tgbot.handlers.treasury.payments import charge_user
-from src.tgbot.handlers.treasury.service import get_user_balance
+from src.tgbot.handlers.treasury.service import (
+    check_if_treasury_trx_exists,
+    get_user_balance,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -92,11 +95,14 @@ async def handle_agent_trigger(update: Update, context: ContextTypes.DEFAULT_TYP
             ),
         )
 
-    # Charge 1 burger
+    # Charge 1 burger (idempotent — prevents double-charge on webhook retry)
+    external_id = f"chat_agent:{chat_id}:{msg.message_id}"
+    if await check_if_treasury_trx_exists(user_id, TrxType.BOT_REPLY_PAYMENT, external_id):
+        return  # Already charged for this message
     await charge_user(
         user_id,
         TrxType.BOT_REPLY_PAYMENT,
-        external_id=f"chat_agent:{chat_id}:{msg.message_id}",
+        external_id=external_id,
     )
 
     # Show typing indicator

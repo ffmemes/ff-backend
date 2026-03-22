@@ -196,15 +196,27 @@ async def dispatch_tool(
 ) -> str:
     try:
         if tool_name == "search_memes":
-            return await execute_search_memes(**args)
+            return await execute_search_memes(
+                query=args.get("query", ""),
+                limit=args.get("limit", 5),
+            )
         elif tool_name == "send_meme":
             return await execute_send_meme(
-                bot, chat_id, reply_to_message_id=reply_to_message_id, **args
+                bot, chat_id,
+                meme_id=args.get("meme_id", 0),
+                reply_to_message_id=reply_to_message_id,
             )
         elif tool_name == "get_chat_history":
-            return await execute_get_chat_history(chat_id, **args)
+            return await execute_get_chat_history(
+                chat_id,
+                limit=args.get("limit", 50),
+            )
         elif tool_name == "react_to_message":
-            return await execute_react_to_message(bot, chat_id, **args)
+            return await execute_react_to_message(
+                bot, chat_id,
+                message_id=args.get("message_id", 0),
+                emoji=args.get("emoji", "👍"),
+            )
         else:
             return f"Unknown tool: {tool_name}"
     except Exception as e:

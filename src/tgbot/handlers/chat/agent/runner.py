@@ -33,6 +33,7 @@ async def run_chat_agent(
     client = AsyncOpenAI(
         api_key=settings.DEEPSEEK_API_KEY,
         base_url=settings.DEEPSEEK_BASE_URL,
+        timeout=30.0,
     )
 
     # Build initial context from recent messages
