@@ -22,10 +22,17 @@ from src.tgbot.handlers.treasury.service import (
 logger = logging.getLogger(__name__)
 
 
+TRIGGER_KEYWORDS = ["ffmemes", "фф ", "ff "]
+
+
 def is_bot_mentioned(msg: Message, bot_id: int, bot_username: str) -> bool:
-    """Check if the bot was mentioned or replied to."""
-    if msg.text and f"@{bot_username.lower()}" in msg.text.lower():
-        return True
+    """Check if the bot was mentioned, replied to, or triggered by keyword."""
+    if msg.text:
+        text_lower = msg.text.lower()
+        if f"@{bot_username.lower()}" in text_lower:
+            return True
+        if any(kw in text_lower for kw in TRIGGER_KEYWORDS):
+            return True
 
     if msg.reply_to_message and msg.reply_to_message.from_user:
         if msg.reply_to_message.from_user.id == bot_id:
