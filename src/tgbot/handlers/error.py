@@ -3,7 +3,7 @@ import logging
 import traceback
 
 from telegram import Update
-from telegram.error import Forbidden
+from telegram.error import Forbidden, TimedOut
 from telegram.ext import ContextTypes
 
 from src.tgbot.constants import (
@@ -87,4 +87,7 @@ Wait for 2 minutes and press /start.
             logging.exception("Failed to send crash message fallback")
 
     error_text_to_send = f"⚠️⚠️⚠️ for #{user_id}:\n{message}"
-    return await log(error_text_to_send, context.bot)
+    try:
+        await log(error_text_to_send, context.bot)
+    except TimedOut:
+        logging.warning("TimedOut sending stacktrace to admin chat")

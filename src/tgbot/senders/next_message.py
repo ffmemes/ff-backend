@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 from telegram import Bot, InlineKeyboardMarkup, Message, Update
-from telegram.error import BadRequest, Forbidden
+from telegram.error import BadRequest, Forbidden, TimedOut
 
 from src.recommendations import meme_queue
 from src.recommendations.service import (
@@ -117,6 +117,14 @@ async def next_message(
                 )
         except BadRequest as error:
             await _disable_broken_meme(meme, error)
+            attempt += 1
+            continue
+        except TimedOut:
+            logger.warning(
+                "Telegram API timed out delivering meme %s to user %s, retrying",
+                meme.id,
+                user_id,
+            )
             attempt += 1
             continue
 

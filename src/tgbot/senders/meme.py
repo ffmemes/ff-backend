@@ -151,13 +151,12 @@ async def edit_last_message_with_meme(
             media=get_input_media(meme),
             reply_markup=reply_markup,
         )
+        return await message.edit_caption(
+            caption=meme.caption,
+            parse_mode=ParseMode.HTML,
+            reply_markup=reply_markup,
+        )
     except BadRequest as error:
         if "Message to edit not found" in str(error):
             return None
         raise
-
-    return await message.edit_caption(
-        caption=meme.caption,
-        parse_mode=ParseMode.HTML,
-        reply_markup=reply_markup,
-    )
