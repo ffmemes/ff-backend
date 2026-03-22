@@ -53,6 +53,10 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     except Exception as e:
         logger.warning("Failed to save message: %s", e)
 
+    # Skip bot messages, channel forwards (777000), and service messages
+    if not msg.from_user or msg.from_user.is_bot or msg.from_user.id == 777000:
+        return
+
     # Check if chat agent is enabled
     if not settings.CHAT_AGENT_ENABLED:
         if random.random() < 0.05:
