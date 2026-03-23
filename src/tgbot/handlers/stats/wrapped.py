@@ -306,18 +306,18 @@ async def _generate_and_cache(
             {"lock": True, "stats_report": stats_report},
             ttl=300,
         )
-        print(f"[wrapped] starting generation for {user_id}")
+        logger.info("[wrapped] starting generation for %d", user_id)
 
         data = await generate_wrapped_data(
             user_id, descriptions, is_ru, stats_report,
         )
         if data:
             await set_user_wrapped(user_id, data)
-            print(f"[wrapped] done for {user_id}")
+            logger.info("[wrapped] done for %d", user_id)
         else:
-            print(f"[wrapped] returned None for {user_id}")
+            logger.warning("[wrapped] returned None for %d", user_id)
     except Exception as e:
-        print(f"[wrapped] bg error for {user_id}: {e}")
+        logger.error("[wrapped] bg error for %d: %s", user_id, e)
         from src.redis import redis_client
         await redis_client.delete(f"wrapped:{user_id}")
 
@@ -330,22 +330,15 @@ async def handle_wrapped_button(
     user_id = update.effective_user.id
     uw = await get_user_wrapped(user_id)
     if not uw:
+        logger.warning("[wrapped] no cache for %d", user_id)
         return
 
     if uw.get("lock"):
-        # Show stats if available, else wait message
         if update.callback_query:
-            stats = uw.get("stats_report")
-            if stats and update.callback_query.data == "wrapped_1":
-                await update.callback_query.answer(
-                    "⏳ Ещё генерирую... подожди пару секунд",
-                    show_alert=False,
-                )
-            else:
-                await update.callback_query.answer(
-                    "⏳ Подожди пару секунд...",
-                    show_alert=False,
-                )
+            await update.callback_query.answer(
+                "⏳ Ещё генерирую... подожди пару секунд",
+                show_alert=False,
+            )
         return
 
     if update.callback_query:
@@ -356,7 +349,7 @@ async def handle_wrapped_button(
     else:
         key = 0
 
-    print(f"[wrapped] user={user_id} key={key}")
+    logger.info("[wrapped] user=%d key=%d", user_id, key)
 
     try:
         await context.bot.send_chat_action(
@@ -365,7 +358,30 @@ async def handle_wrapped_button(
     except Exception:
         pass
 
-    # Slide 0: Stats
+    try:
+        await _show_slide(update, context, uw, key, user_id)
+    except Exception as e:
+        logger.error(
+            "[wrapped] slide %d error for %d: %s",
+            key, user_id, e, exc_info=True,
+        )
+        # Try to send next slide as fallback
+        try:
+            if key < 5:
+                await _show_slide(
+                    update, context, uw, key + 1, user_id,
+                )
+        except Exception:
+            pass
+
+
+async def _show_slide(
+    update: Update, context: ContextTypes.DEFAULT_TYPE,
+    uw: dict, key: int, user_id: int,
+) -> None:
+    """Send a single slide. Extracted for error isolation."""
+
+    # ── Slides ──
     if key == 0:
         await update.effective_chat.send_message(
             text=uw.get("stats_report", "📊"),
@@ -394,7 +410,7 @@ async def handle_wrapped_button(
                     )
                     sent = True
         except Exception as e:
-            print(f"[wrapped] meme slide error: {e}")
+            logger.error("[wrapped] meme slide error: %s", e)
         if not sent:
             key = 2
 
@@ -408,7 +424,7 @@ async def handle_wrapped_button(
                     reply_markup=_next_btn("wrapped_3"),
                 )
             except Exception as e:
-                print(f"[wrapped] humor slide error: {e}")
+                logger.error("[wrapped] humor slide error: %s", e)
                 key = 3
         else:
             key = 3
@@ -423,7 +439,7 @@ async def handle_wrapped_button(
                     reply_markup=_next_btn("wrapped_4"),
                 )
             except Exception as e:
-                print(f"[wrapped] anti slide error: {e}")
+                logger.error("[wrapped] anti slide error: %s", e)
                 key = 4
         else:
             key = 4
@@ -443,7 +459,7 @@ async def handle_wrapped_button(
                     ),
                 )
             except Exception as e:
-                print(f"[wrapped] stats extra error: {e}")
+                logger.error("[wrapped] stats extra error: %s", e)
                 key = 5
         else:
             key = 5
