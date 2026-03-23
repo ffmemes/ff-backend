@@ -313,12 +313,31 @@ async def handle_wrapped_go(
         ),
     )
 
-    # Generate everything in background (1 DeepSeek call + SQL)
-    data = await generate_wrapped_data(
-        user_id, descriptions, is_ru, stats_report,
+    # Generate in background task (don't block the webhook handler)
+    import asyncio
+    asyncio.create_task(
+        _generate_and_cache(user_id, descriptions, is_ru, stats_report)
     )
-    if data:
-        await set_user_wrapped(user_id, data)
+
+
+async def _generate_and_cache(
+    user_id: int, descriptions: list, is_ru: bool, stats_report: str,
+):
+    """Background task: generate wrapped data and save to cache."""
+    try:
+        data = await generate_wrapped_data(
+            user_id, descriptions, is_ru, stats_report,
+        )
+        if data:
+            await set_user_wrapped(user_id, data)
+            print(f"[wrapped] generated for user {user_id}")
+        else:
+            print(f"[wrapped] generation returned None for {user_id}")
+    except Exception as e:
+        print(f"[wrapped] bg generation error for {user_id}: {e}")
+        # Clear the lock so user can retry
+        from src.redis import redis_client
+        await redis_client.delete(f"wrapped:{user_id}")
 
 
 # ──────────────────────────────────────────────────────────
