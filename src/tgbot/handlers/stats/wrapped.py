@@ -328,8 +328,10 @@ async def handle_wrapped_go(
 async def handle_wrapped_button(
     update: Update, context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    user_wrapped = await get_user_wrapped(update.effective_user.id)
+    user_id = update.effective_user.id
+    user_wrapped = await get_user_wrapped(user_id)
     if not user_wrapped:
+        print(f"[wrapped] no cache for {user_id}")
         return
 
     if user_wrapped.get("lock"):
@@ -345,6 +347,16 @@ async def handle_wrapped_button(
         key = int(update.callback_query.data.replace("wrapped_", ""))
     else:
         key = 0
+
+    print(f"[wrapped] user={user_id} key={key}")
+
+    # Show typing between slides
+    try:
+        await context.bot.send_chat_action(
+            chat_id=user_id, action=ChatAction.TYPING,
+        )
+    except Exception:
+        pass
 
     # Slide 0: Stats (re-entry from cache)
     if key == 0:
@@ -390,47 +402,65 @@ async def handle_wrapped_button(
 
     # Slide 2: ДНК юмора + personality roast
     if key == 2:
-        text_msg = user_wrapped.get("humor_report", "")
-        if text_msg:
-            await update.effective_chat.send_message(
-                text=text_msg,
-                parse_mode="HTML",
-                reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton(
-                        "Дальше →", callback_data="wrapped_3",
-                    )]]
-                ),
-            )
-        else:
+        try:
+            text_msg = user_wrapped.get("humor_report", "")
+            if text_msg:
+                await update.effective_chat.send_message(
+                    text=text_msg,
+                    parse_mode="HTML",
+                    reply_markup=InlineKeyboardMarkup(
+                        [[InlineKeyboardButton(
+                            "Дальше →", callback_data="wrapped_3",
+                        )]]
+                    ),
+                )
+            else:
+                print(f"[wrapped] empty humor_report, skip to 3")
+                key = 3
+        except Exception as e:
+            print(f"[wrapped] slide 2 error: {e}")
             key = 3
 
     # Slide 3: Anti-profile (what your dislikes say)
     if key == 3:
-        anti = user_wrapped.get("anti_profile", "")
-        if anti:
-            await update.effective_chat.send_message(
-                text=anti,
-                parse_mode="HTML",
-                reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton(
-                        "Дальше →", callback_data="wrapped_4",
-                    )]]
-                ),
-            )
-        else:
+        try:
+            anti = user_wrapped.get("anti_profile", "")
+            if anti:
+                await update.effective_chat.send_message(
+                    text=anti,
+                    parse_mode="HTML",
+                    reply_markup=InlineKeyboardMarkup(
+                        [[InlineKeyboardButton(
+                            "Дальше →", callback_data="wrapped_4",
+                        )]]
+                    ),
+                )
+            else:
+                print(f"[wrapped] empty anti_profile, skip to 4")
+                key = 4
+        except Exception as e:
+            print(f"[wrapped] slide 3 error: {e}")
             key = 4
 
     # Slide 4: Top 3 sources + speed + peak hour
     if key == 4:
-        await update.effective_chat.send_message(
-            text=user_wrapped.get("stats_extra", ""),
-            parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton(
-                    "Финалочка →", callback_data="wrapped_5",
-                )]]
-            ),
-        )
+        try:
+            extra = user_wrapped.get("stats_extra", "")
+            if extra:
+                await update.effective_chat.send_message(
+                    text=extra,
+                    parse_mode="HTML",
+                    reply_markup=InlineKeyboardMarkup(
+                        [[InlineKeyboardButton(
+                            "Финалочка →", callback_data="wrapped_5",
+                        )]]
+                    ),
+                )
+            else:
+                key = 5
+        except Exception as e:
+            print(f"[wrapped] slide 4 error: {e}")
+            key = 5
 
     # Slide 5: Prediction + finale
     if key == 5:
