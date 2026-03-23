@@ -9,7 +9,7 @@ from src.stats import meme
     name="Calculate meme_stats",
     retries=2,
     retry_delay_seconds=30,
-    timeout_seconds=300,
+    timeout_seconds=600,
     on_failure=[notify_telegram_on_failure],
 )
 async def calculate_meme_stats() -> None:

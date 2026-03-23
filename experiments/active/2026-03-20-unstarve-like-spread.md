@@ -33,8 +33,19 @@ The `raw_impr_rank = 0` filter (top-quartile by impressions) already ensures qua
 
 ## Failure Criteria
 
-- Engine LR drops below 40% (quality degradation from stale memes)
+- ~~Engine LR drops below 40%~~ **Revised 2026-03-22**: LR floor relaxed to 35%. Rationale: North Star moved +1 (median 19) while this experiment was live. The LR/volume trade-off is working — more content served → longer sessions. LR decline from 51% to ~40% is pool expansion effect (expected), not quality degradation. Only act if session length drops below 17.
 - Median session length drops below 16
+
+## Mid-experiment Notes (2026-03-22)
+
+| Date | Daily Sent | Daily LR |
+|------|-----------|---------|
+| Mar 19 (baseline) | 768 | 45.5% |
+| Mar 20 (day 1) | 2,079 | 47.3% |
+| Mar 21 (day 2) | 3,378 | 42.9% |
+| Mar 22 (partial) | 1,073 | 39.4% |
+
+Volume +4.4x (exceeds ≥3x success criterion). LR declining as pool expands — expected. North Star +1 (18→19) concurrent with this experiment. **CEO decision: continue, accept new LR baseline, do not add age filter back.** Failure will be session length regression, not LR.
 
 ## Metrics After
 
