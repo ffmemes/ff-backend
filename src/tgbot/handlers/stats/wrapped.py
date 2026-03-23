@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import json
 import logging
@@ -36,141 +37,125 @@ WRAPPED_MIN_REACTIONS = 30
 WRAPPED_MIN_DESCRIPTIONS = 5
 
 
-# ──────────────────────────────────────────────────────────
-# LLM HELPERS
-# ──────────────────────────────────────────────────────────
+# ── LLM ──────────────────────────────────────────────────
 
 async def call_deepseek(prompt: str) -> str:
-    """Single DeepSeek call — cheap and fast."""
     client = AsyncOpenAI(
         api_key=settings.DEEPSEEK_API_KEY,
         base_url=settings.DEEPSEEK_BASE_URL,
     )
-    response = await client.chat.completions.create(
+    resp = await client.chat.completions.create(
         model="deepseek-chat",
-        messages=[
-            {"role": "user", "content": prompt},
-        ],
+        messages=[{"role": "user", "content": prompt}],
         max_tokens=1500,
         temperature=0.9,
     )
-    return response.choices[0].message.content
+    return resp.choices[0].message.content
 
 
 def parse_json_from_llm(raw: str) -> dict | None:
-    """Extract JSON from LLM response, handling markdown fences."""
-    content = raw.strip()
-    if content.startswith("```"):
-        content = content.split("\n", 1)[1] if "\n" in content else content[3:]
-    if content.endswith("```"):
-        content = content[:-3]
-    content = content.strip()
-    if content.startswith("json"):
-        content = content[4:].strip()
+    c = raw.strip()
+    if c.startswith("```"):
+        c = c.split("\n", 1)[1] if "\n" in c else c[3:]
+    if c.endswith("```"):
+        c = c[:-3]
+    c = c.strip()
+    if c.startswith("json"):
+        c = c[4:].strip()
     try:
-        return json.loads(content)
+        return json.loads(c)
     except Exception:
         return None
 
 
-# ──────────────────────────────────────────────────────────
-# SQL-ONLY INSIGHTS (no LLM needed)
-# ──────────────────────────────────────────────────────────
+# ── SQL INSIGHTS ─────────────────────────────────────────
 
 async def get_reaction_speed_insight(user_id: int) -> dict:
-    """Average reaction time + percentile. Pure SQL."""
+    """Median reaction time, split by like/dislike. Pure SQL."""
     from sqlalchemy import text
 
     from src.database import fetch_one
 
     row = await fetch_one(text("""
-        WITH user_speed AS (
-            SELECT AVG(
-                EXTRACT(EPOCH FROM (reacted_at - sent_at))
-            ) AS avg_sec
+        WITH reactions AS (
+            SELECT
+                EXTRACT(EPOCH FROM (reacted_at - sent_at)) AS sec,
+                reaction_id
             FROM user_meme_reaction
             WHERE user_id = :user_id
-              AND reacted_at IS NOT NULL
-              AND sent_at IS NOT NULL
-              AND EXTRACT(EPOCH FROM (reacted_at - sent_at)) > 0
-              AND EXTRACT(EPOCH FROM (reacted_at - sent_at)) < 120
-        ),
-        all_speeds AS (
-            SELECT user_id, AVG(
-                EXTRACT(EPOCH FROM (reacted_at - sent_at))
-            ) AS avg_sec
-            FROM user_meme_reaction
-            WHERE reacted_at IS NOT NULL
-              AND sent_at IS NOT NULL
-              AND EXTRACT(EPOCH FROM (reacted_at - sent_at)) > 0
-              AND EXTRACT(EPOCH FROM (reacted_at - sent_at)) < 120
-            GROUP BY user_id
-            HAVING COUNT(*) >= 20
+              AND reacted_at IS NOT NULL AND sent_at IS NOT NULL
+              AND EXTRACT(EPOCH FROM (reacted_at - sent_at))
+                  BETWEEN 0.5 AND 120
         )
         SELECT
-            (SELECT avg_sec FROM user_speed) AS avg_sec,
-            (SELECT ROUND(100.0 * COUNT(*) FILTER (
-                WHERE avg_sec > (SELECT avg_sec FROM user_speed)
-             ) / NULLIF(COUNT(*), 0))
-             FROM all_speeds) AS faster_than_pct
+            PERCENTILE_CONT(0.5) WITHIN GROUP (
+                ORDER BY sec
+            ) AS median_sec,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (
+                ORDER BY sec
+            ) FILTER (WHERE reaction_id = 1) AS median_like,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (
+                ORDER BY sec
+            ) FILTER (WHERE reaction_id = 2) AS median_dislike
+        FROM reactions
     """), {"user_id": user_id})
 
-    if not row or row["avg_sec"] is None:
+    if not row or row["median_sec"] is None:
         return {}
     return {
-        "avg_sec": round(float(row["avg_sec"]), 1),
-        "faster_than_pct": int(row["faster_than_pct"] or 50),
+        "median_sec": round(float(row["median_sec"]), 1),
+        "median_like": round(float(row["median_like"] or 0), 1),
+        "median_dislike": round(float(row["median_dislike"] or 0), 1),
     }
 
 
-async def get_peak_hour_insight(user_id: int) -> dict:
-    """When user is most active. Pure SQL."""
+async def get_peak_hour_insight(user_id: int, is_ru: bool = True) -> dict:
+    """Peak activity hour. Moscow time for RU, UTC for EN."""
     from sqlalchemy import text
 
     from src.database import fetch_one
 
-    row = await fetch_one(text("""
+    # UTC+3 for Russian users
+    tz_offset = 3 if is_ru else 0
+    row = await fetch_one(text(f"""
         SELECT
-            EXTRACT(HOUR FROM reacted_at) AS peak_hour,
+            EXTRACT(HOUR FROM reacted_at + interval '{tz_offset} hours')
+                AS peak_hour,
             COUNT(*) AS cnt
         FROM user_meme_reaction
-        WHERE user_id = :user_id
-          AND reacted_at IS NOT NULL
-        GROUP BY 1
-        ORDER BY 2 DESC
-        LIMIT 1
+        WHERE user_id = :user_id AND reacted_at IS NOT NULL
+        GROUP BY 1 ORDER BY 2 DESC LIMIT 1
     """), {"user_id": user_id})
 
     if not row:
         return {}
     hour = int(row["peak_hour"])
-    if hour >= 0 and hour < 6:
-        label = "ночной скроллер 🌙"
-    elif hour < 10:
-        label = "утренний мемолюб ☀️"
-    elif hour < 14:
-        label = "дневной прокрастинатор 💼"
-    elif hour < 18:
-        label = "послеобеденный залипатель 🍕"
-    elif hour < 22:
-        label = "вечерний мемоман 🌆"
-    else:
-        label = "полуночный скроллер 🦉"
-    return {"hour": hour, "label": label}
+    labels = {
+        (0, 6): "ночной скроллер 🌙",
+        (6, 10): "утренний мемолюб ☀️",
+        (10, 14): "дневной прокрастинатор 💼",
+        (14, 18): "послеобеденный залипатель 🍕",
+        (18, 22): "вечерний мемоман 🌆",
+        (22, 24): "полуночный скроллер 🦉",
+    }
+    label = next(
+        (v for (lo, hi), v in labels.items() if lo <= hour < hi),
+        "мемоман",
+    )
+    tz_label = "МСК" if is_ru else "UTC"
+    return {"hour": hour, "label": label, "tz": tz_label}
 
 
 async def get_surprise_meme(user_id: int) -> dict | None:
-    """Meme where user liked it but most others didn't. Pure SQL."""
+    """Meme user liked but most others didn't."""
     from sqlalchemy import text
 
     from src.database import fetch_one
 
     row = await fetch_one(text("""
-        SELECT
-            m.id AS meme_id,
-            m.type,
-            m.telegram_file_id,
-            COALESCE(ms.lr_smoothed, 0.5) AS global_lr
+        SELECT m.id AS meme_id, m.type, m.telegram_file_id,
+               ROUND(COALESCE(ms.lr_smoothed, 0.5) * 100)
+                   AS global_lr_pct
         FROM user_meme_reaction umr
         JOIN meme m ON m.id = umr.meme_id
         LEFT JOIN meme_stats ms ON ms.meme_id = m.id
@@ -179,29 +164,19 @@ async def get_surprise_meme(user_id: int) -> dict | None:
           AND m.telegram_file_id IS NOT NULL
           AND COALESCE(ms.lr_smoothed, 0.5) < 0.35
           AND COALESCE(ms.nmemes_sent, 0) >= 10
-        ORDER BY ms.lr_smoothed ASC
-        LIMIT 1
+        ORDER BY ms.lr_smoothed ASC LIMIT 1
     """), {"user_id": user_id})
-
     if not row:
         return None
-    return {
-        "meme_id": row["meme_id"],
-        "type": row["type"],
-        "telegram_file_id": row["telegram_file_id"],
-        "global_lr": round(float(row["global_lr"]) * 100),
-    }
+    return dict(row)
 
 
-# ──────────────────────────────────────────────────────────
-# MAIN HANDLER
-# ──────────────────────────────────────────────────────────
+# ── MAIN HANDLER ─────────────────────────────────────────
 
 async def handle_wrapped(
     update: Update, context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
     user_id = update.effective_user.id
-
     await create_or_update_user(id=user_id)
     await save_tg_user(
         id=user_id,
@@ -220,48 +195,69 @@ async def handle_wrapped(
             f"Подпишись:\n{TELEGRAM_CHANNEL_RU_LINK}"
         )
 
-    user_wrapped = await get_user_wrapped(user_id)
-    if user_wrapped and not user_wrapped.get("lock"):
+    cached = await get_user_wrapped(user_id)
+    if cached and not cached.get("lock"):
         return await handle_wrapped_button(update, context)
-    if user_wrapped and user_wrapped.get("lock"):
+    if cached and cached.get("lock"):
         return
 
-    # Instant welcome with fun buttons
+    # Check conditions BEFORE showing welcome
+    user_stats_data = await get_user_stats(user_id)
+    if not user_stats_data:
+        return await update.message.reply_text(
+            "Маловато ты пользовался ботом 😅 /start"
+        )
+    nmemes_sent = user_stats_data.get("nmemes_sent", 0)
+    if nmemes_sent < WRAPPED_MIN_REACTIONS:
+        remaining = WRAPPED_MIN_REACTIONS - nmemes_sent
+        return await update.message.reply_text(
+            f"Посмотри ещё {remaining} мемов и возвращайся! /start"
+        )
+    descriptions = await get_meme_descriptions_for_wrapped(
+        user_id, limit=40,
+    )
+    if len(descriptions) < WRAPPED_MIN_DESCRIPTIONS:
+        return await update.message.reply_text(
+            "Мы ещё анализируем твои мемы... 🔬\n"
+            "Попробуй через пару часов! /start"
+        )
+
+    # ── START DEEPSEEK EARLY (while user reads welcome) ──
+    user = await get_user_by_id(user_id)
+    is_ru = get_user_interface_language(user) == "ru"
+    stats_report = await get_bot_usage_report(
+        user_id, user_stats_data, user, is_ru,
+    )
+    asyncio.create_task(
+        _generate_and_cache(
+            user_id, descriptions, is_ru, stats_report or "",
+        )
+    )
+
+    # Welcome message
     await update.effective_chat.send_message(
         text=(
             "🎁 Мы подготовили глубокий анализ "
             "твоего чувства юмора.\n\n"
             "Хочешь посмотреть?"
         ),
-        reply_markup=InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton(
-                    "ДА", callback_data="wrapped_go",
-                ),
-                InlineKeyboardButton(
-                    "ПОСМОТРЕТЬ", callback_data="wrapped_go",
-                ),
-            ]
-        ]),
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("ДА", callback_data="wrapped_go"),
+            InlineKeyboardButton(
+                "ПОСМОТРЕТЬ", callback_data="wrapped_go",
+            ),
+        ]]),
     )
 
 
 async def handle_wrapped_go(
     update: Update, context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    """User pressed ДА/ПОСМОТРЕТЬ — generate everything."""
+    """ДА / ПОСМОТРЕТЬ pressed — show stats slide."""
     if update.callback_query:
         await update.callback_query.answer()
 
     user_id = update.effective_user.id
-
-    user_wrapped = await get_user_wrapped(user_id)
-    if user_wrapped and not user_wrapped.get("lock"):
-        return await handle_wrapped_button(update, context)
-    if user_wrapped and user_wrapped.get("lock"):
-        return
-
-    # Show typing
     try:
         await context.bot.send_chat_action(
             chat_id=user_id, action=ChatAction.TYPING,
@@ -269,107 +265,99 @@ async def handle_wrapped_go(
     except Exception:
         pass
 
-    # Check minimums
-    user_stats_data = await get_user_stats(user_id)
-    if not user_stats_data:
-        return await update.effective_chat.send_message(
-            "Маловато ты пользовался ботом 😅\n"
-            "Посмотри побольше мемов! /start"
+    cached = await get_user_wrapped(user_id)
+    if cached and not cached.get("lock"):
+        return await handle_wrapped_button(update, context)
+
+    # Still generating — show stats from cache (partial)
+    if cached and cached.get("lock"):
+        stats = cached.get("stats_report")
+        if stats:
+            return await update.effective_chat.send_message(
+                text=stats,
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton(
+                        "Дальше →", callback_data="wrapped_1",
+                    )]]
+                ),
+            )
+        # Still no stats — tell user to wait
+        await update.effective_chat.send_message(
+            "⏳ Анализирую твои мемы... нажми Дальше через пару секунд"
         )
+        return
 
-    nmemes_sent = user_stats_data.get("nmemes_sent", 0)
-    if nmemes_sent < WRAPPED_MIN_REACTIONS:
-        remaining = WRAPPED_MIN_REACTIONS - nmemes_sent
-        return await update.effective_chat.send_message(
-            f"Посмотри ещё {remaining} мемов и возвращайся! /start"
-        )
-
-    descriptions = await get_meme_descriptions_for_wrapped(
-        user_id, limit=40,
-    )
-    if len(descriptions) < WRAPPED_MIN_DESCRIPTIONS:
-        return await update.effective_chat.send_message(
-            "Мы ещё анализируем твои мемы... 🔬\n"
-            "Попробуй через пару часов! /start"
-        )
-
-    user = await get_user_by_id(user_id)
-    is_ru = get_user_interface_language(user) == "ru"
-
-    # Send stats slide immediately
-    stats_report = await get_bot_usage_report(user_id, is_ru)
-    if stats_report is None:
-        return await update.effective_chat.send_message(
-            "Маловато данных 😅 Жми /start"
-        )
-
+    # No cache at all — shouldn't happen, but handle gracefully
     await update.effective_chat.send_message(
-        text=stats_report,
-        parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton(
-                "Дальше →", callback_data="wrapped_1",
-            )]]
-        ),
-    )
-
-    # Generate in background task (don't block the webhook handler)
-    import asyncio
-    asyncio.create_task(
-        _generate_and_cache(user_id, descriptions, is_ru, stats_report)
+        "Попробуй /wrapped ещё раз"
     )
 
 
 async def _generate_and_cache(
-    user_id: int, descriptions: list, is_ru: bool, stats_report: str,
+    user_id: int, descriptions: list,
+    is_ru: bool, stats_report: str,
 ):
-    """Background task: generate wrapped data and save to cache."""
+    """Background: generate all data and save to cache."""
     try:
+        # Save stats immediately so ДА can show them
+        await set_user_wrapped(
+            user_id,
+            {"lock": True, "stats_report": stats_report},
+            ttl=300,
+        )
+        print(f"[wrapped] starting generation for {user_id}")
+
         data = await generate_wrapped_data(
             user_id, descriptions, is_ru, stats_report,
         )
         if data:
             await set_user_wrapped(user_id, data)
-            print(f"[wrapped] generated for user {user_id}")
+            print(f"[wrapped] done for {user_id}")
         else:
-            print(f"[wrapped] generation returned None for {user_id}")
+            print(f"[wrapped] returned None for {user_id}")
     except Exception as e:
-        print(f"[wrapped] bg generation error for {user_id}: {e}")
-        # Clear the lock so user can retry
+        print(f"[wrapped] bg error for {user_id}: {e}")
         from src.redis import redis_client
         await redis_client.delete(f"wrapped:{user_id}")
 
 
-# ──────────────────────────────────────────────────────────
-# SLIDE NAVIGATION
-# ──────────────────────────────────────────────────────────
+# ── SLIDE NAVIGATION ─────────────────────────────────────
 
 async def handle_wrapped_button(
     update: Update, context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
     user_id = update.effective_user.id
-    user_wrapped = await get_user_wrapped(user_id)
-    if not user_wrapped:
-        print(f"[wrapped] no cache for {user_id}")
+    uw = await get_user_wrapped(user_id)
+    if not uw:
         return
 
-    if user_wrapped.get("lock"):
+    if uw.get("lock"):
+        # Show stats if available, else wait message
         if update.callback_query:
-            await update.callback_query.answer(
-                "⏳ Ещё генерирую... подожди пару секунд",
-                show_alert=False,
-            )
+            stats = uw.get("stats_report")
+            if stats and update.callback_query.data == "wrapped_1":
+                await update.callback_query.answer(
+                    "⏳ Ещё генерирую... подожди пару секунд",
+                    show_alert=False,
+                )
+            else:
+                await update.callback_query.answer(
+                    "⏳ Подожди пару секунд...",
+                    show_alert=False,
+                )
         return
 
     if update.callback_query:
         await update.callback_query.answer()
-        key = int(update.callback_query.data.replace("wrapped_", ""))
+        key = int(
+            update.callback_query.data.replace("wrapped_", ""),
+        )
     else:
         key = 0
 
     print(f"[wrapped] user={user_id} key={key}")
 
-    # Show typing between slides
     try:
         await context.bot.send_chat_action(
             chat_id=user_id, action=ChatAction.TYPING,
@@ -377,123 +365,114 @@ async def handle_wrapped_button(
     except Exception:
         pass
 
-    # Slide 0: Stats (re-entry from cache)
+    # Slide 0: Stats
     if key == 0:
         await update.effective_chat.send_message(
-            text=user_wrapped["stats_report"],
+            text=uw.get("stats_report", "📊"),
             parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton(
-                    "Дальше →", callback_data="wrapped_1",
-                )]]
-            ),
+            reply_markup=_next_btn("wrapped_1"),
         )
 
-    # Slide 1: Мем, который олицетворяет тебя
+    # Slide 1: Your meme
     if key == 1:
-        meme_info = user_wrapped.get("your_meme")
         sent = False
-        if meme_info and meme_info.get("meme_id"):
-            meme_data = await get_meme_by_id(meme_info["meme_id"])
-            if meme_data and meme_data.get("telegram_file_id"):
-                caption = meme_info.get(
-                    "caption", "🎯 Этот мем — это ты",
-                )
-                meme = MemeData(
-                    id=meme_data["id"],
-                    type=meme_data["type"],
-                    telegram_file_id=meme_data["telegram_file_id"],
-                    caption=caption,
-                )
-                await send_new_message_with_meme(
-                    context.bot,
-                    update.effective_user.id,
-                    meme,
-                    reply_markup=InlineKeyboardMarkup(
-                        [[InlineKeyboardButton(
-                            "Дальше →", callback_data="wrapped_2",
-                        )]]
-                    ),
-                )
-                sent = True
-        if not sent:
-            key = 2  # skip to next
-
-    # Slide 2: ДНК юмора + personality roast
-    if key == 2:
+        meme_info = uw.get("your_meme")
         try:
-            text_msg = user_wrapped.get("humor_report", "")
-            if text_msg:
-                await update.effective_chat.send_message(
-                    text=text_msg,
-                    parse_mode="HTML",
-                    reply_markup=InlineKeyboardMarkup(
-                        [[InlineKeyboardButton(
-                            "Дальше →", callback_data="wrapped_3",
-                        )]]
-                    ),
-                )
-            else:
-                print(f"[wrapped] empty humor_report, skip to 3")
-                key = 3
+            if meme_info and meme_info.get("meme_id"):
+                md = await get_meme_by_id(meme_info["meme_id"])
+                if md and md.get("telegram_file_id"):
+                    meme = MemeData(
+                        id=md["id"], type=md["type"],
+                        telegram_file_id=md["telegram_file_id"],
+                        caption=meme_info.get(
+                            "caption", "🎯 Этот мем — это ты",
+                        ),
+                    )
+                    await send_new_message_with_meme(
+                        context.bot, user_id, meme,
+                        reply_markup=_next_btn("wrapped_2"),
+                    )
+                    sent = True
         except Exception as e:
-            print(f"[wrapped] slide 2 error: {e}")
+            print(f"[wrapped] meme slide error: {e}")
+        if not sent:
+            key = 2
+
+    # Slide 2: Humor DNA + roast
+    if key == 2:
+        txt = uw.get("humor_report", "")
+        if txt:
+            try:
+                await update.effective_chat.send_message(
+                    text=txt, parse_mode="HTML",
+                    reply_markup=_next_btn("wrapped_3"),
+                )
+            except Exception as e:
+                print(f"[wrapped] humor slide error: {e}")
+                key = 3
+        else:
             key = 3
 
-    # Slide 3: Anti-profile (what your dislikes say)
+    # Slide 3: Anti-profile
     if key == 3:
-        try:
-            anti = user_wrapped.get("anti_profile", "")
-            if anti:
+        txt = uw.get("anti_profile", "")
+        if txt:
+            try:
                 await update.effective_chat.send_message(
-                    text=anti,
-                    parse_mode="HTML",
-                    reply_markup=InlineKeyboardMarkup(
-                        [[InlineKeyboardButton(
-                            "Дальше →", callback_data="wrapped_4",
-                        )]]
-                    ),
+                    text=txt, parse_mode="HTML",
+                    reply_markup=_next_btn("wrapped_4"),
                 )
-            else:
-                print(f"[wrapped] empty anti_profile, skip to 4")
+            except Exception as e:
+                print(f"[wrapped] anti slide error: {e}")
                 key = 4
-        except Exception as e:
-            print(f"[wrapped] slide 3 error: {e}")
+        else:
             key = 4
 
-    # Slide 4: Top 3 sources + speed + peak hour
+    # Slide 4: Sources + speed + peak
     if key == 4:
-        try:
-            extra = user_wrapped.get("stats_extra", "")
-            if extra:
+        txt = uw.get("stats_extra", "")
+        if txt:
+            try:
                 await update.effective_chat.send_message(
-                    text=extra,
-                    parse_mode="HTML",
+                    text=txt, parse_mode="HTML",
                     reply_markup=InlineKeyboardMarkup(
                         [[InlineKeyboardButton(
-                            "Финалочка →", callback_data="wrapped_5",
+                            "Финалочка →",
+                            callback_data="wrapped_5",
                         )]]
                     ),
                 )
-            else:
+            except Exception as e:
+                print(f"[wrapped] stats extra error: {e}")
                 key = 5
-        except Exception as e:
-            print(f"[wrapped] slide 4 error: {e}")
+        else:
             key = 5
 
-    # Slide 5: Prediction + finale
+    # Slide 5: Prediction + referral
     if key == 5:
-        prediction = user_wrapped.get("prediction", "")
+        pred = uw.get("prediction", "")
         await update.effective_chat.send_message(
             text=(
                 "🔮 <b>Предсказание на лето 2026:</b>\n\n"
-                f"<i>{prediction}</i>\n\n"
-                "❤️ Спасибо за то, что пользуешься ботом.\n"
-                "Продолжай смотреть мемы и пересылай друзьям!\n\n"
-                "🍔 @ffmemesbot\n\n/start"
+                f"<i>{pred}</i>\n\n"
+                "❤️ Спасибо за то, что пользуешься ботом.\n\n"
+                "Перешли ссылку другу — пусть тоже узнает "
+                "свой мем-профиль 👇"
             ),
             parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton(
+                    "📤 Отправить другу",
+                    url="https://t.me/ffmemesbot?start=wrapped",
+                ),
+            ]]),
         )
+
+
+def _next_btn(callback: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton("Дальше →", callback_data=callback)]]
+    )
 
 
 async def handle_wrapped_clear(
@@ -505,30 +484,24 @@ async def handle_wrapped_clear(
         return
     from src.redis import redis_client
     await redis_client.delete(f"wrapped:{user_id}")
-    await update.message.reply_text("Wrapped cache cleared ✓ /wrapped")
+    await update.message.reply_text("Cache cleared ✓ /wrapped")
 
 
-# ──────────────────────────────────────────────────────────
-# GENERATION (1 DeepSeek call + SQL)
-# ──────────────────────────────────────────────────────────
+# ── GENERATION ───────────────────────────────────────────
 
 async def generate_wrapped_data(
-    user_id: int,
-    descriptions: list,
-    is_ru: bool,
-    stats_report: str,
+    user_id: int, descriptions: list,
+    is_ru: bool, stats_report: str,
 ) -> dict | None:
-    """One DeepSeek call + SQL queries → all wrapped data."""
-    await set_user_wrapped(user_id, {"lock": True}, ttl=300)
+    await set_user_wrapped(
+        user_id,
+        {"lock": True, "stats_report": stats_report},
+        ttl=300,
+    )
 
     try:
-        # 1. Build meme context for DeepSeek
-        liked = [
-            d for d in descriptions if d.get("reaction_id") == 1
-        ]
-        disliked = [
-            d for d in descriptions if d.get("reaction_id") == 2
-        ]
+        liked = [d for d in descriptions if d.get("reaction_id") == 1]
+        disliked = [d for d in descriptions if d.get("reaction_id") == 2]
 
         liked_texts = "\n".join(
             f"[{i}] ✅ {d.get('description') or d.get('ocr_text', '')}"
@@ -539,65 +512,34 @@ async def generate_wrapped_data(
             for d in disliked[:15]
         )
 
-        # 2. ONE DeepSeek call for everything (run first!)
-        prompt = _build_mega_prompt(liked_texts, disliked_texts, is_ru)
+        # ONE DeepSeek call
+        prompt = _build_mega_prompt(liked_texts, disliked_texts)
         raw = await call_deepseek(prompt)
-        parsed = parse_json_from_llm(raw)
-
-        if not parsed:
+        p = parse_json_from_llm(raw)
+        if not p:
             logger.warning(
-                "DeepSeek JSON failed for user %d. Raw: %s",
-                user_id, raw[:300],
+                "DeepSeek JSON failed user %d: %s", user_id, raw[:300],
             )
-            parsed = {}
+            p = {}
 
-        # 3. Determine "your meme"
-        your_meme = _pick_meme_from_result(parsed, liked)
+        your_meme = _pick_meme(p, liked)
 
-        # 4. SQL insights (safe — each wrapped in try/except)
-        try:
-            speed = await get_reaction_speed_insight(user_id)
-        except Exception as e:
-            logger.warning("Speed insight failed: %s", e)
-            speed = {}
-        try:
-            peak = await get_peak_hour_insight(user_id)
-        except Exception as e:
-            logger.warning("Peak hour insight failed: %s", e)
-            peak = {}
-        try:
-            surprise = await get_surprise_meme(user_id)
-        except Exception as e:
-            logger.warning("Surprise meme failed: %s", e)
-            surprise = None
-        try:
-            sources_report = await _build_sources_report(user_id, is_ru)
-        except Exception as e:
-            logger.warning("Sources report failed: %s", e)
-            sources_report = ""
-
-        # 5. Build all slide content
-        humor_report = _build_humor_slide(parsed, is_ru)
-        anti_profile = _build_anti_profile_slide(parsed, is_ru)
-        stats_extra = _build_stats_extra_slide(
-            sources_report, speed, peak, is_ru,
-        )
-        prediction = parsed.get(
-            "prediction",
-            "Летом ты будешь пересылать мемы вместо работы 🔥",
-        )
+        # SQL insights (each safe)
+        speed = await _safe(get_reaction_speed_insight(user_id))
+        peak = await _safe(get_peak_hour_insight(user_id, is_ru))
+        surprise = await _safe(get_surprise_meme(user_id))
+        sources = await _safe(_build_sources_report(user_id))
 
         # Use surprise meme if LLM didn't pick one
         if not your_meme and surprise:
+            lr = surprise.get("global_lr_pct", "?")
             your_meme = {
                 "meme_id": surprise["meme_id"],
                 "caption": (
-                    f"🎲 Этот мем лайкнул только ты "
-                    f"(глобальный лайк-рейт: {surprise['global_lr']}%)"
+                    f"🎲 Этот мем лайкнул только ты\n"
+                    f"(глобальный лайк-рейт: {lr}%)"
                 ),
             }
-
-        # Random liked meme as last resort
         if not your_meme and liked:
             pick = random.choice(liked[:10])
             your_meme = {
@@ -605,35 +547,48 @@ async def generate_wrapped_data(
                 "caption": "🎲 А вот мем, который тебе зашёл:",
             }
 
+        # Build slides
+        # Stats report gets vibe from DeepSeek
+        vibe = p.get("vibe", "")
+        if vibe and stats_report:
+            stats_report = stats_report.replace(
+                stats_report.split("\n<i>")[-1] if "\n<i>" in stats_report else "",
+                f"\n<i>{vibe}</i>",
+            ) if "\n<i>" in stats_report else stats_report + f"\n\n<i>{vibe}</i>"
+
         return {
             "stats_report": stats_report,
             "your_meme": your_meme,
-            "humor_report": humor_report,
-            "anti_profile": anti_profile,
-            "stats_extra": stats_extra,
-            "prediction": prediction,
+            "humor_report": _build_humor_slide(p),
+            "anti_profile": _build_anti_slide(p),
+            "stats_extra": _build_extra_slide(sources, speed, peak),
+            "prediction": p.get(
+                "prediction",
+                "Летом ты будешь листать мемы вместо работы 🔥",
+            ),
         }
-
     except Exception as e:
-        logger.error(
-            "Wrapped generation failed for user %d: %s",
-            user_id, e, exc_info=True,
-        )
+        logger.error("Wrapped failed user %d: %s", user_id, e, exc_info=True)
         return {
             "stats_report": stats_report,
             "your_meme": None,
             "humor_report": "",
             "anti_profile": "",
             "stats_extra": "",
-            "prediction": "Летом ты будешь пересылать мемы вместо работы 🔥",
+            "prediction": "Летом ты будешь листать мемы вместо работы 🔥",
         }
 
 
-def _build_mega_prompt(
-    liked_texts: str, disliked_texts: str, is_ru: bool,
-) -> str:
-    """One prompt that returns all LLM content as JSON."""
-    return f"""Ты мем-психолог. Проанализируй чувство юмора человека.
+async def _safe(coro):
+    try:
+        return await coro
+    except Exception as e:
+        logger.warning("Wrapped SQL insight failed: %s", e)
+        return {} if not isinstance(e, TypeError) else None
+
+
+def _build_mega_prompt(liked_texts: str, disliked_texts: str) -> str:
+    return f"""Ты мем-психолог. Проанализируй чувство юмора.
 
 ЛАЙКНУТЫЕ МЕМЫ:
 {liked_texts}
@@ -641,107 +596,102 @@ def _build_mega_prompt(
 СКИПНУТЫЕ МЕМЫ:
 {disliked_texts}
 
-Верни JSON (и только JSON, без текста до/после):
+Верни ТОЛЬКО JSON:
 {{
-  "meme_index": число (какой лайкнутый мем [индекс] лучше олицетворяет этого человека),
-  "meme_caption": "почему этот мем — это он (2 предложения, как подкол от друга)",
+  "vibe": "одно предложение-характеристика этого человека по его мемам, \
+как подкол от друга, 10-15 слов",
+  "meme_index": число (индекс лайкнутого мема, который олицетворяет),
+  "meme_caption": "почему этот мем — это ты (2 предложения, подкол)",
   "humor_dna": [
-    {{"name": "название категории", "pct": число}},
-    {{"name": "название категории", "pct": число}},
-    {{"name": "название категории", "pct": число}}
+    {{"name": "категория", "pct": число}},
+    {{"name": "категория", "pct": число}},
+    {{"name": "категория", "pct": число}}
   ],
-  "humor_roast": "3 пункта, каждый 1-2 предложения, как голосовое другу",
-  "anti_profile": "2-3 предложения что НЕ любит и почему, как голосовое",
-  "prediction": "предсказание на лето 2026, 1-2 предложения, абсурдное"
+  "humor_roast": "3 абзаца через \\n\\n. Каждый 1-2 предложения. \
+Пиши смешно, как голосовое другу. Упоминай конкретные мемы. \
+Шути, а не ставь диагноз.",
+  "anti_profile": "2-3 коротких абзаца через \\n\\n. \
+Обращайся на ТЫ: 'ты терпеть не можешь...'. \
+Что ТЫ не любишь и почему.",
+  "prediction": "предсказание на лето 2026. \
+Одно-два предложения. Конкретно, абсурдно, \
+как голосовое другу. Без метафор."
 }}
 
 Правила:
-- Названия категорий: конкретные и прикольные, 2-3 слова
-- humor_roast: три абзаца через \\n\\n, каждый 1-2 предложения
+- Категории: конкретные, прикольные, 2-3 слова
+- Проценты примерно дают 100
 - Всё на русском
-- Пиши просто, как будто записываешь голосовое
-- Обязательно используй знания о скипнутых мемах
-- Проценты в humor_dna примерно дают 100"""
+- Пиши просто, как голосовое сообщение
+- Anti_profile: обязательно на ТЫ (не в третьем лице)
+- Humor_roast: шути, а не ставь приговор"""
 
 
-def _pick_meme_from_result(parsed: dict, liked: list) -> dict | None:
-    """Extract meme selection from DeepSeek result."""
-    idx = parsed.get("meme_index")
-    caption = parsed.get(
-        "meme_caption", "🎯 Этот мем олицетворяет тебя",
-    )
+def _pick_meme(p: dict, liked: list) -> dict | None:
+    idx = p.get("meme_index")
+    cap = p.get("meme_caption", "🎯 Этот мем олицетворяет тебя")
     if idx is not None and 0 <= idx < len(liked):
         return {
             "meme_id": liked[idx]["meme_id"],
-            "caption": f"🎯 Этот мем олицетворяет тебя:\n\n<i>{caption}</i>",
+            "caption": f"🎯 Этот мем олицетворяет тебя:\n\n<i>{cap}</i>",
         }
     return None
 
 
-def _build_humor_slide(parsed: dict, is_ru: bool) -> str:
-    """Build humor DNA + roast slide."""
-    dna = parsed.get("humor_dna", [])
-    roast = parsed.get("humor_roast", "")
+def _build_humor_slide(p: dict) -> str:
+    dna = p.get("humor_dna", [])
+    roast = p.get("humor_roast", "")
 
-    def make_bar(pct: int) -> str:
-        filled = round(pct / 10)
-        return "█" * filled + "░" * (10 - filled)
+    def bar(pct):
+        f = round(pct / 10)
+        return "█" * f + "░" * (10 - f)
 
     lines = ["🧬 <b>Твоя ДНК юмора:</b>\n"]
-    for cat in dna[:3]:
-        pct = min(100, max(0, cat.get("pct", 33)))
-        name = cat.get("name", "???")
-        lines.append(f"{make_bar(pct)} {pct}%\n{name}\n")
+    for c in dna[:3]:
+        pct = min(100, max(0, c.get("pct", 33)))
+        lines.append(f"{bar(pct)} {pct}%\n{c.get('name', '???')}\n")
 
     if roast:
         lines.append(f"\n👀 <b>Что я понял про тебя:</b>\n\n{roast}")
-
     return "\n".join(lines) if len(lines) > 1 else ""
 
 
-def _build_anti_profile_slide(parsed: dict, is_ru: bool) -> str:
-    """Build anti-profile slide (what dislikes reveal)."""
-    anti = parsed.get("anti_profile", "")
+def _build_anti_slide(p: dict) -> str:
+    anti = p.get("anti_profile", "")
     if not anti:
         return ""
     return f"🚫 <b>Что говорят твои скипы:</b>\n\n{anti}"
 
 
-def _build_stats_extra_slide(
-    sources_report: str,
-    speed: dict,
-    peak: dict,
-    is_ru: bool,
+def _build_extra_slide(
+    sources: str, speed: dict, peak: dict,
 ) -> str:
-    """Build stats slide: sources + speed + peak hour."""
     parts = []
-
-    if sources_report:
-        parts.append(sources_report)
+    if sources:
+        parts.append(sources)
 
     if speed:
-        avg = speed["avg_sec"]
-        pct = speed["faster_than_pct"]
+        med = speed.get("median_sec", 0)
+        ml = speed.get("median_like", 0)
+        md = speed.get("median_dislike", 0)
         parts.append(
-            f"⚡ <b>Скорость реакции:</b> {avg} сек в среднем\n"
-            f"Ты быстрее {pct}% пользователей"
+            f"⚡ <b>Скорость реакции:</b> {med} сек\n"
+            f"(до лайка: {ml} сек, до скипа: {md} сек)"
         )
 
     if peak:
-        h = peak["hour"]
-        label = peak["label"]
+        h = peak.get("hour", 0)
+        label = peak.get("label", "")
+        tz = peak.get("tz", "")
         parts.append(
-            f"🕐 <b>Пик активности:</b> {h}:00\n"
+            f"🕐 <b>Пик активности:</b> {h}:00 {tz}\n"
             f"Ты — {label}"
         )
 
-    return "\n\n".join(parts) if parts else "📊 Скоро тут будет больше данных!"
+    return "\n\n".join(parts) if parts else ""
 
 
-async def _build_sources_report(
-    user_id: int, is_ru: bool,
-) -> str:
-    """Top 3 real meme sources (filtered)."""
+async def _build_sources_report(user_id: int) -> str:
     sources = await get_most_liked_meme_source_urls(user_id, limit=10)
     real = [
         s for s in (sources or [])
@@ -749,7 +699,6 @@ async def _build_sources_report(
         and not s["url"].startswith("tg://user")
         and ("t.me/" in s["url"] or "vk.com/" in s["url"])
     ]
-
     if len(real) < 3:
         try:
             top = await get_top_meme_source_urls(limit=5)
@@ -764,38 +713,18 @@ async def _build_sources_report(
                         break
         except Exception:
             pass
-
     if not real:
         return ""
-
     src_list = "\n".join(f"▪️ {s['url']}" for s in real[:3])
-    return (
-        f"📡 <b>Твои топ мем-паблики:</b>\n\n{src_list}"
-    )
+    return f"📡 <b>Твои топ мем-паблики:</b>\n\n{src_list}"
 
 
-def get_user_interface_language(user) -> str:
-    lang = user.get("language_code") if user else None
-    return lang if lang else "ru"
+# ── STATS SLIDE ──────────────────────────────────────────
 
-
-async def is_wrapped_auto_trigger_active(user_id: int) -> bool:
-    now = datetime.datetime.utcnow()
-    if now < datetime.datetime(2026, 4, 1):
-        user = await get_user_by_id(user_id)
-        return user and user.get("type") in ("moderator", "admin")
-    if now <= datetime.datetime(2026, 4, 7):
-        return True
-    return False
-
-
-# ──────────────────────────────────────────────────────────
-# STATS SLIDE
-# ──────────────────────────────────────────────────────────
-
-async def get_bot_usage_report(user_id: int, is_ru: bool = True):
-    user = await get_user_by_id(user_id)
-    user_stats = await get_user_stats(user_id)
+async def get_bot_usage_report(
+    user_id: int, user_stats: dict, user: dict,
+    is_ru: bool = True,
+) -> str | None:
     if user_stats is None:
         return None
 
@@ -809,15 +738,6 @@ async def get_bot_usage_report(user_id: int, is_ru: bool = True):
         return None
 
     like_rate = round(100 * likes / max(memes_sent, 1))
-
-    if like_rate > 50:
-        vibe = "Ты лайкаешь больше половины мемов — душа компании 😄"
-    elif like_rate > 30:
-        vibe = "Лайкаешь примерно каждый третий — у тебя есть вкус 👌"
-    elif like_rate > 15:
-        vibe = "Только каждый пятый удостоен лайка — избирательный 🧐"
-    else:
-        vibe = "Менее 15% мемов достойны — мем-сноб 🎩"
 
     report = (
         "📊 <b>Meme Wrapped 2026</b>\n\n"
@@ -838,5 +758,29 @@ async def get_bot_usage_report(user_id: int, is_ru: bool = True):
             t = f"больше {time_sec // 3600} часов 😳"
         report += f"🕒 В боте <b>{t}</b>\n"
 
+    # Placeholder vibe — will be replaced by DeepSeek output
+    if like_rate > 50:
+        vibe = "Лайкаешь больше половины — тебе всё смешно 😄"
+    elif like_rate > 30:
+        vibe = "Лайкаешь каждый третий — у тебя есть вкус 👌"
+    elif like_rate > 15:
+        vibe = "Лайкаешь каждый пятый — избирательный 🧐"
+    else:
+        vibe = "Менее 15% мемов достойны — мем-сноб 🎩"
     report += f"\n<i>{vibe}</i>"
     return report
+
+
+def get_user_interface_language(user) -> str:
+    lang = user.get("language_code") if user else None
+    return lang if lang else "ru"
+
+
+async def is_wrapped_auto_trigger_active(user_id: int) -> bool:
+    now = datetime.datetime.utcnow()
+    if now < datetime.datetime(2026, 4, 1):
+        user = await get_user_by_id(user_id)
+        return user and user.get("type") in ("moderator", "admin")
+    if now <= datetime.datetime(2026, 4, 7):
+        return True
+    return False
