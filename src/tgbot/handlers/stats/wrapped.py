@@ -1,4 +1,3 @@
-import asyncio
 import datetime
 import json
 import logging
@@ -186,6 +185,15 @@ async def handle_wrapped_button(
     if not user_wrapped:
         return
 
+    # Race condition guard: user pressed "Next" before LLM finished
+    if user_wrapped.get("lock"):
+        if update.callback_query:
+            await update.callback_query.answer(
+                "⏳ Ещё генерирую... подожди пару секунд",
+                show_alert=False,
+            )
+        return
+
     if update.callback_query:
         await update.callback_query.answer()
         key = int(update.callback_query.data.replace("wrapped_", ""))
@@ -277,7 +285,7 @@ async def generate_user_wrapped(
     bot_usage_report: str = "",
 ):
     """Generate LLM content for Wrapped. Stats slide already sent."""
-    await set_user_wrapped(user_id, {"lock": True})
+    await set_user_wrapped(user_id, {"lock": True}, ttl=300)  # 5 min TTL
 
     try:
         # LLM calls (user is reading stats slide while these run)
@@ -477,7 +485,7 @@ Bad names: "Юмор", "Мемы", "Смешное", "Разное\""""
     for cat in categories[:3]:
         pct = min(100, max(0, cat.get("pct", 50)))
         bar = make_bar(pct)
-        lines.append(f"{bar} {pct}% {cat['name']}")
+        lines.append(f"{bar} {pct}% {cat.get('name', '???')}")
 
     if summary:
         lines.append(f"\n{summary}")

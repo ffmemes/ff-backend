@@ -127,5 +127,9 @@ async def get_user_wrapped(user_id: str) -> dict | None:
     return orjson.loads(data) if data else None
 
 
-async def set_user_wrapped(user_id: str, data: dict) -> None:
-    await redis_client.set(get_user_wrapped_key(user_id), orjson.dumps(data))
+async def set_user_wrapped(user_id: str, data: dict, ttl: int = None) -> None:
+    key = get_user_wrapped_key(user_id)
+    if ttl:
+        await redis_client.set(key, orjson.dumps(data), ex=ttl)
+    else:
+        await redis_client.set(key, orjson.dumps(data))
