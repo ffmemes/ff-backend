@@ -44,6 +44,21 @@ async def get_shared_memes(user_id: int, limit: int) -> list[dict[str, Any]]:
     return await fetch_all(text(select_statement))
 
 
+async def get_top_meme_source_urls(limit: int = 5) -> list:
+    """Get top meme sources by overall like rate (fallback for users with few sources)."""
+    query = text("""
+        SELECT MS.id, MS.url
+        FROM meme_source_stats MSS
+        JOIN meme_source MS ON MS.id = MSS.meme_source_id
+        WHERE MS.url IS NOT NULL
+          AND MS.url NOT LIKE 'tg://user%%'
+          AND MSS.nlikes > 50
+        ORDER BY MSS.nlikes DESC
+        LIMIT :limit
+    """)
+    return await fetch_all(query, {"limit": limit})
+
+
 async def get_ocr_text_of_liked_memes_for_llm(user_id: int) -> list:
     select_statement = """
         SELECT

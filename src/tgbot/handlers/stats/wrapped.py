@@ -46,22 +46,27 @@ async def call_chatgpt(prompt: str) -> str:
     return response.choices[0].message.content
 
 
-async def call_chatgpt_json(prompt: str) -> dict | None:
-    """Call ChatGPT and parse JSON response."""
-    try:
-        raw = await call_chatgpt(prompt)
-        content = raw.strip()
-        if content.startswith("```"):
-            content = content.split("\n", 1)[1] if "\n" in content else content[3:]
-        if content.endswith("```"):
-            content = content[:-3]
-        content = content.strip()
-        if content.startswith("json"):
-            content = content[4:].strip()
-        return json.loads(content)
-    except Exception as e:
-        logger.warning("Failed to parse LLM JSON: %s", e)
-        return None
+async def call_chatgpt_json(prompt: str, retries: int = 2) -> dict | None:
+    """Call ChatGPT and parse JSON response. Retries on failure."""
+    for attempt in range(retries):
+        try:
+            raw = await call_chatgpt(prompt)
+            content = raw.strip()
+            if content.startswith("```"):
+                content = content.split("\n", 1)[1] if "\n" in content else content[3:]
+            if content.endswith("```"):
+                content = content[:-3]
+            content = content.strip()
+            if content.startswith("json"):
+                content = content[4:].strip()
+            return json.loads(content)
+        except Exception as e:
+            logger.warning(
+                "LLM JSON parse failed (attempt %d/%d): %s. Raw: %s",
+                attempt + 1, retries, e,
+                raw[:200] if "raw" in dir() else "no response",
+            )
+    return None
 
 
 def get_user_interface_language(user) -> str:
@@ -139,6 +144,15 @@ async def handle_wrapped_go(
         await update.callback_query.answer()
 
     user_id = update.effective_user.id
+
+    # FIX #1: Show typing action so user knows something is loading
+    try:
+        from telegram.constants import ChatAction
+        await context.bot.send_chat_action(
+            chat_id=user_id, action=ChatAction.TYPING,
+        )
+    except Exception:
+        pass
 
     # Already cached?
     user_wrapped = await get_user_wrapped(user_id)
@@ -432,14 +446,14 @@ async def get_bot_usage_report(user_id: int, is_ru: bool = True):
 
     # ── FIX #2: Better personality labels ──
     if is_ru:
-        if like_rate > 60:
+        if like_rate > 50:
             vibe = "Ты лайкаешь больше половины мемов — душа компании 😄"
-        elif like_rate > 40:
-            vibe = "Ты лайкаешь меньше половины — у тебя есть вкус 👌"
-        elif like_rate > 20:
-            vibe = "Ты лайкаешь только каждый пятый мем — ты избирательный 🧐"
+        elif like_rate > 30:
+            vibe = "Ты лайкаешь примерно каждый третий — у тебя есть вкус 👌"
+        elif like_rate > 15:
+            vibe = "Ты лайкаешь только каждый пятый мем — избирательный 🧐"
         else:
-            vibe = "Менее 20% мемов удостоены твоего лайка — мем-сноб 🎩"
+            vibe = "Менее 15% мемов достойны твоего лайка — мем-сноб 🎩"
 
         # ── FIX #3: "начнём с цифр" intro ──
         report = (
@@ -452,14 +466,14 @@ async def get_bot_usage_report(user_id: int, is_ru: bool = True):
             f"👋 Заходил <b>{sessions}</b> раз\n"
         )
     else:
-        if like_rate > 60:
+        if like_rate > 50:
             vibe = "You like most memes — life of the party 😄"
-        elif like_rate > 40:
-            vibe = "Less than half get your like — you have taste 👌"
-        elif like_rate > 20:
+        elif like_rate > 30:
+            vibe = "About every third gets your like — you have taste 👌"
+        elif like_rate > 15:
             vibe = "Only every 5th meme gets a like — selective 🧐"
         else:
-            vibe = "Less than 20% worthy — meme snob 🎩"
+            vibe = "Less than 15% worthy — meme snob 🎩"
 
         report = (
             "📊 <b>Meme Wrapped 2026</b>\n\n"
@@ -489,16 +503,47 @@ async def get_bot_usage_report(user_id: int, is_ru: bool = True):
 
 async def get_meme_sources_report(user_id: int, is_ru: bool = True):
     """Top 3 meme sources based on user's likes."""
-    sources = await get_most_liked_meme_source_urls(user_id, limit=3)
+    # Fetch more to filter out user-uploaded memes (tg://user links)
+    sources = await get_most_liked_meme_source_urls(user_id, limit=10)
     if not sources:
         return ""
 
-    src_list = "\n".join(f"▪️ {s['url']}" for s in sources)
+    # Filter: only real channel/group links, not tg://user?id=
+    real_sources = [
+        s for s in sources
+        if s.get("url")
+        and not s["url"].startswith("tg://user")
+        and ("t.me/" in s["url"] or "vk.com/" in s["url"])
+    ]
+
+    if len(real_sources) < 3:
+        # Fallback: fill with popular sources from meme_source_stats
+        from src.stats.service import get_top_meme_source_urls
+        try:
+            top = await get_top_meme_source_urls(limit=5)
+            for t in top:
+                if (
+                    t.get("url")
+                    and not t["url"].startswith("tg://user")
+                    and t["url"] not in [s["url"] for s in real_sources]
+                ):
+                    real_sources.append(t)
+                    if len(real_sources) >= 3:
+                        break
+        except Exception:
+            pass
+
+    if not real_sources:
+        return ""
+
+    src_list = "\n".join(
+        f"▪️ {s['url']}" for s in real_sources[:3]
+    )
 
     if is_ru:
         return (
             "📡 <b>Твои топ-3 мем-паблика:</b>\n\n"
-            "По твоим лайкам я вижу, что тебе зайдут:\n\n"
+            "По твоим лайкам, тебе точно зайдут:\n\n"
             f"{src_list}"
         )
     return (
@@ -615,7 +660,8 @@ async def get_humor_dna_report(
 
     result = await call_chatgpt_json(prompt)
     if not result or "categories" not in result:
-        return ""
+        # Fallback: use old-style text-only humor report
+        return await _get_humor_text_fallback(descriptions, is_ru)
 
     categories = result["categories"]
     summary = result.get("summary", "")
@@ -686,3 +732,35 @@ Reference their actual meme taste. No metaphors, keep it simple."""
             "Летом ты будешь пересылать мемы вместо работы 🔥"
             if is_ru else "Your summer will be full of memes 🔥"
         )
+
+
+async def _get_humor_text_fallback(
+    descriptions: list, is_ru: bool = True,
+) -> str:
+    """Fallback humor report using old-style text prompt (no JSON)."""
+    texts = "\n".join(
+        d.get("description", d.get("ocr_text", ""))
+        for d in descriptions[:20]
+        if d.get("reaction_id") == 1
+        and (d.get("description") or d.get("ocr_text"))
+    )
+    if len(texts) < 50:
+        return ""
+
+    prompt = f"""Изучи тексты любимых мемов и скажи, что они говорят \
+о чувстве юмора. Пиши неформально, как друг.
+
+Тексты мемов:
+{texts}
+
+Дай ровно 3 пункта. Каждый — 1-2 предложения. Упоминай \
+конкретные мемы. Пиши как голосовое сообщение другу."""
+
+    try:
+        result = await call_chatgpt(prompt)
+        return (
+            "👀 Я посмотрел на твои лайки и вот что понял:\n\n"
+            f"{result}"
+        )
+    except Exception:
+        return ""
