@@ -365,13 +365,19 @@ async def handle_wrapped_button(
         if meme_info and meme_info.get("meme_id"):
             meme_data = await get_meme_by_id(meme_info["meme_id"])
             if meme_data and meme_data.get("telegram_file_id"):
-                meme = MemeData(**meme_data)
-                caption = meme_info.get("caption", "🎯 Этот мем — это ты")
+                caption = meme_info.get(
+                    "caption", "🎯 Этот мем — это ты",
+                )
+                meme = MemeData(
+                    id=meme_data["id"],
+                    type=meme_data["type"],
+                    telegram_file_id=meme_data["telegram_file_id"],
+                    caption=caption,
+                )
                 await send_new_message_with_meme(
                     context.bot,
                     update.effective_user.id,
                     meme,
-                    caption=caption,
                     reply_markup=InlineKeyboardMarkup(
                         [[InlineKeyboardButton(
                             "Дальше →", callback_data="wrapped_2",
