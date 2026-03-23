@@ -211,6 +211,15 @@ def add_handlers(application: Application) -> None:
 
     application.add_handler(CallbackQueryHandler(handle_wrapped_button, pattern=r"^wrapped_\d"))
 
+    from src.tgbot.handlers.stats.wrapped import handle_wrapped_clear
+    application.add_handler(
+        CommandHandler(
+            "wrapped_clear",
+            handle_wrapped_clear,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+        )
+    )
+
     ####################
     # user stats
     application.add_handler(

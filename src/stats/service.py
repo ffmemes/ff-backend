@@ -79,3 +79,29 @@ async def get_ocr_text_of_liked_memes_for_llm(user_id: int) -> list:
         LIMIT 20;
     """
     return await fetch_all(text(select_statement), {"user_id": user_id})
+
+
+async def get_meme_descriptions_for_wrapped(user_id: int, limit: int = 20):
+    """Get descriptions of user's liked AND disliked memes for Wrapped LLM prompts.
+
+    Includes reaction type so the LLM can understand both preferences and aversions.
+    Uses COALESCE: description (OpenRouter) → text (OCR) as fallback.
+    """
+    select_statement = """
+        SELECT
+            m.id AS meme_id,
+            COALESCE(m.ocr_result->>'description', m.ocr_result->>'text') AS description,
+            m.ocr_result->>'text' AS ocr_text,
+            m.type,
+            m.telegram_file_id,
+            umr.reaction_id
+        FROM user_meme_reaction umr
+        JOIN meme m ON m.id = umr.meme_id
+        WHERE umr.user_id = :user_id
+          AND m.ocr_result IS NOT NULL
+          AND (m.ocr_result->>'description' IS NOT NULL
+               OR m.ocr_result->>'text' IS NOT NULL)
+        ORDER BY umr.reacted_at DESC
+        LIMIT :limit
+    """
+    return await fetch_all(text(select_statement), {"user_id": user_id, "limit": limit})

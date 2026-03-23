@@ -88,6 +88,10 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if deep_link == "kitchen":
         return await handle_show_kitchen(update, context)
 
+    if deep_link == "wrapped":
+        from src.tgbot.handlers.stats.wrapped import handle_wrapped
+        return await handle_wrapped(update, context)
+
     if created:  # new user:
         await init_user_languages_from_tg_user(update.effective_user)
         await handle_language_settings(update, context)

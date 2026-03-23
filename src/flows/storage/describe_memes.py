@@ -57,8 +57,9 @@ ALL_FAILED = "__all_failed"
 
 
 async def get_memes_to_describe(limit: int = 30) -> list[dict]:
-    """Get image memes without descriptions, ordered by popularity.
+    """Get image memes without descriptions, ordered by likes (most liked first).
 
+    Prioritizes memes that active users have liked — directly improves Wrapped coverage.
     Skips memes that have failed 3+ times (tracked in ocr_result.describe_failures).
     """
     from sqlalchemy import text
@@ -79,7 +80,7 @@ async def get_memes_to_describe(limit: int = 30) -> list[dict]:
                 OR M.ocr_result->>'description' IS NULL
             )
             AND COALESCE((M.ocr_result->>'describe_failures')::int, 0) < 3
-        ORDER BY COALESCE(MS.nmemes_sent, 0) DESC, M.id DESC
+        ORDER BY COALESCE(MS.nlikes, 0) DESC, M.id DESC
         LIMIT :limit
     """).bindparams(limit=limit)
 
@@ -262,8 +263,14 @@ async def describe_single_meme(meme_row: dict, log) -> str:
 
     update_kwargs = {"ocr_result": merged}
 
-    if language and not meme_row.get("language_code"):
-        update_kwargs["language_code"] = language
+    # Only update language_code if the detected language is one we already use
+    # This ensures inner joins with user_language work correctly
+    KNOWN_LANGUAGES = {
+        "ru", "en", "uk", "es", "fa", "pl", "hi",
+        "am", "de", "fr", "pt-br", "ar", "uz",
+    }
+    if language and language.lower() in KNOWN_LANGUAGES:
+        update_kwargs["language_code"] = language.lower()
 
     update_query = (
         meme.update()

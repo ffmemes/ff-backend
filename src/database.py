@@ -415,6 +415,21 @@ user_deep_link_log = Table(
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
 )
 
+telegram_chat = Table(
+    "telegram_chat",
+    metadata,
+    Column("id", BigInteger, primary_key=True),  # Telegram chat_id
+    Column("type", String(20)),  # group, supergroup, channel, private
+    Column("title", String(256)),
+    Column("username", String(128)),
+    Column("members_count", Integer),
+    Column("bot_status", String(20)),  # member, left, kicked, None
+    Column("bot_joined_at", DateTime),
+    Column("bot_left_at", DateTime),
+    Column("created_at", DateTime, server_default=func.now()),
+    Column("updated_at", DateTime, server_default=func.now()),
+)
+
 message_tg = Table(
     "message_tg",
     metadata,
@@ -425,7 +440,18 @@ message_tg = Table(
     Column("user_id", BigInteger, nullable=False),
     Column("text", String),
     Column("reply_to_message_id", BigInteger),
+    Column("sender_chat_id", BigInteger),  # Channel ID when posted as channel (777000 case)
     UniqueConstraint("chat_id", "message_id", name="uq_message_tg"),
+)
+
+user_wrapped = Table(
+    "user_wrapped",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("user_id", BigInteger, ForeignKey("user.id"), nullable=False),
+    Column("data", JSONB, nullable=False),
+    Column("card_telegram_file_id", String),
+    Column("created_at", DateTime, server_default=func.now()),
 )
 
 chat_meme_reaction = Table(

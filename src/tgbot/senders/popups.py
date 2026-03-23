@@ -38,6 +38,34 @@ async def send_popup(user_id: int, popup: Popup) -> None:
 
 
 async def get_popup_to_send(user_id: int, user_info: dict) -> Popup | None:
+    # Wrapped auto-trigger at 30th meme (April 1-7 for all, before that moderators only)
+    if user_info["nmemes_sent"] == 30:
+        popup_id = "wrapped.auto_trigger"
+        if not await user_popup_already_sent(user_id, popup_id):
+            from src.tgbot.handlers.stats.wrapped import (
+                is_wrapped_auto_trigger_active,
+            )
+            if await is_wrapped_auto_trigger_active(user_id):
+                return Popup(
+                    id=popup_id,
+                    text=(
+                        "🎁 <b>Meme Wrapped 2026</b>\n\n"
+                        "Ты посмотрел 30 мемов — этого достаточно, "
+                        "чтобы я составил твой мем-профиль!\n\n"
+                        "Жми кнопку ниже 👇"
+                    ),
+                    reply_markup=InlineKeyboardMarkup(
+                        [
+                            [
+                                InlineKeyboardButton(
+                                    "🧬 Мой Wrapped",
+                                    url="https://t.me/ffmemesbot?start=wrapped",  # noqa: E501
+                                )
+                            ]
+                        ]
+                    ),
+                )
+
     if user_info["nmemes_sent"] == 10:
         popup_id = "achievement.nmemes_sent_10"
         if not await user_popup_already_sent(user_id, popup_id):
