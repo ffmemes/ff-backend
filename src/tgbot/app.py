@@ -209,6 +209,8 @@ def add_handlers(application: Application) -> None:
         )
     )
 
+    from src.tgbot.handlers.stats.wrapped import handle_wrapped_go
+    application.add_handler(CallbackQueryHandler(handle_wrapped_go, pattern=r"^wrapped_go$"))
     application.add_handler(CallbackQueryHandler(handle_wrapped_button, pattern=r"^wrapped_\d"))
 
     from src.tgbot.handlers.stats.wrapped import handle_wrapped_clear
