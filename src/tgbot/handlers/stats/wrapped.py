@@ -85,19 +85,25 @@ async def get_reaction_speed_insight(user_id: int) -> dict:
 
     row = await fetch_one(text("""
         WITH user_speed AS (
-            SELECT AVG(sec_to_react) AS avg_sec
+            SELECT AVG(
+                EXTRACT(EPOCH FROM (reacted_at - sent_at))
+            ) AS avg_sec
             FROM user_meme_reaction
             WHERE user_id = :user_id
-              AND sec_to_react IS NOT NULL
-              AND sec_to_react > 0
-              AND sec_to_react < 120
+              AND reacted_at IS NOT NULL
+              AND sent_at IS NOT NULL
+              AND EXTRACT(EPOCH FROM (reacted_at - sent_at)) > 0
+              AND EXTRACT(EPOCH FROM (reacted_at - sent_at)) < 120
         ),
         all_speeds AS (
-            SELECT user_id, AVG(sec_to_react) AS avg_sec
+            SELECT user_id, AVG(
+                EXTRACT(EPOCH FROM (reacted_at - sent_at))
+            ) AS avg_sec
             FROM user_meme_reaction
-            WHERE sec_to_react IS NOT NULL
-              AND sec_to_react > 0
-              AND sec_to_react < 120
+            WHERE reacted_at IS NOT NULL
+              AND sent_at IS NOT NULL
+              AND EXTRACT(EPOCH FROM (reacted_at - sent_at)) > 0
+              AND EXTRACT(EPOCH FROM (reacted_at - sent_at)) < 120
             GROUP BY user_id
             HAVING COUNT(*) >= 20
         )
@@ -478,7 +484,7 @@ async def generate_wrapped_data(
             for d in disliked[:15]
         )
 
-        # 2. ONE DeepSeek call for everything
+        # 2. ONE DeepSeek call for everything (run first!)
         prompt = _build_mega_prompt(liked_texts, disliked_texts, is_ru)
         raw = await call_deepseek(prompt)
         parsed = parse_json_from_llm(raw)
@@ -493,11 +499,27 @@ async def generate_wrapped_data(
         # 3. Determine "your meme"
         your_meme = _pick_meme_from_result(parsed, liked)
 
-        # 4. SQL insights (parallel-safe, no LLM)
-        speed = await get_reaction_speed_insight(user_id)
-        peak = await get_peak_hour_insight(user_id)
-        surprise = await get_surprise_meme(user_id)
-        sources_report = await _build_sources_report(user_id, is_ru)
+        # 4. SQL insights (safe — each wrapped in try/except)
+        try:
+            speed = await get_reaction_speed_insight(user_id)
+        except Exception as e:
+            logger.warning("Speed insight failed: %s", e)
+            speed = {}
+        try:
+            peak = await get_peak_hour_insight(user_id)
+        except Exception as e:
+            logger.warning("Peak hour insight failed: %s", e)
+            peak = {}
+        try:
+            surprise = await get_surprise_meme(user_id)
+        except Exception as e:
+            logger.warning("Surprise meme failed: %s", e)
+            surprise = None
+        try:
+            sources_report = await _build_sources_report(user_id, is_ru)
+        except Exception as e:
+            logger.warning("Sources report failed: %s", e)
+            sources_report = ""
 
         # 5. Build all slide content
         humor_report = _build_humor_slide(parsed, is_ru)
