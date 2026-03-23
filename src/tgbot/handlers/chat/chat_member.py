@@ -68,7 +68,11 @@ async def handle_chat_member_update(
     elif chat.type in [Chat.GROUP, Chat.SUPERGROUP]:
         if not was_member and is_member:
             logging.info("%s added the bot to the group %s", cause_name, chat.title)
-            context.bot_data.setdefault("group_ids", set()).add(chat.id)
+            try:
+                from src.tgbot.handlers.chat.service import upsert_telegram_chat_bot_joined
+                await upsert_telegram_chat_bot_joined(chat)
+            except Exception as e:
+                logging.warning("Failed to persist bot join for chat %s: %s", chat.id, e)
             # Onboarding: welcome message + demo meme
             try:
                 await _send_group_onboarding(context.bot, chat.id)
@@ -76,6 +80,11 @@ async def handle_chat_member_update(
                 logging.warning("Onboarding failed for chat %s: %s", chat.id, e)
         elif was_member and not is_member:
             logging.info("%s removed the bot from the group %s", cause_name, chat.title)
+            try:
+                from src.tgbot.handlers.chat.service import update_telegram_chat_bot_left
+                await update_telegram_chat_bot_left(chat.id)
+            except Exception as e:
+                logging.warning("Failed to persist bot leave for chat %s: %s", chat.id, e)
 
     elif not was_member and is_member:
         logging.info("%s added the bot to the channel %s", cause_name, chat.title)
