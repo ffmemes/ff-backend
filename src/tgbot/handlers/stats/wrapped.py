@@ -3,6 +3,7 @@ import datetime
 import json
 import logging
 import random
+import sys
 
 from openai import AsyncOpenAI
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -34,6 +35,12 @@ from src.tgbot.utils import check_if_user_chat_member
 logger = logging.getLogger(__name__)
 
 WRAPPED_MIN_REACTIONS = 30
+
+
+def _log(msg: str) -> None:
+    """Force-log to stderr (bypasses gunicorn log config)."""
+    sys.stderr.write(f"[wrapped] {msg}\n")
+    sys.stderr.flush()
 WRAPPED_MIN_DESCRIPTIONS = 5
 
 
@@ -177,6 +184,7 @@ async def handle_wrapped(
     update: Update, context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
     user_id = update.effective_user.id
+    _log(f"handle_wrapped called for {user_id}")
     await create_or_update_user(id=user_id)
     await save_tg_user(
         id=user_id,
@@ -258,6 +266,7 @@ async def handle_wrapped_go(
         await update.callback_query.answer()
 
     user_id = update.effective_user.id
+    _log(f"handle_wrapped_go called for {user_id}")
     try:
         await context.bot.send_chat_action(
             chat_id=user_id, action=ChatAction.TYPING,
@@ -306,18 +315,18 @@ async def _generate_and_cache(
             {"lock": True, "stats_report": stats_report},
             ttl=300,
         )
-        logger.info("[wrapped] starting generation for %d", user_id)
+        _log(f"starting generation for {user_id}")
 
         data = await generate_wrapped_data(
             user_id, descriptions, is_ru, stats_report,
         )
         if data:
             await set_user_wrapped(user_id, data)
-            logger.info("[wrapped] done for %d", user_id)
+            _log(f"done for {user_id}")
         else:
-            logger.warning("[wrapped] returned None for %d", user_id)
+            _log(f"returned None for {user_id}")
     except Exception as e:
-        logger.error("[wrapped] bg error for %d: %s", user_id, e)
+        _log(f"bg error for {user_id}: {e}")
         from src.redis import redis_client
         await redis_client.delete(f"wrapped:{user_id}")
 
@@ -330,7 +339,7 @@ async def handle_wrapped_button(
     user_id = update.effective_user.id
     uw = await get_user_wrapped(user_id)
     if not uw:
-        logger.warning("[wrapped] no cache for %d", user_id)
+        _log(f"no cache for {user_id}")
         return
 
     if uw.get("lock"):
@@ -349,7 +358,7 @@ async def handle_wrapped_button(
     else:
         key = 0
 
-    logger.info("[wrapped] user=%d key=%d", user_id, key)
+    _log(f"user={user_id} key={key}")
 
     try:
         await context.bot.send_chat_action(
@@ -410,7 +419,7 @@ async def _show_slide(
                     )
                     sent = True
         except Exception as e:
-            logger.error("[wrapped] meme slide error: %s", e)
+            _log(f"meme slide error: {e}")
         if not sent:
             key = 2
 
@@ -424,7 +433,7 @@ async def _show_slide(
                     reply_markup=_next_btn("wrapped_3"),
                 )
             except Exception as e:
-                logger.error("[wrapped] humor slide error: %s", e)
+                _log(f"humor slide error: {e}")
                 key = 3
         else:
             key = 3
@@ -439,7 +448,7 @@ async def _show_slide(
                     reply_markup=_next_btn("wrapped_4"),
                 )
             except Exception as e:
-                logger.error("[wrapped] anti slide error: %s", e)
+                _log(f"anti slide error: {e}")
                 key = 4
         else:
             key = 4
@@ -459,7 +468,7 @@ async def _show_slide(
                     ),
                 )
             except Exception as e:
-                logger.error("[wrapped] stats extra error: %s", e)
+                _log(f"stats extra error: {e}")
                 key = 5
         else:
             key = 5
