@@ -336,7 +336,8 @@ async def _generate_and_cache(
 async def handle_wrapped_button(
     update: Update, context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    _log(f"handle_wrapped_button ENTRY cb={update.callback_query.data if update.callback_query else 'none'}")
+    cb = update.callback_query.data if update.callback_query else "none"
+    _log(f"handle_wrapped_button ENTRY cb={cb}")
     user_id = update.effective_user.id
     uw = await get_user_wrapped(user_id)
     if not uw:
@@ -344,10 +345,18 @@ async def handle_wrapped_button(
         return
 
     if uw.get("lock"):
+        _log(f"lock active for {user_id}, resending button")
         if update.callback_query:
-            await update.callback_query.answer(
-                "⏳ Ещё генерирую... подожди пару секунд",
-                show_alert=False,
+            await update.callback_query.answer()
+            # Re-send a message with the same button so user can retry
+            await update.effective_chat.send_message(
+                text="⏳ Ещё генерирую... нажми через пару секунд 👇",
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton(
+                        "Дальше →",
+                        callback_data=update.callback_query.data,
+                    )]]
+                ),
             )
         return
 
