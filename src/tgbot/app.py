@@ -489,7 +489,18 @@ async def process_event(payload: dict) -> None:
     # TODO: try await application.update_queue.put(update)
     # https://github.com/python-telegram-bot/python-telegram-bot/wiki/Webhooks#custom-solution
 
-    await application.process_update(update)
+    try:
+        await application.process_update(update)
+    except Exception as e:
+        import sys
+        cb = ""
+        if update.callback_query:
+            cb = f" cb={update.callback_query.data}"
+        sys.stderr.write(
+            f"[process_event] UNHANDLED ERROR{cb}: {e}\n"
+        )
+        sys.stderr.flush()
+        raise
 
 
 async def setup_webhook(application: Application) -> None:
