@@ -336,6 +336,7 @@ async def _generate_and_cache(
 async def handle_wrapped_button(
     update: Update, context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
+    _log(f"handle_wrapped_button ENTRY cb={update.callback_query.data if update.callback_query else 'none'}")
     user_id = update.effective_user.id
     uw = await get_user_wrapped(user_id)
     if not uw:
