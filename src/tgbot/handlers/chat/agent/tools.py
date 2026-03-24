@@ -125,8 +125,9 @@ async def execute_search_memes(query: str, limit: int = 5) -> str:
 
 
 async def execute_send_meme(
-    bot, chat_id: int, meme_id: int, reply_to_message_id: int | None = None
+    bot, chat_id: int, meme_id: int | str, reply_to_message_id: int | None = None
 ) -> str:
+    meme_id = int(meme_id)
     meme = await fetch_one(
         text(
             "SELECT id, type, telegram_file_id, caption "

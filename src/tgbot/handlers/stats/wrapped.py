@@ -35,13 +35,31 @@ from src.tgbot.utils import check_if_user_chat_member
 logger = logging.getLogger(__name__)
 
 WRAPPED_MIN_REACTIONS = 30
+WRAPPED_MIN_DESCRIPTIONS = 5
+
+LOADING_MESSAGES = [
+    "⏳ Ещё генерирую... нажми через пару секунд 👇",
+    "🧠 DeepSeek думает... ещё чуть-чуть 👇",
+    "🔬 Анализирую твой юмор... почти готово 👇",
+    "⚡ Скоро будет! Нажми ещё раз 👇",
+    "🎯 Уже скоро... нажми через пару секунд 👇",
+    "🔄 Ещё немного... терпение! 👇",
+]
+
+LOADING_BUTTONS = [
+    "Дальше →",
+    "Ну давай уже →",
+    "Готово? →",
+    "Проверить →",
+    "Ещё раз →",
+    "Жмяк →",
+]
 
 
 def _log(msg: str) -> None:
     """Force-log to stderr (bypasses gunicorn log config)."""
     sys.stderr.write(f"[wrapped] {msg}\n")
     sys.stderr.flush()
-WRAPPED_MIN_DESCRIPTIONS = 5
 
 
 # ── LLM ──────────────────────────────────────────────────
@@ -250,9 +268,8 @@ async def handle_wrapped(
             "Хочешь посмотреть?"
         ),
         reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("ДА", callback_data="wrapped_go"),
             InlineKeyboardButton(
-                "ПОСМОТРЕТЬ", callback_data="wrapped_go",
+                "ПОСМОТРЕТЬ 🔮", callback_data="wrapped_go",
             ),
         ]]),
     )
@@ -278,23 +295,39 @@ async def handle_wrapped_go(
     if cached and not cached.get("lock"):
         return await handle_wrapped_button(update, context)
 
-    # Still generating — show stats from cache (partial)
+    # Still generating — edit the button message with loading text
     if cached and cached.get("lock"):
         stats = cached.get("stats_report")
-        if stats:
-            return await update.effective_chat.send_message(
-                text=stats,
-                parse_mode="HTML",
-                reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton(
-                        "Дальше →", callback_data="wrapped_1",
-                    )]]
-                ),
-            )
-        # Still no stats — tell user to wait
-        await update.effective_chat.send_message(
-            "⏳ Анализирую твои мемы... нажми Дальше через пару секунд"
-        )
+        if stats and update.callback_query:
+            try:
+                await update.callback_query.message.edit_text(
+                    text=stats,
+                    parse_mode="HTML",
+                    reply_markup=InlineKeyboardMarkup(
+                        [[InlineKeyboardButton(
+                            "Дальше →", callback_data="wrapped_1",
+                        )]]
+                    ),
+                )
+            except Exception:
+                pass
+            return
+        # Still no stats — edit existing message
+        if update.callback_query:
+            msg_text = random.choice(LOADING_MESSAGES)
+            btn_text = random.choice(LOADING_BUTTONS)
+            try:
+                await update.callback_query.message.edit_text(
+                    text=msg_text,
+                    reply_markup=InlineKeyboardMarkup(
+                        [[InlineKeyboardButton(
+                            btn_text,
+                            callback_data="wrapped_1",
+                        )]]
+                    ),
+                )
+            except Exception:
+                pass
         return
 
     # No cache at all — shouldn't happen, but handle gracefully
@@ -345,19 +378,25 @@ async def handle_wrapped_button(
         return
 
     if uw.get("lock"):
-        _log(f"lock active for {user_id}, resending button")
+        _log(f"lock active for {user_id}, editing message")
         if update.callback_query:
             await update.callback_query.answer()
-            # Re-send a message with the same button so user can retry
-            await update.effective_chat.send_message(
-                text="⏳ Ещё генерирую... нажми через пару секунд 👇",
-                reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton(
-                        "Дальше →",
-                        callback_data=update.callback_query.data,
-                    )]]
-                ),
-            )
+            # EDIT existing message instead of sending new one
+            msg_text = random.choice(LOADING_MESSAGES)
+            btn_text = random.choice(LOADING_BUTTONS)
+            try:
+                await update.callback_query.message.edit_text(
+                    text=msg_text,
+                    reply_markup=InlineKeyboardMarkup(
+                        [[InlineKeyboardButton(
+                            btn_text,
+                            callback_data=update.callback_query.data,
+                        )]]
+                    ),
+                )
+            except Exception:
+                # edit_text fails if text is identical — ignore
+                pass
         return
 
     if update.callback_query:
