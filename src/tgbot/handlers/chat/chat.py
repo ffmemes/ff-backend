@@ -6,6 +6,8 @@ from telegram.error import BadRequest, Forbidden
 from telegram.ext import ContextTypes
 
 from src.config import settings
+from src.stats.service import get_user_stats
+from src.tgbot.constants import TELEGRAM_CHAT_RU_CHAT_ID
 from src.tgbot.handlers.chat.reaction import give_random_reaction
 from src.tgbot.handlers.chat.service import (
     get_latest_chat_messages,
@@ -21,7 +23,8 @@ from src.tgbot.handlers.treasury.service import (
 
 logger = logging.getLogger(__name__)
 
-
+ANTISPAM_MIN_REACTIONS = 5
+ANTISPAM_CHAT_IDS = {TELEGRAM_CHAT_RU_CHAT_ID}
 TRIGGER_KEYWORDS = ["ffmemes", "фф ", "ff "]
 
 
@@ -56,6 +59,24 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     # Skip bot messages, channel forwards (777000), and service messages
     if not msg.from_user or msg.from_user.is_bot or msg.from_user.id == 777000:
         return
+
+    # Anti-spam: in protected chats, delete messages from users without enough reactions
+    if msg.chat_id in ANTISPAM_CHAT_IDS:
+        user_id = msg.from_user.id
+        stats = await get_user_stats(user_id)
+        total_reactions = (
+            (stats.get("nlikes", 0) + stats.get("ndislikes", 0))
+            if stats else 0
+        )
+        if total_reactions < ANTISPAM_MIN_REACTIONS:
+            await _reply_and_delete(
+                msg,
+                "Чтобы писать в чат, сначала воспользуйся ботом 👇\n"
+                "https://t.me/ffmemesbot",
+                sleep_sec=15,
+                delete_original=True,
+            )
+            return
 
     # Check if chat agent is enabled
     if not settings.CHAT_AGENT_ENABLED:
