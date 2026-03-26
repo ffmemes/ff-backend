@@ -24,6 +24,7 @@ from src.storage.service import (
     get_unloaded_ig_memes,
     get_unloaded_tg_memes,
     get_unloaded_vk_memes,
+    resolve_meme_duplicate,
     update_meme,
     update_meme_status_of_ready_memes,
 )
@@ -333,22 +334,14 @@ async def final_meme_pipeline() -> None:
                 meme["id"], meme["telegram_file_id"]
             )
             if dup_id:
-                await update_meme(
-                    meme["id"],
-                    status=MemeStatus.DUPLICATE,
-                    duplicate_of=dup_id,
-                )
+                await resolve_meme_duplicate(meme["id"], dup_id)
                 continue
 
         # it's ok if there is no OCR result for videos
         if meme["ocr_result"]:
             duplicate_meme_id = await find_meme_duplicate(meme["id"], meme["ocr_result"]["text"])
             if duplicate_meme_id:
-                await update_meme(
-                    meme["id"],
-                    status=MemeStatus.DUPLICATE,
-                    duplicate_of=duplicate_meme_id,
-                )
+                await resolve_meme_duplicate(meme["id"], duplicate_meme_id)
                 continue
 
     # next step of a pipeline

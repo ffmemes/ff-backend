@@ -3,6 +3,7 @@ from typing import Any
 from sqlalchemy import nulls_first, select, text
 
 from src.database import (
+    execute,
     fetch_all,
     fetch_one,
     meme,
@@ -252,3 +253,107 @@ async def find_meme_duplicate(meme_id: int, imagetext: str) -> int | None:
     if res:
         return res["id"]
     return None
+
+
+async def resolve_meme_duplicate(dupe_id: int, original_id: int) -> dict[str, int]:
+    """Mark a meme as duplicate with full cleanup.
+
+    1. Move reactions from dupe → original (skip conflicts)
+    2. Delete remaining reactions on dupe
+    3. Delete meme_stats for dupe
+    4. Set meme status='duplicate', duplicate_of=original_id
+
+    Stats for original will auto-recalculate on next 5-15 min cycle.
+    Returns counts: {moved, conflicts, deleted_stats}.
+    """
+    # 1. Move non-conflicting reactions to original
+    move_query = text("""
+        WITH moved AS (
+            INSERT INTO user_meme_reaction
+                (user_id, meme_id, recommended_by, sent_at, reaction_id, reacted_at)
+            SELECT user_id, :original_id, recommended_by, sent_at, reaction_id, reacted_at
+            FROM user_meme_reaction
+            WHERE meme_id = :dupe_id
+              AND NOT EXISTS (
+                  SELECT 1 FROM user_meme_reaction existing
+                  WHERE existing.user_id = user_meme_reaction.user_id
+                    AND existing.meme_id = :original_id
+              )
+            ON CONFLICT (user_id, meme_id) DO NOTHING
+            RETURNING 1
+        )
+        SELECT count(*) AS moved FROM moved
+    """)
+    res = await fetch_one(move_query, {"dupe_id": dupe_id, "original_id": original_id})
+    moved = res["moved"] if res else 0
+
+    # 2. Delete all reactions remaining on dupe (conflicts + already moved)
+    delete_reactions = text("""
+        WITH deleted AS (
+            DELETE FROM user_meme_reaction WHERE meme_id = :dupe_id RETURNING 1
+        )
+        SELECT count(*) AS conflicts FROM deleted
+    """)
+    res = await fetch_one(delete_reactions, {"dupe_id": dupe_id})
+    conflicts = res["conflicts"] if res else 0
+
+    # 3. Delete meme_stats for dupe (stale, will not regenerate since no reactions)
+    await execute(
+        text("DELETE FROM meme_stats WHERE meme_id = :dupe_id"),
+        {"dupe_id": dupe_id},
+    )
+
+    # 4. Mark meme as duplicate
+    await execute(
+        text("""
+            UPDATE meme
+            SET status = 'duplicate', duplicate_of = :original_id
+            WHERE id = :dupe_id
+        """),
+        {"dupe_id": dupe_id, "original_id": original_id},
+    )
+
+    return {"moved": moved, "conflicts": conflicts}
+
+
+async def resolve_all_file_id_duplicates() -> dict[str, int]:
+    """Find and resolve all memes with duplicate telegram_file_id.
+
+    For each group of memes sharing a file_id with status='ok':
+    keeps the oldest (smallest id), resolves the rest as duplicates.
+    Returns total counts.
+    """
+    # Find all file_id duplicate groups
+    dupes_query = text("""
+        SELECT id, telegram_file_id,
+            FIRST_VALUE(id) OVER (
+                PARTITION BY telegram_file_id ORDER BY id ASC
+            ) AS original_id
+        FROM meme
+        WHERE status = 'ok'
+          AND telegram_file_id IS NOT NULL
+          AND telegram_file_id IN (
+              SELECT telegram_file_id FROM meme
+              WHERE status = 'ok' AND telegram_file_id IS NOT NULL
+              GROUP BY telegram_file_id HAVING count(*) > 1
+          )
+    """)
+    rows = await fetch_all(dupes_query)
+
+    total_moved = 0
+    total_conflicts = 0
+    total_resolved = 0
+
+    for row in rows:
+        if row["id"] == row["original_id"]:
+            continue  # skip the keeper
+        result = await resolve_meme_duplicate(row["id"], row["original_id"])
+        total_moved += result["moved"]
+        total_conflicts += result["conflicts"]
+        total_resolved += 1
+
+    return {
+        "resolved": total_resolved,
+        "reactions_moved": total_moved,
+        "reactions_dropped": total_conflicts,
+    }
