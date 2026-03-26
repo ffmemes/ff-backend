@@ -1,3 +1,4 @@
+import re
 import random
 from html import escape
 
@@ -123,13 +124,33 @@ def _get_ru_caption_for_crossposting_meme(meme: MemeData, channel: Channel) -> s
     return text
 
 
+def _clean_caption(caption: str) -> str:
+    """Strip source attribution lines from Reddit-sourced meme captions."""
+    lines = caption.splitlines()
+    cleaned = []
+    for line in lines:
+        stripped = line.strip()
+        # Skip Reddit URLs
+        if re.search(r"https?://(www\.)?(reddit\.com|redd\.it)", stripped):
+            continue
+        # Skip Telegram @handles
+        if re.match(r"^@\S+$", stripped):
+            continue
+        # Skip subreddit-like tokens (single word, only alphanumeric + underscores)
+        if re.match(r"^[A-Za-z0-9_]{1,30}$", stripped):
+            continue
+        cleaned.append(line)
+    return "\n".join(cleaned).strip()
+
+
 def _get_en_caption_for_crossposting_meme(meme: MemeData, channel: Channel) -> str:
     ref_link = "https://t.me/ffmemesbot?start=sc_{}_{}".format(meme.id, channel.value)
 
     emoji = get_random_emoji()
     referral_html = f"""{emoji} <i><a href="{ref_link}">Fast Food Memes</a></i>"""
-    caption = escape(meme.caption, quote=False) if meme.caption else ""
-    text = caption + "\n\n" + referral_html
+    raw_caption = meme.caption or ""
+    caption = escape(_clean_caption(raw_caption), quote=False)
+    text = (caption + "\n\n" + referral_html) if caption else referral_html
     return text
 
 
