@@ -68,10 +68,21 @@ Rationale:
 
 Watch for: if cold_start_explore continues showing 0% continuation days at end of extension, phase 1 (diversity-first) likely fails the hypothesis. May need to swap phase 1 strategy.
 
-## Metrics After
+## Metrics After (2026-03-26 — early conclusion)
 
-*(Fill in after 2026-04-02)*
+| Metric | Result | Status |
+|--------|--------|--------|
+| cold_start_explore continuation | 18.8% LR / 36.4% continuation | ❌ Hypothesis falsified |
+| cold_start_adapt continuation | 61.1% | ⚠️ Below baseline |
+| 10-meme retention (new users) | 24.2% (28-user cohort) | ❌ Far below target |
+| First-meme LR | 0% | ❌ Hypothesis falsified |
+| WAU | 502 | ✅ No regression |
+| Median session length | 19 | ✅ No regression |
 
 ## Conclusion
 
-*(Fill in after measurement)*
+**FAILURE — concluded early (2026-03-26), before extension deadline.**
+
+Root cause: diversity-first Phase 1 (DISTINCT ON meme_source_id) maximises heterogeneity, not quality. New users with zero taste signal need the best memes globally, not the most varied.
+
+Action taken: Phase 1 replaced with quality-first selection (≥50 reactions, ≥40% LR) in Cold Start v2 experiment (2026-03-26-cold-start-v2.md). cold_start_adapt retained for Phase 2-3.
