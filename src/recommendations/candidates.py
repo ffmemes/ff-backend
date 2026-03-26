@@ -344,15 +344,15 @@ async def get_recently_liked(
 
 async def cold_start_explore(
     user_id: int,
-    limit: int = 15,
+    limit: int = 5,
     exclude_meme_ids: list[int] = [],
 ):
-    """Phase 1 cold start: globally top-quality memes by like rate.
+    """Phase 1 cold start: quality-first selection for new user first impression.
 
-    Serves the highest lr_smoothed memes overall — no source-diversity
-    constraint. For new users with no preference data, maximising per-meme
-    quality gives the best chance of a good first impression regardless of
-    genre. The adapt phase (memes 6-15) then calibrates on real reactions.
+    Serves memes with proven social proof (>=50 reactions) and high like rate
+    (>=40%). New users need the bot's best content first — maximising per-meme
+    quality gives the best chance of a good first impression before Phase 2
+    adapts to their taste via real reactions.
 
     Used for memes 1-5 (first impression).
     """
@@ -376,11 +376,11 @@ async def cold_start_explore(
         WHERE 1=1
             AND M.status = 'ok'
             AND R.meme_id IS NULL
-            AND MS.nmemes_sent >= 20
-            AND MS.lr_smoothed > 0.45
+            AND (MS.nlikes + MS.ndislikes) >= 50
+            AND MS.lr_smoothed >= 0.40
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
 
-        ORDER BY MS.lr_smoothed DESC
+        ORDER BY MS.lr_smoothed DESC, (MS.nlikes + MS.ndislikes) DESC
         LIMIT :limit
     """
     return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
