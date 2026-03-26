@@ -1,4 +1,5 @@
 STOP_WORDS = [
+    # Russian ads / promos
     "читать далее",
     "теперь в телеграм",
     "t.me/",
@@ -45,9 +46,27 @@ STOP_WORDS = [
     "сбербанк",
     "channel",
     "казино",
+    "кэшбэк",
+    "кешбэк",
+    "узнай подробнее",
+    "узнать подробнее",
+    "бесплатн",
+    # English ads / movie piracy / NSFW
+    "download movie",
+    "download film",
+    "click here",
+    "1080p",
+    "720p",
+    "fast link",
+    "nude",
+    "naked",
+    "comment in ->",
 ]
 
 MENTION_WORDS = ["@", "http", "t.me/"]
+
+# Patterns in outlink URLs that indicate an ad
+AD_LINK_PATTERNS = ["erid=", "utm_campaign="]
 
 
 def text_is_adverisement(original_text: str | None) -> bool:
@@ -67,6 +86,18 @@ def text_is_adverisement(original_text: str | None) -> bool:
     return False
 
 
+def outlinks_are_ad(out_links: list[str] | None) -> bool:
+    """Check if outlinks contain ad-related patterns (e.g. erid= tracking)."""
+    if not out_links:
+        return False
+    for link in out_links:
+        link_lower = link.lower()
+        for pattern in AD_LINK_PATTERNS:
+            if pattern in link_lower:
+                return True
+    return False
+
+
 def post_is_likely_ad(
     caption: str | None,
     out_links: list[str] | None,
@@ -81,6 +112,9 @@ def post_is_likely_ad(
     if text_is_adverisement(caption):
         return True
 
+    if outlinks_are_ad(out_links):
+        return True
+
     has_outlinks = bool(out_links and len(out_links) > 0)
     if not has_outlinks:
         return False
@@ -90,7 +124,7 @@ def post_is_likely_ad(
         return True
 
     # Outlinks + long caption = likely sponsored content
-    if caption and len(caption.strip()) > 150 and has_outlinks:
+    if caption and len(caption.strip()) > 100 and has_outlinks:
         return True
 
     return False

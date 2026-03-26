@@ -1,0 +1,23 @@
+schema: paperclip/v1
+
+# gstack skills source — update via: POST /api/companies/:id/skills/import {"source": "https://github.com/garrytan/gstack"}
+skills:
+  source: https://github.com/garrytan/gstack
+
+agents:
+  analyst:
+    adapter:
+      type: claude_local
+    inputs:
+      env:
+        ANALYST_DATABASE_URL:
+          kind: secret
+          requirement: required
+  ceo:
+    adapter:
+      type: claude_local
+    inputs:
+      env:
+        ANALYST_DATABASE_URL:
+          kind: secret
+          requirement: optional

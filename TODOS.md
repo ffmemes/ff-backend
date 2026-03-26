@@ -13,8 +13,17 @@
 ### ~~Unstarve like_spread_and_recent engine~~ — DONE
 **Context:** Done 2026-03-20. Removed `age_days < 30` filter in `src/recommendations/candidates.py`. Candidates 72→thousands. See [specs/experiment-2026-03-20-adaptive-cold-start.md](specs/experiment-2026-03-20-adaptive-cold-start.md).
 
-### ~~Add per-user recency filter to goat engine~~ — DONE
-**Context:** Done 2026-03-26. Added `AND R.sent_at > NOW() - INTERVAL '30 days'` to the LEFT JOIN exclusion filter in `goat()` in `candidates.py:257`. Commit `895756b`. Awaiting push to GitHub.
+### Incremental meme_stats computation
+**What:** Rewrite `calculate_meme_stats()` to only update memes with reactions in the last 2–3 hours (using `WHERE m.id IN (SELECT DISTINCT meme_id FROM user_meme_reaction WHERE reacted_at > NOW() - INTERVAL '3 hours')`), then upsert only those rows.
+**Why:** Full table scan on 22M+ user_meme_reaction rows exceeded 300s Prefect timeout on 2026-03-23 (peak traffic), causing VQ connection storm (22 events) and 6.5h stats staleness. Temporary fix (timeout 300→600s, commit f40b16a) bought headroom but at peak traffic 600s will eventually be insufficient too.
+**File:** `src/stats/meme.py` (`calculate_meme_stats()`), `src/flows/stats/meme.py`
+**Depends on:** Nothing — isolated change. Verify that meme_stats UPSERT logic handles partial updates correctly (memes with no new reactions keep their existing stats).
+
+### Add per-user recency filter to goat engine
+**What:** In the goat SQL query, add a filter to exclude memes the user saw recently (e.g., `sent_at > now() - interval '30 days'` via `user_meme_reaction`). This rotates the GOAT pool per-user.
+**Why:** Goat LR declined from 44% → 16% over 6 days post-fix due to pool exhaustion — the same top-ranked GOATs are served repeatedly to users who already saw them. Goat has 98% continuation rate (best engine) so the pool exhaustion is the only issue.
+**File:** `src/recommendations/candidates.py` (goat function)
+**Depends on:** Nothing — targeted SQL change.
 
 ### Auto-discover new TG channels from forwarded messages
 **What:** When the TG scraper parses a forwarded post, extract the source channel URL. Store discovered channels in a new `meme_source_candidate` table with status='discovered'. Admin/moderator approval flow to promote to `meme_source`.

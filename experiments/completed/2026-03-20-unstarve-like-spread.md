@@ -37,6 +37,22 @@ The `raw_impr_rank = 0` filter (top-quartile by impressions) already ensures qua
 - ~~Engine LR drops below 40%~~ **Revised 2026-03-22**: LR floor relaxed to 35%. Rationale: North Star moved +1 (median 19) while this experiment was live. The LR/volume trade-off is working — more content served → longer sessions. LR decline from 51% to ~40% is pool expansion effect (expected), not quality degradation. Only act if session length drops below 17.
 - Median session length drops below 16
 
+## Mid-experiment Notes (2026-03-23)
+
+| Date | Daily Sent | Daily LR |
+|------|-----------|---------|
+| Mar 19 (baseline) | 768 | 45.5% |
+| Mar 20 (day 1) | 2,079 | 47.3% |
+| Mar 21 (day 2) | 3,378 | 42.9% |
+| Mar 22 (full) | 2,686 | 40.5% |
+| Mar 23 (partial ~50%) | 1,078 | 32.8% |
+
+**7-day rolling: 11,334 sent, 43.1% LR.**
+
+Mar 23 partial LR at 32.8% is below the 35% watch floor. Day-over-day same-hour comparison: Mar 22 at 13:00 UTC was 39.6%; Mar 23 at 12:25 UTC is 32.8% — a ~7pp drop. The downward trend is clearly accelerating as the pool ages further.
+
+**CEO decision (2026-03-23):** HOLD. Do not add age filter back yet. The failure criterion is session length regression (< 16), not LR. North Star at 19 (all-time high, 4 consecutive days) is the primary protection. The 7-day rolling LR (43.1%) is still well above 35%. Wait for Mar 23 EOD data (FFM-9). **If Mar 23 EOD closes below 35% AND 7-day rolling also breaks 35%, then evaluate partial age filter re-introduction (e.g., age < 180 days).**
+
 ## Mid-experiment Notes (2026-03-22)
 
 | Date | Daily Sent | Daily LR |
