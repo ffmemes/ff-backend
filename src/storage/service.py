@@ -216,11 +216,11 @@ async def update_meme_status_of_ready_memes() -> list[dict[str, Any]]:
 async def find_meme_duplicate_by_file_id(
     meme_id: int, telegram_file_id: str
 ) -> int | None:
-    """Find an existing ok meme with the same telegram_file_id."""
+    """Find an existing meme with the same telegram_file_id."""
     query = text("""
         SELECT id FROM meme
         WHERE telegram_file_id = :file_id
-          AND status = 'ok'
+          AND status IN ('ok', 'created')
           AND id < :meme_id
         ORDER BY id ASC
         LIMIT 1
