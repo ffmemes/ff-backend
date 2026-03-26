@@ -317,48 +317,40 @@ async def cold_start_explore(
     limit: int = 15,
     exclude_meme_ids: list[int] = [],
 ):
-    """Phase 1 cold start: diverse high-quality memes from different sources.
+    """Phase 1 cold start: globally top-quality memes by like rate.
 
-    Selects the best meme from each top source (DISTINCT ON meme_source_id)
-    to guarantee source diversity. Data-driven source selection — top sources
-    by average like rate for the user's language. No hardcoded source list.
+    Serves the highest lr_smoothed memes overall — no source-diversity
+    constraint. For new users with no preference data, maximising per-meme
+    quality gives the best chance of a good first impression regardless of
+    genre. The adapt phase (memes 6-15) then calibrates on real reactions.
 
     Used for memes 1-5 (first impression).
     """
 
     query = f"""
-        SELECT id, type, telegram_file_id, caption, recommended_by
-        FROM (
-            SELECT DISTINCT ON (M.meme_source_id)
-                M.id
-                , M.type, M.telegram_file_id, M.caption
-                , 'cold_start_explore' AS recommended_by
-                , MSS.nlikes::float / NULLIF(MSS.nlikes + MSS.ndislikes, 0) AS source_lr
-                , MS.lr_smoothed
+        SELECT
+            M.id
+            , M.type, M.telegram_file_id, M.caption
+            , 'cold_start_explore' AS recommended_by
 
-            FROM meme M
-            INNER JOIN meme_stats MS
-                ON MS.meme_id = M.id
-            INNER JOIN meme_source_stats MSS
-                ON MSS.meme_source_id = M.meme_source_id
-            INNER JOIN user_language L
-                ON L.language_code = M.language_code
-                AND L.user_id = :user_id
-            LEFT JOIN user_meme_reaction R
-                ON R.meme_id = M.id
-                AND R.user_id = :user_id
+        FROM meme M
+        INNER JOIN meme_stats MS
+            ON MS.meme_id = M.id
+        INNER JOIN user_language L
+            ON L.language_code = M.language_code
+            AND L.user_id = :user_id
+        LEFT JOIN user_meme_reaction R
+            ON R.meme_id = M.id
+            AND R.user_id = :user_id
 
-            WHERE 1=1
-                AND M.status = 'ok'
-                AND R.meme_id IS NULL
-                AND MS.nmemes_sent >= 20
-                AND MS.lr_smoothed > 0.3
-                AND MSS.nlikes + MSS.ndislikes > 50
-                {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+        WHERE 1=1
+            AND M.status = 'ok'
+            AND R.meme_id IS NULL
+            AND MS.nmemes_sent >= 20
+            AND MS.lr_smoothed > 0.45
+            {exclude_meme_ids_sql_filter(exclude_meme_ids)}
 
-            ORDER BY M.meme_source_id, MS.lr_smoothed DESC
-        ) sub
-        ORDER BY source_lr DESC, lr_smoothed DESC
+        ORDER BY MS.lr_smoothed DESC
         LIMIT :limit
     """
     return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
