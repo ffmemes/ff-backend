@@ -36,6 +36,11 @@ async def download_meme_content_file(
             return None
 
         response.raise_for_status()
+
+        if not response.content:
+            logging.warning("Empty content from URL: %s", url)
+            return None
+
         return response.content
 
 
@@ -140,8 +145,10 @@ async def upload_meme_content_to_tg(
             logging.warning(f"Flood control exceeded: {e}")
             await asyncio.sleep(e.retry_after)
         except BadRequest as e:
-            logging.warning(f"Can't upload. Telegram error: {e}")
-            await asyncio.sleep(5)
+            logging.warning(
+                "Can't upload meme %s. Telegram error: %s", meme["id"], e
+            )
+            await update_meme(meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK)
             return None
 
         await asyncio.sleep(3)  # flood control
