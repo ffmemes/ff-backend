@@ -10,8 +10,10 @@ from src.storage.etl import insert_parsed_posts_from_telegram
 from src.storage.parsers.tg import TelegramChannelScraper
 from src.storage.service import (
     get_telegram_sources_to_parse,
+    maybe_auto_snooze_source,
     update_meme_source,
 )
+from src.tgbot.logs import log
 
 
 @flow(name="Parse Telegram Source", timeout_seconds=300)
@@ -31,6 +33,17 @@ async def parse_telegram_source(
         await insert_parsed_posts_from_telegram(meme_source_id, posts)
 
     await update_meme_source(meme_source_id=meme_source_id, parsed_at=datetime.utcnow())
+
+    snooze_reason = await maybe_auto_snooze_source(meme_source_id, len(posts))
+    if snooze_reason:
+        logger.warning(
+            f"Auto-snoozed source {meme_source_id} ({meme_source_url}): {snooze_reason}"
+        )
+        await log(
+            f"🔕 Auto-snoozed TG source <b>@{tg_username}</b> (id={meme_source_id})\n"
+            f"Reason: <code>{snooze_reason}</code>"
+        )
+
     await asyncio.sleep(5)
 
 

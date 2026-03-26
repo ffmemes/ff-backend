@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import nulls_first, select, text
@@ -8,6 +9,7 @@ from src.database import (
     fetch_one,
     meme,
     meme_source,
+    meme_source_stats,
 )
 from src.storage.constants import (
     MemeSourceStatus,
@@ -68,6 +70,70 @@ async def update_meme_source(meme_source_id: int, **kwargs) -> dict[str, Any] | 
         .returning(meme_source)
     )
     return await fetch_one(update_query)
+
+
+async def maybe_auto_snooze_source(
+    meme_source_id: int,
+    new_posts_count: int,
+) -> str | None:
+    """
+    Check auto-snooze criteria after a parse attempt.
+    Snoozes the source if either criterion is met:
+      1. 3 consecutive parse attempts returned 0 posts.
+      2. like_rate < 10% with at least 100 total reactions.
+    Returns the snooze reason string if snoozed, None otherwise.
+    """
+    source = await fetch_one(
+        select(meme_source).where(meme_source.c.id == meme_source_id)
+    )
+    if not source or source["status"] != MemeSourceStatus.PARSING_ENABLED.value:
+        return None
+
+    current_data = source["data"] or {}
+    now_iso = datetime.utcnow().isoformat()
+
+    # Track consecutive empty parses
+    if new_posts_count == 0:
+        consecutive = current_data.get("consecutive_empty_parses", 0) + 1
+    else:
+        consecutive = 0
+
+    updated_data = {**current_data, "consecutive_empty_parses": consecutive}
+
+    # Criterion 1: 3+ consecutive empty parses
+    if consecutive >= 3:
+        await update_meme_source(
+            meme_source_id,
+            status=MemeSourceStatus.SNOOZED.value,
+            data={**updated_data, "snoozed_reason": "no_posts_3x", "snoozed_at": now_iso},
+        )
+        return "no_posts_3x"
+
+    # Criterion 2: like_rate < 10% (min 100 reactions for a meaningful sample)
+    stats = await fetch_one(
+        select(meme_source_stats).where(
+            meme_source_stats.c.meme_source_id == meme_source_id
+        )
+    )
+    if stats is not None:
+        total = stats["nlikes"] + stats["ndislikes"]
+        if total >= 100 and stats["nlikes"] / total < 0.10:
+            await update_meme_source(
+                meme_source_id,
+                status=MemeSourceStatus.SNOOZED.value,
+                data={
+                    **updated_data,
+                    "snoozed_reason": "low_like_rate",
+                    "snoozed_at": now_iso,
+                },
+            )
+            return "low_like_rate"
+
+    # No snooze: persist updated counter if it changed
+    if updated_data != current_data:
+        await update_meme_source(meme_source_id, data=updated_data)
+
+    return None
 
 
 async def update_meme(meme_id: int, **kwargs) -> dict[str, Any] | None:
