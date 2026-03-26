@@ -1,10 +1,19 @@
 import asyncio
+import logging
 from typing import Any
 
 from sqlalchemy import text
 
-from src.database import fetch_all
+from src.database import fetch_all, fetch_one
 from src.recommendations.utils import exclude_meme_ids_sql_filter
+
+logger = logging.getLogger(__name__)
+
+# Quality thresholds for the goat pool.
+# Memes must have enough data and age to be considered "greatest of all time".
+GOAT_MIN_REACTIONS = 20    # (nlikes + ndislikes) — enough statistical signal
+GOAT_MIN_LR = 0.30         # lr_smoothed — minimum proven like rate
+GOAT_MIN_AGE_DAYS = 3      # days since created_at — must have aged enough to accumulate reactions
 
 
 def _build_params(
@@ -213,6 +222,24 @@ async def goat(
     limit: int = 10,
     exclude_meme_ids: list[int] = [],
 ):
+    # Log global pool size for QA monitoring (no user-specific join needed)
+    pool_row = await fetch_one(
+        text(
+            f"""
+            SELECT COUNT(*) AS pool_size
+            FROM meme M
+            INNER JOIN meme_stats MS ON MS.meme_id = M.id
+            WHERE M.status = 'ok'
+                AND (MS.nlikes + MS.ndislikes) >= {GOAT_MIN_REACTIONS}
+                AND MS.lr_smoothed >= {GOAT_MIN_LR}
+                AND M.created_at <= NOW() - INTERVAL '{GOAT_MIN_AGE_DAYS} days'
+        """
+        ),
+        {},
+    )
+    pool_size = pool_row["pool_size"] if pool_row else 0
+    logger.info("goat pool_size=%d", pool_size)
+
     query = f"""
         WITH SCORES AS (
             SELECT
@@ -236,6 +263,9 @@ async def goat(
                 ON UMSS.user_id = :user_id
                 AND UMSS.meme_source_id = M.meme_source_id
             WHERE M.status = 'ok'
+                AND (MS.nlikes + MS.ndislikes) >= {GOAT_MIN_REACTIONS}
+                AND MS.lr_smoothed >= {GOAT_MIN_LR}
+                AND M.created_at <= NOW() - INTERVAL '{GOAT_MIN_AGE_DAYS} days'
         )
 
 

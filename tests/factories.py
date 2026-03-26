@@ -73,11 +73,14 @@ async def create_meme(
     caption: str | None = None,
     raw_meme_id: int | None = None,
     published_at: datetime | None = None,
+    created_at: datetime | None = None,
 ) -> dict:
     if raw_meme_id is None:
         raw_meme_id = id
     if published_at is None:
         published_at = FIXED_DT
+    if created_at is None:
+        created_at = FIXED_DT
     row = {
         "id": id,
         "meme_source_id": meme_source_id,
@@ -88,6 +91,7 @@ async def create_meme(
         "telegram_file_id": telegram_file_id,
         "caption": caption,
         "published_at": published_at,
+        "created_at": created_at,
     }
     await conn.execute(insert(meme).values(row).on_conflict_do_nothing())
     return row
