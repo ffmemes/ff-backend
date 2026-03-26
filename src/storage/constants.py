@@ -37,6 +37,7 @@ class MemeStatus(str, Enum):
     DUPLICATE = "duplicate"
     AD = "ad"
     BROKEN_CONTENT_LINK = "broken_content_link"
+    EXPIRED_CONTENT_LINK = "expired_content_link"  # pipeline didn't process before CDN URL expired
 
     PUBLISHED = "published"  # meme was cross-posted to a channel
 
