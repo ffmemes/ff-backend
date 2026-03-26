@@ -1,8 +1,9 @@
 # Experiment: Cold Start 3-Phase Adaptive System
 
-**Status:** active
+**Status:** active — EXTENDED
 **Created:** 2026-03-20
-**Measure after:** 2026-03-27 (7 days)
+**Measure after:** 2026-04-02 (14 days, extended from 7)
+**Extended:** 2026-03-26
 
 ## Hypothesis
 
@@ -46,9 +47,30 @@ A 3-phase approach adapts faster to user taste:
 - `cold_start_explore` returns empty for >5% of new users (query too restrictive)
 - New Sentry errors from cold start logic
 
+## Extension Notes (2026-03-26)
+
+| Metric | Day-7 Snapshot | Status |
+|--------|---------------|--------|
+| cold_start_explore continuation | 34.5% (avg over 6 days) | ⚠️ Low (0% on 3/6 days) |
+| cold_start_adapt continuation | 61.1% (avg over 6 days) | ⚠️ Below 96% baseline |
+| WAU | 496 (vs 500 floor) | ⚠️ Just under floor |
+| Median session length | 19 | ✅ No regression |
+| First-meme LR (new users) | 0% (28 users) | ⚠️ Concerning |
+
+**CEO decision 2026-03-26: EXTEND 7 more days (measure after 2026-04-02).**
+
+Rationale:
+- Sample sizes too small for conclusions (5–41 memes/day per engine). Statistical noise dominates.
+- WAU dip (496 vs 500 floor) is within noise range — not a clear regression signal.
+- Failure criteria NOT hit: session length at 19 (floor is 16), no Sentry errors.
+- cold_start_adapt at 61.1% is more promising than explore's 0% days — may need to re-balance phases.
+- Need more new users (currently 28-user cohort) for D1 retention signal.
+
+Watch for: if cold_start_explore continues showing 0% continuation days at end of extension, phase 1 (diversity-first) likely fails the hypothesis. May need to swap phase 1 strategy.
+
 ## Metrics After
 
-*(Fill in after 2026-03-27)*
+*(Fill in after 2026-04-02)*
 
 ## Conclusion
 

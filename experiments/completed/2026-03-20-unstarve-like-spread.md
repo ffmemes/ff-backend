@@ -1,7 +1,8 @@
 # Experiment: Unstarve like_spread_and_recent engine
 
-**Status:** active
+**Status:** completed — SUCCESS
 **Created:** 2026-03-20
+**Concluded:** 2026-03-26
 **Measure after:** 2026-03-27 (7 days)
 
 ## Hypothesis
@@ -49,8 +50,17 @@ Volume +4.4x (exceeds ≥3x success criterion). LR declining as pool expands —
 
 ## Metrics After
 
-*(Fill in after 2026-03-27)*
+| Metric | Baseline | Final (7d) | Target | Result |
+|--------|----------|------------|--------|--------|
+| like_spread_and_recent sent (7d) | 3,112 | **18,233** | >9,000 | ✅ +486% (5.9x) |
+| like_spread_and_recent LR | 51.1% | **42.5%** | ≥35% (revised) | ✅ Above floor |
+| Session continuation rate | — | **97.7%** | — | ✅ Excellent |
+| Median session length | 18 memes | **19 memes** | ≥17 | ✅ +1 above baseline |
 
 ## Conclusion
 
-*(Fill in after measurement)*
+**SUCCESS. Concluded 2026-03-26 (1 day early — results clear).**
+
+All revised success criteria met. Removing the `age_days < 30` constraint expanded the candidate pool from ~72 to thousands, increasing weekly volume 5.9x (from 3,112 to 18,233 memes). LR settled at 42.5% — above the revised 35% floor — as expected with a larger, more diverse pool. Critically, North Star (median session length) improved from 18 → 19 memes concurrently, and session continuation rate is 97.7%.
+
+**Permanent change:** The `age_days < 30` filter is removed permanently. No rollback needed — the engine now runs without the constraint.
