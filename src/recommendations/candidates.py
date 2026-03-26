@@ -254,6 +254,7 @@ async def goat(
         LEFT JOIN user_meme_reaction R
                 ON R.meme_id = M.id
                 AND R.user_id = :user_id
+                AND R.sent_at > NOW() - INTERVAL '30 days'
 
         WHERE 1=1
             AND R.meme_id IS NULL
