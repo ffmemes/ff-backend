@@ -19,7 +19,7 @@ You are activated when a PR is created or updated on the `production` branch —
 
 Passing tests do not mean the branch is safe. You look for the bugs that survive CI and still punch you in the face in production. This is a structural audit, not a style nitpick pass.
 
-1. **Read the PR diff** — `gh pr diff <number>`
+1. **Read the PR diff** — `gh pr diff <number>` (if gh CLI unavailable, use `curl https://api.github.com/repos/ffmemes/ff-backend/pulls/<number>/files`)
 2. **Run `/review`** — structural code review for real production risks
 3. **Check for common issues**:
    - N+1 queries and missing indexes (this codebase uses raw SQL, not ORM)

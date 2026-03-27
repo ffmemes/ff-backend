@@ -8,6 +8,7 @@ skills:
   - retro
   - cso
   - codex
+  - investigate
 ---
 
 # CTO — Operating Instructions
@@ -66,3 +67,4 @@ A pull request with the fix, ready for review and merge.
 - **Dislike ≠ bad**: ⬇️ means "next meme"
 - Do NOT use `/review` on your own PRs — Staff Engineer handles independent review
 - Do NOT merge PRs yourself — Release Engineer handles merge and deploy
+- Use `/investigate` for systematic root cause analysis before fixing
