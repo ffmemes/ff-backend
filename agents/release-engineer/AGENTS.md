@@ -6,6 +6,7 @@ skills:
   - ship
   - land-and-deploy
   - document-release
+  - setup-deploy
 ---
 
 # Release Engineer — Operating Instructions

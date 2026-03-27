@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [production]
+  push:
+    branches: [production]
+
+jobs:
+  notify-staff-engineer:
+    if: github.event_name == 'pull_request' && github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Staff Engineer review
+        run: |
+          curl -s -X POST \
+            "https://org.ffmemes.com/api/routine-triggers/public/910d844a954042dc060c56bf/fire" \
+            -H "Authorization: Bearer ${{ secrets.PAPERCLIP_TRIGGER_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{"pr_number": ${{ github.event.pull_request.number }}, "pr_url": "${{ github.event.pull_request.html_url }}"}'
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff==0.1.9
+      - run: ruff check src/ tests/
+      - run: ruff format --check src/ tests/
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:6.2
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements/dev.txt
+      - run: pytest tests/ -x -q
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/postgres
+          REDIS_URL: redis://localhost:6379
+          TELEGRAM_BOT_TOKEN: "fake:token"
+          TELEGRAM_BOT_USERNAME: "test_bot"
+          TELEGRAM_BOT_WEBHOOK_SECRET: "test_secret"
+          MEME_STORAGE_TELEGRAM_CHAT_ID: "-1001234567890"
+          UPLOADED_MEMES_REVIEW_CHAT_ID: "-1001234567890"
+          ADMIN_LOGS_CHAT_ID: "-1001234567890"
