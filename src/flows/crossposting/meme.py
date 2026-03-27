@@ -1,5 +1,5 @@
-import re
 import random
+import re
 from html import escape
 
 from prefect import flow, get_run_logger

@@ -78,7 +78,8 @@ async def analyse_meme_caption(meme: dict[str, Any]) -> None:
         await update_meme(meme["id"], caption=new_caption)
 
     if meme["language_code"] == "en":
-        if len(set(meme["caption"]) & set("йцукенгшщзхъёфывапролджэячсмитьбю")) > 0:
+        _ru_chars = set("йцукенгшщзхъёфывапролджэячсмитьбю")
+        if len(set(meme["caption"]) & _ru_chars) > 0:
             await update_meme(meme["id"], language_code="ru")
             return
 

@@ -112,7 +112,7 @@ async def pay_if_not_paid_with_alert(
 
         # ruff: noqa
         asyncio.create_task(
-            log(f"💳 {user_name}/{user_id}: +{PAYOUTS[type]} 🍔 for {TRX_TYPE_DESCRIPTIONS[type]}")
+            log(f"💳 {user_name}/{user_id}: +{PAYOUTS[type]} 🍔 for {TRX_TYPE_DESCRIPTIONS[type]}")  # noqa: E501
         )
 
     return res

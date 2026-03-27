@@ -45,7 +45,7 @@ async def explain_meme_ru(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not active_in_bot:
         # await update.message.set_reaction(reaction=)
 
-        return await update.message.reply_text("🙈 Не вижу тебя в боте. Надо зайти -> @ffmemesbot")
+        return await update.message.reply_text("🙈 Не вижу тебя в боте. Надо зайти -> @ffmemesbot")  # noqa: E501
 
     # check that user subscribed to a channel
     subscribed_to_channel = await check_if_user_chat_member(
@@ -53,7 +53,7 @@ async def explain_meme_ru(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     if not subscribed_to_channel:
         return await update.message.reply_text(
-            "😵‍💫 Не вижу тебя в канале. Надо подписаться -> @fastfoodmemes"
+            "😵‍💫 Не вижу тебя в канале. Надо подписаться -> @fastfoodmemes"  # noqa: E501
         )
 
     return await generate_and_send_meme_explanation(update.message)

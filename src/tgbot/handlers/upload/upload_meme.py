@@ -125,7 +125,7 @@ async def _reply_with_forwarded_meme_stats(
             "",
             f"source: {source_url_text}",
             f"{source_nlikes} 👍 {source_ndislikes} 👎",
-            f"{source_memes_sent_events} 👁️ / {source_memes_sent} memes ({valid_sent_ratio}% valid)",
+            f"{source_memes_sent_events} 👁️ / {source_memes_sent} memes ({valid_sent_ratio}% valid)",  # noqa: E501
         ]
     )
 

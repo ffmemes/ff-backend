@@ -25,7 +25,7 @@ class VkGroupScraper(Scraper):
         self.source_link = source_link
         self.vk_source_link = None
         self.VK_TOKEN = settings.VK_TOKEN
-        self.base_url = "https://api.vk.com/method/wall.get?access_token={vk_token}&v={v}&domain={domain}&count=100&offset={offset}"
+        self.base_url = "https://api.vk.com/method/wall.get?access_token={vk_token}&v={v}&domain={domain}&count=100&offset={offset}"  # noqa: E501
 
     async def get_items(self, num_of_posts: Optional[int] = None) -> list[VkGroupPostParsingResult]:
         logger.info(f"Going to parse VK: {self.source_link}")

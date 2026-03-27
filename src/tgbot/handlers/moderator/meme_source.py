@@ -82,7 +82,7 @@ async def handle_meme_source_change_status(
     user_id = update.effective_user.id
     user_info = await get_user_info(user_id)
     if not UserType(user_info["type"]).is_moderator:
-        await update.callback_query.answer("🤷‍♀️ Only moderators can change meme source status 🤷‍♂️")
+        await update.callback_query.answer("🤷‍♀️ Only moderators can change meme source status 🤷‍♂️")  # noqa: E501
         return
 
     args = update.callback_query.data.split(":")

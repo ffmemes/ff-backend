@@ -43,4 +43,17 @@ max-complexity = 10
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
 
+[tool.ruff.lint.per-file-ignores]
+# Long strings inside triple-quoted string literals can't use inline noqa
+"src/tgbot/handlers/chat/agent/prompts.py" = ["E501"]
+"src/tgbot/handlers/chat/ai.py" = ["E501"]
+"src/tgbot/handlers/chat/explain_meme.py" = ["E501"]
+"src/tgbot/handlers/treasury/commands.py" = ["E501"]
+"src/stats/user.py" = ["E501"]
+"src/tgbot/handlers/moderator/get_meme.py" = ["E501"]
+"src/tgbot/handlers/moderator/invite.py" = ["E501"]
+"src/tgbot/handlers/stats/wrapped.py" = ["E501"]
+"src/flows/crossposting/meme.py" = ["E501"]
+"src/flows/rewards/uploaded_memes.py" = ["E501"]
+
 [tool.poetry.dependencies]
