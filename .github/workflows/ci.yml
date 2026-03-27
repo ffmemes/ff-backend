@@ -8,7 +8,7 @@ on:
 
 jobs:
   notify-staff-engineer:
-    if: github.event_name == 'pull_request' && github.event.action == 'opened'
+    if: github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'reopened')
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Staff Engineer review
