@@ -50,7 +50,7 @@ async def get_popup_to_send(user_id: int, user_info: dict) -> Popup | None:
                     id=popup_id,
                     text=(
                         "🎁 <b>Meme Wrapped 2026</b>\n\n"
-                        "Ты посмотрел 30 мемов — этого достаточно, "
+                        "Ты посмотрел 30 мемов — этого достаточно, "  # noqa: E501
                         "чтобы я составил твой мем-профиль!\n\n"
                         "Жми кнопку ниже 👇"
                     ),

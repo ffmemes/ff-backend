@@ -79,9 +79,9 @@ Menu:
 ▪▪ an invited friend has Telegram premium: {PAYOUTS[TrxType.USER_INVITER_PREMIUM]} 🍔
 ▪▪ only new ffmemes users counts
 
-▪ top 5 uploaded memes in weekly leaderboard: 
-    🥇: {PAYOUTS[TrxType.UPLOADER_TOP_WEEKLY_1]} 🍔 
-    🥈: {PAYOUTS[TrxType.UPLOADER_TOP_WEEKLY_2]} 🍔 
+▪ top 5 uploaded memes in weekly leaderboard:
+    🥇: {PAYOUTS[TrxType.UPLOADER_TOP_WEEKLY_1]} 🍔
+    🥈: {PAYOUTS[TrxType.UPLOADER_TOP_WEEKLY_2]} 🍔
     🥉: {PAYOUTS[TrxType.UPLOADER_TOP_WEEKLY_3]} 🍔
     4: {PAYOUTS[TrxType.UPLOADER_TOP_WEEKLY_4]} 🍔
     5: {PAYOUTS[TrxType.UPLOADER_TOP_WEEKLY_5]} 🍔
@@ -131,7 +131,7 @@ You:
 /kitchen /uploads /chat
         """
         else:
-            LEADERBOARD_TEXT += "\nTo see your place in the leaderboard, set your /nickname ⬅️\n\n"
+            LEADERBOARD_TEXT += "\nTo see your place in the leaderboard, set your /nickname ⬅️\n\n"  # noqa: E501
 
     return await update.message.reply_text(
         LEADERBOARD_TEXT,
@@ -155,7 +155,7 @@ To update your public nickname, use the following command:
 
     nickname = context.args[0].strip()
     if len(nickname) > 32:
-        return await update.message.reply_text("Nickname should be less than 32 characters 🤷‍♂️")
+        return await update.message.reply_text("Nickname should be less than 32 characters 🤷‍♂️")  # noqa: E501
 
     stop_characters = ["<", ">"]
     for stop_c in stop_characters:

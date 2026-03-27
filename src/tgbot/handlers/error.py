@@ -68,7 +68,7 @@ Wait for 2 minutes and press /start.
         channel_link = TELEGRAM_CHANNEL_RU_LINK if has_russian else TELEGRAM_CHANNEL_EN_LINK
 
         if has_russian:
-            channel_message = f"🎯 Пока мы всё чиним, мемы можно ловить тут: {channel_link}"
+            channel_message = f"🎯 Пока мы всё чиним, мемы можно ловить тут: {channel_link}"  # noqa: E501
         else:
             channel_message = f"🎯 While we are fixing things, memes live here: {channel_link}"
 

@@ -33,5 +33,5 @@ async def reward_user_for_daily_activity(user_id: int):
                 parse_mode=ParseMode.HTML,
             )
             await log(
-                f"+daily to #{user_id}: {interface_lang}, {balance} 🍔, {nmemes_sent} 📮"  # noqa E501
+                f"+daily to #{user_id}: {interface_lang}, {balance} 🍔, {nmemes_sent} 📮"  # noqa: E501
             )

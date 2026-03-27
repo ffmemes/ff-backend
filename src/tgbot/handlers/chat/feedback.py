@@ -31,7 +31,7 @@ NOTE: we will not see messages without this command
     )
 
     # react to the user's message to show that message was read & delivered
-    reaction = random.choice(["🕊", "🍾", "👾", "🔥", "🤝", "⚡", "💯", "👍", "🫡", "👌", "💅"])
+    reaction = random.choice(["🕊", "🍾", "👾", "🔥", "🤝", "⚡", "💯", "👍", "🫡", "👌", "💅"])  # noqa: E501
     await update.message.set_reaction(reaction)
 
 

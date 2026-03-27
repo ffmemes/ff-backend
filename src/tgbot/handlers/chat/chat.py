@@ -71,7 +71,7 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
         if total_reactions < ANTISPAM_MIN_REACTIONS:
             await _reply_and_delete(
                 msg,
-                "Чтобы писать в чат, сначала воспользуйся ботом 👇\n"
+                "Чтобы писать в чат, сначала воспользуйся ботом 👇\n"  # noqa: E501
                 "https://t.me/ffmemesbot",
                 sleep_sec=15,
                 delete_original=True,
@@ -109,7 +109,7 @@ async def handle_agent_trigger(update: Update, context: ContextTypes.DEFAULT_TYP
     cost = PAYOUTS[TrxType.BOT_REPLY_PAYMENT] * (-1)  # 1
 
     if balance < cost:
-        text = "У меня есть мемы на любой вкус, но сначала нужны бургеры 🍔"
+        text = "У меня есть мемы на любой вкус, но сначала нужны бургеры 🍔"  # noqa: E501
         return await _reply_and_delete(
             msg,
             text,
@@ -197,8 +197,17 @@ async def _send_fallback_meme(bot: Bot, chat_id: int, reply_to_message_id: int):
 
     file_id = row["telegram_file_id"]
     if row["type"] == "animation":
-        await bot.send_animation(chat_id=chat_id, animation=file_id, reply_markup=keyboard, reply_to_message_id=reply_to_message_id)
+        await bot.send_animation(
+            chat_id=chat_id, animation=file_id,
+            reply_markup=keyboard, reply_to_message_id=reply_to_message_id,
+        )
     elif row["type"] == "video":
-        await bot.send_video(chat_id=chat_id, video=file_id, reply_markup=keyboard, reply_to_message_id=reply_to_message_id)
+        await bot.send_video(
+            chat_id=chat_id, video=file_id,
+            reply_markup=keyboard, reply_to_message_id=reply_to_message_id,
+        )
     else:
-        await bot.send_photo(chat_id=chat_id, photo=file_id, reply_markup=keyboard, reply_to_message_id=reply_to_message_id)
+        await bot.send_photo(
+            chat_id=chat_id, photo=file_id,
+            reply_markup=keyboard, reply_to_message_id=reply_to_message_id,
+        )
