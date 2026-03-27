@@ -22,10 +22,12 @@ from src.flows.broadcasts.meme import (
 )
 
 # Crossposting
+from src.flows.crossposting.editorial import post_editorial_to_channel
 from src.flows.crossposting.meme import (
     post_meme_to_tgchannelen,
     post_meme_to_tgchannelru,
 )
+from src.flows.crossposting.weekly_report import post_weekly_burger_report
 from src.flows.parsers.ig import parse_ig_sources
 
 # Parsers
@@ -135,6 +137,14 @@ if __name__ == "__main__":
             schedules=[
                 CronSchedule(cron="40 8,10,14,18,20 * * *", timezone=MSK)
             ],
+        ),
+        # ── Editorial (on-demand + weekly report) ──
+        post_editorial_to_channel.to_deployment(
+            name="Post Editorial",
+        ),
+        post_weekly_burger_report.to_deployment(
+            name="Weekly Burger Report",
+            schedules=[CronSchedule(cron="0 14 * * 0", timezone=MSK)],
         ),
         # ── Rewards (weekly) ──
         reward_ru_users_for_weekly_top_uploaded_memes.to_deployment(

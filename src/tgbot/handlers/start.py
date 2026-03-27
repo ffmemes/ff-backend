@@ -102,8 +102,17 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             update.effective_user.name,
             deep_link,
         )
+
+        # handle giveaway after onboarding so user_language rows exist
+        if deep_link and deep_link.startswith("giveaway_"):
+            from src.tgbot.handlers.treasury.giveaway import handle_giveaway
+            await handle_giveaway(update, context, deep_link)
         return
     else:  # existing user:
+        if deep_link and deep_link.startswith("giveaway_"):
+            from src.tgbot.handlers.treasury.giveaway import handle_giveaway
+            return await handle_giveaway(update, context, deep_link)
+
         await next_message(
             context.bot,
             user_id,
