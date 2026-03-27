@@ -149,3 +149,4 @@ test.py
 experiments/log.jsonl
 # Agent daily reports (generated per heartbeat, can be large)
 experiments/reports/
+agents/backup/
