@@ -6,8 +6,13 @@ from src.database import execute
 async def calculate_meme_reactions_and_engagement(
     min_user_reactions: int = 10,
     min_meme_reactions: int = 3,
+    lookback_hours: int = 3,
 ) -> None:
-    """Combined lr_smoothed + engagement_score + basic counts in a single scan.
+    """Combined lr_smoothed + engagement_score + basic counts — incremental mode.
+
+    Only recomputes stats for memes that received reactions in the last
+    `lookback_hours` hours. Memes with no recent activity keep their existing
+    meme_stats rows unchanged (ON CONFLICT DO UPDATE only fires for included rows).
 
     lr_smoothed algorithm:
         1. like_symmetrical: reaction_id=1 → +1, else → -1
@@ -30,7 +35,13 @@ async def calculate_meme_reactions_and_engagement(
             lr_smoothed, engagement_score
         )
 
-        WITH BASE_REACTIONS AS (
+        WITH RECENT_MEME_IDS AS (
+            SELECT DISTINCT meme_id
+            FROM user_meme_reaction
+            WHERE reacted_at > NOW() - :lookback_hours * INTERVAL '1 hour'
+        ),
+
+        BASE_REACTIONS AS (
             SELECT
                 R.user_id, R.meme_id, R.reaction_id,
                 R.sent_at, R.reacted_at,
@@ -40,6 +51,7 @@ async def calculate_meme_reactions_and_engagement(
                     OVER (PARTITION BY R.user_id) AS user_last_reaction_sent_at
             FROM user_meme_reaction R
             JOIN meme ON R.meme_id = meme.id
+            WHERE R.meme_id IN (SELECT meme_id FROM RECENT_MEME_IDS)
         ),
 
         WITH_USER_AVGS AS (
@@ -154,6 +166,7 @@ async def calculate_meme_reactions_and_engagement(
         {
             "min_user_reactions": min_user_reactions,
             "min_meme_reactions": min_meme_reactions,
+            "lookback_hours": lookback_hours,
         },
     )
 
