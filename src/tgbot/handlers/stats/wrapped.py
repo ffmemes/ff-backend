@@ -225,7 +225,9 @@ async def handle_wrapped(
     if cached and not cached.get("lock"):
         return await handle_wrapped_button(update, context)
     if cached and cached.get("lock"):
-        return
+        return await update.message.reply_text(
+            "⏳ Уже генерирую твой Wrapped... подожди пару секунд!"
+        )
 
     # Check conditions BEFORE showing welcome
     user_stats_data = await get_user_stats(user_id)
@@ -401,9 +403,11 @@ async def handle_wrapped_button(
 
     if update.callback_query:
         await update.callback_query.answer()
-        key = int(
-            update.callback_query.data.replace("wrapped_", ""),
-        )
+        suffix = update.callback_query.data.replace("wrapped_", "")
+        if suffix.isdigit():
+            key = int(suffix)
+        else:
+            key = 0  # "wrapped_go" or any non-numeric → start from slide 0
     else:
         key = 0
 
@@ -622,13 +626,14 @@ async def generate_wrapped_data(
             }
 
         # Build slides
-        # Stats report gets vibe from DeepSeek
+        # Stats report gets vibe from DeepSeek — replace placeholder vibe
         vibe = p.get("vibe", "")
         if vibe and stats_report:
-            stats_report = stats_report.replace(
-                stats_report.split("\n<i>")[-1] if "\n<i>" in stats_report else "",
-                f"\n<i>{vibe}</i>",
-            ) if "\n<i>" in stats_report else stats_report + f"\n\n<i>{vibe}</i>"
+            # Remove existing placeholder vibe (last <i>...</i> block)
+            if "\n<i>" in stats_report:
+                idx = stats_report.rfind("\n<i>")
+                stats_report = stats_report[:idx]
+            stats_report += f"\n\n<i>{vibe}</i>"
 
         return {
             "stats_report": stats_report,
