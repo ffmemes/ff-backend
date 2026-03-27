@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [production]
+  push:
+    branches: [production]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check src/ tests/
+      - run: ruff format --check src/ tests/
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:6.2
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: pytest tests/ -x -q
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/postgres
+          REDIS_URL: redis://localhost:6379
+          TELEGRAM_BOT_TOKEN: "fake:token"
+          TELEGRAM_BOT_USERNAME: "test_bot"
+          TELEGRAM_BOT_WEBHOOK_SECRET: "test_secret"
+          MEME_STORAGE_TELEGRAM_CHAT_ID: "-1001234567890"
+          UPLOADED_MEMES_REVIEW_CHAT_ID: "-1001234567890"
+          ADMIN_LOGS_CHAT_ID: "-1001234567890"

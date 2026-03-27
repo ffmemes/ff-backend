@@ -5,14 +5,6 @@ skills:
   source: https://github.com/garrytan/gstack
 
 agents:
-  analyst:
-    adapter:
-      type: claude_local
-    inputs:
-      env:
-        ANALYST_DATABASE_URL:
-          kind: secret
-          requirement: required
   ceo:
     adapter:
       type: claude_local
@@ -21,3 +13,67 @@ agents:
         ANALYST_DATABASE_URL:
           kind: secret
           requirement: optional
+
+  analyst:
+    adapter:
+      type: claude_local
+    inputs:
+      env:
+        ANALYST_DATABASE_URL:
+          kind: secret
+          requirement: required
+
+  cto:
+    adapter:
+      type: claude_local
+    inputs:
+      env:
+        ANALYST_DATABASE_URL:
+          kind: secret
+          requirement: optional
+
+  staff-engineer:
+    adapter:
+      type: claude_local
+    inputs:
+      env:
+        ANALYST_DATABASE_URL:
+          kind: secret
+          requirement: optional
+
+  qa:
+    adapter:
+      type: claude_local
+    inputs:
+      env:
+        ANALYST_DATABASE_URL:
+          kind: secret
+          requirement: required
+        COOLIFY_ACCESS_TOKEN:
+          kind: secret
+          requirement: required
+        COOLIFY_BASE_URL:
+          kind: secret
+          requirement: required
+        SENTRY_AUTH_TOKEN:
+          kind: secret
+          requirement: optional
+
+  release-engineer:
+    adapter:
+      type: claude_local
+    inputs:
+      env:
+        GH_TOKEN:
+          kind: secret
+          requirement: optional
+        COOLIFY_ACCESS_TOKEN:
+          kind: secret
+          requirement: optional
+        COOLIFY_BASE_URL:
+          kind: secret
+          requirement: optional
+
+  comms:
+    adapter:
+      type: claude_local
