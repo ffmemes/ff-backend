@@ -1,7 +1,6 @@
 from typing import Any
 
 import pytest
-
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import engine, user, user_language
@@ -53,7 +52,9 @@ async def test_cold_start_phase1_uses_explore():
             "best_uploaded_memes": best_uploaded,
         }
 
-    candidates = await generate_recommendations(TEST_USER_ID, 10, nmemes_sent=3, retriever=TestRetriever())
+    candidates = await generate_recommendations(
+        TEST_USER_ID, 10, nmemes_sent=3, retriever=TestRetriever()
+    )
     assert len(candidates) == 3
     assert candidates[0]["id"] == 101
 
@@ -79,7 +80,9 @@ async def test_cold_start_phase1_fallback_to_lr_smoothed():
             "best_uploaded_memes": best_uploaded,
         }
 
-    candidates = await generate_recommendations(TEST_USER_ID, 10, nmemes_sent=0, retriever=TestRetriever())
+    candidates = await generate_recommendations(
+        TEST_USER_ID, 10, nmemes_sent=0, retriever=TestRetriever()
+    )
     assert len(candidates) == 2
     assert candidates[0]["id"] in [301, 302]
 
@@ -102,7 +105,9 @@ async def test_cold_start_phase1_fallback_to_uploaded():
             "best_uploaded_memes": best_uploaded,
         }
 
-    candidates = await generate_recommendations(TEST_USER_ID, 10, nmemes_sent=2, retriever=TestRetriever())
+    candidates = await generate_recommendations(
+        TEST_USER_ID, 10, nmemes_sent=2, retriever=TestRetriever()
+    )
     assert len(candidates) == 1
     assert candidates[0]["id"] == 401
 
@@ -134,7 +139,9 @@ async def test_cold_start_phase2_uses_adapt():
             "best_uploaded_memes": best_uploaded,
         }
 
-    candidates = await generate_recommendations(TEST_USER_ID, 10, nmemes_sent=8, retriever=TestRetriever())
+    candidates = await generate_recommendations(
+        TEST_USER_ID, 10, nmemes_sent=8, retriever=TestRetriever()
+    )
     assert len(candidates) == 3
     assert candidates[0]["id"] == 201
 
@@ -160,7 +167,9 @@ async def test_cold_start_phase2_fallback():
             "best_uploaded_memes": best_uploaded,
         }
 
-    candidates = await generate_recommendations(TEST_USER_ID, 10, nmemes_sent=10, retriever=TestRetriever())
+    candidates = await generate_recommendations(
+        TEST_USER_ID, 10, nmemes_sent=10, retriever=TestRetriever()
+    )
     assert len(candidates) == 1
     assert candidates[0]["id"] == 301
 
@@ -272,7 +281,9 @@ async def test_generate_above_100():
             "es_ranked": es_ranked,
         }
 
-    candidates = await generate_recommendations(TEST_USER_ID, 10, 200, TestRetriever(), random_seed=102)
+    candidates = await generate_recommendations(
+        TEST_USER_ID, 10, 200, TestRetriever(), random_seed=102
+    )
     assert len(candidates) == 10
     # lr_smoothed is pinned at position 0
     assert candidates[0]["id"] in [7, 8, 9, 10]
