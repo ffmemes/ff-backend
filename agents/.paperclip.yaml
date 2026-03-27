@@ -77,3 +77,11 @@ agents:
   comms:
     adapter:
       type: claude_local
+    inputs:
+      env:
+        ANALYST_DATABASE_URL:
+          kind: secret
+          requirement: optional
+        FFMEMES_PROD_TELEGRAM_BOT_TOKEN:
+          kind: secret
+          requirement: required
