@@ -114,7 +114,7 @@ async def test_like_value(conn):
                 }
             )
     await _insert_reactions(conn, reactions)
-    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0)
+    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0, lookback_hours=999_999)
 
     score = await _get_engagement_score(1)
     assert score is not None
@@ -139,7 +139,7 @@ async def test_slow_dislike_value(conn):
                 }
             )
     await _insert_reactions(conn, reactions)
-    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0)
+    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0, lookback_hours=999_999)
 
     score_disliked = await _get_engagement_score(1)
     score_liked = await _get_engagement_score(2)
@@ -188,7 +188,7 @@ async def test_fast_dislike_value(conn):
                     }
                 )
     await _insert_reactions(conn, reactions)
-    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0)
+    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0, lookback_hours=999_999)
 
     fast_dislike_score = await _get_engagement_score(1)
     slow_dislike_score = await _get_engagement_score(2)
@@ -247,7 +247,7 @@ async def test_dislike_timing_edge_cases(conn):
                     }
                 )
     await _insert_reactions(conn, reactions)
-    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0)
+    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0, lookback_hours=999_999)
 
     score_too_fast = await _get_engagement_score(1)
     score_too_slow = await _get_engagement_score(2)
@@ -297,7 +297,7 @@ async def test_skip_detection(conn):
                 }
             )
     await _insert_reactions(conn, reactions)
-    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0)
+    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0, lookback_hours=999_999)
 
     score_skipped = await _get_engagement_score(1)
     score_liked = await _get_engagement_score(2)
@@ -333,7 +333,7 @@ async def test_last_meme_excluded(conn):
             }
         )
     await _insert_reactions(conn, reactions)
-    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0)
+    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0, lookback_hours=999_999)
 
     # meme 1: all rows are NULL (last meme per user) → excluded → no score
     score = await _get_engagement_score(1)
@@ -402,7 +402,7 @@ async def test_user_bias_smoothing(conn):
             )
 
     await _insert_reactions(conn, reactions)
-    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0)
+    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0, lookback_hours=999_999)
 
     score_1 = await _get_engagement_score(1)
     score_2 = await _get_engagement_score(2)
@@ -432,7 +432,7 @@ async def test_min_user_threshold(conn):
                 }
             )
     await _insert_reactions(conn, reactions)
-    await calculate_meme_reactions_and_engagement(min_user_reactions=5, min_meme_reactions=0)
+    await calculate_meme_reactions_and_engagement(min_user_reactions=5, min_meme_reactions=0, lookback_hours=999_999)
 
     # No memes should get scores (all users below threshold)
     score = await _get_engagement_score(1)
@@ -466,7 +466,7 @@ async def test_min_meme_threshold(conn):
         }
     )
     await _insert_reactions(conn, reactions)
-    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=3)
+    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=3, lookback_hours=999_999)
 
     assert await _get_engagement_score(1) is not None
     # meme 20 has only 1 reaction < threshold 3
@@ -511,7 +511,7 @@ async def test_all_skips_meme(conn):
             }
         )
     await _insert_reactions(conn, reactions)
-    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0)
+    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0, lookback_hours=999_999)
 
     score_all_skips = await _get_engagement_score(1)
     score_all_likes = await _get_engagement_score(2)
