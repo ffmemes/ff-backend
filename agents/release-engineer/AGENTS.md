@@ -26,15 +26,15 @@ You are activated when CTO or another engineer has a PR ready for review and mer
 
 ## Process
 
+1. **Review the PR** — check that CI passes, code looks clean, no secrets committed
+2. **Use `/land-and-deploy`** to merge the PR, wait for CI and deploy, and verify production health automatically
+3. After deploy verified: use `/document-release` to update docs if the change warrants it
+4. **Hand off to QA** — QA Engineer will run post-deploy verification (`/canary`, Sentry scan, DB health)
+
+**Fallback** (if `/land-and-deploy` is unavailable):
 ```bash
-# Review PR
-gh pr view <number>
-gh pr diff <number>
-
-# Merge (after review passes)
 gh pr merge <number> --merge
-
-# Verify deploy
+# Verify deploy via Coolify
 curl -s "$COOLIFY_BASE_URL/api/v1/applications/v0kkssccwoswgwwscws4kscc" \
   -H "Authorization: Bearer $COOLIFY_ACCESS_TOKEN" | jq .status
 ```
