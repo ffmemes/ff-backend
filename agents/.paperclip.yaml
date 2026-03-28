@@ -58,6 +58,15 @@ agents:
         SENTRY_AUTH_TOKEN:
           kind: secret
           requirement: optional
+        TELEGRAM_API_ID:
+          kind: secret
+          requirement: optional
+        TELEGRAM_API_HASH:
+          kind: secret
+          requirement: optional
+        TELEGRAM_SESSION_STRING:
+          kind: secret
+          requirement: optional
 
   release-engineer:
     adapter:
