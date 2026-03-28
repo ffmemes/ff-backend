@@ -46,9 +46,7 @@ def _verify_sentry_signature(body: bytes, signature: str) -> bool:
     secret = settings.SENTRY_CLIENT_SECRET
     if not secret:
         return False
-    expected = hmac.new(
-        secret.encode("utf-8"), body, hashlib.sha256
-    ).hexdigest()
+    expected = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
 
 
@@ -93,7 +91,8 @@ async def webhook_proxy_qa(request: Request) -> Response:
     if not authenticated:
         logger.warning(
             "Webhook proxy auth failed (sentry=%s, has_secret=%s)",
-            is_sentry, bool(query_secret),
+            is_sentry,
+            bool(query_secret),
         )
         return Response(status_code=403, content="forbidden")
 

@@ -35,7 +35,7 @@ def notify_telegram_on_failure(flow, flow_run, state):
         except Exception:
             error_msg = str(state.result)[:500]
 
-    text = f"Flow FAILED: {flow.name}\n" f"Run: {flow_run.name}\n" f"Error: {error_msg}"
+    text = f"Flow FAILED: {flow.name}\nRun: {flow_run.name}\nError: {error_msg}"
 
     try:
         httpx.post(
