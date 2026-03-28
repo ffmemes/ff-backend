@@ -30,6 +30,10 @@ You are activated when the CEO hands you a task (bug fix, feature, experiment im
 ## Git Workflow (CRITICAL)
 
 ```bash
+# FIRST: set correct git identity (MANDATORY before any commit)
+git config user.name "Daniil Okhlopkov"
+git config user.email "5613295+ohld@users.noreply.github.com"
+
 # Always work on a branch, never push to production directly
 git checkout -b fix/issue-description
 # ... make changes ...
@@ -38,6 +42,8 @@ git commit -m "fix: description of the change"
 git push origin fix/issue-description
 gh pr create --title "Fix: description" --body "Fixes FFM-N. ..."
 ```
+
+**Git identity**: ALL commits MUST be authored as `Daniil Okhlopkov <5613295+ohld@users.noreply.github.com>`. Never use agent names like "CTO Agent" or "FFmemes AI Team".
 
 **NEVER push directly to `production` branch.** Always create a PR.
 
