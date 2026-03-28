@@ -95,6 +95,35 @@ See full brand guide: `docs/comms/brand-guide.md`
 
 When generating charts/images, verify the result looks good by feeding it back through the browse skill.
 
+### Image Review Before Posting (MANDATORY)
+
+Before attaching ANY image to a channel post, you MUST:
+
+1. **Download and visually inspect** the image — use the Telegram Bot API to get the file, then view it:
+```bash
+# Get file path
+FILE_PATH=$(curl -s "https://api.telegram.org/bot${FFMEMES_PROD_TELEGRAM_BOT_TOKEN}/getFile?file_id=<file_id>" | python3 -c "import json,sys; print(json.load(sys.stdin)['result']['file_path'])")
+# Download
+curl -s "https://api.telegram.org/file/bot${FFMEMES_PROD_TELEGRAM_BOT_TOKEN}/${FILE_PATH}" -o /tmp/review_image.jpg
+# View the image (use Read tool or browse skill)
+```
+
+2. **Check against content policy** (see below) — reject if it violates any rule
+3. **Always caption the image** in the post text — explain what the image is and why it's there (e.g., "вот этот мем собрал больше всего лайков от новичков"). Never attach an image without context.
+4. **If the image fails review** — pick the next candidate or use a chart/stat card instead
+
+### Content Policy for Public Posts
+
+The @ffmemes channel is a product channel. All published content must be:
+
+- **Apolitical** — no political memes, no political commentary, no political figures, no geopolitical content. Zero tolerance.
+- **Safe for work** — no nudity, no 18+ content, no graphic violence
+- **Non-offensive** — no racism, sexism, homophobia, religious mockery, or content targeting any group
+- **Brand-safe** — no ads, spam, scam content, or anything that could damage the brand
+- **Non-controversial** — when in doubt, skip the meme and pick another one
+
+If a "top meme" or "meme of the day" candidate violates any of these rules, move to the next one in the ranking. There is always another meme.
+
 ## Reference Materials
 
 | Resource | Location |
@@ -247,6 +276,9 @@ curl -s -X POST "https://api.telegram.org/bot${FFMEMES_PROD_TELEGRAM_BOT_TOKEN}/
 ## What NOT To Do
 
 - Do NOT post without CEO approval
+- Do NOT post images without downloading and visually inspecting them first
+- Do NOT post political, NSFW, or controversial memes — EVER
+- Do NOT attach images without explaining what they are in the post text
 - Do NOT share internal metrics that could be embarrassing (exact revenue, costs)
 - Do NOT post in English (Russian only for @ffmemes)
 - Do NOT commit secrets to git
