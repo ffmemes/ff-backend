@@ -1,26 +1,35 @@
-from typing import Any
+from collections import defaultdict
+from unittest.mock import AsyncMock, patch
 
 import pytest
-from sqlalchemy.dialects.postgresql import insert
 
-from src.database import engine, user, user_language
 from src.recommendations.candidates import CandidatesRetriever
 from src.recommendations.meme_queue import generate_recommendations
 
 TEST_USER_ID = 99999
 
 
-@pytest.fixture(autouse=True, scope="module")
-async def setup_test_user():
-    async with engine.begin() as conn:
-        await conn.execute(
-            insert(user).values(id=TEST_USER_ID, type="user").on_conflict_do_nothing()
-        )
-        await conn.execute(
-            insert(user_language)
-            .values(user_id=TEST_USER_ID, language_code="en")
-            .on_conflict_do_nothing()
-        )
+@pytest.fixture(autouse=True)
+def mock_redis():
+    """Mock Redis and user_info calls — these tests validate blending logic, not Redis."""
+    user_info = defaultdict(int, {"nmemes_sent": 0})
+    with (
+        patch(
+            "src.recommendations.meme_queue.get_user_info",
+            new_callable=AsyncMock,
+            return_value=user_info,
+        ),
+        patch(
+            "src.recommendations.meme_queue.redis.get_all_memes_in_queue_by_key",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch(
+            "src.recommendations.meme_queue.redis.add_memes_to_queue_by_key",
+            new_callable=AsyncMock,
+        ),
+    ):
+        yield
 
 
 # ── Cold start Phase 1 (nmemes_sent < 6): cold_start_explore ──
