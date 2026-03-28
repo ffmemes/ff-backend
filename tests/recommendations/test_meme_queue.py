@@ -1,7 +1,6 @@
 from typing import Any
 
 import pytest
-import pytest_asyncio
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import engine, user, user_language
@@ -11,7 +10,7 @@ from src.recommendations.meme_queue import generate_recommendations
 TEST_USER_ID = 99999
 
 
-@pytest_asyncio.fixture(autouse=True, scope="module", loop_scope="session")
+@pytest.fixture(autouse=True, scope="module")
 async def setup_test_user():
     async with engine.begin() as conn:
         await conn.execute(

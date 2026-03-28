@@ -25,7 +25,7 @@ SOURCE_TELEGRAM = 10001
 SOURCE_USER_UPLOAD = 10002
 
 
-@pytest_asyncio.fixture(loop_scope="session")
+@pytest_asyncio.fixture()
 async def base_data():
     """Shared base fixture: users, sources, memes, stats."""
     async with engine.connect() as conn:

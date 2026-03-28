@@ -20,7 +20,7 @@ from src.stats.user import calculate_user_stats
 T0 = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=1)
 
 
-@pytest_asyncio.fixture(loop_scope="session")
+@pytest_asyncio.fixture()
 async def setup():
     async with engine.connect() as conn:
         await create_user(conn, id=10001)

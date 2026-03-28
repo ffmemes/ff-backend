@@ -19,7 +19,7 @@ from src.database import engine, user_meme_source_stats
 from src.stats.user_meme_source import calculate_user_meme_source_stats
 
 
-@pytest_asyncio.fixture(loop_scope="session")
+@pytest_asyncio.fixture()
 async def setup():
     async with engine.connect() as conn:
         await create_user(conn, id=10001)
