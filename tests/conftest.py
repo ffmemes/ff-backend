@@ -1,10 +1,10 @@
+import asyncio
+from typing import Generator
+
 import pytest
-import pytest_asyncio
 
+from src.database import engine
 from src.redis import pool as redis_pool
-
-# All async tests share a single session-scoped event loop
-pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -17,9 +17,12 @@ def run_migrations() -> None:
     os.system("alembic downgrade base")
 
 
-@pytest_asyncio.fixture(autouse=True, scope="session", loop_scope="session")
-async def _reset_redis_pool():
-    """Ensure Redis pool starts fresh on the session event loop."""
-    await redis_pool.disconnect()
-    yield
-    await redis_pool.disconnect()
+@pytest.fixture(scope="session")
+def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    loop.run_until_complete(engine.dispose())
+    loop.run_until_complete(redis_pool.disconnect())
+    yield loop
+    loop.run_until_complete(engine.dispose())
+    loop.run_until_complete(redis_pool.disconnect())
+    loop.close()
