@@ -88,7 +88,32 @@ When triggered after a deploy (by Coolify webhook or Release Engineer handoff):
 1. Run `/canary` to check for console errors, performance regressions, and page failures
 2. Check Sentry for new errors in the last 10 minutes
 3. Verify DB health query
-4. Report results to **CTO** — GREEN (all clear) or RED (issues found)
+4. Run E2E smoke tests (see below)
+5. Report results to **CTO** — GREEN (all clear) or RED (issues found)
+
+## Post-Deploy E2E Smoke Tests
+
+After running /canary, Sentry scan, and DB health checks, run the E2E smoke tests to verify the bot works as a real user would experience it:
+
+```bash
+pip install -r requirements-e2e.txt  # if not already installed
+python scripts/e2e_smoke.py
+```
+
+Requires env vars: `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION_STRING` (configured as Paperclip secrets).
+
+**Interpret results:**
+- `PASS` — GREEN, bot is fully functional (responds with memes + buttons)
+- `WARN` — YELLOW, bot responds but with unexpected content (popups, text instead of memes). Not an outage.
+- `FAIL` — CRITICAL RED, bot is not responding to users. Escalate to CTO immediately.
+- `SKIP` — E2E credentials not configured. Rely on other checks (Sentry, logs, DB health).
+
+**If FAIL post-deploy:**
+1. Check if it's a transient Telegram API issue (retry once after 30s)
+2. If still failing, escalate to CTO with full script output
+3. The specific failure message maps directly to the broken feature
+
+**Session string exclusivity:** The Telegram session string can only be used by one process at a time. Do not run E2E smoke tests concurrently with any other Telethon client using the same session. If the session is invalidated, regenerate with `python scripts/generate_session_string.py`.
 
 ## What NOT To Do
 - Do NOT fix bugs yourself (create tasks for **CTO**)
