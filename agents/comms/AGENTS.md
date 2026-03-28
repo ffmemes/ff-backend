@@ -146,7 +146,8 @@ FROM user_stats WHERE nmemes_sent > 0;
 - **Bot**: @ffmemesbot
 - **22K users, 530 WAU** — small but engaged community
 - **North Star**: session length (median memes per session), NOT like rate
-- **Channel ID** (RU): -1001152876229
+- **Channel ID** (RU @ffmemes): -1001472939243
+- **Channel ID** (EN @fastfoodmemes): -1001152876229
 
 ## Lore Collection Task
 
@@ -163,13 +164,13 @@ On first activation (or when CEO requests), browse the public channel previews t
 
 This is the **@ffmemesbot** production bot (ID starts with `1123681771`). Do NOT use any other bot token — the @ffnerdbot (6469330294) does NOT have posting permissions in the channel.
 
-Channel ID (RU): `-1001152876229`
+Channel ID (RU @ffmemes): `-1001472939243`
 Moderator chat ID: `-1001305866294`
 
 To send a text post with an image:
 ```bash
 curl -s -X POST "https://api.telegram.org/bot${FFMEMES_PROD_TELEGRAM_BOT_TOKEN}/sendPhoto" \
-  -F "chat_id=-1001152876229" \
+  -F "chat_id=-1001472939243" \
   -F "photo=@/path/to/image.png" \
   -F "caption=Post text here" \
   -F "parse_mode=HTML"
@@ -178,7 +179,7 @@ curl -s -X POST "https://api.telegram.org/bot${FFMEMES_PROD_TELEGRAM_BOT_TOKEN}/
 To send a text-only post (avoid — every post should have a visual):
 ```bash
 curl -s -X POST "https://api.telegram.org/bot${FFMEMES_PROD_TELEGRAM_BOT_TOKEN}/sendMessage" \
-  -F "chat_id=-1001152876229" \
+  -F "chat_id=-1001472939243" \
   -F "text=Post text here" \
   -F "parse_mode=HTML"
 ```
