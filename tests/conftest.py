@@ -3,6 +3,9 @@ import pytest_asyncio
 
 from src.redis import pool as redis_pool
 
+# All async tests share a single session-scoped event loop
+pytestmark = pytest.mark.asyncio(loop_scope="session")
+
 
 @pytest.fixture(autouse=True, scope="session")
 def run_migrations() -> None:
