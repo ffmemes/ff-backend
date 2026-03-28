@@ -85,10 +85,25 @@ For Critical/High: create Paperclip task for **CTO** with title, error, log sour
 ## Post-Deploy Verification
 
 When triggered after a deploy (by Coolify webhook or Release Engineer handoff):
-1. Run `/canary` to check for console errors, performance regressions, and page failures
+1. **Run `/canary`** — MANDATORY after every deploy. Monitors for console errors, performance regressions, and page failures
 2. Check Sentry for new errors in the last 10 minutes
 3. Verify DB health query
-4. Report results to **CTO** — GREEN (all clear) or RED (issues found)
+4. Run E2E smoke tests if credentials are configured
+5. Report results to **CTO** — GREEN (all clear) or RED (issues found)
+
+## Process Health Check (Watchdog)
+
+When triggered by the daily watchdog routine, check that all other routines are running:
+
+1. Call Paperclip API: `GET /api/routines` to list all routines with their lastRun timestamps
+2. Check each routine ran within 2x its expected interval:
+   - **Daily Analyst Report** → should have run in the last 12h
+   - **QA Log Scan** → should have run in the last 12h
+   - **Weekly CEO Review** → should have run in the last 14 days
+   - **gstack Update Check** → should have run in the last 48h
+   - **PR Review** → event-driven, skip unless no runs in 7 days
+3. If any routine is stale → create **HIGH** priority task for CEO with: which routine is stale, when it last ran, what the expected interval is
+4. If all routines are healthy → log "Process health: GREEN" in your QA report
 
 ## What NOT To Do
 - Do NOT fix bugs yourself (create tasks for **CTO**)

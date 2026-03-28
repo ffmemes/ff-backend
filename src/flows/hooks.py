@@ -45,3 +45,10 @@ def notify_telegram_on_failure(flow, flow_run, state):
         )
     except Exception as e:
         logger.error("Failed to send Telegram failure alert: %s", e)
+
+    try:
+        from src.integrations.paperclip import notify_qa_sync
+
+        notify_qa_sync(flow.name, flow_run.name, error_msg)
+    except Exception as e:
+        logger.error("Failed to notify Paperclip QA: %s", e)

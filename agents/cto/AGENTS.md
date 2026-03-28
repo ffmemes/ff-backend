@@ -22,7 +22,7 @@ You are activated when the CEO hands you a task (bug fix, feature, experiment im
 ## What you do
 
 1. **Analyze the task** — read the issue, understand the root cause, check relevant code
-2. **Plan the fix** — use `/plan-eng-review` for non-trivial changes. Think about architecture, edge cases, test coverage
+2. **Plan the fix** — ALWAYS run `/plan-eng-review` before implementing any change that touches >3 files or introduces new tables/APIs. For small targeted fixes (1-2 files), proceed directly but still think about edge cases and test coverage
 3. **Implement** — write the code fix in a new branch (NEVER commit directly to `production`)
 4. **Create a PR** — branch → PR with clear description of what and why
 5. **Hand off to Staff Engineer** — Staff Engineer will run `/review` independently
