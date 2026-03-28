@@ -19,34 +19,41 @@ async def _get_weekly_burger_stats() -> dict:
     """Query treasury_trx for weekly aggregates."""
 
     total_minted = await fetch_one(
-        text("""
+        text(
+            """
             SELECT COALESCE(SUM(amount), 0) as total
             FROM treasury_trx
             WHERE amount > 0
               AND created_at > now() - interval '7 days'
-        """)
+        """
+        )
     )
 
     total_spent = await fetch_one(
-        text("""
+        text(
+            """
             SELECT COALESCE(SUM(ABS(amount)), 0) as total
             FROM treasury_trx
             WHERE amount < 0
               AND created_at > now() - interval '7 days'
-        """)
+        """
+        )
     )
 
     active_earners = await fetch_one(
-        text("""
+        text(
+            """
             SELECT COUNT(DISTINCT user_id) as count
             FROM treasury_trx
             WHERE amount > 0
               AND created_at > now() - interval '7 days'
-        """)
+        """
+        )
     )
 
     top_earners = await fetch_all(
-        text("""
+        text(
+            """
             SELECT user_id, SUM(amount) as earned
             FROM treasury_trx
             WHERE amount > 0
@@ -54,14 +61,17 @@ async def _get_weekly_burger_stats() -> dict:
             GROUP BY user_id
             ORDER BY earned DESC
             LIMIT 5
-        """)
+        """
+        )
     )
 
     total_supply = await fetch_one(
-        text("""
+        text(
+            """
             SELECT COALESCE(SUM(amount), 0) as total
             FROM treasury_trx
-        """)
+        """
+        )
     )
 
     return {
@@ -93,7 +103,9 @@ def _format_report(stats: dict) -> str:
             lines.append(f"{medals[i]} +{earned:,} 🍔".replace(",", " "))
 
     lines.append("")
-    lines.append('Как заработать бургеры: <a href="https://t.me/ffmemesbot?start=kitchen">/kitchen</a>')
+    lines.append(
+        'Как заработать бургеры: <a href="https://t.me/ffmemesbot?start=kitchen">/kitchen</a>'
+    )
 
     return "\n".join(lines)
 

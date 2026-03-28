@@ -95,7 +95,8 @@ async def execute_search_memes(query: str, limit: int = 5) -> str:
     query = query.replace("%", r"\%").replace("_", r"\_")
     limit = min(limit, 10)
     rows = await fetch_all(
-        text("""
+        text(
+            """
             SELECT m.id, m.type,
                    COALESCE(
                        m.ocr_result->>'description',
@@ -112,7 +113,8 @@ async def execute_search_memes(query: str, limit: int = 5) -> str:
               )
             ORDER BY COALESCE(ms.nlikes, 0) DESC
             LIMIT :limit
-        """),
+        """
+        ),
         {"pattern": f"%{query}%", "limit": limit},
     )
     if not rows:
@@ -147,18 +149,24 @@ async def execute_send_meme(
     try:
         if meme_type == "animation":
             await bot.send_animation(
-                chat_id=chat_id, animation=file_id,
-                reply_markup=keyboard, reply_to_message_id=reply_to_message_id,
+                chat_id=chat_id,
+                animation=file_id,
+                reply_markup=keyboard,
+                reply_to_message_id=reply_to_message_id,
             )
         elif meme_type == "video":
             await bot.send_video(
-                chat_id=chat_id, video=file_id,
-                reply_markup=keyboard, reply_to_message_id=reply_to_message_id,
+                chat_id=chat_id,
+                video=file_id,
+                reply_markup=keyboard,
+                reply_to_message_id=reply_to_message_id,
             )
         else:
             await bot.send_photo(
-                chat_id=chat_id, photo=file_id,
-                reply_markup=keyboard, reply_to_message_id=reply_to_message_id,
+                chat_id=chat_id,
+                photo=file_id,
+                reply_markup=keyboard,
+                reply_to_message_id=reply_to_message_id,
             )
         return f"Sent meme {meme_id}."
     except Exception as e:
@@ -174,9 +182,7 @@ async def execute_get_chat_history(chat_id: int, limit: int = 50) -> str:
     return _messages_to_text(messages)
 
 
-async def execute_react_to_message(
-    bot, chat_id: int, message_id: int, emoji: str
-) -> str:
+async def execute_react_to_message(bot, chat_id: int, message_id: int, emoji: str) -> str:
     try:
         await bot.set_message_reaction(
             chat_id=chat_id,
@@ -203,7 +209,8 @@ async def dispatch_tool(
             )
         elif tool_name == "send_meme":
             return await execute_send_meme(
-                bot, chat_id,
+                bot,
+                chat_id,
                 meme_id=args.get("meme_id", 0),
                 reply_to_message_id=reply_to_message_id,
             )
@@ -214,7 +221,8 @@ async def dispatch_tool(
             )
         elif tool_name == "react_to_message":
             return await execute_react_to_message(
-                bot, chat_id,
+                bot,
+                chat_id,
                 message_id=args.get("message_id", 0),
                 emoji=args.get("emoji", "👍"),
             )

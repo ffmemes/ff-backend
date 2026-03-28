@@ -41,6 +41,7 @@ async def clean_reactions(setup):
         from sqlalchemy import delete
 
         from src.database import user_meme_reaction
+
         await conn.execute(delete(user_stats).where(user_stats.c.user_id >= 10000))
         await conn.execute(delete(user_meme_reaction).where(user_meme_reaction.c.user_id >= 10000))
         await conn.commit()
@@ -78,9 +79,7 @@ async def test_session_gap_30min(setup, clean_reactions):
 
     await calculate_user_stats()
 
-    rows = await fetch_all(
-        select(user_stats).where(user_stats.c.user_id == 10001)
-    )
+    rows = await fetch_all(select(user_stats).where(user_stats.c.user_id == 10001))
     assert len(rows) == 1
     row = rows[0]
 
@@ -120,9 +119,7 @@ async def test_median_session_length(setup, clean_reactions):
 
     await calculate_user_stats()
 
-    rows = await fetch_all(
-        select(user_stats).where(user_stats.c.user_id == 10001)
-    )
+    rows = await fetch_all(select(user_stats).where(user_stats.c.user_id == 10001))
     assert len(rows) == 1
     row = rows[0]
 

@@ -30,9 +30,7 @@ async def setup_test_user():
 async def test_cold_start_phase1_uses_explore():
     """Phase 1 (<6 memes): uses cold_start_explore engine"""
 
-    async def cold_start_explore(
-        self, user_id, limit=10, exclude_meme_ids=[], **kw
-    ):
+    async def cold_start_explore(self, user_id, limit=10, exclude_meme_ids=[], **kw):
         return [{"id": 101}, {"id": 102}, {"id": 103}]
 
     async def cold_start_adapt(self, user_id, limit=10, exclude_meme_ids=[], **kw):

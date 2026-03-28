@@ -46,11 +46,7 @@ async def post_editorial_to_channel(
     """
     logger = get_run_logger()
 
-    chat_id = (
-        TELEGRAM_CHANNEL_RU_CHAT_ID
-        if channel == "ru"
-        else TELEGRAM_CHANNEL_EN_CHAT_ID
-    )
+    chat_id = TELEGRAM_CHANNEL_RU_CHAT_ID if channel == "ru" else TELEGRAM_CHANNEL_EN_CHAT_ID
 
     reply_markup = None
     if button_text and button_url:

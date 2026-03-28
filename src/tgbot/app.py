@@ -210,10 +210,12 @@ def add_handlers(application: Application) -> None:
     )
 
     from src.tgbot.handlers.stats.wrapped import handle_wrapped_go
+
     application.add_handler(CallbackQueryHandler(handle_wrapped_go, pattern=r"^wrapped_go$"))
     application.add_handler(CallbackQueryHandler(handle_wrapped_button, pattern=r"^wrapped_\d"))
 
     from src.tgbot.handlers.stats.wrapped import handle_wrapped_clear
+
     application.add_handler(
         CommandHandler(
             "wrapped_clear",
@@ -493,12 +495,11 @@ async def process_event(payload: dict) -> None:
         await application.process_update(update)
     except Exception as e:
         import sys
+
         cb = ""
         if update.callback_query:
             cb = f" cb={update.callback_query.data}"
-        sys.stderr.write(
-            f"[process_event] UNHANDLED ERROR{cb}: {e}\n"
-        )
+        sys.stderr.write(f"[process_event] UNHANDLED ERROR{cb}: {e}\n")
         sys.stderr.flush()
         raise
 

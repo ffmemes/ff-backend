@@ -45,6 +45,7 @@ async def get_popup_to_send(user_id: int, user_info: dict) -> Popup | None:
             from src.tgbot.handlers.stats.wrapped import (
                 is_wrapped_auto_trigger_active,
             )
+
             if await is_wrapped_auto_trigger_active(user_id):
                 return Popup(
                     id=popup_id,
