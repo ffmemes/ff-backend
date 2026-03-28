@@ -110,14 +110,14 @@ async def send_new_message_with_meme(
     meme: MemeData,
     reply_markup: InlineKeyboardMarkup | None = None,
 ) -> Message:
-    try:
+    async def _do_send(parse_mode):
         if meme.type == MemeType.IMAGE:
             return await bot.send_photo(
                 chat_id=user_id,
                 photo=meme.telegram_file_id,
                 caption=meme.caption,
                 reply_markup=reply_markup,
-                parse_mode=ParseMode.HTML,
+                parse_mode=parse_mode,
             )
         elif meme.type == MemeType.VIDEO:
             return await bot.send_video(
@@ -125,7 +125,7 @@ async def send_new_message_with_meme(
                 video=meme.telegram_file_id,
                 caption=meme.caption,
                 reply_markup=reply_markup,
-                parse_mode=ParseMode.HTML,
+                parse_mode=parse_mode,
             )
         elif meme.type == MemeType.ANIMATION:
             return await bot.send_animation(
@@ -133,10 +133,23 @@ async def send_new_message_with_meme(
                 animation=meme.telegram_file_id,
                 caption=meme.caption,
                 reply_markup=reply_markup,
-                parse_mode=ParseMode.HTML,
+                parse_mode=parse_mode,
             )
         else:
             raise NotImplementedError(f"Can't send meme. Unknown meme type: {meme.type}")
+
+    try:
+        return await _do_send(ParseMode.HTML)
+    except BadRequest as error:
+        if "can't parse entities" in str(error).lower():
+            logger.warning(
+                "HTML entity error sending meme %s to user %s: %s. Retrying without parse_mode.",
+                meme.id,
+                user_id,
+                error,
+            )
+            return await _do_send(None)
+        raise
     except Forbidden:
         await update_user(user_id, type=UserType.BLOCKED_BOT)
 
