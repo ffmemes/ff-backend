@@ -347,9 +347,10 @@ async def test_last_meme_excluded(conn):
         min_user_reactions=0, min_meme_reactions=0, lookback_hours=999_999
     )
 
-    # meme 1: all rows are NULL (last meme per user) → excluded → no score
+    # meme 1: all rows are NULL (last meme per user) → excluded from AVG →
+    # engagement_score defaults to 0 (neutral, no engagement signal)
     score = await _get_engagement_score(1)
-    assert score is None
+    assert score == 0.0
 
 
 @pytest.mark.asyncio
