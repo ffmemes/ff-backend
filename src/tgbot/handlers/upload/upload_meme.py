@@ -92,9 +92,7 @@ async def _reply_with_forwarded_meme_stats(
     source_nlikes = meme_source_stats["nlikes"] if meme_source_stats else 0
     source_ndislikes = meme_source_stats["ndislikes"] if meme_source_stats else 0
     source_memes_sent = meme_source_stats["nmemes_sent"] if meme_source_stats else 0
-    source_memes_sent_events = (
-        meme_source_stats["nmemes_sent_events"] if meme_source_stats else 0
-    )
+    source_memes_sent_events = meme_source_stats["nmemes_sent_events"] if meme_source_stats else 0
     source_memes_parsed = meme_source_stats["nmemes_parsed"] if meme_source_stats else 0
 
     published_at = meme.get("published_at")
@@ -115,9 +113,7 @@ async def _reply_with_forwarded_meme_stats(
         info_lines.append(published_line)
 
     valid_sent_ratio = (
-        int(source_memes_sent / source_memes_parsed * 100)
-        if source_memes_parsed
-        else 0
+        int(source_memes_sent / source_memes_parsed * 100) if source_memes_parsed else 0
     )
 
     info_lines.extend(

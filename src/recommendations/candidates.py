@@ -11,9 +11,9 @@ logger = logging.getLogger(__name__)
 
 # Quality thresholds for the goat pool.
 # Memes must have enough data and age to be considered "greatest of all time".
-GOAT_MIN_REACTIONS = 10    # (nlikes + ndislikes) — enough statistical signal
-GOAT_MIN_LR = 0.20         # lr_smoothed — minimum proven like rate
-GOAT_MIN_AGE_DAYS = 3      # days since created_at — must have aged enough to accumulate reactions
+GOAT_MIN_REACTIONS = 10  # (nlikes + ndislikes) — enough statistical signal
+GOAT_MIN_LR = 0.20  # lr_smoothed — minimum proven like rate
+GOAT_MIN_AGE_DAYS = 3  # days since created_at — must have aged enough to accumulate reactions
 
 
 def _build_params(

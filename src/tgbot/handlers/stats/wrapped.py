@@ -64,6 +64,7 @@ def _log(msg: str) -> None:
 
 # ── LLM ──────────────────────────────────────────────────
 
+
 async def call_deepseek(prompt: str) -> str:
     client = AsyncOpenAI(
         api_key=settings.DEEPSEEK_API_KEY,
@@ -95,13 +96,16 @@ def parse_json_from_llm(raw: str) -> dict | None:
 
 # ── SQL INSIGHTS ─────────────────────────────────────────
 
+
 async def get_reaction_speed_insight(user_id: int) -> dict:
     """Median reaction time, split by like/dislike. Pure SQL."""
     from sqlalchemy import text
 
     from src.database import fetch_one
 
-    row = await fetch_one(text("""
+    row = await fetch_one(
+        text(
+            """
         WITH reactions AS (
             SELECT
                 EXTRACT(EPOCH FROM (reacted_at - sent_at)) AS sec,
@@ -123,7 +127,10 @@ async def get_reaction_speed_insight(user_id: int) -> dict:
                 ORDER BY sec
             ) FILTER (WHERE reaction_id = 2) AS median_dislike
         FROM reactions
-    """), {"user_id": user_id})
+    """
+        ),
+        {"user_id": user_id},
+    )
 
     if not row or row["median_sec"] is None:
         return {}
@@ -142,7 +149,9 @@ async def get_peak_hour_insight(user_id: int, is_ru: bool = True) -> dict:
 
     # UTC+3 for Russian users
     tz_offset = 3 if is_ru else 0
-    row = await fetch_one(text(f"""
+    row = await fetch_one(
+        text(
+            f"""
         SELECT
             EXTRACT(HOUR FROM reacted_at + interval '{tz_offset} hours')
                 AS peak_hour,
@@ -150,7 +159,10 @@ async def get_peak_hour_insight(user_id: int, is_ru: bool = True) -> dict:
         FROM user_meme_reaction
         WHERE user_id = :user_id AND reacted_at IS NOT NULL
         GROUP BY 1 ORDER BY 2 DESC LIMIT 1
-    """), {"user_id": user_id})
+    """
+        ),
+        {"user_id": user_id},
+    )
 
     if not row:
         return {}
@@ -177,7 +189,9 @@ async def get_surprise_meme(user_id: int) -> dict | None:
 
     from src.database import fetch_one
 
-    row = await fetch_one(text("""
+    row = await fetch_one(
+        text(
+            """
         SELECT m.id AS meme_id, m.type, m.telegram_file_id,
                ROUND(COALESCE(ms.lr_smoothed, 0.5) * 100)
                    AS global_lr_pct
@@ -190,7 +204,10 @@ async def get_surprise_meme(user_id: int) -> dict | None:
           AND COALESCE(ms.lr_smoothed, 0.5) < 0.35
           AND COALESCE(ms.nmemes_sent, 0) >= 10
         ORDER BY ms.lr_smoothed ASC LIMIT 1
-    """), {"user_id": user_id})
+    """
+        ),
+        {"user_id": user_id},
+    )
     if not row:
         return None
     return dict(row)
@@ -198,8 +215,10 @@ async def get_surprise_meme(user_id: int) -> dict | None:
 
 # ── MAIN HANDLER ─────────────────────────────────────────
 
+
 async def handle_wrapped(
-    update: Update, context: ContextTypes.DEFAULT_TYPE,
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
     user_id = update.effective_user.id
     _log(f"handle_wrapped called for {user_id}")
@@ -214,7 +233,9 @@ async def handle_wrapped(
     )
 
     if not await check_if_user_chat_member(
-        context.bot, user_id, TELEGRAM_CHANNEL_RU_CHAT_ID,
+        context.bot,
+        user_id,
+        TELEGRAM_CHANNEL_RU_CHAT_ID,
     ):
         return await update.message.reply_text(
             f"Статистика доступна только подписчикам нашего канала 😉\n\n"
@@ -232,9 +253,7 @@ async def handle_wrapped(
     # Check conditions BEFORE showing welcome
     user_stats_data = await get_user_stats(user_id)
     if not user_stats_data:
-        return await update.message.reply_text(
-            "Маловато ты пользовался ботом 😅 /start"
-        )
+        return await update.message.reply_text("Маловато ты пользовался ботом 😅 /start")
     nmemes_sent = user_stats_data.get("nmemes_sent", 0)
     if nmemes_sent < WRAPPED_MIN_REACTIONS:
         remaining = WRAPPED_MIN_REACTIONS - nmemes_sent
@@ -242,43 +261,53 @@ async def handle_wrapped(
             f"Посмотри ещё {remaining} мемов и возвращайся! /start"
         )
     descriptions = await get_meme_descriptions_for_wrapped(
-        user_id, limit=40,
+        user_id,
+        limit=40,
     )
     if len(descriptions) < WRAPPED_MIN_DESCRIPTIONS:
         return await update.message.reply_text(
-            "Мы ещё анализируем твои мемы... 🔬\n"
-            "Попробуй через пару часов! /start"
+            "Мы ещё анализируем твои мемы... 🔬\n" "Попробуй через пару часов! /start"
         )
 
     # ── START DEEPSEEK EARLY (while user reads welcome) ──
     user = await get_user_by_id(user_id)
     is_ru = get_user_interface_language(user) == "ru"
     stats_report = await get_bot_usage_report(
-        user_id, user_stats_data, user, is_ru,
+        user_id,
+        user_stats_data,
+        user,
+        is_ru,
     )
     asyncio.create_task(
         _generate_and_cache(
-            user_id, descriptions, is_ru, stats_report or "",
+            user_id,
+            descriptions,
+            is_ru,
+            stats_report or "",
         )
     )
 
     # Welcome message
     await update.effective_chat.send_message(
         text=(
-            "🎁 Мы подготовили глубокий анализ "
-            "твоего чувства юмора.\n\n"
-            "Хочешь посмотреть?"
+            "🎁 Мы подготовили глубокий анализ " "твоего чувства юмора.\n\n" "Хочешь посмотреть?"
         ),
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton(
-                "ПОСМОТРЕТЬ 🔮", callback_data="wrapped_go",
-            ),
-        ]]),
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "ПОСМОТРЕТЬ 🔮",
+                        callback_data="wrapped_go",
+                    ),
+                ]
+            ]
+        ),
     )
 
 
 async def handle_wrapped_go(
-    update: Update, context: ContextTypes.DEFAULT_TYPE,
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
     """ДА / ПОСМОТРЕТЬ pressed — show stats slide."""
     if update.callback_query:
@@ -288,7 +317,8 @@ async def handle_wrapped_go(
     _log(f"handle_wrapped_go called for {user_id}")
     try:
         await context.bot.send_chat_action(
-            chat_id=user_id, action=ChatAction.TYPING,
+            chat_id=user_id,
+            action=ChatAction.TYPING,
         )
     except Exception:
         pass
@@ -306,9 +336,14 @@ async def handle_wrapped_go(
                     text=stats,
                     parse_mode="HTML",
                     reply_markup=InlineKeyboardMarkup(
-                        [[InlineKeyboardButton(
-                            "Дальше →", callback_data="wrapped_1",
-                        )]]
+                        [
+                            [
+                                InlineKeyboardButton(
+                                    "Дальше →",
+                                    callback_data="wrapped_1",
+                                )
+                            ]
+                        ]
                     ),
                 )
             except Exception:
@@ -322,10 +357,14 @@ async def handle_wrapped_go(
                 await update.callback_query.message.edit_text(
                     text=msg_text,
                     reply_markup=InlineKeyboardMarkup(
-                        [[InlineKeyboardButton(
-                            btn_text,
-                            callback_data="wrapped_1",
-                        )]]
+                        [
+                            [
+                                InlineKeyboardButton(
+                                    btn_text,
+                                    callback_data="wrapped_1",
+                                )
+                            ]
+                        ]
                     ),
                 )
             except Exception:
@@ -333,14 +372,14 @@ async def handle_wrapped_go(
         return
 
     # No cache at all — shouldn't happen, but handle gracefully
-    await update.effective_chat.send_message(
-        "Попробуй /wrapped ещё раз"
-    )
+    await update.effective_chat.send_message("Попробуй /wrapped ещё раз")
 
 
 async def _generate_and_cache(
-    user_id: int, descriptions: list,
-    is_ru: bool, stats_report: str,
+    user_id: int,
+    descriptions: list,
+    is_ru: bool,
+    stats_report: str,
 ):
     """Background: generate all data and save to cache."""
     try:
@@ -353,7 +392,10 @@ async def _generate_and_cache(
         _log(f"starting generation for {user_id}")
 
         data = await generate_wrapped_data(
-            user_id, descriptions, is_ru, stats_report,
+            user_id,
+            descriptions,
+            is_ru,
+            stats_report,
         )
         if data:
             await set_user_wrapped(user_id, data)
@@ -363,13 +405,16 @@ async def _generate_and_cache(
     except Exception as e:
         _log(f"bg error for {user_id}: {e}")
         from src.redis import redis_client
+
         await redis_client.delete(f"wrapped:{user_id}")
 
 
 # ── SLIDE NAVIGATION ─────────────────────────────────────
 
+
 async def handle_wrapped_button(
-    update: Update, context: ContextTypes.DEFAULT_TYPE,
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
     cb = update.callback_query.data if update.callback_query else "none"
     _log(f"handle_wrapped_button ENTRY cb={cb}")
@@ -390,10 +435,14 @@ async def handle_wrapped_button(
                 await update.callback_query.message.edit_text(
                     text=msg_text,
                     reply_markup=InlineKeyboardMarkup(
-                        [[InlineKeyboardButton(
-                            btn_text,
-                            callback_data=update.callback_query.data,
-                        )]]
+                        [
+                            [
+                                InlineKeyboardButton(
+                                    btn_text,
+                                    callback_data=update.callback_query.data,
+                                )
+                            ]
+                        ]
                     ),
                 )
             except Exception:
@@ -415,7 +464,8 @@ async def handle_wrapped_button(
 
     try:
         await context.bot.send_chat_action(
-            chat_id=user_id, action=ChatAction.TYPING,
+            chat_id=user_id,
+            action=ChatAction.TYPING,
         )
     except Exception:
         pass
@@ -425,21 +475,31 @@ async def handle_wrapped_button(
     except Exception as e:
         logger.error(
             "[wrapped] slide %d error for %d: %s",
-            key, user_id, e, exc_info=True,
+            key,
+            user_id,
+            e,
+            exc_info=True,
         )
         # Try to send next slide as fallback
         try:
             if key < 5:
                 await _show_slide(
-                    update, context, uw, key + 1, user_id,
+                    update,
+                    context,
+                    uw,
+                    key + 1,
+                    user_id,
                 )
         except Exception:
             pass
 
 
 async def _show_slide(
-    update: Update, context: ContextTypes.DEFAULT_TYPE,
-    uw: dict, key: int, user_id: int,
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    uw: dict,
+    key: int,
+    user_id: int,
 ) -> None:
     """Send a single slide. Extracted for error isolation."""
 
@@ -460,14 +520,18 @@ async def _show_slide(
                 md = await get_meme_by_id(meme_info["meme_id"])
                 if md and md.get("telegram_file_id"):
                     meme = MemeData(
-                        id=md["id"], type=md["type"],
+                        id=md["id"],
+                        type=md["type"],
                         telegram_file_id=md["telegram_file_id"],
                         caption=meme_info.get(
-                            "caption", "🎯 Этот мем — это ты",
+                            "caption",
+                            "🎯 Этот мем — это ты",
                         ),
                     )
                     await send_new_message_with_meme(
-                        context.bot, user_id, meme,
+                        context.bot,
+                        user_id,
+                        meme,
                         reply_markup=_next_btn("wrapped_2"),
                     )
                     sent = True
@@ -482,7 +546,8 @@ async def _show_slide(
         if txt:
             try:
                 await update.effective_chat.send_message(
-                    text=txt, parse_mode="HTML",
+                    text=txt,
+                    parse_mode="HTML",
                     reply_markup=_next_btn("wrapped_3"),
                 )
             except Exception as e:
@@ -497,7 +562,8 @@ async def _show_slide(
         if txt:
             try:
                 await update.effective_chat.send_message(
-                    text=txt, parse_mode="HTML",
+                    text=txt,
+                    parse_mode="HTML",
                     reply_markup=_next_btn("wrapped_4"),
                 )
             except Exception as e:
@@ -512,12 +578,17 @@ async def _show_slide(
         if txt:
             try:
                 await update.effective_chat.send_message(
-                    text=txt, parse_mode="HTML",
+                    text=txt,
+                    parse_mode="HTML",
                     reply_markup=InlineKeyboardMarkup(
-                        [[InlineKeyboardButton(
-                            "Финалочка →",
-                            callback_data="wrapped_5",
-                        )]]
+                        [
+                            [
+                                InlineKeyboardButton(
+                                    "Финалочка →",
+                                    callback_data="wrapped_5",
+                                )
+                            ]
+                        ]
                     ),
                 )
             except Exception as e:
@@ -538,38 +609,45 @@ async def _show_slide(
                 "свой мем-профиль 👇"
             ),
             parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton(
-                    "📤 Отправить другу",
-                    url="https://t.me/ffmemesbot?start=wrapped",
-                ),
-            ]]),
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            "📤 Отправить другу",
+                            url="https://t.me/ffmemesbot?start=wrapped",
+                        ),
+                    ]
+                ]
+            ),
         )
 
 
 def _next_btn(callback: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        [[InlineKeyboardButton("Дальше →", callback_data=callback)]]
-    )
+    return InlineKeyboardMarkup([[InlineKeyboardButton("Дальше →", callback_data=callback)]])
 
 
 async def handle_wrapped_clear(
-    update: Update, context: ContextTypes.DEFAULT_TYPE,
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
     user_id = update.effective_user.id
     user = await get_user_by_id(user_id)
     if not user or user.get("type") not in ("moderator", "admin"):
         return
     from src.redis import redis_client
+
     await redis_client.delete(f"wrapped:{user_id}")
     await update.message.reply_text("Cache cleared ✓ /wrapped")
 
 
 # ── GENERATION ───────────────────────────────────────────
 
+
 async def generate_wrapped_data(
-    user_id: int, descriptions: list,
-    is_ru: bool, stats_report: str,
+    user_id: int,
+    descriptions: list,
+    is_ru: bool,
+    stats_report: str,
 ) -> dict | None:
     await set_user_wrapped(
         user_id,
@@ -586,8 +664,7 @@ async def generate_wrapped_data(
             for i, d in enumerate(liked[:25])
         )
         disliked_texts = "\n".join(
-            f"❌ {d.get('description') or d.get('ocr_text', '')}"
-            for d in disliked[:15]
+            f"❌ {d.get('description') or d.get('ocr_text', '')}" for d in disliked[:15]
         )
 
         # ONE DeepSeek call
@@ -596,7 +673,9 @@ async def generate_wrapped_data(
         p = parse_json_from_llm(raw)
         if not p:
             logger.warning(
-                "DeepSeek JSON failed user %d: %s", user_id, raw[:300],
+                "DeepSeek JSON failed user %d: %s",
+                user_id,
+                raw[:300],
             )
             p = {}
 
@@ -613,10 +692,7 @@ async def generate_wrapped_data(
             lr = surprise.get("global_lr_pct", "?")
             your_meme = {
                 "meme_id": surprise["meme_id"],
-                "caption": (
-                    f"🎲 Этот мем лайкнул только ты\n"
-                    f"(глобальный лайк-рейт: {lr}%)"
-                ),
+                "caption": (f"🎲 Этот мем лайкнул только ты\n" f"(глобальный лайк-рейт: {lr}%)"),
             }
         if not your_meme and liked:
             pick = random.choice(liked[:10])
@@ -743,7 +819,9 @@ def _build_anti_slide(p: dict) -> str:
 
 
 def _build_extra_slide(
-    sources: str, speed: dict, peak: dict,
+    sources: str,
+    speed: dict,
+    peak: dict,
 ) -> str:
     parts = []
     if sources:
@@ -754,18 +832,14 @@ def _build_extra_slide(
         ml = speed.get("median_like", 0)
         md = speed.get("median_dislike", 0)
         parts.append(
-            f"⚡ <b>Скорость реакции:</b> {med} сек\n"
-            f"(до лайка: {ml} сек, до скипа: {md} сек)"
+            f"⚡ <b>Скорость реакции:</b> {med} сек\n" f"(до лайка: {ml} сек, до скипа: {md} сек)"
         )
 
     if peak:
         h = peak.get("hour", 0)
         label = peak.get("label", "")
         tz = peak.get("tz", "")
-        parts.append(
-            f"🕐 <b>Пик активности:</b> {h}:00 {tz}\n"
-            f"Ты — {label}"
-        )
+        parts.append(f"🕐 <b>Пик активности:</b> {h}:00 {tz}\n" f"Ты — {label}")
 
     return "\n\n".join(parts) if parts else ""
 
@@ -773,7 +847,8 @@ def _build_extra_slide(
 async def _build_sources_report(user_id: int) -> str:
     sources = await get_most_liked_meme_source_urls(user_id, limit=10)
     real = [
-        s for s in (sources or [])
+        s
+        for s in (sources or [])
         if s.get("url")
         and not s["url"].startswith("tg://user")
         and ("t.me/" in s["url"] or "vk.com/" in s["url"])
@@ -781,7 +856,7 @@ async def _build_sources_report(user_id: int) -> str:
     if len(real) < 3:
         try:
             top = await get_top_meme_source_urls(limit=5)
-            for t in (top or []):
+            for t in top or []:
                 if (
                     t.get("url")
                     and not t["url"].startswith("tg://user")
@@ -800,8 +875,11 @@ async def _build_sources_report(user_id: int) -> str:
 
 # ── STATS SLIDE ──────────────────────────────────────────
 
+
 async def get_bot_usage_report(
-    user_id: int, user_stats: dict, user: dict,
+    user_id: int,
+    user_stats: dict,
+    user: dict,
     is_ru: bool = True,
 ) -> str | None:
     if user_stats is None:

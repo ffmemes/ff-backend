@@ -36,9 +36,7 @@ async def parse_telegram_source(
 
     snooze_reason = await maybe_auto_snooze_source(meme_source_id, len(posts))
     if snooze_reason:
-        logger.warning(
-            f"Auto-snoozed source {meme_source_id} ({meme_source_url}): {snooze_reason}"
-        )
+        logger.warning(f"Auto-snoozed source {meme_source_id} ({meme_source_url}): {snooze_reason}")
         await log(
             f"🔕 Auto-snoozed TG source <b>@{tg_username}</b> (id={meme_source_id})\n"
             f"Reason: <code>{snooze_reason}</code>"
@@ -72,9 +70,7 @@ async def parse_telegram_sources(
             ok_count += 1
         except Exception as e:
             fail_count += 1
-            logger.error(
-                f"Source {tg_source['id']} ({tg_source['url']}) failed: {e}"
-            )
+            logger.error(f"Source {tg_source['id']} ({tg_source['url']}) failed: {e}")
 
     elapsed = time.monotonic() - t0
     logger.info(

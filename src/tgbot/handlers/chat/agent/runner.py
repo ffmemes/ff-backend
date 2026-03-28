@@ -152,13 +152,15 @@ def _log_usage(
     async def _insert():
         try:
             await execute(
-                text("""
+                text(
+                    """
                     INSERT INTO chat_agent_usage
                     (chat_id, user_id, prompt_tokens, completion_tokens,
                      tool_calls, response_time_ms, trigger_type)
                     VALUES (:chat_id, :user_id, :prompt_tokens, :completion_tokens,
                             :tool_calls, :response_time_ms, :trigger_type)
-                """),
+                """
+                ),
                 {
                     "chat_id": chat_id,
                     "user_id": user_id,

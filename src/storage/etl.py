@@ -328,8 +328,12 @@ async def update_or_create_memes(transformed_memes, memes_not_in_memes_table):
         in memes_not_in_memes_table
     ]
     if len(create_these_memes):
-        stmt = insert(meme).values(create_these_memes).on_conflict_do_nothing(
-            index_elements=["meme_source_id", "raw_meme_id"],
+        stmt = (
+            insert(meme)
+            .values(create_these_memes)
+            .on_conflict_do_nothing(
+                index_elements=["meme_source_id", "raw_meme_id"],
+            )
         )
         await execute(stmt)
 
@@ -357,7 +361,5 @@ async def update_or_create_memes(transformed_memes, memes_not_in_memes_table):
     # Retry broken uploads: reset broken_content_link → created
     # so the upload pipeline picks them up again.
     await execute(
-        meme.update()
-        .where(meme.c.status == "broken_content_link")
-        .values(status="created"),
+        meme.update().where(meme.c.status == "broken_content_link").values(status="created"),
     )

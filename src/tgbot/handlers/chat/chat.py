@@ -64,10 +64,7 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if msg.chat_id in ANTISPAM_CHAT_IDS:
         user_id = msg.from_user.id
         stats = await get_user_stats(user_id)
-        total_reactions = (
-            (stats.get("nlikes", 0) + stats.get("ndislikes", 0))
-            if stats else 0
-        )
+        total_reactions = (stats.get("nlikes", 0) + stats.get("ndislikes", 0)) if stats else 0
         if total_reactions < ANTISPAM_MIN_REACTIONS:
             await _reply_and_delete(
                 msg,
@@ -178,7 +175,9 @@ async def _send_fallback_meme(bot: Bot, chat_id: int, reply_to_message_id: int):
 
     from src.database import fetch_one
 
-    row = await fetch_one(sql_text("""
+    row = await fetch_one(
+        sql_text(
+            """
         SELECT m.id, m.type, m.telegram_file_id
         FROM meme m
         INNER JOIN meme_stats ms ON ms.meme_id = m.id
@@ -187,27 +186,36 @@ async def _send_fallback_meme(bot: Bot, chat_id: int, reply_to_message_id: int):
           AND ms.nlikes > 10
         ORDER BY random()
         LIMIT 1
-    """))
+    """
+        )
+    )
 
     if not row:
         return
 
     from src.tgbot.handlers.chat.group_meme_reaction import build_meme_reaction_keyboard
+
     keyboard = build_meme_reaction_keyboard(row["id"])
 
     file_id = row["telegram_file_id"]
     if row["type"] == "animation":
         await bot.send_animation(
-            chat_id=chat_id, animation=file_id,
-            reply_markup=keyboard, reply_to_message_id=reply_to_message_id,
+            chat_id=chat_id,
+            animation=file_id,
+            reply_markup=keyboard,
+            reply_to_message_id=reply_to_message_id,
         )
     elif row["type"] == "video":
         await bot.send_video(
-            chat_id=chat_id, video=file_id,
-            reply_markup=keyboard, reply_to_message_id=reply_to_message_id,
+            chat_id=chat_id,
+            video=file_id,
+            reply_markup=keyboard,
+            reply_to_message_id=reply_to_message_id,
         )
     else:
         await bot.send_photo(
-            chat_id=chat_id, photo=file_id,
-            reply_markup=keyboard, reply_to_message_id=reply_to_message_id,
+            chat_id=chat_id,
+            photo=file_id,
+            reply_markup=keyboard,
+            reply_to_message_id=reply_to_message_id,
         )

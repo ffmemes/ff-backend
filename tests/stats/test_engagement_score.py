@@ -104,13 +104,19 @@ async def test_like_value(conn):
     reactions = []
     for uid in range(1, 12):
         for mid in range(1, 12):
-            reactions.append({
-                "user_id": uid, "meme_id": mid, "reaction_id": 1,
-                "sent_at": _t(uid * 100 + mid),
-                "reacted_at": _t(uid * 100 + mid + 5),
-            })
+            reactions.append(
+                {
+                    "user_id": uid,
+                    "meme_id": mid,
+                    "reaction_id": 1,
+                    "sent_at": _t(uid * 100 + mid),
+                    "reacted_at": _t(uid * 100 + mid + 5),
+                }
+            )
     await _insert_reactions(conn, reactions)
-    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0)
+    await calculate_meme_reactions_and_engagement(
+        min_user_reactions=0, min_meme_reactions=0, lookback_hours=999_999
+    )
 
     score = await _get_engagement_score(1)
     assert score is not None
@@ -125,13 +131,19 @@ async def test_slow_dislike_value(conn):
     for uid in range(1, 12):
         for mid in range(1, 12):
             rid = 2 if mid == 1 else 1
-            reactions.append({
-                "user_id": uid, "meme_id": mid, "reaction_id": rid,
-                "sent_at": _t(uid * 100 + mid),
-                "reacted_at": _t(uid * 100 + mid + 5),  # all >3s (slow)
-            })
+            reactions.append(
+                {
+                    "user_id": uid,
+                    "meme_id": mid,
+                    "reaction_id": rid,
+                    "sent_at": _t(uid * 100 + mid),
+                    "reacted_at": _t(uid * 100 + mid + 5),  # all >3s (slow)
+                }
+            )
     await _insert_reactions(conn, reactions)
-    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0)
+    await calculate_meme_reactions_and_engagement(
+        min_user_reactions=0, min_meme_reactions=0, lookback_hours=999_999
+    )
 
     score_disliked = await _get_engagement_score(1)
     score_liked = await _get_engagement_score(2)
@@ -148,27 +160,41 @@ async def test_fast_dislike_value(conn):
         for mid in range(1, 12):
             if mid == 1:
                 # fast dislike (2 seconds)
-                reactions.append({
-                    "user_id": uid, "meme_id": mid, "reaction_id": 2,
-                    "sent_at": _t(uid * 100 + mid),
-                    "reacted_at": _t(uid * 100 + mid + 2),
-                })
+                reactions.append(
+                    {
+                        "user_id": uid,
+                        "meme_id": mid,
+                        "reaction_id": 2,
+                        "sent_at": _t(uid * 100 + mid),
+                        "reacted_at": _t(uid * 100 + mid + 2),
+                    }
+                )
             elif mid == 2:
                 # slow dislike (5 seconds)
-                reactions.append({
-                    "user_id": uid, "meme_id": mid, "reaction_id": 2,
-                    "sent_at": _t(uid * 100 + mid),
-                    "reacted_at": _t(uid * 100 + mid + 5),
-                })
+                reactions.append(
+                    {
+                        "user_id": uid,
+                        "meme_id": mid,
+                        "reaction_id": 2,
+                        "sent_at": _t(uid * 100 + mid),
+                        "reacted_at": _t(uid * 100 + mid + 5),
+                    }
+                )
             else:
                 # likes
-                reactions.append({
-                    "user_id": uid, "meme_id": mid, "reaction_id": 1,
-                    "sent_at": _t(uid * 100 + mid),
-                    "reacted_at": _t(uid * 100 + mid + 5),
-                })
+                reactions.append(
+                    {
+                        "user_id": uid,
+                        "meme_id": mid,
+                        "reaction_id": 1,
+                        "sent_at": _t(uid * 100 + mid),
+                        "reacted_at": _t(uid * 100 + mid + 5),
+                    }
+                )
     await _insert_reactions(conn, reactions)
-    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0)
+    await calculate_meme_reactions_and_engagement(
+        min_user_reactions=0, min_meme_reactions=0, lookback_hours=999_999
+    )
 
     fast_dislike_score = await _get_engagement_score(1)
     slow_dislike_score = await _get_engagement_score(2)
@@ -185,33 +211,51 @@ async def test_dislike_timing_edge_cases(conn):
         for mid in range(1, 12):
             if mid == 1:
                 # Very fast (0.1s, outside range) → default -1.0
-                reactions.append({
-                    "user_id": uid, "meme_id": mid, "reaction_id": 2,
-                    "sent_at": _t(uid * 100 + mid),
-                    "reacted_at": _t(uid * 100 + mid + 0.1),
-                })
+                reactions.append(
+                    {
+                        "user_id": uid,
+                        "meme_id": mid,
+                        "reaction_id": 2,
+                        "sent_at": _t(uid * 100 + mid),
+                        "reacted_at": _t(uid * 100 + mid + 0.1),
+                    }
+                )
             elif mid == 2:
                 # Very slow (120s, outside range) → default -1.0
-                reactions.append({
-                    "user_id": uid, "meme_id": mid, "reaction_id": 2,
-                    "sent_at": _t(uid * 100 + mid),
-                    "reacted_at": _t(uid * 100 + mid + 120),
-                })
+                reactions.append(
+                    {
+                        "user_id": uid,
+                        "meme_id": mid,
+                        "reaction_id": 2,
+                        "sent_at": _t(uid * 100 + mid),
+                        "reacted_at": _t(uid * 100 + mid + 120),
+                    }
+                )
             elif mid == 3:
                 # Normal slow dislike (5s, within range) → -1.0
-                reactions.append({
-                    "user_id": uid, "meme_id": mid, "reaction_id": 2,
-                    "sent_at": _t(uid * 100 + mid),
-                    "reacted_at": _t(uid * 100 + mid + 5),
-                })
+                reactions.append(
+                    {
+                        "user_id": uid,
+                        "meme_id": mid,
+                        "reaction_id": 2,
+                        "sent_at": _t(uid * 100 + mid),
+                        "reacted_at": _t(uid * 100 + mid + 5),
+                    }
+                )
             else:
-                reactions.append({
-                    "user_id": uid, "meme_id": mid, "reaction_id": 1,
-                    "sent_at": _t(uid * 100 + mid),
-                    "reacted_at": _t(uid * 100 + mid + 5),
-                })
+                reactions.append(
+                    {
+                        "user_id": uid,
+                        "meme_id": mid,
+                        "reaction_id": 1,
+                        "sent_at": _t(uid * 100 + mid),
+                        "reacted_at": _t(uid * 100 + mid + 5),
+                    }
+                )
     await _insert_reactions(conn, reactions)
-    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0)
+    await calculate_meme_reactions_and_engagement(
+        min_user_reactions=0, min_meme_reactions=0, lookback_hours=999_999
+    )
 
     score_too_fast = await _get_engagement_score(1)
     score_too_slow = await _get_engagement_score(2)
@@ -230,26 +274,40 @@ async def test_skip_detection(conn):
     reactions = []
     for uid in range(1, 12):
         # meme 1: sent first, no reaction (skip — user continues to other memes)
-        reactions.append({
-            "user_id": uid, "meme_id": 1, "reaction_id": None,
-            "sent_at": _t(uid * 100),
-            "reacted_at": None,
-        })
+        reactions.append(
+            {
+                "user_id": uid,
+                "meme_id": 1,
+                "reaction_id": None,
+                "sent_at": _t(uid * 100),
+                "reacted_at": None,
+            }
+        )
         # meme 2: liked (comparison)
-        reactions.append({
-            "user_id": uid, "meme_id": 2, "reaction_id": 1,
-            "sent_at": _t(uid * 100 + 2),
-            "reacted_at": _t(uid * 100 + 2 + 5),
-        })
+        reactions.append(
+            {
+                "user_id": uid,
+                "meme_id": 2,
+                "reaction_id": 1,
+                "sent_at": _t(uid * 100 + 2),
+                "reacted_at": _t(uid * 100 + 2 + 5),
+            }
+        )
         # memes 3-11: likes (background to establish user bias)
         for mid in range(3, 12):
-            reactions.append({
-                "user_id": uid, "meme_id": mid, "reaction_id": 1,
-                "sent_at": _t(uid * 100 + mid),
-                "reacted_at": _t(uid * 100 + mid + 5),
-            })
+            reactions.append(
+                {
+                    "user_id": uid,
+                    "meme_id": mid,
+                    "reaction_id": 1,
+                    "sent_at": _t(uid * 100 + mid),
+                    "reacted_at": _t(uid * 100 + mid + 5),
+                }
+            )
     await _insert_reactions(conn, reactions)
-    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0)
+    await calculate_meme_reactions_and_engagement(
+        min_user_reactions=0, min_meme_reactions=0, lookback_hours=999_999
+    )
 
     score_skipped = await _get_engagement_score(1)
     score_liked = await _get_engagement_score(2)
@@ -265,23 +323,34 @@ async def test_last_meme_excluded(conn):
     for uid in range(1, 12):
         # memes 2-11: normal likes
         for mid in range(2, 12):
-            reactions.append({
-                "user_id": uid, "meme_id": mid, "reaction_id": 1,
-                "sent_at": _t(uid * 100 + mid),
-                "reacted_at": _t(uid * 100 + mid + 5),
-            })
+            reactions.append(
+                {
+                    "user_id": uid,
+                    "meme_id": mid,
+                    "reaction_id": 1,
+                    "sent_at": _t(uid * 100 + mid),
+                    "reacted_at": _t(uid * 100 + mid + 5),
+                }
+            )
         # meme 1: sent AFTER all others, no reaction → last meme → excluded
-        reactions.append({
-            "user_id": uid, "meme_id": 1, "reaction_id": None,
-            "sent_at": _t(uid * 100 + 99),
-            "reacted_at": None,
-        })
+        reactions.append(
+            {
+                "user_id": uid,
+                "meme_id": 1,
+                "reaction_id": None,
+                "sent_at": _t(uid * 100 + 99),
+                "reacted_at": None,
+            }
+        )
     await _insert_reactions(conn, reactions)
-    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0)
+    await calculate_meme_reactions_and_engagement(
+        min_user_reactions=0, min_meme_reactions=0, lookback_hours=999_999
+    )
 
-    # meme 1: all rows are NULL (last meme per user) → excluded → no score
+    # meme 1: all rows are NULL (last meme per user) → excluded from AVG →
+    # engagement_score defaults to 0 (neutral, no engagement signal)
     score = await _get_engagement_score(1)
-    assert score is None
+    assert score == 0.0
 
 
 @pytest.mark.asyncio
@@ -291,42 +360,64 @@ async def test_user_bias_smoothing(conn):
 
     # User 1: likes ALL memes (high bias)
     for mid in range(1, 12):
-        reactions.append({
-            "user_id": 1, "meme_id": mid, "reaction_id": 1,
-            "sent_at": _t(mid),
-            "reacted_at": _t(mid + 5),
-        })
+        reactions.append(
+            {
+                "user_id": 1,
+                "meme_id": mid,
+                "reaction_id": 1,
+                "sent_at": _t(mid),
+                "reacted_at": _t(mid + 5),
+            }
+        )
 
     # User 2: dislikes ALL memes (low bias, slow dislikes)
     for mid in range(1, 12):
-        reactions.append({
-            "user_id": 2, "meme_id": mid, "reaction_id": 2,
-            "sent_at": _t(100 + mid),
-            "reacted_at": _t(100 + mid + 5),
-        })
+        reactions.append(
+            {
+                "user_id": 2,
+                "meme_id": mid,
+                "reaction_id": 2,
+                "sent_at": _t(100 + mid),
+                "reacted_at": _t(100 + mid + 5),
+            }
+        )
 
     # Users 3-11: like meme 1, dislike meme 2 (slow), mixed on others
     for uid in range(3, 12):
-        reactions.append({
-            "user_id": uid, "meme_id": 1, "reaction_id": 1,
-            "sent_at": _t(uid * 100 + 1),
-            "reacted_at": _t(uid * 100 + 1 + 5),
-        })
-        reactions.append({
-            "user_id": uid, "meme_id": 2, "reaction_id": 2,
-            "sent_at": _t(uid * 100 + 2),
-            "reacted_at": _t(uid * 100 + 2 + 5),
-        })
+        reactions.append(
+            {
+                "user_id": uid,
+                "meme_id": 1,
+                "reaction_id": 1,
+                "sent_at": _t(uid * 100 + 1),
+                "reacted_at": _t(uid * 100 + 1 + 5),
+            }
+        )
+        reactions.append(
+            {
+                "user_id": uid,
+                "meme_id": 2,
+                "reaction_id": 2,
+                "sent_at": _t(uid * 100 + 2),
+                "reacted_at": _t(uid * 100 + 2 + 5),
+            }
+        )
         for mid in range(3, 12):
             rid = 1 if mid % 2 == 0 else 2
-            reactions.append({
-                "user_id": uid, "meme_id": mid, "reaction_id": rid,
-                "sent_at": _t(uid * 100 + mid),
-                "reacted_at": _t(uid * 100 + mid + 5),
-            })
+            reactions.append(
+                {
+                    "user_id": uid,
+                    "meme_id": mid,
+                    "reaction_id": rid,
+                    "sent_at": _t(uid * 100 + mid),
+                    "reacted_at": _t(uid * 100 + mid + 5),
+                }
+            )
 
     await _insert_reactions(conn, reactions)
-    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0)
+    await calculate_meme_reactions_and_engagement(
+        min_user_reactions=0, min_meme_reactions=0, lookback_hours=999_999
+    )
 
     score_1 = await _get_engagement_score(1)
     score_2 = await _get_engagement_score(2)
@@ -346,17 +437,23 @@ async def test_min_user_threshold(conn):
     # Users 1-3: only 2 reactions each (below threshold of 5)
     for uid in range(1, 4):
         for mid in [1, 2]:
-            reactions.append({
-                "user_id": uid, "meme_id": mid, "reaction_id": 1,
-                "sent_at": _t(uid * 100 + mid),
-                "reacted_at": _t(uid * 100 + mid + 5),
-            })
+            reactions.append(
+                {
+                    "user_id": uid,
+                    "meme_id": mid,
+                    "reaction_id": 1,
+                    "sent_at": _t(uid * 100 + mid),
+                    "reacted_at": _t(uid * 100 + mid + 5),
+                }
+            )
     await _insert_reactions(conn, reactions)
-    await calculate_meme_reactions_and_engagement(min_user_reactions=5, min_meme_reactions=0)
+    await calculate_meme_reactions_and_engagement(
+        min_user_reactions=5, min_meme_reactions=0, lookback_hours=999_999
+    )
 
-    # No memes should get scores (all users below threshold)
+    # All users below threshold → engagement_score defaults to 0 (neutral)
     score = await _get_engagement_score(1)
-    assert score is None
+    assert score == 0.0
 
 
 @pytest.mark.asyncio
@@ -366,23 +463,33 @@ async def test_min_meme_threshold(conn):
     # 11 users each react to memes 1-11
     for uid in range(1, 12):
         for mid in range(1, 12):
-            reactions.append({
-                "user_id": uid, "meme_id": mid, "reaction_id": 1,
-                "sent_at": _t(uid * 100 + mid),
-                "reacted_at": _t(uid * 100 + mid + 5),
-            })
+            reactions.append(
+                {
+                    "user_id": uid,
+                    "meme_id": mid,
+                    "reaction_id": 1,
+                    "sent_at": _t(uid * 100 + mid),
+                    "reacted_at": _t(uid * 100 + mid + 5),
+                }
+            )
     # Only user 1 reacts to meme 20
-    reactions.append({
-        "user_id": 1, "meme_id": 20, "reaction_id": 1,
-        "sent_at": _t(200),
-        "reacted_at": _t(205),
-    })
+    reactions.append(
+        {
+            "user_id": 1,
+            "meme_id": 20,
+            "reaction_id": 1,
+            "sent_at": _t(200),
+            "reacted_at": _t(205),
+        }
+    )
     await _insert_reactions(conn, reactions)
-    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=3)
+    await calculate_meme_reactions_and_engagement(
+        min_user_reactions=0, min_meme_reactions=3, lookback_hours=999_999
+    )
 
     assert await _get_engagement_score(1) is not None
-    # meme 20 has only 1 reaction < threshold 3
-    assert await _get_engagement_score(20) is None
+    # meme 20 has only 1 reaction < threshold 3 → defaults to 0
+    assert await _get_engagement_score(20) == 0.0
 
 
 @pytest.mark.asyncio
@@ -392,27 +499,40 @@ async def test_all_skips_meme(conn):
     for uid in range(1, 12):
         # memes 2-11: normal likes FIRST (establish positive user avg)
         for mid in range(2, 12):
-            reactions.append({
-                "user_id": uid, "meme_id": mid, "reaction_id": 1,
-                "sent_at": _t(uid * 100 + mid),
-                "reacted_at": _t(uid * 100 + mid + 5),
-            })
+            reactions.append(
+                {
+                    "user_id": uid,
+                    "meme_id": mid,
+                    "reaction_id": 1,
+                    "sent_at": _t(uid * 100 + mid),
+                    "reacted_at": _t(uid * 100 + mid + 5),
+                }
+            )
         # meme 1: sent AFTER likes, no reaction (skip)
         # Placed after other memes so running avg is established
-        reactions.append({
-            "user_id": uid, "meme_id": 1, "reaction_id": None,
-            "sent_at": _t(uid * 100 + 50),
-            "reacted_at": None,
-        })
+        reactions.append(
+            {
+                "user_id": uid,
+                "meme_id": 1,
+                "reaction_id": None,
+                "sent_at": _t(uid * 100 + 50),
+                "reacted_at": None,
+            }
+        )
         # one more like AFTER the skip to confirm user continued
-        reactions.append({
-            "user_id": uid, "meme_id": 12,
-            "reaction_id": 1,
-            "sent_at": _t(uid * 100 + 60),
-            "reacted_at": _t(uid * 100 + 65),
-        })
+        reactions.append(
+            {
+                "user_id": uid,
+                "meme_id": 12,
+                "reaction_id": 1,
+                "sent_at": _t(uid * 100 + 60),
+                "reacted_at": _t(uid * 100 + 65),
+            }
+        )
     await _insert_reactions(conn, reactions)
-    await calculate_meme_reactions_and_engagement(min_user_reactions=0, min_meme_reactions=0)
+    await calculate_meme_reactions_and_engagement(
+        min_user_reactions=0, min_meme_reactions=0, lookback_hours=999_999
+    )
 
     score_all_skips = await _get_engagement_score(1)
     score_all_likes = await _get_engagement_score(2)

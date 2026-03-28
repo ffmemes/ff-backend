@@ -70,6 +70,7 @@ async def handle_chat_member_update(
             logging.info("%s added the bot to the group %s", cause_name, chat.title)
             try:
                 from src.tgbot.handlers.chat.service import upsert_telegram_chat_bot_joined
+
                 await upsert_telegram_chat_bot_joined(chat)
             except Exception as e:
                 logging.warning("Failed to persist bot join for chat %s: %s", chat.id, e)
@@ -82,6 +83,7 @@ async def handle_chat_member_update(
             logging.info("%s removed the bot from the group %s", cause_name, chat.title)
             try:
                 from src.tgbot.handlers.chat.service import update_telegram_chat_bot_left
+
                 await update_telegram_chat_bot_left(chat.id)
             except Exception as e:
                 logging.warning("Failed to persist bot leave for chat %s: %s", chat.id, e)
@@ -117,7 +119,9 @@ async def _send_group_onboarding(bot: Bot, chat_id: int) -> None:
         from src.database import fetch_one
         from src.tgbot.handlers.chat.group_meme_reaction import build_meme_reaction_keyboard
 
-        row = await fetch_one(text("""
+        row = await fetch_one(
+            text(
+                """
             SELECT m.id, m.type, m.telegram_file_id
             FROM meme m
             INNER JOIN meme_stats ms ON ms.meme_id = m.id
@@ -126,7 +130,9 @@ async def _send_group_onboarding(bot: Bot, chat_id: int) -> None:
               AND ms.nlikes > 20
             ORDER BY random()
             LIMIT 1
-        """))
+        """
+            )
+        )
 
         if row:
             keyboard = build_meme_reaction_keyboard(row["id"])
