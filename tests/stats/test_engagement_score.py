@@ -451,9 +451,9 @@ async def test_min_user_threshold(conn):
         min_user_reactions=5, min_meme_reactions=0, lookback_hours=999_999
     )
 
-    # No memes should get scores (all users below threshold)
+    # All users below threshold → engagement_score defaults to 0 (neutral)
     score = await _get_engagement_score(1)
-    assert score is None
+    assert score == 0.0
 
 
 @pytest.mark.asyncio
@@ -488,8 +488,8 @@ async def test_min_meme_threshold(conn):
     )
 
     assert await _get_engagement_score(1) is not None
-    # meme 20 has only 1 reaction < threshold 3
-    assert await _get_engagement_score(20) is None
+    # meme 20 has only 1 reaction < threshold 3 → defaults to 0
+    assert await _get_engagement_score(20) == 0.0
 
 
 @pytest.mark.asyncio
