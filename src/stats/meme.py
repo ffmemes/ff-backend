@@ -39,13 +39,16 @@ async def calculate_meme_reactions_and_engagement(
             SELECT DISTINCT meme_id
             FROM user_meme_reaction
             WHERE reacted_at > NOW() - :lookback_hours * INTERVAL '1 hour'
+               OR sent_at > NOW() - :lookback_hours * INTERVAL '1 hour'
         ),
 
         BASE_REACTIONS AS (
             SELECT
                 R.user_id, R.meme_id, R.reaction_id,
                 R.sent_at, R.reacted_at,
-                CASE WHEN R.reaction_id = 1 THEN 1 ELSE -1 END AS like_sym,
+                CASE WHEN R.reaction_id = 1 THEN 1
+                     WHEN R.reaction_id IS NOT NULL THEN -1
+                END AS like_sym,
                 EXTRACT(EPOCH FROM R.reacted_at - R.sent_at) AS sec_to_react,
                 MAX(CASE WHEN R.reaction_id IS NOT NULL THEN R.sent_at END)
                     OVER (PARTITION BY R.user_id) AS user_last_reaction_sent_at
@@ -78,7 +81,6 @@ async def calculate_meme_reactions_and_engagement(
                     ELSE NULL
                 END AS engagement_value
             FROM BASE_REACTIONS
-            WHERE reaction_id IS NOT NULL
         ),
 
         SMOOTHED AS (
