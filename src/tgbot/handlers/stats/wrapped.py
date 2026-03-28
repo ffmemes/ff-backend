@@ -38,19 +38,19 @@ WRAPPED_MIN_REACTIONS = 30
 WRAPPED_MIN_DESCRIPTIONS = 5
 
 LOADING_MESSAGES = [
-    "⏳ Ещё генерирую... нажми через пару секунд 👇",
-    "🧠 DeepSeek думает... ещё чуть-чуть 👇",
-    "🔬 Анализирую твой юмор... почти готово 👇",
-    "⚡ Скоро будет! Нажми ещё раз 👇",
-    "🎯 Уже скоро... нажми через пару секунд 👇",
-    "🔄 Ещё немного... терпение! 👇",
+    "🔬 Анализируем твои мемы...",
+    "👀 Смотрим на лайки...",
+    "📊 Много же ты листал...",
+    "🤖 AI смотрит твои мемы...",
+    "🧠 Изучаем твой юмор...",
+    "🎭 Определяем твой вайб...",
 ]
 
 LOADING_BUTTONS = [
-    "Дальше →",
-    "Ну давай уже →",
     "Готово? →",
     "Проверить →",
+    "Ну давай уже →",
+    "Уже? →",
     "Ещё раз →",
     "Жмяк →",
 ]
@@ -461,6 +461,13 @@ async def handle_wrapped_button(
         key = 0
 
     _log(f"user={user_id} key={key}")
+
+    # Delete the loading/button message before showing results
+    if update.callback_query and key == 0:
+        try:
+            await update.callback_query.message.delete()
+        except Exception:
+            pass
 
     try:
         await context.bot.send_chat_action(
