@@ -131,8 +131,14 @@ async def webhook_proxy_qa(request: Request) -> Response:
                 timeout=10,
             )
             logger.info("Paperclip QA trigger fired: %s", resp.status_code)
+            if resp.status_code >= 300:
+                logger.error(
+                    "Paperclip QA trigger returned non-2xx: %s", resp.status_code
+                )
+                return Response(status_code=502, content="bad gateway")
     except Exception as e:
         logger.error("Failed to proxy to Paperclip QA: %s", e)
+        return Response(status_code=502, content="bad gateway")
 
     return Response(status_code=200, content="ok")
 
@@ -146,7 +152,7 @@ def notify_qa_sync(flow_name: str, run_name: str, error_msg: str) -> None:
         return
 
     try:
-        httpx.post(
+        resp = httpx.post(
             trigger_url,
             headers={"Authorization": f"Bearer {trigger_secret}"},
             json={
@@ -157,5 +163,6 @@ def notify_qa_sync(flow_name: str, run_name: str, error_msg: str) -> None:
             },
             timeout=10,
         )
+        resp.raise_for_status()
     except Exception as e:
         logger.error("Failed to notify Paperclip QA: %s", e)
