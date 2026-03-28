@@ -64,6 +64,15 @@ agents:
         PAPERCLIP_URL:
           kind: secret
           requirement: optional
+        TELEGRAM_API_ID:
+          kind: secret
+          requirement: optional
+        TELEGRAM_API_HASH:
+          kind: secret
+          requirement: optional
+        TELEGRAM_SESSION_STRING:
+          kind: secret
+          requirement: optional
 
   release-engineer:
     adapter:
