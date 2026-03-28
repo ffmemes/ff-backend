@@ -1,6 +1,6 @@
 """Contract tests for recommendation engine SQL queries against real Postgres."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import pytest
 import pytest_asyncio
@@ -56,7 +56,7 @@ async def base_data():
 
         # 1 already-reacted meme for user 10001 (recent, within 30-day window)
         await create_meme(conn, id=10011, meme_source_id=SOURCE_TELEGRAM)
-        recent = datetime.now(timezone.utc) - timedelta(days=1)
+        recent = datetime.utcnow() - timedelta(days=1)
         await create_reaction(
             conn, user_id=10001, meme_id=10011, reaction_id=1, sent_at=recent, reacted_at=recent
         )
