@@ -10,14 +10,19 @@ The cold_start_3phase experiment (FAILURE, 2026-03-26) used diversity-first Phas
 
 Root cause: diversity guarantees variety, not quality. New users with no taste signal need the bot's objectively best memes first — not the most heterogeneous selection.
 
-**Quality-first hypothesis:** Serving memes with proven social proof (≥50 reactions, ≥40% like rate), ordered by like rate, will maximise first-impression quality. Phase 2 (cold_start_adapt) then calibrates on real reactions as before.
+**Quality-first hypothesis:** Serving memes with proven social proof (≥20 explicit reactions, ≥40% lr_smoothed), ordered by like rate, will maximise first-impression quality. Phase 2 (cold_start_adapt) then calibrates on real reactions as before.
 
 ## Changes Made
 
 - `src/recommendations/candidates.py`: Replaced `cold_start_explore()` filter and ordering:
   - Old: `MS.nmemes_sent >= 20 AND MS.lr_smoothed > 0.45`, ORDER BY `lr_smoothed DESC`
-  - New: `(MS.nlikes + MS.ndislikes) >= 50 AND MS.lr_smoothed >= 0.40`, ORDER BY `lr_smoothed DESC, total_reactions DESC`
+  - Initial new: `(MS.nlikes + MS.ndislikes) >= 50 AND MS.lr_smoothed >= 0.40`, ORDER BY `lr_smoothed DESC, total_reactions DESC`
+  - Fixed (2026-03-28): `(MS.nlikes + MS.ndislikes) >= 20 AND MS.lr_smoothed >= 0.40` — see fix below
   - Default limit: 15 → 5 (Phase 1 serves 5 memes)
+
+### Fix (2026-03-28): Cold Start Explore Pool Was Empty
+
+Phase 1 was not triggering for new users on Mar 27–28 (68+ users received `lr_smoothed` fallback instead). Root cause: reaction count threshold `>= 50` was too strict. `nlikes + ndislikes` counts only explicit likes/dislikes, not skips. At typical 30–40% explicit-reaction rates, reaching 50 reactions requires ~150 sends — far too strict for most memes including high-quality ones. Lowered to `>= 20` reactions, consistent with the GOAT pool's "enough statistical signal" benchmark (`GOAT_MIN_REACTIONS = 10`). Quality gate `lr_smoothed >= 0.40` retained unchanged.
 
 ## Metrics to Track
 
