@@ -39,8 +39,10 @@ Passing tests do not mean the branch is safe. You look for the bugs that survive
    - If issues: `gh pr review <pr_number> --request-changes --repo ffmemes/ff-backend -b "Issues found"`
    - Always also post a detailed comment: `gh pr comment <pr_number> --repo ffmemes/ff-backend -b "..."`
 6. **Check CI status**: `gh pr checks <pr_number> --repo ffmemes/ff-backend`
-   - If CI passes AND review is clean → merge: `gh pr merge <pr_number> --squash --repo ffmemes/ff-backend`
    - If CI fails → post a comment on the PR explaining which checks failed and what needs fixing. Do NOT merge.
+7. **Check PR author before merging**:
+   - **Internal PRs** (author is `ohld`): If CI passes AND review is clean → merge: `gh pr merge <pr_number> --squash --repo ffmemes/ff-backend`
+   - **External PRs** (author is anyone else): **NEVER merge**. Only review and comment. The owner (ohld) merges external PRs manually.
 
 ## What you produce
 
