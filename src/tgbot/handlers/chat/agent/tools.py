@@ -12,13 +12,13 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "search_memes",
-            "description": "Search memes by text query.",
+            "description": "Search memes by keywords. Returns a list of meme IDs with previews. Use short queries, 1-3 words.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Search keywords from the meme text",
+                        "description": "Short search keywords, 1-3 words",
                     },
                     "limit": {
                         "type": "integer",
@@ -34,13 +34,13 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "send_meme",
-            "description": "Send a meme to the chat by its ID.",
+            "description": "Send a meme to the chat. Use after search_memes to pick the best one. If you send a meme, you don't need to also write a text reply.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "meme_id": {
                         "type": "integer",
-                        "description": "The meme ID to send",
+                        "description": "The meme ID from search results",
                     }
                 },
                 "required": ["meme_id"],
@@ -51,13 +51,13 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "get_chat_history",
-            "description": "Fetch more messages from the current chat for additional context.",
+            "description": "Get more chat messages for context if the conversation is unclear.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "limit": {
                         "type": "integer",
-                        "description": "Number of messages to fetch (max 100)",
+                        "description": "Number of messages (max 100)",
                         "default": 50,
                     }
                 },
@@ -69,7 +69,7 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "react_to_message",
-            "description": "React to a message with an emoji.",
+            "description": "Put an emoji reaction on a message.",
             "parameters": {
                 "type": "object",
                 "properties": {

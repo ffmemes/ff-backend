@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import time
 
 from openai import AsyncOpenAI
@@ -14,8 +15,24 @@ from src.tgbot.handlers.chat.service import get_latest_chat_messages
 
 logger = logging.getLogger(__name__)
 
-MAX_TURNS = 8
+MAX_TURNS = 5
 MAX_TOOL_CALLS = 15
+
+# DeepSeek sometimes leaks internal DSML function-call XML as text.
+_DSML_PATTERN = re.compile(
+    r"<[｜\|]DSML[｜\|].*?</[｜\|]DSML[｜\|]\w+>",
+    re.DOTALL,
+)
+
+
+def _clean_response(text: str | None) -> str | None:
+    """Strip DeepSeek DSML artifacts and other junk from the response."""
+    if not text:
+        return None
+    cleaned = _DSML_PATTERN.sub("", text).strip()
+    if not cleaned:
+        return None
+    return cleaned
 
 
 async def run_chat_agent(
@@ -45,7 +62,7 @@ async def run_chat_agent(
         {
             "role": "user",
             "content": (
-                f"Вот последние сообщения в чате:\n\n{chat_context}\n\n"
+                f"Последние сообщения в чате:\n\n{chat_context}\n\n"
                 "Ответь на последнее сообщение."
             ),
         },
@@ -62,8 +79,8 @@ async def run_chat_agent(
                 model="deepseek-chat",
                 messages=api_messages,
                 tools=TOOL_SCHEMAS if turn < MAX_TURNS - 1 else None,
-                max_tokens=500,
-                temperature=0.8,
+                max_tokens=300,
+                temperature=0.7,
             )
         except Exception as e:
             logger.error("DeepSeek API error: %s", e)
@@ -110,7 +127,7 @@ async def run_chat_agent(
                 )
             continue
 
-        # Final text response
+        # Final text response — clean DeepSeek artifacts before returning
         _log_usage(
             chat_id,
             user_id,
@@ -120,7 +137,7 @@ async def run_chat_agent(
             start_time,
             trigger_type,
         )
-        return message.content
+        return _clean_response(message.content)
 
     # Max turns reached
     _log_usage(
