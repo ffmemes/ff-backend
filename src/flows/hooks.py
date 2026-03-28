@@ -12,8 +12,34 @@ from src.config import settings
 logger = logging.getLogger(__name__)
 
 
+def _extract_error_msg(state) -> str:
+    """Extract error message from a Prefect flow run state."""
+    if state.message:
+        return state.message[:500]
+    if state.result:
+        try:
+            exc = state.result(raise_on_failure=False)
+            if isinstance(exc, BaseException):
+                tb = traceback.format_exception(type(exc), exc, exc.__traceback__)
+                return "".join(tb)[-500:]
+        except Exception:
+            return str(state.result)[:500]
+    return ""
+
+
 def notify_telegram_on_failure(flow, flow_run, state):
-    """Send a Telegram message to ADMIN_LOGS_CHAT_ID when a flow fails."""
+    """Send failure alerts to Telegram and Paperclip QA when a flow fails."""
+    error_msg = _extract_error_msg(state)
+
+    # Notify Paperclip QA (independent of Telegram config)
+    try:
+        from src.integrations.paperclip import notify_qa_sync
+
+        notify_qa_sync(flow.name, flow_run.name, error_msg)
+    except Exception as e:
+        logger.error("Failed to notify Paperclip QA: %s", e)
+
+    # Notify Telegram admin chat
     bot_token = settings.TELEGRAM_BOT_TOKEN
     chat_id = settings.ADMIN_LOGS_CHAT_ID
 
@@ -22,18 +48,6 @@ def notify_telegram_on_failure(flow, flow_run, state):
             "Cannot send failure alert: TELEGRAM_BOT_TOKEN or ADMIN_LOGS_CHAT_ID not set"
         )
         return
-
-    error_msg = ""
-    if state.message:
-        error_msg = state.message[:500]
-    elif state.result:
-        try:
-            exc = state.result(raise_on_failure=False)
-            if isinstance(exc, BaseException):
-                tb = traceback.format_exception(type(exc), exc, exc.__traceback__)
-                error_msg = "".join(tb)[-500:]
-        except Exception:
-            error_msg = str(state.result)[:500]
 
     text = f"Flow FAILED: {flow.name}\nRun: {flow_run.name}\nError: {error_msg}"
 
@@ -45,10 +59,3 @@ def notify_telegram_on_failure(flow, flow_run, state):
         )
     except Exception as e:
         logger.error("Failed to send Telegram failure alert: %s", e)
-
-    try:
-        from src.integrations.paperclip import notify_qa_sync
-
-        notify_qa_sync(flow.name, flow_run.name, error_msg)
-    except Exception as e:
-        logger.error("Failed to notify Paperclip QA: %s", e)
