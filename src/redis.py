@@ -7,17 +7,22 @@ import orjson
 from redis import asyncio as aioredis
 from redis.exceptions import ResponseError
 from src.config import settings
+from src.constants import Environment
 from src.models import CustomModel
 
 logger = logging.getLogger(__name__)
 
-pool = aioredis.ConnectionPool.from_url(
-    str(settings.REDIS_URL),
+_pool_kwargs: dict = dict(
     max_connections=settings.REDIS_MAX_CONNECTIONS,
-    health_check_interval=settings.REDIS_HEALTH_CHECK_INTERVAL,
-    socket_keepalive=True,
     decode_responses=True,
 )
+if settings.ENVIRONMENT != Environment.TESTING:
+    _pool_kwargs.update(
+        health_check_interval=settings.REDIS_HEALTH_CHECK_INTERVAL,
+        socket_keepalive=True,
+    )
+
+pool = aioredis.ConnectionPool.from_url(str(settings.REDIS_URL), **_pool_kwargs)
 redis_client = aioredis.Redis(connection_pool=pool)
 
 
