@@ -1,7 +1,7 @@
-import asyncio
-from typing import Generator
-
 import pytest
+import pytest_asyncio
+
+from src.database import engine
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -14,13 +14,9 @@ def run_migrations() -> None:
     os.system("alembic downgrade base")
 
 
-@pytest.fixture(scope="session")
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
-    from src.database import engine
-
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    # Dispose stale pool connections so new ones bind to this loop
-    loop.run_until_complete(engine.dispose())
-    yield loop
-    loop.run_until_complete(engine.dispose())
-    loop.close()
+@pytest_asyncio.fixture(autouse=True, scope="session", loop_scope="session")
+async def _dispose_engine():
+    """Dispose stale pool connections so new ones bind to the session loop."""
+    await engine.dispose()
+    yield
+    await engine.dispose()
