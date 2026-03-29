@@ -9,18 +9,13 @@ from agents.tool import ToolContext
 from src.tgbot.handlers.chat.agent.runner import ChatAgentContext
 
 
-def _make_tool_ctx(bot=None, chat_id=123, user_id=1, tool_arguments="{}"):
+def _make_tool_ctx(bot=None, chat_id=123, user_id=1):
     """Build a ToolContext wrapping a ChatAgentContext for tool tests."""
     if bot is None:
         bot = MagicMock()
         bot.send_photo = AsyncMock()
     ctx = ChatAgentContext(bot=bot, chat_id=chat_id, user_id=user_id)
-    return ToolContext(
-        context=ctx,
-        tool_name="test",
-        tool_call_id="test",
-        tool_arguments=tool_arguments,
-    )
+    return ToolContext(context=ctx, tool_name="test", tool_call_id="test")
 
 
 @pytest.mark.asyncio
@@ -58,8 +53,8 @@ async def test_send_meme_coerces_string_meme_id():
             # LLM sends meme_id as string in JSON — must be coerced to int
             result = await send_meme.on_invoke_tool(tool_ctx, json.dumps({"meme_id": "6091977"}))
 
-    assert isinstance(
-        captured_params["meme_id"], int
-    ), "meme_id must be cast to int before SQL — asyncpg rejects str for integer columns"
+    assert isinstance(captured_params["meme_id"], int), (
+        "meme_id must be cast to int before SQL — asyncpg rejects str for integer columns"
+    )
     assert captured_params["meme_id"] == 6091977
     assert "Sent" in result
