@@ -201,11 +201,15 @@ async def generate_recommendations(
             if len(candidates) == 0:
                 logging.info(
                     "Cold start %s empty for user %s, falling back to lr_smoothed",
-                    engine, user_id,
+                    engine,
+                    user_id,
                 )
                 candidates = await retriever.get_candidates(
-                    "lr_smoothed", user_id, limit,
-                    exclude_mem_ids=meme_ids_in_queue, min_sends=10,
+                    "lr_smoothed",
+                    user_id,
+                    limit,
+                    exclude_mem_ids=meme_ids_in_queue,
+                    min_sends=10,
                 )
 
             if len(candidates) == 0:
@@ -309,9 +313,9 @@ async def generate_recommendations(
             candidates = await fetch_all(text(fallback_query), params)
             if candidates:
                 logging.info(
-                    "Moderator user %s: low_sent + blender empty, "
-                    "last_resort found %d memes",
-                    user_id, len(candidates),
+                    "Moderator user %s: low_sent + blender empty, " "last_resort found %d memes",
+                    user_id,
+                    len(candidates),
                 )
     else:
         candidates = await get_candidates(user_id, limit)

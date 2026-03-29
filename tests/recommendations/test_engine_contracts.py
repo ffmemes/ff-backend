@@ -25,7 +25,7 @@ SOURCE_TELEGRAM = 10001
 SOURCE_USER_UPLOAD = 10002
 
 
-@pytest_asyncio.fixture(loop_scope="session")
+@pytest_asyncio.fixture()
 async def base_data():
     """Shared base fixture: users, sources, memes, stats."""
     async with engine.connect() as conn:
@@ -54,10 +54,11 @@ async def base_data():
         # 1 wrong-language meme (should be excluded for ru users)
         await create_meme(conn, id=10010, meme_source_id=SOURCE_TELEGRAM, language_code="en")
 
-        # 1 already-reacted meme for user 10001
+        # 1 already-reacted meme for user 10001 (recent, within 30-day window)
         await create_meme(conn, id=10011, meme_source_id=SOURCE_TELEGRAM)
+        recent = datetime.utcnow() - timedelta(days=1)
         await create_reaction(
-            conn, user_id=10001, meme_id=10011, reaction_id=1, reacted_at=FIXED_DT
+            conn, user_id=10001, meme_id=10011, reaction_id=1, sent_at=recent, reacted_at=recent
         )
 
         # meme_stats for all ok memes (10001-10008, 10011)
@@ -185,9 +186,9 @@ async def test_best_uploaded_memes_only_from_user_upload_source(base_data):
     results = await retriever.get_candidates("best_uploaded_memes", USER_ID, limit=50)
     assert len(results) > 0
     for r in results:
-        assert r["id"] in range(10006, 10009), (
-            f"best_uploaded_memes returned meme {r['id']} not from user upload source"
-        )
+        assert r["id"] in range(
+            10006, 10009
+        ), f"best_uploaded_memes returned meme {r['id']} not from user upload source"
 
 
 @pytest.mark.asyncio
@@ -195,7 +196,6 @@ async def test_goat_empty_without_user_source_stats(base_data):
     """User 10004 has no user_meme_source_stats -> goat uses INNER JOIN -> empty."""
     results = await retriever.get_candidates("goat", 10004, limit=50)
     assert len(results) == 0
-
 
 
 @pytest.mark.asyncio

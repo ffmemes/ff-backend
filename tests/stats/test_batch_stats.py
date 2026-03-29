@@ -27,7 +27,7 @@ SOURCE_1 = 10001
 SOURCE_2 = 10002
 
 
-@pytest_asyncio.fixture(loop_scope="session")
+@pytest_asyncio.fixture()
 async def setup():
     """Create test users, sources, and memes."""
     async with engine.connect() as conn:

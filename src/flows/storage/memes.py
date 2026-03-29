@@ -183,9 +183,7 @@ async def _process_unloaded_memes(
                 logger.warning("OCR service unavailable, skipping OCR for rest of batch.")
                 break
 
-    logger.info(
-        f"Batch done: {ok_count} uploaded, {fail_count} failed out of {total}."
-    )
+    logger.info(f"Batch done: {ok_count} uploaded, {fail_count} failed out of {total}.")
 
 
 @flow(
@@ -331,9 +329,7 @@ async def final_meme_pipeline() -> None:
 
         # exact file_id dedup: catches cross-source reposts of identical files
         if meme["telegram_file_id"]:
-            dup_id = await find_meme_duplicate_by_file_id(
-                meme["id"], meme["telegram_file_id"]
-            )
+            dup_id = await find_meme_duplicate_by_file_id(meme["id"], meme["telegram_file_id"])
             if dup_id:
                 await resolve_meme_duplicate(meme["id"], dup_id)
                 continue

@@ -83,9 +83,7 @@ async def maybe_auto_snooze_source(
       2. like_rate < 10% with at least 100 total reactions.
     Returns the snooze reason string if snoozed, None otherwise.
     """
-    source = await fetch_one(
-        select(meme_source).where(meme_source.c.id == meme_source_id)
-    )
+    source = await fetch_one(select(meme_source).where(meme_source.c.id == meme_source_id))
     if not source or source["status"] != MemeSourceStatus.PARSING_ENABLED.value:
         return None
 
@@ -111,9 +109,7 @@ async def maybe_auto_snooze_source(
 
     # Criterion 2: like_rate < 10% (min 100 reactions for a meaningful sample)
     stats = await fetch_one(
-        select(meme_source_stats).where(
-            meme_source_stats.c.meme_source_id == meme_source_id
-        )
+        select(meme_source_stats).where(meme_source_stats.c.meme_source_id == meme_source_id)
     )
     if stats is not None:
         total = stats["nlikes"] + stats["ndislikes"]
@@ -280,18 +276,18 @@ async def update_meme_status_of_ready_memes() -> list[dict[str, Any]]:
     return await fetch_all(update_query)
 
 
-async def find_meme_duplicate_by_file_id(
-    meme_id: int, telegram_file_id: str
-) -> int | None:
+async def find_meme_duplicate_by_file_id(meme_id: int, telegram_file_id: str) -> int | None:
     """Find an existing meme with the same telegram_file_id."""
-    query = text("""
+    query = text(
+        """
         SELECT id FROM meme
         WHERE telegram_file_id = :file_id
           AND status IN ('ok', 'created')
           AND id < :meme_id
         ORDER BY id ASC
         LIMIT 1
-    """)
+    """
+    )
     res = await fetch_one(query, {"file_id": telegram_file_id, "meme_id": meme_id})
     if res:
         return res["id"]
@@ -302,7 +298,8 @@ async def find_meme_duplicate(meme_id: int, imagetext: str) -> int | None:
     if len(imagetext) <= 11:  # skip all memes with less than 11 letters
         return None
 
-    select_query = text("""
+    select_query = text(
+        """
         SELECT
             M.id
         FROM meme M
@@ -313,7 +310,8 @@ async def find_meme_duplicate(meme_id: int, imagetext: str) -> int | None:
             AND (M.ocr_result ->> 'text') % :imagetext
         ORDER BY M.id ASC
         LIMIT 1
-    """).bindparams(meme_id=meme_id, imagetext=imagetext)
+    """
+    ).bindparams(meme_id=meme_id, imagetext=imagetext)
 
     res = await fetch_one(select_query)
     if res:
@@ -333,7 +331,8 @@ async def resolve_meme_duplicate(dupe_id: int, original_id: int) -> dict[str, in
     Returns counts: {moved, conflicts, deleted_stats}.
     """
     # 1. Move non-conflicting reactions to original
-    move_query = text("""
+    move_query = text(
+        """
         WITH moved AS (
             INSERT INTO user_meme_reaction
                 (user_id, meme_id, recommended_by, sent_at, reaction_id, reacted_at)
@@ -349,17 +348,20 @@ async def resolve_meme_duplicate(dupe_id: int, original_id: int) -> dict[str, in
             RETURNING 1
         )
         SELECT count(*) AS moved FROM moved
-    """)
+    """
+    )
     res = await fetch_one(move_query, {"dupe_id": dupe_id, "original_id": original_id})
     moved = res["moved"] if res else 0
 
     # 2. Delete all reactions remaining on dupe (conflicts + already moved)
-    delete_reactions = text("""
+    delete_reactions = text(
+        """
         WITH deleted AS (
             DELETE FROM user_meme_reaction WHERE meme_id = :dupe_id RETURNING 1
         )
         SELECT count(*) AS conflicts FROM deleted
-    """)
+    """
+    )
     res = await fetch_one(delete_reactions, {"dupe_id": dupe_id})
     conflicts = res["conflicts"] if res else 0
 
@@ -371,11 +373,13 @@ async def resolve_meme_duplicate(dupe_id: int, original_id: int) -> dict[str, in
 
     # 4. Mark meme as duplicate
     await execute(
-        text("""
+        text(
+            """
             UPDATE meme
             SET status = 'duplicate', duplicate_of = :original_id
             WHERE id = :dupe_id
-        """),
+        """
+        ),
         {"dupe_id": dupe_id, "original_id": original_id},
     )
 
@@ -390,7 +394,8 @@ async def resolve_all_file_id_duplicates() -> dict[str, int]:
     Returns total counts.
     """
     # Find all file_id duplicate groups
-    dupes_query = text("""
+    dupes_query = text(
+        """
         SELECT id, telegram_file_id,
             FIRST_VALUE(id) OVER (
                 PARTITION BY telegram_file_id ORDER BY id ASC
@@ -403,7 +408,8 @@ async def resolve_all_file_id_duplicates() -> dict[str, int]:
               WHERE status = 'ok' AND telegram_file_id IS NOT NULL
               GROUP BY telegram_file_id HAVING count(*) > 1
           )
-    """)
+    """
+    )
     rows = await fetch_all(dupes_query)
 
     total_moved = 0

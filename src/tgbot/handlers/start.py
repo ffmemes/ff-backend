@@ -90,6 +90,7 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     if deep_link == "wrapped":
         from src.tgbot.handlers.stats.wrapped import handle_wrapped
+
         return await handle_wrapped(update, context)
 
     if created:  # new user:
@@ -106,11 +107,13 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         # handle giveaway after onboarding so user_language rows exist
         if deep_link and deep_link.startswith("giveaway_"):
             from src.tgbot.handlers.treasury.giveaway import handle_giveaway
+
             await handle_giveaway(update, context, deep_link)
         return
     else:  # existing user:
         if deep_link and deep_link.startswith("giveaway_"):
             from src.tgbot.handlers.treasury.giveaway import handle_giveaway
+
             return await handle_giveaway(update, context, deep_link)
 
         await next_message(

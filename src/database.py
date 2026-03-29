@@ -25,9 +25,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import NullPool
 
 from src.config import settings
-from src.constants import DB_NAMING_CONVENTION
+from src.constants import DB_NAMING_CONVENTION, Environment
 from src.storage.constants import (
     MEME_MEME_SOURCE_RAW_MEME_UNIQUE_CONSTRAINT,
     MEME_RAW_IG_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
@@ -36,18 +37,25 @@ from src.storage.constants import (
 )
 
 DATABASE_URL = str(settings.DATABASE_URL)
-engine = create_async_engine(
-    DATABASE_URL,
-    max_overflow=20,
-    pool_size=settings.DATABASE_POOL_SIZE,
-    pool_recycle=settings.DATABASE_POOL_TTL,
-    pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
+
+_engine_kwargs: dict = dict(
     connect_args={
         "prepared_statement_name_func": lambda: f"__asyncpg_{uuid.uuid4()}__",
         "statement_cache_size": 0,
         "prepared_statement_cache_size": 0,
     },
 )
+if settings.ENVIRONMENT == Environment.TESTING:
+    _engine_kwargs["poolclass"] = NullPool
+else:
+    _engine_kwargs.update(
+        max_overflow=20,
+        pool_size=settings.DATABASE_POOL_SIZE,
+        pool_recycle=settings.DATABASE_POOL_TTL,
+        pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
+    )
+
+engine = create_async_engine(DATABASE_URL, **_engine_kwargs)
 
 metadata = MetaData(naming_convention=DB_NAMING_CONVENTION)
 

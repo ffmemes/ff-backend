@@ -64,7 +64,8 @@ async def get_memes_to_describe(limit: int = 30) -> list[dict]:
     """
     from sqlalchemy import text
 
-    query = text("""
+    query = text(
+        """
         SELECT
             M.id,
             M.telegram_file_id,
@@ -82,7 +83,8 @@ async def get_memes_to_describe(limit: int = 30) -> list[dict]:
             AND COALESCE((M.ocr_result->>'describe_failures')::int, 0) < 3
         ORDER BY COALESCE(MS.nlikes, 0) DESC, M.id DESC
         LIMIT :limit
-    """).bindparams(limit=limit)
+    """
+    ).bindparams(limit=limit)
 
     return await fetch_all(query)
 
@@ -266,18 +268,24 @@ async def describe_single_meme(meme_row: dict, log) -> str:
     # Only update language_code if the detected language is one we already use
     # This ensures inner joins with user_language work correctly
     KNOWN_LANGUAGES = {
-        "ru", "en", "uk", "es", "fa", "pl", "hi",
-        "am", "de", "fr", "pt-br", "ar", "uz",
+        "ru",
+        "en",
+        "uk",
+        "es",
+        "fa",
+        "pl",
+        "hi",
+        "am",
+        "de",
+        "fr",
+        "pt-br",
+        "ar",
+        "uz",
     }
     if language and language.lower() in KNOWN_LANGUAGES:
         update_kwargs["language_code"] = language.lower()
 
-    update_query = (
-        meme.update()
-        .where(meme.c.id == meme_id)
-        .values(**update_kwargs)
-        .returning(meme)
-    )
+    update_query = meme.update().where(meme.c.id == meme_id).values(**update_kwargs).returning(meme)
     await fetch_one(update_query)
     return "ok"
 
@@ -317,9 +325,10 @@ async def describe_memes_flow(batch_size: int = 30) -> None:
             log.info("Described meme %d (%d/%d)", meme_row["id"], i + 1, len(memes))
         elif status == "rate_limited":
             log.warning(
-                "All models rate-limited at meme %d (%d/%d). "
-                "Stopping batch — quota exhausted.",
-                meme_row["id"], i + 1, len(memes),
+                "All models rate-limited at meme %d (%d/%d). " "Stopping batch — quota exhausted.",
+                meme_row["id"],
+                i + 1,
+                len(memes),
             )
             break
         else:
@@ -327,7 +336,10 @@ async def describe_memes_flow(batch_size: int = 30) -> None:
             consecutive_fails += 1
             log.warning(
                 "Failed meme %d (%d/%d, %d consecutive)",
-                meme_row["id"], i + 1, len(memes), consecutive_fails,
+                meme_row["id"],
+                i + 1,
+                len(memes),
+                consecutive_fails,
             )
             if consecutive_fails >= 3:
                 log.warning("3 consecutive failures — stopping batch.")

@@ -30,20 +30,20 @@ def build_meme_reaction_keyboard(
 
 async def get_meme_reaction_counts(chat_id: int, meme_id: int) -> dict[int, int]:
     rows = await fetch_all(
-        text("""
+        text(
+            """
             SELECT reaction, count(*) AS cnt
             FROM chat_meme_reaction
             WHERE chat_id = :chat_id AND meme_id = :meme_id
             GROUP BY reaction
-        """),
+        """
+        ),
         {"chat_id": chat_id, "meme_id": meme_id},
     )
     return {row["reaction"]: row["cnt"] for row in rows}
 
 
-async def handle_chat_meme_reaction(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def handle_chat_meme_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     if not query or not query.data:
         return

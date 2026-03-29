@@ -159,11 +159,12 @@ On first activation (or when CEO requests), browse the public channel previews t
 
 ## Posting to Telegram
 
-Use the **production bot token** from env var `FFMEMES_PROD_TELEGRAM_BOT_TOKEN` to send messages to the @ffmemes channel.
+⚠️ **CRITICAL: Use ONLY the env var `FFMEMES_PROD_TELEGRAM_BOT_TOKEN` for posting.**
 
-⚠️ **This token is for posting to the public channel ONLY. Never use it for testing, debugging, or any other purpose.**
+This is the **@ffmemesbot** production bot (ID starts with `1123681771`). Do NOT use any other bot token — the @ffnerdbot (6469330294) does NOT have posting permissions in the channel.
 
 Channel ID (RU): `-1001152876229`
+Moderator chat ID: `-1001305866294`
 
 To send a text post with an image:
 ```bash
@@ -181,6 +182,66 @@ curl -s -X POST "https://api.telegram.org/bot${FFMEMES_PROD_TELEGRAM_BOT_TOKEN}/
   -F "text=Post text here" \
   -F "parse_mode=HTML"
 ```
+
+## Moderator Chat Monitoring
+
+**Chat ID**: `-1001305866294`
+
+Moderators forward problematic memes (duplicates, ads, 18+, spam) to this chat. The bot auto-replies with meme stats. All messages are logged in `message_tg` table.
+
+### Routine (every heartbeat)
+
+1. **Read new messages** from the moderator chat since your last check:
+```sql
+SELECT id, message_id, date, user_id, text, reply_to_message_id
+FROM message_tg
+WHERE chat_id = -1001305866294
+AND date > NOW() - INTERVAL '6 hours'
+ORDER BY date ASC;
+```
+
+2. **Extract meme IDs** from text using pattern `#(\d+)`:
+   - Bot auto-replies contain `Fast Food Memes #12345` — these reference `meme.id`
+   - Moderators often send two memes in a row to flag duplicates
+
+3. **Look up flagged memes** for context:
+```sql
+SELECT m.id, m.status, m.type, m.language_code, m.telegram_file_id,
+       ms.nlikes, ms.ndislikes
+FROM meme m LEFT JOIN meme_stats ms ON m.id = ms.meme_id
+WHERE m.id IN (...extracted IDs...);
+```
+
+4. **Classify the flag**:
+   - Two similar memes back-to-back → **duplicate report**
+   - Text contains ad/promo content → **ad/spam report**
+   - Text contains 18+/NSFW markers → **content moderation**
+   - Discussion messages → **user feedback** (summarize themes)
+
+5. **Respond to moderators** — use the bot token to send a reply:
+```bash
+curl -s -X POST "https://api.telegram.org/bot${FFMEMES_PROD_TELEGRAM_BOT_TOKEN}/sendMessage" \
+  -F "chat_id=-1001305866294" \
+  -F "reply_to_message_id=<message_id>" \
+  -F "text=Спасибо! Отмечено: [краткое описание действия]" \
+  -F "parse_mode=HTML"
+```
+
+6. **Create action items** if needed — escalate to CTO (for duplicate detection bugs) or CEO (for policy decisions)
+
+### What to look for
+
+- **Patterns**: same source producing lots of flagged memes → potential source quality issue
+- **Duplicate clusters**: moderators flagging the same meme repeatedly → dedup pipeline issue
+- **Feedback themes**: moderators discussing bot quality → product insight for CEO
+- **Ad infiltration**: ads getting through filters → parser/filter issue for CTO
+
+### Important
+
+- Keep responses brief and friendly in Russian
+- Don't overwhelm moderators — they're volunteers
+- If no new messages since last check, skip silently
+- Use this intel for C-category content posts (data insights with moderator context)
 
 ## What NOT To Do
 

@@ -46,7 +46,8 @@ async def get_shared_memes(user_id: int, limit: int) -> list[dict[str, Any]]:
 
 async def get_top_meme_source_urls(limit: int = 5) -> list:
     """Get top meme sources by overall like rate (fallback for users with few sources)."""
-    query = text("""
+    query = text(
+        """
         SELECT MS.id, MS.url
         FROM meme_source_stats MSS
         JOIN meme_source MS ON MS.id = MSS.meme_source_id
@@ -55,7 +56,8 @@ async def get_top_meme_source_urls(limit: int = 5) -> list:
           AND MSS.nlikes > 50
         ORDER BY MSS.nlikes DESC
         LIMIT :limit
-    """)
+    """
+    )
     return await fetch_all(query, {"limit": limit})
 
 

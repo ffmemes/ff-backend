@@ -103,9 +103,7 @@ async def handle_show_leaderbaord(update: Update, context: ContextTypes.DEFAULT_
     emoji = get_random_emoji()
     leaderboard = await get_leaderboard()
 
-    LEADERBOARD_TEXT = (
-        f"{emoji} Leaderboard (last {LEADERBOARD_WINDOW_DAYS} days) {emoji}\n\n"
-    )
+    LEADERBOARD_TEXT = f"{emoji} Leaderboard (last {LEADERBOARD_WINDOW_DAYS} days) {emoji}\n\n"
     for i, user in enumerate(leaderboard):
         icon = "🏆" if i == 0 else "🥈" if i == 1 else "🥉" if i == 2 else "🏅"
         nick = user["nickname"] or get_random_emoji() * 3

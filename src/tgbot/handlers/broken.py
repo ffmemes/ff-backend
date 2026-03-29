@@ -10,6 +10,7 @@ from telegram.ext import (
 
 async def handle_broken_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     import sys
+
     cb = update.callback_query.data if update.callback_query else "none"
     sys.stderr.write(f"[broken] catch-all fired: cb={cb}\n")
     sys.stderr.flush()

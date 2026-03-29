@@ -11,9 +11,9 @@ logger = logging.getLogger(__name__)
 
 # Quality thresholds for the goat pool.
 # Memes must have enough data and age to be considered "greatest of all time".
-GOAT_MIN_REACTIONS = 10    # (nlikes + ndislikes) — enough statistical signal
-GOAT_MIN_LR = 0.20         # lr_smoothed — minimum proven like rate
-GOAT_MIN_AGE_DAYS = 3      # days since created_at — must have aged enough to accumulate reactions
+GOAT_MIN_REACTIONS = 10  # (nlikes + ndislikes) — enough statistical signal
+GOAT_MIN_LR = 0.20  # lr_smoothed — minimum proven like rate
+GOAT_MIN_AGE_DAYS = 3  # days since created_at — must have aged enough to accumulate reactions
 
 
 def _build_params(
@@ -349,10 +349,16 @@ async def cold_start_explore(
 ):
     """Phase 1 cold start: quality-first selection for new user first impression.
 
-    Serves memes with proven social proof (>=50 reactions) and high like rate
-    (>=40%). New users need the bot's best content first — maximising per-meme
-    quality gives the best chance of a good first impression before Phase 2
-    adapts to their taste via real reactions.
+    Serves memes with proven social proof (>=20 explicit reactions) and high
+    like rate (>=40%). New users need the bot's best content first — maximising
+    per-meme quality gives the best chance of a good first impression before
+    Phase 2 adapts to their taste via real reactions.
+
+    Threshold rationale: nlikes+ndislikes counts only explicit like/dislike
+    reactions, not skips. With typical reaction rates ~30-40% of sends, a meme
+    sent 50-70 times accumulates ~20 explicit reactions — enough statistical
+    signal for lr_smoothed to be reliable. The old >=50 threshold required
+    ~150+ sends and left the pool empty on launch.
 
     Used for memes 1-5 (first impression).
     """
@@ -376,7 +382,7 @@ async def cold_start_explore(
         WHERE 1=1
             AND M.status = 'ok'
             AND R.meme_id IS NULL
-            AND (MS.nlikes + MS.ndislikes) >= 50
+            AND (MS.nlikes + MS.ndislikes) >= 20
             AND MS.lr_smoothed >= 0.40
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
 

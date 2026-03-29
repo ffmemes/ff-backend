@@ -45,11 +45,7 @@ ENGLISH_REFERRAL_BUTTON_TEXTS = [
 
 
 def select_referral_button_text(has_russian_language: bool) -> str:
-    texts = (
-        RUSSIAN_REFERRAL_BUTTON_TEXTS
-        if has_russian_language
-        else ENGLISH_REFERRAL_BUTTON_TEXTS
-    )
+    texts = RUSSIAN_REFERRAL_BUTTON_TEXTS if has_russian_language else ENGLISH_REFERRAL_BUTTON_TEXTS
     return random.choice(texts)
 
 

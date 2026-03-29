@@ -145,9 +145,7 @@ async def upload_meme_content_to_tg(
             logging.warning(f"Flood control exceeded: {e}")
             await asyncio.sleep(e.retry_after)
         except BadRequest as e:
-            logging.warning(
-                "Can't upload meme %s. Telegram error: %s", meme["id"], e
-            )
+            logging.warning("Can't upload meme %s. Telegram error: %s", meme["id"], e)
             await update_meme(meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK)
             return None
 

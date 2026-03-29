@@ -66,7 +66,7 @@ def _meme(id: int, recommended_by: str = "test") -> dict:
     }
 
 
-@pytest_asyncio.fixture(loop_scope="session")
+@pytest_asyncio.fixture()
 async def queue_user():
     async with engine.connect() as conn:
         await create_user(conn, id=QUEUE_USER)
@@ -90,7 +90,7 @@ async def queue_user():
         await cleanup_test_data(conn)
 
 
-@pytest_asyncio.fixture(autouse=True, loop_scope="session")
+@pytest_asyncio.fixture(autouse=True)
 async def _clean_queue_between_tests():
     """Clear Redis queue and user info cache before each test."""
     queue_key = redis.get_meme_queue_key(QUEUE_USER)

@@ -68,6 +68,7 @@ async def upsert_telegram_chat_bot_joined(chat) -> None:
 async def update_telegram_chat_bot_left(chat_id: int) -> None:
     """Record that the bot was removed from a chat."""
     from sqlalchemy import update
+
     query = (
         update(telegram_chat)
         .where(telegram_chat.c.id == chat_id)
@@ -120,7 +121,8 @@ async def save_telegram_message(msg: Message) -> None:
 
 
 async def get_active_chat_users(chat_id: int, limit: int = 10):
-    select_query = text("""
+    select_query = text(
+        """
         WITH ACTIVE_USERS AS (
             SELECT MSG.user_id, MAX(MSG.date) date
             FROM message_tg MSG
@@ -140,12 +142,14 @@ async def get_active_chat_users(chat_id: int, limit: int = 10):
         FROM ACTIVE_USERS
         LEFT JOIN user_tg UT
             ON UT.id = ACTIVE_USERS.user_id
-    """)
+    """
+    )
     return await fetch_all(select_query, {"chat_id": chat_id, "limit": limit})
 
 
 async def get_latest_chat_messages(chat_id: int, limit: int = 20):
-    select_query = text("""
+    select_query = text(
+        """
         WITH USER_NAMES AS (
             SELECT
                 id,
@@ -184,5 +188,6 @@ async def get_latest_chat_messages(chat_id: int, limit: int = 20):
         WHERE M.chat_id = :chat_id
         ORDER BY M.date DESC
         LIMIT :limit
-    """)
+    """
+    )
     return await fetch_all(select_query, {"chat_id": chat_id, "limit": limit})

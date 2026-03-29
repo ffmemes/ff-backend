@@ -108,13 +108,9 @@ async def next_message(
 
         try:
             if should_replace_previous and previous_message is not None:
-                msg = await _replace_previous_message(
-                    bot, previous_message, meme, reply_markup
-                )
+                msg = await _replace_previous_message(bot, previous_message, meme, reply_markup)
             else:
-                msg = await send_new_message_with_meme(
-                    bot, user_id, meme, reply_markup
-                )
+                msg = await send_new_message_with_meme(bot, user_id, meme, reply_markup)
         except BadRequest as error:
             await _disable_broken_meme(meme, error)
             attempt += 1
@@ -152,9 +148,7 @@ async def _replace_previous_message(
     reply_markup: InlineKeyboardMarkup | None,
 ) -> Message:
     try:
-        edited_message = await edit_last_message_with_meme(
-            previous_message, meme, reply_markup
-        )
+        edited_message = await edit_last_message_with_meme(previous_message, meme, reply_markup)
     except BadRequest as error:
         if _is_missing_message_error(error):
             logger.info(
@@ -185,9 +179,7 @@ async def _replace_previous_message(
 
 async def _disable_broken_meme(meme: MemeData, error: BadRequest) -> None:
     await update_meme(meme.id, status=MemeStatus.BROKEN_CONTENT_LINK)
-    await log(
-        f"meme {meme.id} is disabled now because of: {error.__class__.__name__}: {error}"
-    )
+    await log(f"meme {meme.id} is disabled now because of: {error.__class__.__name__}: {error}")
 
 
 def _is_missing_message_error(error: BadRequest) -> bool:
