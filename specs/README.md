@@ -12,3 +12,4 @@ Detailed specifications for each subsystem. See root [SPEC.md](../SPEC.md) for p
 | [issues.md](issues.md) | Prioritized backlog of known bugs and improvements |
 | [error-profile.md](error-profile.md) | Production error analysis from logs |
 | [data-hypotheses.md](data-hypotheses.md) | Data analysis findings (H1-H7) |
+| [cohort-analysis-2026-03-29.md](cohort-analysis-2026-03-29.md) | Super users vs churned: cohort analysis, 6 experiments |
