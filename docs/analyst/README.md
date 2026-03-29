@@ -63,6 +63,8 @@ Key tables for analytics:
 
 Secondary signals: WAU growth, share click rate, D1/D7 retention, cold start like rate.
 
+**Describe Memes throughput**: `described_24h` — memes described by the OpenRouter Vision flow in the last 24h. Expected >0. Zero means the circuit breaker has paused the flow. See "DESCRIBE MEMES THROUGHPUT" section in metrics.sql.
+
 **Chat Agent metrics**: agent_calls_24h, active_chats_24h, avg_response_ms, token_cost_usd, chat meme like rate. See "CHAT AGENT" section in metrics.sql.
 
 See `experiments/README.md` for report format and `docs/analyst/metrics.sql` for the actual queries.

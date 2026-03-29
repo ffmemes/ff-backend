@@ -35,6 +35,7 @@ Run queries from `docs/analyst/metrics.sql`. Focus on:
 - **Engagement** — DAU/WAU/MAU
 - **Engine performance** — per-engine like rates AND session continuation (not just LR!)
 - **Growth** — share clicks, new users, retention trends
+- **Describe Memes throughput** — memes described per 24h (`described_24h`). Should be >0. If 0, the circuit breaker has likely paused the Describe Memes flow — flag this in the report.
 - **Chat Agent** — agent calls, active chats, response times, token costs, group meme reactions
 - **Anomaly detection** — compare today vs 7-day average. Flag deviations >30%.
 

@@ -287,6 +287,36 @@ ORDER BY day;
 
 
 -- =============================================
+-- SECTION: DESCRIBE MEMES THROUGHPUT
+-- =============================================
+-- Tracks whether the Describe Memes flow (OpenRouter Vision) is running.
+-- Flow runs every 30 min and writes ocr_result->>'calculated_at' on success.
+-- Circuit breaker pauses the flow after 3 failures — this metric detects that.
+-- Expected healthy: described_24h > 0 (ideally 30+ per batch × 48 batches/day)
+
+SELECT
+  count(*) FILTER (
+    WHERE (ocr_result->>'calculated_at')::timestamptz > now() - interval '24 hours'
+  ) AS described_24h,
+  count(*) FILTER (
+    WHERE (ocr_result->>'calculated_at')::timestamptz > now() - interval '7 days'
+  ) AS described_7d,
+  count(*) FILTER (
+    WHERE ocr_result->>'description' IS NOT NULL
+  ) AS total_described,
+  count(*) FILTER (
+    WHERE type = 'image' AND status = 'ok'
+      AND (ocr_result IS NULL OR ocr_result->>'description' IS NULL)
+      AND COALESCE((ocr_result->>'describe_failures')::int, 0) < 3
+  ) AS pending_description,
+  count(*) FILTER (
+    WHERE COALESCE((ocr_result->>'describe_failures')::int, 0) >= 3
+  ) AS permanently_failed
+FROM meme
+WHERE type = 'image' AND status = 'ok';
+
+
+-- =============================================
 -- SECTION: CHAT AGENT (Meme Sommelier)
 -- =============================================
 -- Tracks the AI chat agent in group chats.
