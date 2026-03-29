@@ -142,7 +142,7 @@ async def handle_agent_trigger(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # Run the agent
     try:
-        from src.tgbot.handlers.chat.agent.runner import run_chat_agent
+        from src.tgbot.handlers.chat.agent.runner import clean_response, run_chat_agent
 
         response = await run_chat_agent(
             bot=context.bot,
@@ -150,6 +150,9 @@ async def handle_agent_trigger(update: Update, context: ContextTypes.DEFAULT_TYP
             user_id=user_id,
             reply_to_message_id=msg.message_id,
         )
+
+        # Safety net: strip any DSML XML that leaked through
+        response = clean_response(response)
 
         if response:
             sent_msg = await context.bot.send_message(

@@ -22,4 +22,5 @@ python-telegram-bot[rate-limiter]==22.3.*
 
 Pillow==11.3.*
 
-openai==1.75.*
+openai==2.8.*
+openai-agents==0.4.*
