@@ -44,7 +44,9 @@ docker compose exec app pytest tests/recommendations/test_blender.py
 - **DB**: PostgreSQL 14 (asyncpg + SQLAlchemy 2.0 raw `Table` objects, NOT declarative ORM)
 - **Cache/Queue**: Redis 6.2 (recommendation queues per user, user info cache, 1h TTL)
 - **Jobs**: Prefect 3.4 (parsing, stats, crossposting crons)
-- **OCR**: Modal microservice (toggle: `OCR_ENABLED`, currently off)
+- **OCR/Describe**: Two systems exist:
+  - **Legacy OCR**: Modal microservice (toggle: `OCR_ENABLED`, currently off)
+  - **Describe Memes**: OpenRouter free vision models (`describe_memes.py`), runs every 30 min, ~500-600 memes/day. Populates `meme.ocr_result` JSONB with description + text + language. Uses `calculated_at` field (NOT `meme.created_at`) for monitoring. Circuit breaker auto-pauses after 3 failures/hour
 - **Python**: 3.10 (dev), 3.12 (prod)
 
 ### Docker Compose Services

@@ -36,6 +36,7 @@ Run queries from `docs/analyst/metrics.sql`. Focus on:
 - **Engine performance** — per-engine like rates AND session continuation (not just LR!)
 - **Growth** — share clicks, new users, retention trends
 - **Chat Agent** — agent calls, active chats, response times, token costs, group meme reactions
+- **OCR/Describe Memes** — memes described in last 24h, coverage by popularity tier, backlog size, last_described_at. Use `ocr_result->>'calculated_at'` (NOT `meme.created_at`) to find recently described memes. Alert if described_24h < 100 or last_described_at > 2 hours ago (flow may be paused by circuit breaker)
 - **Anomaly detection** — compare today vs 7-day average. Flag deviations >30%.
 
 **Important**: Like rate is NOT the only metric. The North Star is session length. Always consider multiple signals.

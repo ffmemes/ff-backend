@@ -6,10 +6,16 @@ Populates meme.ocr_result JSONB with:
 - text: raw OCR text extracted from the image
 - language: detected language (ISO 639-1)
 - described_by: model used
-- described_at: timestamp
+- calculated_at: timestamp (use this field, NOT meme.created_at, for monitoring)
 
-Processes most popular memes first (by nmemes_sent).
+Processes most popular memes first (by nlikes DESC).
 Runs every 30 min via Prefect cron, ~30 memes per batch.
+
+Throughput: ~500-600 memes/day on OpenRouter free tier.
+Bottleneck: free model rate limits (20 rpm, ~1000 req/day with $10+ credits).
+Circuit breaker: auto-paused after 3 failures in 1 hour (see setup_automations.py).
+  To resume: prefect deployment resume "Describe Memes (OpenRouter Vision)/Describe Memes (OpenRouter)"
+  Or via Prefect API: PATCH /api/deployments/{id} with {"paused": false}
 """
 
 import asyncio

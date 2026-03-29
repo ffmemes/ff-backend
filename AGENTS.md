@@ -25,6 +25,32 @@
 - Weekly maintenance (Prefect flow health checks, data hygiene jobs, etc.) runs through the Prefect deployment definitions under `flow_deployments/`. Use Docker Compose (`docker-compose.yml`) plus Prefect CLI to register or trigger flows during scheduled operations.
 - For ad-hoc debugging, remember that Prefect logs surface in the worker containers defined in the Compose stack; keep an eye on OCR warnings for signal that the toggle needs to flip back on.
 
+## Describe Memes (OpenRouter Vision)
+
+The `describe_memes` flow (`src/flows/storage/describe_memes.py`) uses free OpenRouter vision models to extract text and descriptions from meme images. This is **separate from the legacy OCR** (Modal, `OCR_ENABLED` toggle).
+
+- **Schedule**: every 30 min, 30 memes/batch
+- **Throughput**: ~500-600 memes/day (limited by OpenRouter free tier: 20 rpm, ~1000 req/day)
+- **Priority**: processes most-liked memes first (`nlikes DESC`)
+- **Storage**: writes to `meme.ocr_result` JSONB with `calculated_at` timestamp
+- **Monitoring**: use `ocr_result->>'calculated_at'` to check recency, NOT `meme.created_at`
+- **Circuit breaker**: auto-pauses after 3 failures in 1 hour
+
+### Handling circuit breaker pauses
+
+When the circuit breaker fires, the deployment is paused and a Prefect automation event is emitted. To resume:
+
+```bash
+# Via Prefect API (preferred — no SSH needed):
+curl -s -X PATCH "https://prefect.swanrate.com/api/deployments/<deployment-id>" \
+  -u "$PREFECT_AUTH_STRING" \
+  -H "Content-Type: application/json" \
+  -d '{"paused": false}'
+```
+
+Auth credentials are in the Coolify environment variables (`PREFECT_AUTH_STRING`).
+Before resuming, verify the root cause is fixed (check recent flow run logs for error details).
+
 ## Key settings & environment toggles
 - Redis, Postgres, and Telegram configuration live in [`src/config.py`](src/config.py). Update `.env` or deployment secrets with:
   - `DATABASE_URL` / pooling parameters for Postgres.
