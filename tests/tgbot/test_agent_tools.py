@@ -37,9 +37,9 @@ async def test_execute_send_meme_coerces_string_meme_id():
 
             await execute_send_meme(mock_bot, chat_id=123, meme_id="6091977")
 
-    assert isinstance(captured_params["meme_id"], int), (
-        "meme_id must be cast to int before SQL — asyncpg rejects str for integer columns"
-    )
+    assert isinstance(
+        captured_params["meme_id"], int
+    ), "meme_id must be cast to int before SQL — asyncpg rejects str for integer columns"
     assert captured_params["meme_id"] == 6091977
 
 
@@ -76,5 +76,7 @@ async def test_dispatch_tool_send_meme_with_string_id():
                 chat_id=123,
             )
 
-    assert "error" not in result.lower() or "not found" in result.lower() or "sent" in result.lower()
+    assert (
+        "error" not in result.lower() or "not found" in result.lower() or "sent" in result.lower()
+    )
     assert isinstance(captured_params.get("meme_id"), int)

@@ -132,9 +132,7 @@ async def webhook_proxy_qa(request: Request) -> Response:
             )
             logger.info("Paperclip QA trigger fired: %s", resp.status_code)
             if resp.status_code >= 300:
-                logger.error(
-                    "Paperclip QA trigger returned non-2xx: %s", resp.status_code
-                )
+                logger.error("Paperclip QA trigger returned non-2xx: %s", resp.status_code)
                 return Response(status_code=502, content="bad gateway")
     except Exception as e:
         logger.error("Failed to proxy to Paperclip QA: %s", e)
