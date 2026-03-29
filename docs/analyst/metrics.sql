@@ -287,13 +287,20 @@ ORDER BY day;
 
 
 -- =============================================
--- SECTION: DESCRIBE MEMES THROUGHPUT
+-- SECTION: OCR / DESCRIBE MEMES (OpenRouter Vision)
 -- =============================================
--- Tracks whether the Describe Memes flow (OpenRouter Vision) is running.
--- Flow runs every 30 min and writes ocr_result->>'calculated_at' on success.
--- Circuit breaker pauses the flow after 3 failures — this metric detects that.
--- Expected healthy: described_24h > 0 (ideally 30+ per batch × 48 batches/day)
+-- Tracks the describe_memes flow which uses free OpenRouter vision models
+-- to extract text + description from meme images.
+--
+-- Throughput: ~30 memes/batch, every 30 min, ~500-600 described/day
+-- Bottleneck: OpenRouter free tier limits (20 rpm, ~1000 req/day)
+-- Priority: processes most-liked memes first (nlikes DESC)
+-- Circuit breaker: auto-pauses after 3 failures in 1 hour
+--
+-- IMPORTANT: use ocr_result->>'calculated_at' to find recently described memes,
+-- NOT meme.created_at (the flow backfills old popular memes, not just new ones)
 
+-- Daily describe throughput and coverage
 SELECT
   count(*) FILTER (
     WHERE (ocr_result->>'calculated_at')::timestamptz > now() - interval '24 hours'
@@ -308,12 +315,42 @@ SELECT
     WHERE type = 'image' AND status = 'ok'
       AND (ocr_result IS NULL OR ocr_result->>'description' IS NULL)
       AND COALESCE((ocr_result->>'describe_failures')::int, 0) < 3
-  ) AS pending_description,
+  ) AS backlog_remaining,
   count(*) FILTER (
     WHERE COALESCE((ocr_result->>'describe_failures')::int, 0) >= 3
-  ) AS permanently_failed
+  ) AS permanently_failed,
+  max((ocr_result->>'calculated_at')::timestamptz) AS last_described_at
 FROM meme
 WHERE type = 'image' AND status = 'ok';
+
+-- Coverage by popularity tier (most important for Wrapped)
+WITH tiers AS (
+  SELECT
+    CASE
+      WHEN COALESCE(ms.nlikes, 0) >= 100 THEN '100+ likes'
+      WHEN COALESCE(ms.nlikes, 0) >= 50 THEN '50-99 likes'
+      WHEN COALESCE(ms.nlikes, 0) >= 20 THEN '20-49 likes'
+      ELSE 'under 20 likes'
+    END AS tier,
+    m.ocr_result->>'description' IS NOT NULL AS has_desc
+  FROM meme m
+  LEFT JOIN meme_stats ms ON ms.meme_id = m.id
+  WHERE m.type = 'image' AND m.status = 'ok'
+)
+SELECT
+  tier,
+  count(*) AS total,
+  count(*) FILTER (WHERE has_desc) AS described,
+  round(100.0 * count(*) FILTER (WHERE has_desc) / count(*)) AS coverage_pct
+FROM tiers
+GROUP BY tier
+ORDER BY
+  CASE tier
+    WHEN '100+ likes' THEN 1
+    WHEN '50-99 likes' THEN 2
+    WHEN '20-49 likes' THEN 3
+    ELSE 4
+  END;
 
 
 -- =============================================
