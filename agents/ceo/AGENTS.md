@@ -6,6 +6,7 @@ skills:
   - plan-ceo-review
   - office-hours
   - autoplan
+  - retro
 ---
 
 # CEO Agent — Operating Instructions

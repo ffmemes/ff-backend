@@ -4,15 +4,15 @@ Autonomous AI team for @ffmemesbot, managed by [Paperclip](https://paperclip.ing
 
 ## Agents
 
-| Agent | Title | Reports To | Trigger | Skills |
-|-------|-------|-----------|---------|--------|
-| CEO | Chief Executive Officer | — | Daily heartbeat | plan-ceo-review, office-hours, autoplan |
-| Analyst | Data Analyst | CEO | Every 6h (routine) | investigate, browse, retro |
-| CTO | Chief Technology Officer | CEO | On-demand (CEO task) | plan-eng-review, plan-design-review, retro, cso, codex |
-| Staff Engineer | Staff Engineer | CTO | PR webhook (auto) | review, investigate |
-| QA Engineer | QA Engineer | CTO | Sentry webhook + 30min fallback | browse, qa, qa-only, benchmark, canary, design-review, design-consultation, setup-browser-cookies |
-| Release Engineer | Release Engineer | CTO | On-demand (Staff Eng approval) | ship, land-and-deploy, document-release, setup-deploy |
-| Comms Manager | Communications | CEO | On-demand (CEO task) | browse, frontend-design |
+| Agent | Title | Reports To | Trigger | Heartbeat | Skills |
+|-------|-------|-----------|---------|-----------|--------|
+| CEO | Chief Executive Officer | — | Weekly routine (Mon 09:00 UTC) | 24h (daily) | plan-ceo-review, office-hours, autoplan |
+| Analyst | Data Analyst | CEO | Daily routine (06:00 UTC) | 6h | investigate, browse, retro |
+| CTO | Chief Technology Officer | CEO | On-demand (CEO task) | **off** | plan-eng-review, plan-design-review, retro, cso, codex, investigate |
+| Staff Engineer | Staff Engineer | CTO | PR webhook (GitHub Actions) | **off** | review, investigate |
+| QA Engineer | QA Engineer | CTO | Webhook (Sentry/Coolify proxy) + 6h schedule | 6h | browse, qa, qa-only, benchmark, canary, design-review, design-consultation, setup-browser-cookies |
+| Release Engineer | Release Engineer | CTO | On-demand (Staff Eng approval) | **off** | ship, land-and-deploy, document-release, setup-deploy |
+| Comms Manager | Communications | CEO | Daily heartbeat | 24h (daily) | browse, frontend-design |
 
 ## Org Chart
 
@@ -49,20 +49,45 @@ Bug detected (Sentry webhook or QA scan)
 
 ## Routines
 
-| Routine | Agent | Schedule (UTC) | What it does |
-|---------|-------|----------------|-------------|
-| Daily Analyst Report | Analyst | `0 6 * * *` | Query metrics, detect anomalies, write report for CEO |
-| QA Health Check | QA | `*/30 * * * *` | Lightweight scan: Sentry + Prefect + DB health (fallback for webhooks) |
-| Weekly CEO Review | CEO | `0 9 * * 1` | Retro, experiments, priorities, backlog review |
-| gstack Update Check | CEO | `0 3 * * *` | Update skills, review changelog |
+| Routine | Agent | Schedule (UTC) | Trigger Type | What it does |
+|---------|-------|----------------|-------------|--------------|
+| Daily Analyst Report | Analyst | `0 6 * * *` | schedule + API | Query metrics, detect anomalies, write report for CEO |
+| QA Log Scan | QA | `0 */6 * * *` | schedule + 2 webhooks + API | Sentry + Coolify logs + DB health |
+| Process Health Check | QA | `0 12 * * *` | schedule | Watchdog: verify all routines are running on time |
+| Weekly CEO Review | CEO | `0 9 * * 1` | schedule | Retro, experiments, priorities, backlog review |
+| Weekly Analyst Summary | Analyst | `0 9 * * 1` | schedule | Weekly summary for CEO review |
+| gstack Update Check | CEO | `0 3 * * *` | schedule | Update skills, review changelog |
+| PR Review | Staff Engineer | on PR event | 2 webhooks + API | Review PRs via GitHub Actions trigger |
 
 ## Webhook Triggers
 
-| Source | Target Agent | Event |
-|--------|-------------|-------|
-| Sentry | QA Engineer | New issue created -> classify + escalate |
-| GitHub | Staff Engineer | PR created/updated -> /review |
-| Coolify | QA Engineer | Deploy complete -> /canary |
+| Source | Target Agent | Event | Mechanism |
+|--------|-------------|-------|-----------|
+| GitHub | Staff Engineer | PR created/updated/synced | GitHub Actions → Paperclip bearer trigger |
+| Sentry | QA Engineer | New issue created | App webhook proxy (`/webhooks/qa-alert`) → Paperclip |
+| Coolify | QA Engineer | Deploy complete | App webhook proxy (`/webhooks/qa-alert?secret=...`) → Paperclip |
+| Prefect | QA Engineer | Flow failure | `notify_qa_sync()` in `src/integrations/paperclip.py` |
+
+### Webhook Proxy
+
+Sentry and Coolify can't send custom `Authorization` headers. The ff-backend app proxies their webhooks to Paperclip at `POST /webhooks/qa-alert` (see `src/integrations/paperclip.py`).
+
+Requires env vars: `PAPERCLIP_QA_TRIGGER_URL`, `PAPERCLIP_QA_TRIGGER_SECRET`, `SENTRY_CLIENT_SECRET`, `WEBHOOK_PROXY_SECRET`.
+
+## Backup & Restore
+
+```bash
+# Take a snapshot of all agents, routines, skills
+./agents/backup/backup.sh
+
+# Restore from backup (after data loss)
+./agents/backup/restore.sh [backup-file.json]
+```
+
+Backups are saved to `agents/backup/paperclip-state-*.json` (gitignored). The script keeps the last 10 snapshots. Run before any major config changes.
+
+**What's backed up:** Agent configs (heartbeats, skills, adapters), routines (triggers, schedules), skills inventory.
+**What's NOT backed up:** Secrets (re-add manually), issue history, execution logs.
 
 ## Structure
 
