@@ -13,9 +13,8 @@ Runs every 30 min via Prefect cron, ~30 memes per batch.
 
 Throughput: ~500-600 memes/day on OpenRouter free tier.
 Bottleneck: free model rate limits (20 rpm, ~1000 req/day with $10+ credits).
-Circuit breaker: auto-paused after 3 failures in 1 hour (see setup_automations.py).
-  To resume: prefect deployment resume "Describe Memes (OpenRouter Vision)/Describe Memes"
-  Or via Prefect API: PATCH /api/deployments/{id} with {"paused": false}
+Circuit breaker: auto-paused after 3 failures in 1 hour.
+  Resume: PATCH /api/deployments/{id} {"paused": false}
 """
 
 import asyncio
