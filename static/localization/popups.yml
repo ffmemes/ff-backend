@@ -80,6 +80,21 @@ popup.inline_search:
     Наприклад: @ffmemesbot котики
 
 
+experiment.upload_promo_day1:
+  en: |-
+    Did you know you can share your own memes? 🤳
+
+    Just send an image to this chat — if other users like it, it'll be shown to more people!
+  ru: |-
+    Знаешь, что ты можешь делиться своими мемами? 🤳
+
+    Просто отправь картинку в этот чат — если другим понравится, мы покажем её всем!
+  uk: |-
+    Знаєш, що ти можеш ділитися своїми мемами? 🤳
+
+    Просто надішли зображення в цей чат — якщо іншим сподобається, ми покажемо його всім!
+
+
 popup.upload_meme:
   en: |-
     📤 Send us your memes! 📥

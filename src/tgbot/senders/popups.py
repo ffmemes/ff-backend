@@ -2,6 +2,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
 from src import localizer
+from src.flows.events import safe_emit
 from src.tgbot.bot import bot
 from src.tgbot.constants import POPUP_BUTTON_CALLBACK_DATA_PATTERN
 from src.tgbot.schemas import Popup
@@ -70,6 +71,17 @@ async def get_popup_to_send(user_id: int, user_info: dict) -> Popup | None:
     if user_info["nmemes_sent"] == 10:
         popup_id = "achievement.nmemes_sent_10"
         if not await user_popup_already_sent(user_id, popup_id):
+            return _get_popup(popup_id, user_info)
+
+    # Upload promotion Day 1 A/B experiment (treatment: user_id % 2 == 0)
+    if user_info["nmemes_sent"] == 10 and user_id % 2 == 0:
+        popup_id = "experiment.upload_promo_day1"
+        if not await user_popup_already_sent(user_id, popup_id):
+            safe_emit(
+                "ff.experiment.upload_promo_day1.sent",
+                f"user.{user_id}",
+                {"user_id": user_id, "group": "treatment"},
+            )
             return _get_popup(popup_id, user_info)
 
     if user_info["nmemes_sent"] % 1000 == 20:
