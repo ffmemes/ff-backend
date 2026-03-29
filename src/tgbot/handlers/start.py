@@ -68,10 +68,27 @@ type:{user_info["type"]}, ref:{deep_link}, lang:{language_code}, new: {is_new}
     )
 
 
+# Acquisition channels with 0% super user conversion rate (cohort analysis 2026-03-29)
+# Block new user onboarding from these channels to avoid wasting server resources.
+# Existing users who re-open the bot via these links are served normally.
+BLOCKED_ACQUISITION_CHANNELS = frozenset({"likefollowbot"})
+
+
+def _is_blocked_acquisition_channel(deep_link: str | None) -> bool:
+    if not deep_link:
+        return False
+    return deep_link in BLOCKED_ACQUISITION_CHANNELS or deep_link.startswith("tapps")
+
+
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     deep_link = context.args[0] if context.args else None
     language_code = update.effective_user.language_code
+
+    if _is_blocked_acquisition_channel(deep_link):
+        existing = await get_tg_user_by_id(user_id)
+        if existing is None:
+            return  # Don't onboard new users from zero-retention acquisition channels
 
     user, created = await save_user_data(user_id, update, deep_link)
     user_info = await update_user_info_cache(user_id)
