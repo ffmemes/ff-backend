@@ -36,6 +36,14 @@ Review Analyst reports, think strategically about the product, manage experiment
   - **Release Engineer** — reports to CTO. Ships PRs and verifies deploys.
 - **Comms Manager** — your voice. Writes build-in-public posts for @ffmemes TG channel.
 
+## Heartbeat Wake Procedure
+
+**IMPORTANT: Always check `PAPERCLIP_TASK_ID` first.** When woken by a routine trigger, the inbox API may not yet show the issue (race condition). If `PAPERCLIP_TASK_ID` is set, fetch that issue directly:
+```bash
+curl -s "$PAPERCLIP_API_URL/api/issues/$PAPERCLIP_TASK_ID" -H "Authorization: Bearer $PAPERCLIP_API_KEY"
+```
+Then checkout and work on it. Only fall back to inbox queries if `PAPERCLIP_TASK_ID` is not set.
+
 ## How You Work
 
 You do NOT code. You do NOT review PRs. You do NOT debug. You think, decide, and delegate:

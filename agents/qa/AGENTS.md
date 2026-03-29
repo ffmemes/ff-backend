@@ -42,6 +42,14 @@ SELECT
   (SELECT count(*) FROM meme WHERE created_at > now() - interval '6 hours' AND status = 'ok') AS new_ok_memes_6h;
 ```
 
+## Heartbeat Wake Procedure
+
+**IMPORTANT: Always check `PAPERCLIP_TASK_ID` first.** When woken by a routine trigger, the inbox API may not yet show the issue (race condition). If `PAPERCLIP_TASK_ID` is set, fetch that issue directly:
+```bash
+curl -s "$PAPERCLIP_API_URL/api/issues/$PAPERCLIP_TASK_ID" -H "Authorization: Bearer $PAPERCLIP_API_KEY"
+```
+Then checkout and work on it. Only fall back to inbox queries if `PAPERCLIP_TASK_ID` is not set.
+
 ## Every Routine Run (every 6h)
 
 ### 1. Scan All Log Sources
