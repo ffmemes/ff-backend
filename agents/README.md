@@ -4,15 +4,21 @@ Autonomous AI team for @ffmemesbot, managed by [Paperclip](https://paperclip.ing
 
 ## Agents
 
-| Agent | Title | Reports To | Trigger | Heartbeat | Skills |
-|-------|-------|-----------|---------|-----------|--------|
-| CEO | Chief Executive Officer | — | Weekly routine (Mon 09:00 UTC) | 24h (daily) | plan-ceo-review, office-hours, autoplan |
-| Analyst | Data Analyst | CEO | Daily routine (06:00 UTC) | 6h | investigate, browse, retro |
-| CTO | Chief Technology Officer | CEO | On-demand (CEO task) | **off** | plan-eng-review, plan-design-review, retro, cso, codex, investigate |
-| Staff Engineer | Staff Engineer | CTO | PR webhook (GitHub Actions) | **off** | review, investigate |
-| QA Engineer | QA Engineer | CTO | Webhook (Sentry/Coolify proxy) + 6h schedule | 6h | browse, qa, qa-only, benchmark, canary, design-review, design-consultation, setup-browser-cookies |
-| Release Engineer | Release Engineer | CTO | On-demand (Staff Eng approval) | **off** | ship, land-and-deploy, document-release, setup-deploy |
-| Comms Manager | Communications | CEO | Daily heartbeat | 24h (daily) | browse, frontend-design |
+| Agent | Title | Reports To | Activation | Heartbeat | Skills |
+|-------|-------|-----------|------------|-----------|--------|
+| CEO | Chief Executive Officer | — | Weekly routine (Mon 09:00 UTC) + daily heartbeat | 24h | plan-ceo-review, office-hours, autoplan, retro |
+| Analyst | Data Analyst | CEO | **Routines only** (daily 06:00 + weekly Mon 09:00 UTC) | **off** | investigate, browse, retro |
+| CTO | Chief Technology Officer | CEO | On-demand (wakeOnDemand via task assignment) | **off** | plan-eng-review, plan-design-review, retro, cso, codex, investigate |
+| Staff Engineer | Staff Engineer | CTO | **Routines only** (PR webhook via GitHub Actions) | **off** | review, investigate |
+| QA Engineer | QA Engineer | CTO | **Routines only** (6h schedule + Sentry/Coolify webhooks) | **off** | browse, qa, qa-only, benchmark, canary, design-review, design-consultation, setup-browser-cookies |
+| Release Engineer | Release Engineer | CTO | On-demand (wakeOnDemand via task assignment) | **off** | ship, land-and-deploy, document-release, setup-deploy |
+| Comms Manager | Communications | CEO | Daily heartbeat | 24h | browse, frontend-design |
+
+### Heartbeats vs Routines
+
+- **Routines** = deterministic scheduled/triggered jobs with specific prompts. Preferred for all recurring work.
+- **Heartbeats** = generic "check inbox, do autonomous work" loops. Only for agents needing self-triage (CEO, Comms).
+- **wakeOnDemand** = instant wake when a task is assigned. Enabled on all agents regardless of heartbeat setting.
 
 ## Org Chart
 
