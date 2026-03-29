@@ -1,4 +1,5 @@
 # ff-backend Agent Notes
+<!-- trigger-test: verifying pull_request_target fires Staff Engineer -->
 
 ## Automated parsing & Prefect storage flows
 - The Prefect flows in [`src/flows/storage/memes.py`](src/flows/storage/memes.py) orchestrate ingestion from all automated sources:
