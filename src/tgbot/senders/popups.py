@@ -7,7 +7,12 @@ from src.tgbot.bot import bot
 from src.tgbot.constants import POPUP_BUTTON_CALLBACK_DATA_PATTERN
 from src.tgbot.schemas import Popup
 from src.tgbot.senders.utils import get_random_emoji
-from src.tgbot.service import create_user_popup_log, user_popup_already_sent
+from src.tgbot.service import (
+    assign_experiment,
+    create_user_popup_log,
+    get_experiment_variant,
+    user_popup_already_sent,
+)
 
 
 def _get_popup(popup_id: str, user_info: dict) -> Popup:
@@ -68,20 +73,27 @@ async def get_popup_to_send(user_id: int, user_info: dict) -> Popup | None:
                     ),
                 )
 
-    # Upload promotion Day 1 A/B experiment (treatment: user_id % 2 == 0)
+    # Upload promotion Day 1 A/B experiment
     # Must come BEFORE the achievement.nmemes_sent_10 check — both trigger at
     # nmemes_sent == 10, and the achievement check's early return would swallow
     # this branch entirely for treatment users.
-    # Treatment users receive the upload promo instead of the nmemes_sent_10 achievement.
-    if user_info["nmemes_sent"] == 10 and user_id % 2 == 0:
-        popup_id = "experiment.upload_promo_day1"
-        if not await user_popup_already_sent(user_id, popup_id):
-            safe_emit(
-                "ff.experiment.upload_promo_day1.sent",
-                f"user.{user_id}",
-                {"user_id": user_id, "group": "treatment"},
-            )
-            return _get_popup(popup_id, user_info)
+    if user_info["nmemes_sent"] == 10:
+        experiment_id = "upload_promo_day1"
+        variant = await get_experiment_variant(user_id, experiment_id)
+        if variant is None:
+            # New user reaching trigger — assign to experiment
+            variant = "treatment" if user_id % 2 == 0 else "control"
+            await assign_experiment(user_id, experiment_id, variant)
+
+        if variant == "treatment":
+            popup_id = "experiment.upload_promo_day1"
+            if not await user_popup_already_sent(user_id, popup_id):
+                safe_emit(
+                    "ff.experiment.upload_promo_day1.sent",
+                    f"user.{user_id}",
+                    {"user_id": user_id, "group": "treatment"},
+                )
+                return _get_popup(popup_id, user_info)
 
     if user_info["nmemes_sent"] == 10:
         popup_id = "achievement.nmemes_sent_10"

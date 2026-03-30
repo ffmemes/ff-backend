@@ -488,6 +488,19 @@ chat_agent_usage = Table(
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
 )
 
+# === Experiment Analytics ===
+
+experiment_assignment = Table(
+    "experiment_assignment",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("experiment_id", String(100), nullable=False),
+    Column("user_id", BigInteger, ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
+    Column("variant", String(50), nullable=False),  # 'control', 'treatment', etc.
+    Column("assigned_at", DateTime, server_default=func.now(), nullable=False),
+    UniqueConstraint("experiment_id", "user_id", name="uq_experiment_assignment"),
+)
+
 
 async def fetch_one(
     select_query: Select | Insert | Update,
