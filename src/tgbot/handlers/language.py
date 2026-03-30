@@ -7,7 +7,7 @@ from telegram.ext import ContextTypes
 from src import localizer
 from src.recommendations.meme_queue import (
     clear_meme_queue_for_user,
-    generate_cold_start_recommendations,
+    generate_recommendations,
 )
 from src.tgbot.constants import LANG_SETTINGS_END_CALLBACK_DATA
 from src.tgbot.handlers.onboarding import onboarding_flow
@@ -137,6 +137,6 @@ async def handle_language_settings_end(
 
     user_id = update.effective_user.id
     await clear_meme_queue_for_user(user_id)
-    await generate_cold_start_recommendations(user_id)
+    await generate_recommendations(user_id, limit=15)
 
     return await onboarding_flow(update, context.bot)
