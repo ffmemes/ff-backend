@@ -415,9 +415,7 @@ async def get_experiment_variant(user_id: int, experiment_id: str) -> str | None
     return row["variant"] if row else None
 
 
-async def assign_experiment(
-    user_id: int, experiment_id: str, variant: str
-) -> None:
+async def assign_experiment(user_id: int, experiment_id: str, variant: str) -> None:
     """Assign a user to an experiment variant. Idempotent (ON CONFLICT DO NOTHING)."""
     insert_query = (
         insert(experiment_assignment)

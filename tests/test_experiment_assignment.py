@@ -18,9 +18,7 @@ async def cleanup():
 
 
 async def _create_test_user(conn, user_id: int) -> None:
-    await conn.execute(
-        insert(user).values(id=user_id, type="user").on_conflict_do_nothing()
-    )
+    await conn.execute(insert(user).values(id=user_id, type="user").on_conflict_do_nothing())
 
 
 @pytest.mark.asyncio
@@ -91,9 +89,7 @@ async def test_multi_variant_experiment():
 async def test_v_experiment_results_view_exists():
     """The v_experiment_results view is queryable."""
     async with engine.begin() as conn:
-        result = await conn.execute(
-            text("SELECT * FROM v_experiment_results LIMIT 1")
-        )
+        result = await conn.execute(text("SELECT * FROM v_experiment_results LIMIT 1"))
         columns = list(result.keys())
         assert "experiment_id" in columns
         assert "variant" in columns
