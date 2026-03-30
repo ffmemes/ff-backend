@@ -388,7 +388,8 @@ async def cold_start_explore(
             AND MS.lr_smoothed >= 0.10
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
 
-        ORDER BY (MS.nlikes::float / NULLIF(MS.nlikes + MS.ndislikes, 0)) DESC, (MS.nlikes + MS.ndislikes) DESC
+        ORDER BY (MS.nlikes::float / NULLIF(MS.nlikes + MS.ndislikes, 0)) DESC,
+                 (MS.nlikes + MS.ndislikes) DESC
         LIMIT :limit
     """
     return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
