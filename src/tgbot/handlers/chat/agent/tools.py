@@ -13,7 +13,7 @@ def get_tools() -> list:
     return [search_memes, send_meme, get_chat_history]
 
 
-@function_tool
+@function_tool(strict_mode=False)
 async def search_memes(
     ctx: RunContextWrapper,
     query: str,
@@ -56,7 +56,7 @@ async def search_memes(
     return "\n".join(lines)
 
 
-@function_tool
+@function_tool(strict_mode=False)
 async def send_meme(ctx: RunContextWrapper, meme_id: int) -> str:
     """Send a meme to the chat by its ID. Use after search_memes to pick one."""
     context = ctx.context
@@ -107,7 +107,7 @@ async def send_meme(ctx: RunContextWrapper, meme_id: int) -> str:
         return f"Failed to send meme: {e}"
 
 
-@function_tool
+@function_tool(strict_mode=False)
 async def get_chat_history(ctx: RunContextWrapper, limit: int = 50) -> str:
     """Fetch more messages from the current chat for additional context."""
     context = ctx.context
