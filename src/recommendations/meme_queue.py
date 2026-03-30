@@ -161,7 +161,7 @@ async def generate_recommendations(
 
         Cold start (<30 memes) uses 3-phase adaptive approach:
           Phase 1 (0-5):  Quality-first — top-liked memes with social proof
-                          (>=50 reactions, >=40% LR)
+                          (>=20 reactions, lr_smoothed >= 0.10)
           Phase 2 (6-15): Adapt — weight sources by user's raw reactions
           Phase 3 (16-30): Transition — blend adapt + growing engines
 
