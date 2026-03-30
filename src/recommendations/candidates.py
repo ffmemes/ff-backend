@@ -349,16 +349,18 @@ async def cold_start_explore(
 ):
     """Phase 1 cold start: quality-first selection for new user first impression.
 
-    Serves memes with proven social proof (>=20 explicit reactions) and high
-    like rate (>=40%). New users need the bot's best content first — maximising
-    per-meme quality gives the best chance of a good first impression before
-    Phase 2 adapts to their taste via real reactions.
+    Serves memes with proven social proof (>=20 explicit reactions) and
+    positive user-bias-corrected like rate. New users need the bot's best
+    content first — maximising per-meme quality gives the best chance of a
+    good first impression before Phase 2 adapts to their taste via real
+    reactions.
 
-    Threshold rationale: nlikes+ndislikes counts only explicit like/dislike
-    reactions, not skips. With typical reaction rates ~30-40% of sends, a meme
-    sent 50-70 times accumulates ~20 explicit reactions — enough statistical
-    signal for lr_smoothed to be reliable. The old >=50 threshold required
-    ~150+ sends and left the pool empty on launch.
+    lr_smoothed is user-bias-corrected and centered around 0 (not a raw
+    like rate). A value of 0.10 means the meme is liked ~10pp above what
+    each user's personal average would predict — a strong positive signal.
+    The previous threshold of 0.40 was far too high and left the pool empty
+    because even universally-liked memes rarely exceed ~0.20 after bias
+    correction.
 
     Used for memes 1-5 (first impression).
     """
@@ -383,7 +385,7 @@ async def cold_start_explore(
             AND M.status = 'ok'
             AND R.meme_id IS NULL
             AND (MS.nlikes + MS.ndislikes) >= 20
-            AND MS.lr_smoothed >= 0.40
+            AND MS.lr_smoothed >= 0.10
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
 
         ORDER BY MS.lr_smoothed DESC, (MS.nlikes + MS.ndislikes) DESC
