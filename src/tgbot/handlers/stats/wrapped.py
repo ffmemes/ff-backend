@@ -4,6 +4,7 @@ import json
 import logging
 import random
 import sys
+from html import escape as html_escape
 
 from openai import AsyncOpenAI
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -609,7 +610,7 @@ async def _show_slide(
         await update.effective_chat.send_message(
             text=(
                 "🔮 <b>Предсказание на лето 2026:</b>\n\n"
-                f"<i>{pred}</i>\n\n"
+                f"<i>{html_escape(pred)}</i>\n\n"
                 "❤️ Спасибо за то, что пользуешься ботом.\n\n"
                 "Перешли ссылку другу — пусть тоже узнает "
                 "свой мем-профиль 👇"
@@ -715,7 +716,7 @@ async def generate_wrapped_data(
             if "\n<i>" in stats_report:
                 idx = stats_report.rfind("\n<i>")
                 stats_report = stats_report[:idx]
-            stats_report += f"\n\n<i>{vibe}</i>"
+            stats_report += f"\n\n<i>{html_escape(vibe)}</i>"
 
         return {
             "stats_report": stats_report,
@@ -794,7 +795,7 @@ def _pick_meme(p: dict, liked: list) -> dict | None:
     if idx is not None and 0 <= idx < len(liked):
         return {
             "meme_id": liked[idx]["meme_id"],
-            "caption": f"🎯 Этот мем олицетворяет тебя:\n\n<i>{cap}</i>",
+            "caption": f"🎯 Этот мем олицетворяет тебя:\n\n<i>{html_escape(cap)}</i>",
         }
     return None
 
@@ -810,10 +811,10 @@ def _build_humor_slide(p: dict) -> str:
     lines = ["🧬 <b>Твоя ДНК юмора:</b>\n"]
     for c in dna[:3]:
         pct = min(100, max(0, c.get("pct", 33)))
-        lines.append(f"{bar(pct)} {pct}%\n{c.get('name', '???')}\n")
+        lines.append(f"{bar(pct)} {pct}%\n{html_escape(c.get('name', '???'))}\n")
 
     if roast:
-        lines.append(f"\n👀 <b>Что я понял про тебя:</b>\n\n{roast}")
+        lines.append(f"\n👀 <b>Что я понял про тебя:</b>\n\n{html_escape(roast)}")
     return "\n".join(lines) if len(lines) > 1 else ""
 
 
@@ -821,7 +822,7 @@ def _build_anti_slide(p: dict) -> str:
     anti = p.get("anti_profile", "")
     if not anti:
         return ""
-    return f"🚫 <b>Что говорят твои скипы:</b>\n\n{anti}"
+    return f"🚫 <b>Что говорят твои скипы:</b>\n\n{html_escape(anti)}"
 
 
 def _build_extra_slide(

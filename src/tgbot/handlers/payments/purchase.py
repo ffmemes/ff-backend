@@ -23,7 +23,11 @@ async def handle_new_token_purchase_request_callback(
     context: CallbackContext,
 ):
     data = update.callback_query.data
-    tokens_to_buy = int(data.split("_")[1])
+    raw = data.split("_")[1] if "_" in data else ""
+    if not raw.isdigit():
+        await update.callback_query.answer()
+        return
+    tokens_to_buy = int(raw)
 
     return await send_invoice_buying_coins_for_stars(
         context.bot,
