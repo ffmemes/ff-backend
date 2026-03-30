@@ -52,6 +52,16 @@ Phase 1 was not triggering for new users on Mar 27–28 (68+ users received `lr_
 - Queue refill threshold (≤8) and on-demand reco limit (15) retained from prior experiment
 - generate_cold_start_recommendations() (language change path) remains on lr_smoothed — low impact, rare event
 
+### Fix (2026-03-29): Switch from lr_smoothed to raw like rate (FFM-83)
+
+Phase 1 pool remained empty even after threshold fix (50→20) because `lr_smoothed` applies user-bias correction that normalizes popular memes toward 0. Max `lr_smoothed` among ≥20-reaction memes: 0.2786 — well below the 0.40 threshold.
+
+**Decision:** Replace `lr_smoothed` with raw like rate (`nlikes / (nlikes + ndislikes)`) for the explore pool. Raw LR is the correct signal for cold start — new users have no history, so user-bias correction is meaningless. Raw LR ≥ 0.40 with ≥ 20 reactions gives a stable, self-sustaining pool of objectively high-quality memes.
+
+- `candidates.py:386`: `lr_smoothed >= 0.40` → `(nlikes::float / NULLIF(nlikes + ndislikes, 0)) >= 0.40`
+- `candidates.py:389`: ORDER BY raw LR DESC instead of lr_smoothed DESC
+- Assigned to CTO via FFM-83
+
 ## Metrics After
 
 *(Fill in after 2026-04-09)*
