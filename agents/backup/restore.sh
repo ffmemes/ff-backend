@@ -49,7 +49,7 @@ url = '$PAPERCLIP_URL'
 key = '$PAPERCLIP_API_KEY'
 company = '$COMPANY_ID'
 
-for agent in backup['agents_full']:
+for agent in backup['agents']:
     name = agent['name']
     data = {
         'name': name,
