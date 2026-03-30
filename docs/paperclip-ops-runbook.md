@@ -79,31 +79,39 @@ docker exec -it $CONT codex login --device-auth
 docker exec -it $CONT gh auth login
 
 # Upload agent instructions after editing locally
-scp agents/<name>/AGENTS.md root@t.ffmemes.com:/tmp/agent.md
-ssh root@t.ffmemes.com "docker cp /tmp/agent.md $CONT:/paperclip/instances/default/companies/<company-id>/agents/<agent-id>/instructions/AGENTS.md"
+# Preferred: use the deploy script (syncs all agents + runs backup)
+./agents/deploy.sh
+# Manual (single agent):
+# scp agents/<name>/AGENTS.md root@t.ffmemes.com:/tmp/agent.md
+# ssh root@t.ffmemes.com "docker cp /tmp/agent.md $CONT:/paperclip/instances/default/companies/<company-id>/agents/<agent-id>/instructions/AGENTS.md"
 ```
 
 ## Agent Team
 
-| Agent | Role | Reports To | Heartbeat | Model |
-|-------|------|-----------|-----------|-------|
-| CEO | Strategic decisions, experiments | — | Daily | opus |
-| Analyst | Metrics, anomaly detection | CEO | 6h | sonnet |
-| CTO | Engineering, PRs | CEO | On-demand | sonnet |
-| QA Engineer | Log monitoring, bug reports | CEO | 6h | sonnet |
-| Release Engineer | PR merge, deploy verify | CTO | On-demand | sonnet |
-| Comms Manager | Public TG channel updates | CEO | On-demand | sonnet |
+| Agent | Role | Reports To | Activation | Model |
+|-------|------|-----------|------------|-------|
+| CEO | Strategic decisions, experiments | — | Weekly routine + daily heartbeat | opus |
+| Analyst | Metrics, anomaly detection | CEO | Routines only (heartbeat off) | sonnet |
+| CTO | Engineering, PRs | CEO | On-demand (wakeOnDemand) | sonnet |
+| Staff Engineer | PR review | CTO | Routines only (PR webhook) | sonnet |
+| QA Engineer | Log monitoring, bug reports | CTO | Routines only (6h schedule + webhooks) | sonnet |
+| Release Engineer | PR merge, deploy verify | CTO | On-demand (wakeOnDemand) | sonnet |
+| Comms Manager | Public TG channel updates | CEO | Daily heartbeat | sonnet |
 
 Agent instructions: `agents/<name>/AGENTS.md` in this repo.
+Deploy after editing: `./agents/deploy.sh`
 
 ## Routines
 
-| Routine | Agent | Schedule (UTC) | What it does |
-|---------|-------|----------------|-------------|
-| Daily Analyst Report | Analyst | `0 6 * * *` | Query metrics, detect anomalies, write report |
-| QA Log Scan | QA | `0 */6 * * *` | Sentry, Coolify logs, DB health |
-| Weekly CEO Review | CEO | `0 9 * * 1` | Retro, experiments, priorities |
-| gstack Update Check | CEO | `0 3 * * *` | Update skills, review changelog |
+| Routine | Agent | Schedule (UTC) | Trigger Type | What it does |
+|---------|-------|----------------|-------------|--------------|
+| Daily Analyst Report | Analyst | `19 6 * * *` | schedule + API | Query metrics, detect anomalies, write report |
+| QA Log Scan | QA | `7 */6 * * *` | schedule + 2 webhooks + API | Sentry, Coolify logs, DB health, E2E smoke |
+| Process Health Check | QA | `37 12 * * *` | schedule | Watchdog: verify all routines are running and succeeding |
+| Weekly CEO Review | CEO | `11 9 * * 1` | schedule | Retro, experiments, priorities |
+| Weekly Analyst Summary | Analyst | `23 9 * * 1` | schedule | Weekly summary for CEO review |
+| gstack Update Check | CEO | `17 3 * * *` | schedule | Update skills, review changelog |
+| PR Review | Staff Engineer | on PR event | 2 webhooks + API | Review PRs via GitHub Actions trigger |
 
 ## Plugins
 

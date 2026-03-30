@@ -14,8 +14,10 @@ Optional:
 
 Usage:
     pip install -r requirements-e2e.txt
-    python scripts/e2e_smoke.py
+    python scripts/e2e_smoke.py           # returning user flow
+    python scripts/e2e_smoke.py --fresh   # reset state + onboarding flow
 """
+import argparse
 import asyncio
 import os
 import sys
@@ -131,8 +133,73 @@ async def test_like(client, bot, meme_msg):
         return "WARN", "Bot responded after like but with unexpected content"
 
 
+# --- Fresh user tests ---
+async def test_delete(client, bot):
+    """Send /delete, click confirmation, verify state cleared."""
+    before_id = await get_latest_msg_id(client, bot)
+    await client.send_message(bot, "/delete")
+    msg = await wait_for_response(client, bot, before_id)
+
+    if msg is None:
+        return "FAIL", "Bot did not respond to /delete"
+
+    # Click the confirmation button ("Delete everything")
+    if msg.reply_markup:
+        for row in msg.reply_markup.rows:
+            for btn in row.buttons:
+                if btn.data and b"delete" in btn.data.lower():
+                    await msg.click(data=btn.data)
+                    confirm_msg = await wait_for_response(client, bot, msg.id)
+                    if confirm_msg and ("ciao" in (confirm_msg.text or "").lower() or "start" in (confirm_msg.text or "").lower()):
+                        return "PASS", f"State deleted: {(confirm_msg.text or '')[:80]}"
+                    return "WARN", f"Delete clicked but unexpected response: {(confirm_msg.text if confirm_msg else 'no response')[:80]}"
+
+    if "sure" in (msg.text or "").lower() or "delete" in (msg.text or "").lower():
+        return "WARN", f"Got confirmation prompt but no button found: {(msg.text or '')[:80]}"
+    return "WARN", f"Unexpected /delete response: {(msg.text or '')[:80]}"
+
+
+async def test_fresh_onboarding(client, bot):
+    """After /reset, send /start and verify onboarding flow for new user.
+    Returns (status, detail, meme_msg).
+    """
+    before_id = await get_latest_msg_id(client, bot)
+    await client.send_message(bot, "/start")
+    # New users may get language selection or onboarding popup before first meme
+    # Wait longer for the full onboarding sequence
+    msg = await wait_for_response(client, bot, before_id, timeout=15)
+
+    if msg is None:
+        return "FAIL", "Bot did not respond to /start after reset", None
+
+    # Check if we got a meme (fast path) or onboarding content
+    has_media = msg.media is not None
+    has_buttons = has_reaction_buttons(msg)
+
+    if has_media and has_buttons:
+        return "PASS", "Fresh user: meme received with buttons (fast onboarding)", msg
+
+    # May need to interact with onboarding (language selection, etc.)
+    # Wait for more messages — onboarding may send multiple
+    await asyncio.sleep(2)
+    messages = await client.get_messages(bot, limit=5)
+    for m in messages:
+        if m.id > before_id and not m.out and m.media and has_reaction_buttons(m):
+            return "PASS", "Fresh user: meme received after onboarding sequence", m
+
+    if has_media:
+        return "WARN", "Fresh user: got media but no reaction buttons", msg
+    if msg.text:
+        return "WARN", f"Fresh user: onboarding text (may need interaction): {msg.text[:100]}", msg
+    return "WARN", "Fresh user: unexpected onboarding response", msg
+
+
 # --- Runner ---
 async def main():
+    parser = argparse.ArgumentParser(description="E2E smoke tests for @ffmemesbot")
+    parser.add_argument("--fresh", action="store_true", help="Reset user state and test onboarding")
+    args = parser.parse_args()
+
     if not all([API_ID, API_HASH, SESSION_STRING]):
         print("SKIP: Telegram E2E credentials not configured")
         print("  Set TELEGRAM_API_ID, TELEGRAM_API_HASH, TELEGRAM_SESSION_STRING")
@@ -154,12 +221,26 @@ async def main():
         bot = await client.get_entity(BOT_USERNAME)
         results = []
 
-        # Test 1: /start → get a meme
-        status, detail, meme_msg = await test_start(client, bot)
-        results.append(("start", status, detail))
-        print(f"  [{status}] start: {detail}")
+        if args.fresh:
+            # Fresh user flow: delete → onboard → first meme → like
+            status, detail = await test_delete(client, bot)
+            results.append(("delete", status, detail))
+            print(f"  [{status}] delete: {detail}")
 
-        # Test 2: click like on that meme → get next meme (no extra /start)
+            if status == "FAIL":
+                print("\nRESULT: FAIL — /delete not working")
+                sys.exit(1)
+
+            status, detail, meme_msg = await test_fresh_onboarding(client, bot)
+            results.append(("onboarding", status, detail))
+            print(f"  [{status}] onboarding: {detail}")
+        else:
+            # Returning user flow: /start → meme
+            status, detail, meme_msg = await test_start(client, bot)
+            results.append(("start", status, detail))
+            print(f"  [{status}] start: {detail}")
+
+        # Both flows: click like on the meme → get next meme
         status, detail = await test_like(client, bot, meme_msg)
         results.append(("like", status, detail))
         print(f"  [{status}] like: {detail}")
@@ -175,7 +256,8 @@ async def main():
             print("\nRESULT: WARN — bot responds but with unexpected content")
             sys.exit(0)
         else:
-            print("\nRESULT: PASS — bot fully functional")
+            mode = "fresh user" if args.fresh else "returning user"
+            print(f"\nRESULT: PASS — bot fully functional ({mode} flow)")
             sys.exit(0)
 
     except Exception as e:

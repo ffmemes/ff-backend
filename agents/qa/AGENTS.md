@@ -50,6 +50,10 @@ curl -s "$PAPERCLIP_API_URL/api/issues/$PAPERCLIP_TASK_ID" -H "Authorization: Be
 ```
 Then checkout and work on it. Only fall back to inbox queries if `PAPERCLIP_TASK_ID` is not set.
 
+**Inbox retry**: If `PAPERCLIP_TASK_ID` is not set AND your inbox is empty, this may be
+a timing race. Wait 10 seconds and check your inbox again. If still empty after retry,
+exit normally — the issue will be picked up on the next wake.
+
 ## Every Routine Run (every 6h)
 
 ### 1. Scan All Log Sources
@@ -76,6 +80,23 @@ For Critical/High: create Paperclip task for **CTO** with title, error, log sour
 ```
 
 ### 5. Log to JSONL + Alert CEO if RED
+
+### 6. Close Your Execution Issue
+
+After completing all work, you MUST mark your Paperclip execution issue as **done**.
+This is critical — if you don't close it, the routine can never fire again (blocked
+by a unique constraint on open execution issues).
+
+If `PAPERCLIP_TASK_ID` is set:
+```bash
+curl -s -X PATCH "$PAPERCLIP_API_URL/api/issues/$PAPERCLIP_TASK_ID" \
+  -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "done"}'
+```
+
+Always close your execution issue, even if your work encountered errors — mark it done
+with a summary of what happened.
 
 ## Key Coolify UUIDs
 | Service | UUID |
@@ -123,18 +144,50 @@ Requires env vars: `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION_STR
 
 **Session string exclusivity:** The Telegram session string can only be used by one process at a time. Do not run E2E smoke tests concurrently with any other Telethon client using the same session. If the session is invalidated, regenerate with `python scripts/generate_session_string.py`.
 
+### Fresh-User Onboarding Test
+
+After the standard smoke passes, test the onboarding flow for new users:
+
+```bash
+python scripts/e2e_smoke.py --fresh
+```
+
+This sends `/delete` to clear the test user's state (DB + Redis), then runs `/start`
+as if it's a brand new user. Verifies the full onboarding: language selection, first
+meme, buttons. Use this after deploying features that touch the onboarding flow or
+cold start path.
+
+### Exploratory Testing (post-deploy, non-blocking)
+
+After deterministic smoke passes, spend 5-10 minutes testing the bot as a real
+user would. This is NOT scripted. Improvise. Try things a real user would try:
+
+- Send random text messages (not commands)
+- Send stickers, photos, voice messages
+- Rapid-fire like/dislike buttons
+- Send /start multiple times in a row
+- Try /lang mid-session
+- Send deep links (t.me/ffmemesbot?start=xxx)
+- Try the share button
+- Test in different languages if configured
+
+File any bugs found as tasks for CTO with reproduction steps and screenshots.
+This is a non-blocking bug hunt — don't gate the deploy on exploratory results.
+
 ## Process Health Check (Watchdog)
 
-When triggered by the daily watchdog routine, check that all other routines are running:
+When triggered by the daily watchdog routine, check that all other routines are running AND succeeding:
 
-1. Call Paperclip API: `GET /api/routines` to list all routines with their lastRun timestamps
-2. Check each routine ran within 2x its expected interval:
-   - **Daily Analyst Report** → should have run in the last 12h
-   - **QA Log Scan** → should have run in the last 12h
-   - **Weekly CEO Review** → should have run in the last 14 days
-   - **gstack Update Check** → should have run in the last 48h
+1. Call Paperclip API: `GET /api/companies/96ee7b2e-6df2-43c8-bbe3-53e19297308a/routines` to list all routines
+2. For each routine, check BOTH **freshness** (did it run recently?) AND **health** (did it succeed?):
+   - **Daily Analyst Report** → ran in last 28h AND `lastRun.status` is not `failed`
+   - **QA Log Scan** → ran in last 12h AND `lastRun.status` is not `failed`
+   - **Weekly CEO Review** → ran in last 14 days AND `lastRun.status` is not `failed`
+   - **Weekly Analyst Summary** → ran in last 14 days AND `lastRun.status` is not `failed`
+   - **gstack Update Check** → ran in last 48h AND `lastRun.status` is not `failed`
    - **PR Review** → event-driven, skip unless no runs in 7 days
-3. If any routine is stale → create **HIGH** priority task for CEO with: which routine is stale, when it last ran, what the expected interval is
+   - **Process Health Check** → skip (that's you)
+3. If any routine is STALE (hasn't run in time) or FAILED (`lastRun.status == "failed"`) → create **HIGH** priority task for CEO with: which routine, when it last ran, what the status was, and the `failureReason` if available
 4. If all routines are healthy → log "Process health: GREEN" in your QA report
 
 ## What NOT To Do
