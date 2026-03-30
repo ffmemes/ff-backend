@@ -68,12 +68,11 @@ async def get_popup_to_send(user_id: int, user_info: dict) -> Popup | None:
                     ),
                 )
 
-    if user_info["nmemes_sent"] == 10:
-        popup_id = "achievement.nmemes_sent_10"
-        if not await user_popup_already_sent(user_id, popup_id):
-            return _get_popup(popup_id, user_info)
-
     # Upload promotion Day 1 A/B experiment (treatment: user_id % 2 == 0)
+    # Must come BEFORE the achievement.nmemes_sent_10 check — both trigger at
+    # nmemes_sent == 10, and the achievement check's early return would swallow
+    # this branch entirely for treatment users.
+    # Treatment users receive the upload promo instead of the nmemes_sent_10 achievement.
     if user_info["nmemes_sent"] == 10 and user_id % 2 == 0:
         popup_id = "experiment.upload_promo_day1"
         if not await user_popup_already_sent(user_id, popup_id):
@@ -82,6 +81,11 @@ async def get_popup_to_send(user_id: int, user_info: dict) -> Popup | None:
                 f"user.{user_id}",
                 {"user_id": user_id, "group": "treatment"},
             )
+            return _get_popup(popup_id, user_info)
+
+    if user_info["nmemes_sent"] == 10:
+        popup_id = "achievement.nmemes_sent_10"
+        if not await user_popup_already_sent(user_id, popup_id):
             return _get_popup(popup_id, user_info)
 
     if user_info["nmemes_sent"] % 1000 == 20:
