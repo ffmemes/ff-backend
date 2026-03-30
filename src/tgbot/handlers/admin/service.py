@@ -17,6 +17,12 @@ from src.database import (
     user_tg,
     user_tg_chat_membership,
 )
+from src.redis import (
+    clear_meme_queue_by_key,
+    get_meme_queue_key,
+    get_user_info_key,
+    redis_client,
+)
 from src.tgbot.constants import UserType
 
 
@@ -34,6 +40,9 @@ async def delete_user(user_id: int) -> None:
     )
     await execute(user_deep_link_log.delete().where(user_deep_link_log.c.user_id == user_id))
     await execute(user_popup_logs.delete().where(user_popup_logs.c.user_id == user_id))
+    # Clear Redis caches so next /start is fully clean
+    await redis_client.delete(get_user_info_key(user_id))
+    await clear_meme_queue_by_key(get_meme_queue_key(user_id))
 
 
 async def get_user_by_tg_username(

@@ -23,6 +23,10 @@ curl -s "$PAPERCLIP_API_URL/api/issues/$PAPERCLIP_TASK_ID" -H "Authorization: Be
 ```
 Then checkout and work on it. Only fall back to inbox queries if `PAPERCLIP_TASK_ID` is not set.
 
+**Inbox retry**: If `PAPERCLIP_TASK_ID` is not set AND your inbox is empty, this may be
+a timing race. Wait 10 seconds and check your inbox again. If still empty after retry,
+exit normally — the issue will be picked up on the next wake.
+
 ## Every Heartbeat (every 6 hours)
 
 ### 1. Review Historical Context
@@ -103,6 +107,24 @@ Append an entry to `experiments/log.jsonl`:
 
 ### 10. Create Task for CEO
 Create a Paperclip issue assigned to @ceo with the report summary, key metrics, anomalies, and recommended actions. Set priority "high" if anomalies >30%.
+
+### 11. Close Your Execution Issue
+
+After completing all work, you MUST mark your Paperclip execution issue as **done**.
+This is critical — if you don't close it, the routine can never fire again (blocked
+by a unique constraint on open execution issues).
+
+If `PAPERCLIP_TASK_ID` is set:
+```bash
+curl -s -X PATCH "$PAPERCLIP_API_URL/api/issues/$PAPERCLIP_TASK_ID" \
+  -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "done"}'
+```
+
+If the issue was already checked out via inbox, close it the same way using its ID.
+Always close your execution issue, even if your work encountered errors — mark it done
+with a summary of what happened.
 
 ## Important Context
 - **North Star**: session length (median memes per session). Higher = better. NOT like rate.

@@ -45,10 +45,15 @@ Bug detected (Sentry webhook or QA scan)
           -> GitHub PR webhook triggers Staff Engineer
             -> Staff Engineer runs /review
               -> If issues: back to CTO
-              -> If clean: hands off to Release Engineer
-                -> Release Engineer runs /ship + /land-and-deploy
+              -> If clean: approves PR + tasks Release Engineer
+                -> Release Engineer runs /ship + /land-and-deploy (merge + deploy)
                   -> Coolify auto-deploys
-                    -> Deploy triggers QA /canary
+                    -> Deploy webhook triggers QA post-deploy verification:
+                      1. /canary (mandatory)
+                      2. Sentry scan (last 10 min)
+                      3. DB health check
+                      4. E2E smoke: returning user + fresh user (--fresh)
+                      5. Exploratory testing (5-10 min, improvised)
                       -> If issues: escalates to CTO
                       -> If clean: done
 ```
@@ -57,13 +62,15 @@ Bug detected (Sentry webhook or QA scan)
 
 | Routine | Agent | Schedule (UTC) | Trigger Type | What it does |
 |---------|-------|----------------|-------------|--------------|
-| Daily Analyst Report | Analyst | `0 6 * * *` | schedule + API | Query metrics, detect anomalies, write report for CEO |
-| QA Log Scan | QA | `0 */6 * * *` | schedule + 2 webhooks + API | Sentry + Coolify logs + DB health |
-| Process Health Check | QA | `0 12 * * *` | schedule | Watchdog: verify all routines are running on time |
-| Weekly CEO Review | CEO | `0 9 * * 1` | schedule | Retro, experiments, priorities, backlog review |
-| Weekly Analyst Summary | Analyst | `0 9 * * 1` | schedule | Weekly summary for CEO review |
-| gstack Update Check | CEO | `0 3 * * *` | schedule | Update skills, review changelog |
+| Daily Analyst Report | Analyst | `19 6 * * *` | schedule + API | Query metrics, detect anomalies, write report for CEO |
+| QA Log Scan | QA | `7 */6 * * *` | schedule + 2 webhooks + API | Sentry + Coolify logs + DB health + E2E smoke |
+| Process Health Check | QA | `37 12 * * *` | schedule | Watchdog: verify all routines are running and succeeding |
+| Weekly CEO Review | CEO | `11 9 * * 1` | schedule | Retro, experiments, priorities, backlog review |
+| Weekly Analyst Summary | Analyst | `23 9 * * 1` | schedule | Weekly summary for CEO review |
+| gstack Update Check | CEO | `17 3 * * *` | schedule | Update skills, review changelog |
 | PR Review | Staff Engineer | on PR event | 2 webhooks + API | Review PRs via GitHub Actions trigger |
+
+**Schedule design**: Prime-minute offsets ensure no two routines fire in the same minute. This avoids resource contention and makes debugging easier.
 
 ## Webhook Triggers
 
@@ -137,15 +144,19 @@ curl -s -X PATCH "$PAPERCLIP_URL/api/agents/<agent-id>" \
   -d '{"adapterConfig": {"paperclipSkillSync": {"desiredSkills": ["garrytan/gstack/skill-name"]}}}'
 ```
 
-### Sync instructions to server
+### Deploy instructions to server
 
-After editing AGENTS.md files locally:
+After editing AGENTS.md files locally, sync all agents to the live Paperclip container:
 
 ```bash
-CONTAINER=$(ssh root@t.ffmemes.com "docker ps --format '{{.Names}}' | grep k4w804")
-scp agents/<name>/AGENTS.md root@t.ffmemes.com:/tmp/agent-instructions.md
-ssh root@t.ffmemes.com "docker cp /tmp/agent-instructions.md $CONTAINER:/paperclip/instances/default/companies/96ee7b2e-6df2-43c8-bbe3-53e19297308a/agents/<agent-id>/instructions/AGENTS.md"
+./agents/deploy.sh
 ```
+
+This runs a backup first, then copies all AGENTS.md files to the container with size verification.
+Changes take effect on the next routine/heartbeat wake (Paperclip re-reads instructions from disk on each agent wake).
+
+Requires SSH key auth to the server (default: `root@t.ffmemes.com`).
+Override with: `PAPERCLIP_SSH_HOST=user@host ./agents/deploy.sh`
 
 ## Agent IDs
 
