@@ -34,11 +34,12 @@ from src.storage.upload import download_meme_content_from_tg
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 # Ordered by preference. Falls back to next model on 429/error.
+# Verified available on OpenRouter as of 2026-03-30 (mistral-small 404, removed from OR)
 VISION_MODELS = [
-    "google/gemma-3-27b-it:free",  # best quality, 140+ languages
-    "google/gemma-3-12b-it:free",  # good fallback, smaller
-    "nvidia/nemotron-nano-12b-v2-vl:free",  # best OCR, fast
-    "mistralai/mistral-small-3.1-24b-instruct:free",  # good multilingual
+    "google/gemma-3-27b-it:free",  # best quality, 140+ languages, 131k context
+    "google/gemma-3-12b-it:free",  # good fallback, smaller, 32k context
+    "google/gemma-3-4b-it:free",   # smallest Gemma, lowest rate limits hit
+    "nvidia/nemotron-nano-12b-v2-vl:free",  # last resort: still listed but unreliable JSON
 ]
 
 DESCRIBE_PROMPT = (
