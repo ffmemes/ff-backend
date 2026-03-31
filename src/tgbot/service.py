@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
     execute,
+    experiment_assignment,
     fetch_all,
     fetch_one,
     inline_search_chosen_result_logs,
@@ -399,3 +400,32 @@ async def unsnooze_memes_of_meme_source(meme_source_id: int) -> int:
     )
     result = await execute(update_statement)
     return result.rowcount
+
+
+# === Experiment Assignment ===
+
+
+async def get_experiment_variant(user_id: int, experiment_id: str) -> str | None:
+    """Get a user's experiment variant. Returns None if not assigned."""
+    query = select(experiment_assignment.c.variant).where(
+        experiment_assignment.c.experiment_id == experiment_id,
+        experiment_assignment.c.user_id == user_id,
+    )
+    row = await fetch_one(query)
+    return row["variant"] if row else None
+
+
+async def assign_experiment(user_id: int, experiment_id: str, variant: str) -> None:
+    """Assign a user to an experiment variant. Idempotent (ON CONFLICT DO NOTHING)."""
+    insert_query = (
+        insert(experiment_assignment)
+        .values(
+            experiment_id=experiment_id,
+            user_id=user_id,
+            variant=variant,
+        )
+        .on_conflict_do_nothing(
+            index_elements=["experiment_id", "user_id"],
+        )
+    )
+    await execute(insert_query)
