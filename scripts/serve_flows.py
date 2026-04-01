@@ -77,7 +77,7 @@ if __name__ == "__main__":
             name="Calculate user_meme_source_stats",
             schedules=[
                 CronSchedule(
-                    cron="3,8,13,18,23,28,33,38,43,48,53,58 * * * *",
+                    cron="12,27,42,57 * * * *",
                     timezone=LON,
                 )
             ],
