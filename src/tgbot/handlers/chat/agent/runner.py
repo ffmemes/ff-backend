@@ -110,8 +110,16 @@ async def run_chat_agent(
     tool_calls_count = 0
     for raw in result.raw_responses:
         if hasattr(raw, "usage") and raw.usage:
-            total_prompt_tokens += getattr(raw.usage, "input_tokens", None) or getattr(raw.usage, "prompt_tokens", None) or 0
-            total_completion_tokens += getattr(raw.usage, "output_tokens", None) or getattr(raw.usage, "completion_tokens", None) or 0
+            total_prompt_tokens += (
+                getattr(raw.usage, "input_tokens", None)
+                or getattr(raw.usage, "prompt_tokens", None)
+                or 0
+            )
+            total_completion_tokens += (
+                getattr(raw.usage, "output_tokens", None)
+                or getattr(raw.usage, "completion_tokens", None)
+                or 0
+            )
         for choice in getattr(raw, "choices", []):
             if hasattr(choice, "message") and choice.message and choice.message.tool_calls:
                 tool_calls_count += len(choice.message.tool_calls)

@@ -1008,9 +1008,7 @@ async def generate_wrapped_data(
         # Pick oneliner meme (avoid your_meme)
         oneliner_meme_id = None
         if liked:
-            oneliner_candidates = [
-                m for m in liked[:10] if m["meme_id"] not in global_used_memes
-            ]
+            oneliner_candidates = [m for m in liked[:10] if m["meme_id"] not in global_used_memes]
             if oneliner_candidates:
                 oneliner_meme_id = random.choice(oneliner_candidates)["meme_id"]
             else:
@@ -1187,9 +1185,7 @@ def _build_zodiac_slide(p: dict, is_ru: bool = True) -> str:
     return f"{header}\n\n" f"<b>{html_escape(sign)}</b>\n\n" f"<i>{html_escape(why)}</i>"
 
 
-def _attach_memes_to_absurd(
-    p: dict, liked: list, used_ids: set | None = None
-) -> list:
+def _attach_memes_to_absurd(p: dict, liked: list, used_ids: set | None = None) -> list:
     """Attach meme IDs to each absurd comparison, ensuring no duplicates."""
     comparisons = p.get("absurd_comparisons", [])
     result = []

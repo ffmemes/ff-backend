@@ -38,7 +38,7 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 VISION_MODELS = [
     "google/gemma-3-27b-it:free",  # best quality, 140+ languages, 131k context
     "google/gemma-3-12b-it:free",  # good fallback, smaller, 32k context
-    "google/gemma-3-4b-it:free",   # smallest Gemma, lowest rate limits hit
+    "google/gemma-3-4b-it:free",  # smallest Gemma, lowest rate limits hit
     "nvidia/nemotron-nano-12b-v2-vl:free",  # last resort: still listed but unreliable JSON
 ]
 
