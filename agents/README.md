@@ -10,7 +10,7 @@ Autonomous AI team for @ffmemesbot, managed by [Paperclip](https://paperclip.ing
 | Analyst | Data Analyst | CEO | **Routines only** (daily 06:00 + weekly Mon 09:00 UTC) | **off** | investigate, browse, retro |
 | CTO | Chief Technology Officer | CEO | On-demand (wakeOnDemand via task assignment) | **off** | plan-eng-review, plan-design-review, retro, cso, codex, investigate |
 | Staff Engineer | Staff Engineer | CTO | **Routines only** (PR webhook via GitHub Actions) | **off** | review, investigate |
-| QA Engineer | QA Engineer | CTO | **Routines only** (6h schedule + Sentry/Coolify webhooks) | **off** | browse, qa, qa-only, benchmark, canary, design-review, design-consultation, setup-browser-cookies |
+| QA Engineer | QA Engineer | CTO | **Routines only** (1h schedule + Sentry/Coolify webhooks) | **off** | browse, qa, qa-only, benchmark, canary, design-review, design-consultation, setup-browser-cookies |
 | Release Engineer | Release Engineer | CTO | On-demand (wakeOnDemand via task assignment) | **off** | ship, land-and-deploy, document-release, setup-deploy |
 | Comms Manager | Communications | CEO | Daily heartbeat | 24h | browse, frontend-design |
 
@@ -63,7 +63,7 @@ Bug detected (Sentry webhook or QA scan)
 | Routine | Agent | Schedule (UTC) | Trigger Type | What it does |
 |---------|-------|----------------|-------------|--------------|
 | Daily Analyst Report | Analyst | `19 6 * * *` | schedule + API | Query metrics, detect anomalies, write report for CEO |
-| QA Log Scan | QA | `7 */6 * * *` | schedule + 2 webhooks + API | Sentry + Coolify logs + DB health + E2E smoke |
+| QA Log Scan | QA | `7 * * * *` | schedule + 2 webhooks + API | Sentry + Coolify logs + DB health. Auto-escalate critical bugs to CTO |
 | Process Health Check | QA | `37 12 * * *` | schedule | Watchdog: verify all routines are running and succeeding |
 | Weekly CEO Review | CEO | `11 9 * * 1` | schedule | Retro, experiments, priorities, backlog review |
 | Weekly Analyst Summary | Analyst | `23 9 * * 1` | schedule | Weekly summary for CEO review |

@@ -35,11 +35,11 @@ curl -s "$COOLIFY_BASE_URL/api/v1/applications/v0kkssccwoswgwwscws4kscc/logs?lin
 Use `ANALYST_DATABASE_URL` (read-only):
 ```sql
 SELECT
-  (SELECT count(*) FROM user_meme_reaction WHERE reacted_at > now() - interval '6 hours') AS reactions_6h,
-  (SELECT count(DISTINCT user_id) FROM user_meme_reaction WHERE reacted_at > now() - interval '6 hours') AS users_6h,
+  (SELECT count(*) FROM user_meme_reaction WHERE reacted_at > now() - interval '1 hour') AS reactions_1h,
+  (SELECT count(DISTINCT user_id) FROM user_meme_reaction WHERE reacted_at > now() - interval '1 hour') AS users_1h,
   (SELECT max(updated_at) FROM user_stats) AS stats_updated,
   (SELECT max(updated_at) FROM meme_stats) AS meme_stats_updated,
-  (SELECT count(*) FROM meme WHERE created_at > now() - interval '6 hours' AND status = 'ok') AS new_ok_memes_6h;
+  (SELECT count(*) FROM meme WHERE created_at > now() - interval '1 hour' AND status = 'ok') AS new_ok_memes_1h;
 ```
 
 ## Heartbeat Wake Procedure
@@ -54,19 +54,20 @@ Then checkout and work on it. Only fall back to inbox queries if `PAPERCLIP_TASK
 a timing race. Wait 10 seconds and check your inbox again. If still empty after retry,
 exit normally — the issue will be picked up on the next wake.
 
-## Every Routine Run (every 6h)
+## Every Routine Run (every 1h)
 
 ### 1. Scan All Log Sources
 Check Sentry, Coolify logs, DB health.
 
 ### 2. Classify Issues
-- **Critical**: Production down, users can't use bot, data loss
-- **High**: Errors affecting UX, broken features, recurring TypeError/AttributeError in hot paths
-- **Medium**: Timeouts, ConnectionRefused (transient) — flag if >10 events/6h
+- **Critical**: Production down, users can't use bot, data loss → **IMMEDIATE escalation to CTO**
+- **High**: Errors affecting UX, broken features, recurring TypeError/AttributeError in hot paths → escalate to CTO within the same scan
+- **Medium**: Timeouts, ConnectionRefused (transient) — flag if >10 events/1h
 - **Low**: Forbidden (user blocked bot), IntegrityError (race conditions) — skip unless spike
 
-### 3. Create Bug Reports
-For Critical/High: create Paperclip task for **CTO** with title, error, log source, suggested fix.
+### 3. Create Bug Reports & Auto-Escalate
+For **Critical**: Create HIGH priority Paperclip task for **CTO** immediately with title, error, log source, and suggested fix. Include "CRITICAL — production impact" in the title.
+For **High**: Create HIGH priority Paperclip task for **CTO** with title, error, log source, suggested fix.
 
 ### 4. Write QA Report
 `experiments/reports/qa-YYYY-MM-DD-HHmm.md`:
@@ -109,7 +110,7 @@ with a summary of what happened.
 - **asyncpg errors** (~6/day) known — only flag if rate increases
 - **Telegram timeouts** (~5/day) known — flag if spike
 - **ok_pct baseline**: 90-96% is NORMAL
-- **Forbidden errors**: Expected, filtered. Only flag if >50 in 6h
+- **Forbidden errors**: Expected, filtered. Only flag if >50 in 1h
 
 ## Post-Deploy Verification
 

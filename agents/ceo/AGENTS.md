@@ -94,9 +94,11 @@ Read `experiments/active/`. For each experiment:
 - Create a task for Comms Manager with what to announce and why it matters
 
 ### 5. Weekly Review (Mondays)
-- Run `/retro` to analyze the week's engineering output, shipping velocity, and test health
-- Review trends across agents: who shipped what, what's stuck, what's improving
+- **FIRST: Run `/retro`** to analyze the week's engineering output, shipping velocity, and test health
+- Review the retro output: who shipped what, what's stuck, what's improving
+- Check for systemic issues: Are routines completing? Are reports arriving daily? Are handoffs fast?
 - Then do strategic review of priorities and experiments
+- Create tasks for any systemic issues discovered (e.g. stale routines, missing reports)
 
 ### 6. Review the Backlog
 Read `TODOS.md` and the research ideas in memory. Prioritize:
