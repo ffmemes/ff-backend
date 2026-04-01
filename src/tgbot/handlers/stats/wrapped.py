@@ -707,6 +707,8 @@ async def _show_slide(
                             telegram_file_id=md["telegram_file_id"],
                             caption=caption,
                         )
+                        if sent:
+                            await asyncio.sleep(5)
                         await send_new_message_with_meme(
                             context.bot,
                             user_id,
@@ -719,6 +721,8 @@ async def _show_slide(
                     _log(f"absurd meme error: {e}")
             # Fallback: text only
             try:
+                if sent:
+                    await asyncio.sleep(5)
                 await update.effective_chat.send_message(
                     text=caption,
                     parse_mode="HTML",
@@ -796,7 +800,7 @@ async def _show_slide(
     if key == 9:
         pred = uw.get("prediction", "")
         share_url = "https://t.me/ffmemesbot?start=wrapped"
-        share_text = "Узнай свой мем-профиль и предсказание на 2026! 🔮"
+        share_text = "Глубокий анализ чувства юмора 🔮"
         share_link = f"https://t.me/share/url?url={quote(share_url)}&text={quote(share_text)}"
         await update.effective_chat.send_message(
             text=(
