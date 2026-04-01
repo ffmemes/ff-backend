@@ -108,6 +108,8 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if deep_link == "wrapped":
         from src.tgbot.handlers.stats.wrapped import handle_wrapped
 
+        if created:
+            await init_user_languages_from_tg_user(update.effective_user)
         return await handle_wrapped(update, context)
 
     if created:  # new user:
