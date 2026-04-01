@@ -1,55 +1,18 @@
 """
 Broadcast wrapped notification to users.
 
-Run inside the app container:
-    docker compose exec app python scripts/broadcast_wrapped.py
+Uses Redis-based dedup — safe to re-run (skips already-sent users).
 
-Flags:
-    --dry-run     Preview without sending
-    --qualified   Only send to users who can complete wrapped now (default: all users)
+    PYTHONPATH=/src python scripts/broadcast_wrapped.py wrapped-apr2026
+    PYTHONPATH=/src python scripts/broadcast_wrapped.py wrapped-apr2026 --dry-run
+    PYTHONPATH=/src python scripts/broadcast_wrapped.py wrapped-apr2026 --delay 0.3
 """
 
 import asyncio
 import sys
 
-from sqlalchemy import text
-
-from src.database import execute, fetch_all
+from src.broadcasts.service import get_all_non_blocked_users, send_broadcast
 from src.localizer import ALMOST_CIS_LANGUAGES
-from src.tgbot.bot import bot
-
-# All non-blocked users
-ALL_USERS_QUERY = text("""
-    SELECT
-        u.id AS user_id,
-        COALESCE(ut.language_code, 'en') AS language_code
-    FROM "user" u
-    LEFT JOIN user_tg ut ON ut.id = u.id
-    WHERE u.type NOT IN ('waitlist', 'blocked_bot')
-    ORDER BY u.last_active_at DESC
-""")
-
-# Only users who can complete wrapped right now
-QUALIFIED_USERS_QUERY = text("""
-    SELECT
-        us.user_id,
-        COALESCE(ut.language_code, 'en') AS language_code
-    FROM user_stats us
-    JOIN "user" u ON u.id = us.user_id
-    LEFT JOIN user_tg ut ON ut.id = us.user_id
-    WHERE u.type NOT IN ('waitlist', 'blocked_bot')
-      AND u.last_active_at > now() - interval '90 days'
-      AND us.nmemes_sent >= 30
-      AND (
-          SELECT count(*)
-          FROM user_meme_reaction umr
-          JOIN meme m ON m.id = umr.meme_id
-          WHERE umr.user_id = us.user_id
-            AND umr.reaction_id = 1
-            AND m.ocr_result IS NOT NULL
-      ) >= 5
-    ORDER BY u.last_active_at DESC
-""")
 
 MESSAGE_RU = (
     "🔮 Мы подготовили глубокий анализ твоего чувства юмора "
@@ -67,66 +30,36 @@ MESSAGE_EN = (
     "Try it 👉 /wrapped"
 )
 
-SEND_DELAY = 0.05  # 50ms between sends (~20/sec, well within TG limits)
+
+def _lang_group(language_code: str) -> str:
+    return "ru" if language_code in ALMOST_CIS_LANGUAGES else "en"
 
 
 async def main():
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    if not args:
+        print("Usage: broadcast_wrapped.py <broadcast_id> [--dry-run] [--delay 0.15]")
+        print("  broadcast_id is required (e.g. 'wrapped-apr2026')")
+        print("  Re-running with the same ID safely skips already-sent users.")
+        sys.exit(1)
+
+    broadcast_id = args[0]
     dry_run = "--dry-run" in sys.argv
-    qualified_only = "--qualified" in sys.argv
 
-    query = QUALIFIED_USERS_QUERY if qualified_only else ALL_USERS_QUERY
-    mode = "qualified only" if qualified_only else "all users"
+    delay = 0.15
+    if "--delay" in sys.argv:
+        idx = sys.argv.index("--delay")
+        delay = float(sys.argv[idx + 1])
 
-    rows = await fetch_all(query)
-    ru_users = [r for r in rows if r["language_code"] in ALMOST_CIS_LANGUAGES]
-    en_users = [r for r in rows if r["language_code"] not in ALMOST_CIS_LANGUAGES]
-
-    print(f"Mode: {mode}")
-    print(f"Target: {len(rows)} total ({len(ru_users)} RU, {len(en_users)} EN)")
-
-    if dry_run:
-        print("\n--- DRY RUN (no messages sent) ---")
-        print(f"\nRU message ({len(ru_users)} users):\n{MESSAGE_RU}")
-        print(f"\nEN message ({len(en_users)} users):\n{MESSAGE_EN}")
-        return
-
-    sent = 0
-    failed = 0
-    blocked = 0
-
-    for user_list, message in [(ru_users, MESSAGE_RU), (en_users, MESSAGE_EN)]:
-        for row in user_list:
-            user_id = row["user_id"]
-            try:
-                await bot.send_message(chat_id=user_id, text=message)
-                sent += 1
-                if sent % 100 == 0:
-                    print(f"  sent: {sent}, blocked: {blocked}, failed: {failed}")
-            except Exception as e:
-                err = str(e).lower()
-                if "blocked" in err or "deactivated" in err or "not found" in err:
-                    blocked += 1
-                    await execute(
-                        text("UPDATE \"user\" SET type = 'blocked_bot' WHERE id = :uid"),
-                        {"uid": user_id},
-                    )
-                elif "too many requests" in err or "retry after" in err:
-                    # Telegram flood control — back off and retry
-                    print(f"  rate limited, sleeping 5s...")
-                    await asyncio.sleep(5)
-                    try:
-                        await bot.send_message(chat_id=user_id, text=message)
-                        sent += 1
-                    except Exception:
-                        failed += 1
-                else:
-                    failed += 1
-                    if failed <= 10:
-                        print(f"  error for {user_id}: {e}")
-
-            await asyncio.sleep(SEND_DELAY)
-
-    print(f"\nDone! Sent: {sent}, Blocked: {blocked}, Failed: {failed}")
+    users = await get_all_non_blocked_users()
+    await send_broadcast(
+        broadcast_id=broadcast_id,
+        users=users,
+        messages={"ru": MESSAGE_RU, "en": MESSAGE_EN},
+        language_fn=_lang_group,
+        delay=delay,
+        dry_run=dry_run,
+    )
 
 
 if __name__ == "__main__":
