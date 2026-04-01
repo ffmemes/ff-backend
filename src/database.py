@@ -211,6 +211,7 @@ meme = Table(
         "meme_source_id",
         ForeignKey("meme_source.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     ),
     Column("raw_meme_id", Integer, nullable=False, index=True),
     Column("status", String, nullable=False, index=True),

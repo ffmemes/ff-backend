@@ -40,6 +40,7 @@ from src.flows.rewards.uploaded_memes import (
     reward_ru_users_for_weekly_top_uploaded_memes,
 )
 from src.flows.stats.meme import calculate_meme_stats
+from src.flows.stats.meme_heavy import calculate_meme_stats_heavy
 from src.flows.stats.meme_source import calculate_meme_source_stats
 
 # Stats
@@ -68,6 +69,10 @@ if __name__ == "__main__":
         calculate_meme_stats.to_deployment(
             name="Calculate meme_stats",
             schedules=[CronSchedule(cron="3,18,33,48 * * * *", timezone=LON)],
+        ),
+        calculate_meme_stats_heavy.to_deployment(
+            name="Calculate meme_stats (heavy)",
+            schedules=[CronSchedule(cron="6 * * * *", timezone=LON)],
         ),
         calculate_meme_source_stats.to_deployment(
             name="Calculate meme_source_stats",

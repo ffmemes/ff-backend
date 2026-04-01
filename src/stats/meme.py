@@ -192,6 +192,7 @@ async def calculate_meme_raw_impressions_stats() -> None:
                 ON MRT.id = M.raw_meme_id AND MS.type = 'telegram'
             LEFT JOIN meme_raw_vk MRV
                 ON MRV.id = M.raw_meme_id AND MS.type = 'vk'
+            WHERE M.status = 'ok'
         )
 
         INSERT INTO meme_stats (

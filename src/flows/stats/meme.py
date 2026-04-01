@@ -15,10 +15,8 @@ from src.stats import meme
 async def calculate_meme_stats() -> None:
     # Incremental: only recompute stats for memes active in the last 3 hours.
     # Memes with no recent reactions keep their existing meme_stats rows.
+    # Heavy operations (raw_impr_rank, invited_count) run separately every hour
+    # via calculate_meme_stats_heavy to avoid blocking this 15-min flow.
     await meme.calculate_meme_reactions_and_engagement(lookback_hours=3)
-
-    await meme.calculate_meme_raw_impressions_stats()
-
-    await meme.calculate_meme_invited_count()
 
     safe_emit("ff.stats.meme.completed", "ff.stats.meme")
