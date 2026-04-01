@@ -159,6 +159,24 @@ Required in `.env`: `DATABASE_URL`, `REDIS_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM
 
 Optional: `OCR_ENABLED` (default false), `VK_TOKEN`, `OPENAI_API_KEY`, `SENTRY_DSN`
 
+### Credential Safety
+
+**IMPORTANT**: Always reference credentials via `$ENV_VAR_NAME` in bash commands. Never expand, paste, or hardcode actual secret values inline. Use `source .env` to load variables, then reference by name:
+
+```bash
+# CORRECT — password stays hidden
+source .env
+psql $ANALYST_DATABASE_URL
+
+# ALSO CORRECT — .pgpass handles auth automatically
+psql -h $PGHOST -p $PGPORT -U $PGUSER -d $PGDATABASE
+
+# WRONG — never do this (never inline the actual password)
+psql "host=... user=... password=ACTUAL_PASSWORD dbname=..."
+```
+
+This applies to all secrets: database URLs, API tokens, bot tokens, etc.
+
 ## Product Context
 
 - Like rate ~50%, but dislike != bad meme (users often dislike good memes)

@@ -643,8 +643,9 @@ async def _show_slide(
 
     # ── Slide 0: Stats ──
     if key == 0:
+        txt = uw.get("stats_report") or "📊"
         await update.effective_chat.send_message(
-            text=uw.get("stats_report") or "📊",
+            text=txt,
             parse_mode="HTML",
             reply_markup=_next_btn("wrapped_1", ru),
         )
@@ -999,8 +1000,23 @@ async def generate_wrapped_data(
                 stats_report = stats_report[:idx]
             stats_report += f"\n\n<i>{html_escape(vibe)}</i>"
 
-        # Pick random liked memes for absurd comparisons
-        absurd_memes = _attach_memes_to_absurd(p, liked)
+        # Track used meme IDs globally to avoid showing the same meme twice
+        global_used_memes = set()
+        if your_meme and your_meme.get("meme_id"):
+            global_used_memes.add(your_meme["meme_id"])
+
+        # Pick oneliner meme (avoid your_meme)
+        oneliner_meme_id = None
+        if liked:
+            oneliner_candidates = [m for m in liked[:10] if m["meme_id"] not in global_used_memes]
+            if oneliner_candidates:
+                oneliner_meme_id = random.choice(oneliner_candidates)["meme_id"]
+            else:
+                oneliner_meme_id = random.choice(liked[:10])["meme_id"]
+            global_used_memes.add(oneliner_meme_id)
+
+        # Pick memes for absurd comparisons (avoid already used)
+        absurd_memes = _attach_memes_to_absurd(p, liked, global_used_memes)
 
         default_prediction = (
             "Летом ты будешь листать мемы вместо работы 🔥"
@@ -1013,7 +1029,7 @@ async def generate_wrapped_data(
             "your_meme": your_meme,
             "humor_dna": _build_humor_dna_slide(p, is_ru),
             "humor_oneliner": p.get("humor_oneliner", ""),
-            "oneliner_meme_id": random.choice(liked[:10])["meme_id"] if liked else None,
+            "oneliner_meme_id": oneliner_meme_id,
             "absurd_items": absurd_memes,
             "anti_profile": _build_anti_slide(p, is_ru),
             "popular_meme": _build_meme_data(popular_meme, is_popular=True, is_ru=is_ru),
@@ -1092,7 +1108,9 @@ def _build_mega_prompt(liked_texts: str, disliked_texts: str, lang: str = "ru") 
   "humor_oneliner": "4-8 слов. Ярлык мем-вкуса, не комплимент. \
 Как кличка от друга, не описание из гороскопа.",
   "anti_profile": "2-3 коротких абзаца через \\n\\n. \
-На ТЫ: 'ты терпеть не можешь...'. Конкретно.",
+На ТЫ: 'ты терпеть не можешь...'. Конкретно. \
+Последний абзац ОБЯЗАТЕЛЬНО позитивный — что в этом крутого, \
+почему такой вкус в мемах это кайф.",
   "absurd_comparisons": [
     {{"category": "{categories[0]}", "thing": "конкретный предмет", \
 "why": "потому что ты лайкаешь X и Y — 1 предложение", \
@@ -1107,15 +1125,24 @@ def _build_mega_prompt(liked_texts: str, disliked_texts: str, lang: str = "ru") 
 
 Правила:
 - humor_dna: 5 конкретных прикольных категорий по 2-3 слова, проценты ~100
-- zodiac: знак как метафора мемного поведения, не "кто он по жизни"
+- zodiac: знак как метафора мемного поведения, не "кто он по жизни". \
+ВАЖНО: НЕ БЛИЗНЕЦЫ. Близнецы — запрещённый знак. Выбирай из остальных 11 знаков. \
+Привязывай знак к КОНКРЕТНЫМ паттернам в мемах (например: Овен если агрессивный юмор, \
+Рыбы если меланхолия, Лев если самоирония, Козерог если сухой юмор, и т.д.)
 - absurd_comparisons: thing = конкретный предмет (не "хаос-машина"). \
-Каждый comparison на ДРУГИХ мотивах, не повторяй шутку
-- meme_ref: индекс [N] из ЛАЙКНУТЫХ мемов
+Каждый comparison на ДРУГИХ мотивах, не повторяй шутку. \
+meme_ref ДОЛЖЕН быть РАЗНЫМ для каждого comparison (три разных числа!)
+- meme_ref: индекс [N] из ЛАЙКНУТЫХ мемов. Каждый meme_ref уникален!
+- meme_index: ДОЛЖЕН отличаться от всех meme_ref в absurd_comparisons
 
 АНТИСЛОП:
 - ЗАПРЕЩЕНЫ слова: уникальный, особенный, тонкий, изысканный, многогранный, хаотичный, вайб, ирония, абсурд (без конкретики)
 - ЗАПРЕЩЕНЫ шаблоны: "ты из тех, кто...", "генерал постиронии", "ценитель абсурда"
-- НЕ хвали. Подкалывай
+- Подкалывай дружески, но ВСЕГДА заканчивай на позитивной ноте. \
+Человек должен улыбнуться, а не расстроиться. \
+Формула: подкол + комплимент ("ты залипаешь на X — но это потому что у тебя Y"). \
+Если мемы пользователя про грусть, депрессию, одиночество — будь мягче и теплее. \
+Не подчёркивай негатив, а покажи что юмор помогает справляться
 - Каждое утверждение ДОЛЖНО опираться на конкретный мем
 - Если шутка подошла бы любому — перепиши
 - Лучший юмор = противоречия: "лайкаешь X, но скипаешь Y"{lang_instruction}"""
@@ -1158,17 +1185,22 @@ def _build_zodiac_slide(p: dict, is_ru: bool = True) -> str:
     return f"{header}\n\n" f"<b>{html_escape(sign)}</b>\n\n" f"<i>{html_escape(why)}</i>"
 
 
-def _attach_memes_to_absurd(p: dict, liked: list) -> list:
-    """Attach meme IDs to each absurd comparison."""
+def _attach_memes_to_absurd(p: dict, liked: list, used_ids: set | None = None) -> list:
+    """Attach meme IDs to each absurd comparison, ensuring no duplicates."""
     comparisons = p.get("absurd_comparisons", [])
     result = []
-    used_ids = set()
+    if used_ids is None:
+        used_ids = set()
+    else:
+        used_ids = set(used_ids)  # don't mutate caller's set
     for c in comparisons[:3]:
         meme_id = None
-        # Try LLM-suggested meme_ref
+        # Try LLM-suggested meme_ref (but skip if already used)
         ref = c.get("meme_ref")
         if ref is not None and isinstance(ref, int) and 0 <= ref < len(liked):
-            meme_id = liked[ref]["meme_id"]
+            candidate = liked[ref]["meme_id"]
+            if candidate not in used_ids:
+                meme_id = candidate
         # Fallback: random liked meme not yet used
         if not meme_id and liked:
             available = [m for m in liked[:15] if m["meme_id"] not in used_ids]
