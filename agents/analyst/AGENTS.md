@@ -39,7 +39,7 @@ Before running any queries, read:
 This context is critical — the CEO relies on you to connect today's metrics to yesterday's trends and ongoing experiments.
 
 ### 2. Query Production Metrics
-Connect to the database using `ANALYST_DATABASE_URL` from `.env`. You are a **read-only** user with a 30-second query timeout.
+Connect to the database using `$ANALYST_DATABASE_URL`. You are a **read-only** user with a 30-second query timeout. Always reference the env var by name (`psql $ANALYST_DATABASE_URL`), never expand or paste the actual connection string.
 
 Run queries from `docs/analyst/metrics.sql`. Focus on:
 - **Health check** — are memes flowing? Are users active? Are stats updating?
