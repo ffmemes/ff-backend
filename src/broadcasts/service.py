@@ -1,6 +1,16 @@
+import asyncio
+import logging
+
 from sqlalchemy import text
 
-from src.database import fetch_all
+from src.database import execute, fetch_all
+from src.redis import redis_client
+from src.tgbot.bot import bot
+
+logger = logging.getLogger(__name__)
+
+
+# ── User queries ────────────────────────────────────────
 
 
 async def get_user_ids_active_minutes_ago(
@@ -87,3 +97,114 @@ async def get_users_active_more_than_days_ago(
         AND type != 'blocked_bot'
     """
     return await fetch_all(text(select_query))
+
+
+async def get_all_non_blocked_users() -> list[dict]:
+    return await fetch_all(
+        text(
+            """
+        SELECT u.id AS user_id, COALESCE(ut.language_code, 'en') AS language_code
+        FROM "user" u
+        LEFT JOIN user_tg ut ON ut.id = u.id
+        WHERE u.type NOT IN ('waitlist', 'blocked_bot')
+        ORDER BY u.last_active_at DESC
+    """
+        )
+    )
+
+
+# ── Broadcast engine ────────────────────────────────────
+
+
+def _broadcast_redis_key(broadcast_id: str) -> str:
+    return f"broadcast:{broadcast_id}:sent"
+
+
+async def send_broadcast(
+    broadcast_id: str,
+    users: list[dict],
+    messages: dict[str, str],
+    language_fn,
+    delay: float = 0.15,
+    dry_run: bool = False,
+) -> dict:
+    """
+    Send a text broadcast to a list of users with dedup via Redis.
+
+    Args:
+        broadcast_id: Unique ID for this broadcast (e.g. "wrapped-2026-04-01").
+                      Re-running with the same ID skips already-sent users.
+        users: List of dicts with at least "user_id" and "language_code" keys.
+        messages: Dict mapping language group to message text, e.g.
+                  {"ru": "...", "en": "..."}.
+        language_fn: Function(language_code) -> message key from messages dict.
+        delay: Seconds between sends. 0.15 = ~7/sec.
+        dry_run: If True, print stats but don't send.
+
+    Returns:
+        {"sent": N, "blocked": N, "failed": N, "skipped": N}
+    """
+    redis_key = _broadcast_redis_key(broadcast_id)
+    already_sent = await redis_client.scard(redis_key)
+
+    print(f"Broadcast '{broadcast_id}': {len(users)} users, {already_sent} already sent")
+
+    if dry_run:
+        print("--- DRY RUN ---")
+        for msg_key, msg_text in messages.items():
+            count = sum(1 for u in users if language_fn(u["language_code"]) == msg_key)
+            print(f"\n{msg_key} ({count} users):\n{msg_text}")
+        return {"sent": 0, "blocked": 0, "failed": 0, "skipped": int(already_sent)}
+
+    sent = 0
+    blocked = 0
+    failed = 0
+    skipped = 0
+
+    for row in users:
+        user_id = row["user_id"]
+
+        # Dedup: skip if already sent in this broadcast
+        if await redis_client.sismember(redis_key, str(user_id)):
+            skipped += 1
+            continue
+
+        msg_key = language_fn(row["language_code"])
+        message = messages.get(msg_key, messages.get("en", ""))
+
+        try:
+            await bot.send_message(chat_id=user_id, text=message)
+            sent += 1
+            await redis_client.sadd(redis_key, str(user_id))
+
+            if sent % 100 == 0:
+                print(f"  sent:{sent} blocked:{blocked} failed:{failed} skipped:{skipped}")
+
+        except Exception as e:
+            err = str(e).lower()
+            if "blocked" in err or "deactivated" in err or "not found" in err:
+                blocked += 1
+                await redis_client.sadd(redis_key, str(user_id))
+                await execute(
+                    text("UPDATE \"user\" SET type = 'blocked_bot' WHERE id = :uid"),
+                    {"uid": user_id},
+                )
+            elif "too many requests" in err or "retry after" in err:
+                print("  rate limited, sleeping 10s...")
+                await asyncio.sleep(10)
+                try:
+                    await bot.send_message(chat_id=user_id, text=message)
+                    sent += 1
+                    await redis_client.sadd(redis_key, str(user_id))
+                except Exception:
+                    failed += 1
+            else:
+                failed += 1
+                if failed <= 10:
+                    logger.warning("Broadcast %s error for %d: %s", broadcast_id, user_id, e)
+
+        await asyncio.sleep(delay)
+
+    result = {"sent": sent, "blocked": blocked, "failed": failed, "skipped": skipped}
+    print(f"\nDone! {result}")
+    return result
