@@ -53,6 +53,7 @@ else:
         pool_size=settings.DATABASE_POOL_SIZE,
         pool_recycle=settings.DATABASE_POOL_TTL,
         pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
+        pool_timeout=settings.DATABASE_POOL_TIMEOUT,
     )
 
 engine = create_async_engine(DATABASE_URL, **_engine_kwargs)
@@ -508,7 +509,8 @@ async def fetch_one(
 ) -> dict[str, Any] | None:
     async with engine.begin() as conn:
         cursor: CursorResult = await conn.execute(select_query, params or {})
-        return cursor.first()._asdict() if cursor.rowcount > 0 else None
+        row = cursor.first()
+        return row._asdict() if row is not None else None
 
 
 async def fetch_all(
