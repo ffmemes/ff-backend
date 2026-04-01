@@ -211,6 +211,10 @@ Use the `/browse` skill from gstack for all web browsing. Never use `mcp__claude
 
 Available skills: `/plan-ceo-review`, `/plan-eng-review`, `/review`, `/ship`, `/browse`, `/qa`, `/setup-browser-cookies`, `/retro`
 
+## Broadcasts
+
+**IMPORTANT: Read `docs/broadcasts.md` before sending any broadcast.** Use `send_broadcast()` from `src/broadcasts/service.py` with a unique `broadcast_id` for dedup. Never run inline ad-hoc broadcast code. Language detection uses `user_language` table (bot preference), NOT `user_tg.language_code` (Telegram app language).
+
 ## Known Issues
 
 - SQL string interpolation in `candidates.py` -- needs parameterization (injection risk)
