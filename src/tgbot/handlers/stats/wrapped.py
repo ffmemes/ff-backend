@@ -744,7 +744,7 @@ async def _show_slide(
             await update.effective_chat.send_message(
                 text=f"{header}\n\n<i>{html_escape(oneliner)}</i>",
                 parse_mode="HTML",
-                reply_markup=_next_btn("wrapped_5"),
+                reply_markup=_next_btn("wrapped_5", ru),
             )
         elif not sent:
             key = 5
