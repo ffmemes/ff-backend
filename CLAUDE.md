@@ -169,7 +169,7 @@ source .env
 psql $ANALYST_DATABASE_URL
 
 # ALSO CORRECT — .pgpass handles auth automatically
-psql -h t.ffmemes.com -p 4441 -U analyst_readonly -d ff
+psql -h $PGHOST -p $PGPORT -U $PGUSER -d $PGDATABASE
 
 # WRONG — never do this (never inline the actual password)
 psql "host=... user=... password=ACTUAL_PASSWORD dbname=..."
