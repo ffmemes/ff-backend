@@ -236,7 +236,8 @@ async def get_most_popular_liked_meme(user_id: int) -> dict | None:
             """
         SELECT m.id AS meme_id, m.type, m.telegram_file_id,
                ROUND(COALESCE(ms.lr_smoothed, 0.5) * 100)
-                   AS global_lr_pct
+                   AS global_lr_pct,
+               COALESCE(ms.nlikes, 0) AS nlikes
         FROM user_meme_reaction umr
         JOIN meme m ON m.id = umr.meme_id
         LEFT JOIN meme_stats ms ON ms.meme_id = m.id
@@ -265,7 +266,8 @@ async def get_unpopular_opinion_meme(user_id: int) -> dict | None:
             """
         SELECT m.id AS meme_id, m.type, m.telegram_file_id,
                ROUND(COALESCE(ms.lr_smoothed, 0.5) * 100)
-                   AS global_lr_pct
+                   AS global_lr_pct,
+               COALESCE(ms.nlikes, 0) AS nlikes
         FROM user_meme_reaction umr
         JOIN meme m ON m.id = umr.meme_id
         LEFT JOIN meme_stats ms ON ms.meme_id = m.id
@@ -535,7 +537,7 @@ async def handle_wrapped_button(
     _log(f"user={user_id} key={key}")
 
     # Delete the loading/button message before showing results
-    if update.callback_query and key == 0:
+    if update.callback_query:
         try:
             await update.callback_query.message.delete()
         except Exception:
@@ -561,7 +563,7 @@ async def handle_wrapped_button(
         )
         # Try to send next slide as fallback
         try:
-            if key < 7:
+            if key < 9:
                 await _show_slide(
                     update,
                     context,
@@ -590,8 +592,24 @@ async def _show_slide(
             reply_markup=_next_btn("wrapped_1"),
         )
 
-    # ── Slide 1: Your meme ──
+    # ── Slide 1: Zodiac ──
     if key == 1:
+        txt = uw.get("zodiac", "")
+        if txt:
+            try:
+                await update.effective_chat.send_message(
+                    text=txt,
+                    parse_mode="HTML",
+                    reply_markup=_next_btn("wrapped_2"),
+                )
+            except Exception as e:
+                _log(f"zodiac slide error: {e}")
+                key = 2
+        else:
+            key = 2
+
+    # ── Slide 2: Your meme ──
+    if key == 2:
         sent = False
         meme_info = uw.get("your_meme")
         try:
@@ -602,42 +620,23 @@ async def _show_slide(
                         id=md["id"],
                         type=md["type"],
                         telegram_file_id=md["telegram_file_id"],
-                        caption=meme_info.get(
-                            "caption",
-                            "🎯 Этот мем — это ты",
-                        ),
+                        caption=meme_info.get("caption", "🎯 Этот мем — это ты"),
                     )
                     await send_new_message_with_meme(
                         context.bot,
                         user_id,
                         meme,
-                        reply_markup=_next_btn("wrapped_2"),
+                        reply_markup=_next_btn("wrapped_3"),
                     )
                     sent = True
         except Exception as e:
             _log(f"meme slide error: {e}")
         if not sent:
-            key = 2
-
-    # ── Slide 2: Humor DNA (5 categories) + roast ──
-    if key == 2:
-        txt = uw.get("humor_report", "")
-        if txt:
-            try:
-                await update.effective_chat.send_message(
-                    text=txt,
-                    parse_mode="HTML",
-                    reply_markup=_next_btn("wrapped_3"),
-                )
-            except Exception as e:
-                _log(f"humor slide error: {e}")
-                key = 3
-        else:
             key = 3
 
-    # ── Slide 3: Absurd comparisons ──
+    # ── Slide 3: Humor DNA (bars only) ──
     if key == 3:
-        txt = uw.get("absurd_report", "")
+        txt = uw.get("humor_dna", "")
         if txt:
             try:
                 await update.effective_chat.send_message(
@@ -646,33 +645,111 @@ async def _show_slide(
                     reply_markup=_next_btn("wrapped_4"),
                 )
             except Exception as e:
-                _log(f"absurd slide error: {e}")
+                _log(f"humor dna error: {e}")
                 key = 4
         else:
             key = 4
 
-    # ── Slide 4: Anti-profile ──
+    # ── Slide 4: Humor oneliner + random liked meme ──
     if key == 4:
+        oneliner = uw.get("humor_oneliner", "")
+        meme_id = uw.get("oneliner_meme_id")
+        sent = False
+        if oneliner and meme_id:
+            try:
+                md = await get_meme_by_id(meme_id)
+                if md and md.get("telegram_file_id"):
+                    caption = f"👀 <b>Твой юмор одной фразой:</b>\n\n<i>{html_escape(oneliner)}</i>"
+                    meme = MemeData(
+                        id=md["id"],
+                        type=md["type"],
+                        telegram_file_id=md["telegram_file_id"],
+                        caption=caption,
+                    )
+                    await send_new_message_with_meme(
+                        context.bot,
+                        user_id,
+                        meme,
+                        reply_markup=_next_btn("wrapped_5"),
+                    )
+                    sent = True
+            except Exception as e:
+                _log(f"oneliner slide error: {e}")
+        if not sent and oneliner:
+            await update.effective_chat.send_message(
+                text=f"👀 <b>Твой юмор одной фразой:</b>\n\n<i>{html_escape(oneliner)}</i>",
+                parse_mode="HTML",
+                reply_markup=_next_btn("wrapped_5"),
+            )
+        elif not sent:
+            key = 5
+
+    # ── Slide 5: Absurd comparisons (separate messages with memes) ──
+    if key == 5:
+        items = uw.get("absurd_items", [])
+        sent = False
+        for i, item in enumerate(items[:3]):
+            is_last = i == len(items[:3]) - 1
+            cat = html_escape(item.get("category", "?"))
+            thing = html_escape(item.get("thing", "?"))
+            why = html_escape(item.get("why", ""))
+            caption = f"🎰 <b>Если бы ты был — {cat}:</b>\n\n<b>{thing}</b>\n<i>{why}</i>"
+            mid = item.get("meme_id")
+            markup = _next_btn("wrapped_6") if is_last else None
+            if mid:
+                try:
+                    md = await get_meme_by_id(mid)
+                    if md and md.get("telegram_file_id"):
+                        meme = MemeData(
+                            id=md["id"],
+                            type=md["type"],
+                            telegram_file_id=md["telegram_file_id"],
+                            caption=caption,
+                        )
+                        await send_new_message_with_meme(
+                            context.bot,
+                            user_id,
+                            meme,
+                            reply_markup=markup,
+                        )
+                        sent = True
+                        continue
+                except Exception as e:
+                    _log(f"absurd meme error: {e}")
+            # Fallback: text only
+            try:
+                await update.effective_chat.send_message(
+                    text=caption,
+                    parse_mode="HTML",
+                    reply_markup=markup,
+                )
+                sent = True
+            except Exception as e:
+                _log(f"absurd text error: {e}")
+        if not sent:
+            key = 6
+
+    # ── Slide 6: Anti-profile ──
+    if key == 6:
         txt = uw.get("anti_profile", "")
         if txt:
             try:
                 await update.effective_chat.send_message(
                     text=txt,
                     parse_mode="HTML",
-                    reply_markup=_next_btn("wrapped_5"),
+                    reply_markup=_next_btn("wrapped_7"),
                 )
             except Exception as e:
                 _log(f"anti slide error: {e}")
-                key = 5
+                key = 7
         else:
-            key = 5
+            key = 7
 
-    # ── Slide 5: Popular meme you liked + unpopular opinion ──
-    if key == 5:
+    # ── Slide 7: Popular meme + unpopular opinion ──
+    if key == 7:
         pop = uw.get("popular_meme")
         unpop = uw.get("unpopular_meme")
         sent = False
-
         for meme_data in [pop, unpop]:
             if meme_data and meme_data.get("meme_id"):
                 try:
@@ -688,17 +765,16 @@ async def _show_slide(
                             context.bot,
                             user_id,
                             meme,
-                            reply_markup=_next_btn("wrapped_6"),
+                            reply_markup=_next_btn("wrapped_8"),
                         )
                         sent = True
                 except Exception as e:
-                    _log(f"meme stats slide error: {e}")
-
+                    _log(f"meme stats error: {e}")
         if not sent:
-            key = 6
+            key = 8
 
-    # ── Slide 6: Sources + speed + peak ──
-    if key == 6:
+    # ── Slide 8: Sources + speed + peak ──
+    if key == 8:
         txt = uw.get("stats_extra", "")
         if txt:
             try:
@@ -706,24 +782,17 @@ async def _show_slide(
                     text=txt,
                     parse_mode="HTML",
                     reply_markup=InlineKeyboardMarkup(
-                        [
-                            [
-                                InlineKeyboardButton(
-                                    "Финалочка →",
-                                    callback_data="wrapped_7",
-                                )
-                            ]
-                        ]
+                        [[InlineKeyboardButton("Финалочка →", callback_data="wrapped_9")]]
                     ),
                 )
             except Exception as e:
                 _log(f"stats extra error: {e}")
-                key = 7
+                key = 9
         else:
-            key = 7
+            key = 9
 
-    # ── Slide 7: Prediction + referral ──
-    if key == 7:
+    # ── Slide 9: Prediction + referral ──
+    if key == 9:
         pred = uw.get("prediction", "")
         await update.effective_chat.send_message(
             text=(
@@ -740,7 +809,7 @@ async def _show_slide(
                         InlineKeyboardButton(
                             "📤 Отправить другу",
                             url="https://t.me/ffmemesbot?start=wrapped",
-                        ),
+                        )
                     ]
                 ]
             ),
@@ -792,9 +861,24 @@ async def generate_wrapped_data(
             f"❌ {d.get('description') or d.get('ocr_text', '')}" for d in disliked[:15]
         )
 
-        # ONE DeepSeek call
+        # DeepSeek + SQL in parallel
+        is_ru = lang == "ru"
         prompt = _build_mega_prompt(liked_texts, disliked_texts, lang)
-        raw = await call_deepseek(prompt)
+
+        deepseek_task = asyncio.create_task(call_deepseek(prompt))
+        sql_tasks = asyncio.gather(
+            _safe(get_reaction_speed_insight(user_id)),
+            _safe(get_peak_hour_insight(user_id, is_ru)),
+            _safe(get_surprise_meme(user_id)),
+            _safe(_build_sources_report(user_id)),
+            _safe(get_most_popular_liked_meme(user_id)),
+            _safe(get_unpopular_opinion_meme(user_id)),
+        )
+
+        raw, (speed, peak, surprise, sources, popular_meme, unpopular_meme) = await asyncio.gather(
+            deepseek_task, sql_tasks
+        )
+
         p = parse_json_from_llm(raw)
         if not p:
             logger.warning(
@@ -805,15 +889,6 @@ async def generate_wrapped_data(
             p = {}
 
         your_meme = _pick_meme(p, liked)
-
-        # SQL insights (each safe)
-        is_ru = lang == "ru"
-        speed = await _safe(get_reaction_speed_insight(user_id))
-        peak = await _safe(get_peak_hour_insight(user_id, is_ru))
-        surprise = await _safe(get_surprise_meme(user_id))
-        sources = await _safe(_build_sources_report(user_id))
-        popular_meme = await _safe(get_most_popular_liked_meme(user_id))
-        unpopular_meme = await _safe(get_unpopular_opinion_meme(user_id))
 
         # Use surprise meme if LLM didn't pick one
         if not your_meme and surprise:
@@ -833,17 +908,22 @@ async def generate_wrapped_data(
         # Stats report gets vibe from DeepSeek — replace placeholder vibe
         vibe = p.get("vibe", "")
         if vibe and stats_report:
-            # Remove existing placeholder vibe (last <i>...</i> block)
             if "\n<i>" in stats_report:
                 idx = stats_report.rfind("\n<i>")
                 stats_report = stats_report[:idx]
             stats_report += f"\n\n<i>{html_escape(vibe)}</i>"
 
+        # Pick random liked memes for absurd comparisons
+        absurd_memes = _attach_memes_to_absurd(p, liked)
+
         return {
             "stats_report": stats_report,
+            "zodiac": _build_zodiac_slide(p),
             "your_meme": your_meme,
-            "humor_report": _build_humor_slide(p),
-            "absurd_report": _build_absurd_slide(p),
+            "humor_dna": _build_humor_dna_slide(p),
+            "humor_oneliner": p.get("humor_oneliner", ""),
+            "oneliner_meme_id": random.choice(liked[:10])["meme_id"] if liked else None,
+            "absurd_items": absurd_memes,
             "anti_profile": _build_anti_slide(p),
             "popular_meme": _build_meme_data(popular_meme, is_popular=True),
             "unpopular_meme": _build_meme_data(unpopular_meme, is_popular=False),
@@ -857,9 +937,12 @@ async def generate_wrapped_data(
         logger.error("Wrapped failed user %d: %s", user_id, e, exc_info=True)
         return {
             "stats_report": stats_report,
+            "zodiac": "",
             "your_meme": None,
-            "humor_report": "",
-            "absurd_report": "",
+            "humor_dna": "",
+            "humor_oneliner": "",
+            "oneliner_meme_id": None,
+            "absurd_items": [],
             "anti_profile": "",
             "popular_meme": None,
             "unpopular_meme": None,
@@ -894,10 +977,12 @@ def _build_mega_prompt(liked_texts: str, disliked_texts: str, lang: str = "ru") 
 
 Верни ТОЛЬКО JSON:
 {{
-  "vibe": "одно предложение-характеристика этого человека по его мемам, \
-как подкол от друга, 10-15 слов",
+  "vibe": "одно предложение-характеристика по мемам, подкол от друга, 10-15 слов",
   "meme_index": число (индекс лайкнутого мема, который олицетворяет),
   "meme_caption": "почему этот мем — это ты (2 предложения, подкол)",
+  "zodiac_sign": "знак зодиака + эмодзи (♈♉♊♋♌♍♎♏♐♑♒♓)",
+  "zodiac_why": "1-2 предложения: почему этот знак, через конкретные мемы. \
+Не пиши общую астрологию — только через мемы.",
   "humor_dna": [
     {{"name": "категория", "pct": число}},
     {{"name": "категория", "pct": число}},
@@ -905,20 +990,22 @@ def _build_mega_prompt(liked_texts: str, disliked_texts: str, lang: str = "ru") 
     {{"name": "категория", "pct": число}},
     {{"name": "категория", "pct": число}}
   ],
-  "humor_roast": "3 абзаца через \\n\\n. Каждый 1-2 предложения. \
-Пиши смешно, как голосовое другу. Упоминай конкретные мемы. \
-Шути, а не ставь диагноз.",
+  "humor_oneliner": "Твоё чувство юмора одной фразой. \
+Конкретно, точно, смешно. Максимум 15 слов.",
   "anti_profile": "2-3 коротких абзаца через \\n\\n. \
 Обращайся на ТЫ: 'ты терпеть не можешь...'. \
 Что ТЫ не любишь и почему.",
   "absurd_comparisons": [
-    {{"category": "{categories[0]}", "thing": "конкретная штука", "why": "смешное объяснение через мемы, 1 предложение"}},
-    {{"category": "{categories[1]}", "thing": "конкретная штука", "why": "смешное объяснение через мемы, 1 предложение"}},
-    {{"category": "{categories[2]}", "thing": "конкретная штука", "why": "смешное объяснение через мемы, 1 предложение"}}
+    {{"category": "{categories[0]}", "thing": "конкретная штука", \
+"why": "1 предложение, объяснение через конкретный мем из списка", \
+"meme_ref": число (индекс лайкнутого мема, который связан)}},
+    {{"category": "{categories[1]}", "thing": "конкретная штука", \
+"why": "1 предложение", "meme_ref": число}},
+    {{"category": "{categories[2]}", "thing": "конкретная штука", \
+"why": "1 предложение", "meme_ref": число}}
   ],
   "prediction": "предсказание на лето 2026. \
-Одно-два предложения. Конкретно, абсурдно, \
-как голосовое другу. Без метафор."
+Одно-два предложения. Конкретно, абсурдно. Без метафор."
 }}
 
 Правила:
@@ -926,18 +1013,16 @@ def _build_mega_prompt(liked_texts: str, disliked_texts: str, lang: str = "ru") 
 - Проценты примерно дают 100
 - Пиши просто, как голосовое сообщение другу
 - Anti_profile: обязательно на ТЫ (не в третьем лице)
-- Humor_roast: шути, а не ставь приговор
-- absurd_comparisons: конкретные предметы, не абстракции. Объяснение связано с мемами
+- absurd_comparisons: конкретные предметы, не абстракции
+- meme_ref: индекс мема из ЛАЙКНУТЫХ, который связан с этим сравнением
 
 АНТИСЛОП — запрещённые приёмы (НЕ ИСПОЛЬЗУЙ):
-- НЕ пиши "у тебя тонкое чувство юмора", "ты ценитель", "настоящий знаток"
-- НЕ используй слова: "уникальный", "особенный", "тонкий", "изысканный", "многогранный", "хаотичный"
+- НЕ используй: "уникальный", "особенный", "тонкий", "изысканный", "многогранный", "хаотичный"
 - НЕ пиши комплименты. Подкалывай, а не хвали
 - Каждое утверждение ДОЛЖНО ссылаться на конкретный мем из списка
-- НЕ пиши "ты из тех, кто..." — это шаблон. Пиши конкретно
-- Prediction: конкретное абсурдное событие, не "ты будешь..." философия
-- САМОПРОВЕРКА: если шутка подошла бы любому случайному пользователю — перепиши её
-- Ищи ПРОТИВОРЕЧИЯ во вкусе: "лайкаешь X, но скипаешь Y" — это самое смешное{lang_instruction}"""
+- НЕ пиши "ты из тех, кто..." — это шаблон
+- САМОПРОВЕРКА: если шутка подошла бы любому — перепиши её
+- Ищи ПРОТИВОРЕЧИЯ: "лайкаешь X, но скипаешь Y" — самое смешное{lang_instruction}"""
 
 
 def _pick_meme(p: dict, liked: list) -> dict | None:
@@ -951,9 +1036,9 @@ def _pick_meme(p: dict, liked: list) -> dict | None:
     return None
 
 
-def _build_humor_slide(p: dict) -> str:
+def _build_humor_dna_slide(p: dict) -> str:
+    """Humor DNA bars only — no roast text."""
     dna = p.get("humor_dna", [])
-    roast = p.get("humor_roast", "")
 
     def bar(pct):
         f = round(pct / 10)
@@ -964,34 +1049,62 @@ def _build_humor_slide(p: dict) -> str:
         pct = min(100, max(0, c.get("pct", 33)))
         lines.append(f"{bar(pct)} {pct}%\n{html_escape(c.get('name', '???'))}\n")
 
-    if roast:
-        lines.append(f"\n👀 <b>Что я понял про тебя:</b>\n\n{html_escape(roast)}")
     return "\n".join(lines) if len(lines) > 1 else ""
 
 
-def _build_absurd_slide(p: dict) -> str:
-    comparisons = p.get("absurd_comparisons", [])
-    if not comparisons:
+def _build_zodiac_slide(p: dict) -> str:
+    sign = p.get("zodiac_sign", "")
+    why = p.get("zodiac_why", "")
+    if not sign:
         return ""
-    lines = ["🎰 <b>Если бы ты был...</b>\n"]
+    return (
+        f"🔮 <b>Твой мем-зодиак:</b>\n\n"
+        f"<b>{html_escape(sign)}</b>\n\n"
+        f"<i>{html_escape(why)}</i>"
+    )
+
+
+def _attach_memes_to_absurd(p: dict, liked: list) -> list:
+    """Attach meme IDs to each absurd comparison."""
+    comparisons = p.get("absurd_comparisons", [])
+    result = []
+    used_ids = set()
     for c in comparisons[:3]:
-        cat = html_escape(c.get("category", "?"))
-        thing = html_escape(c.get("thing", "?"))
-        why = html_escape(c.get("why", ""))
-        lines.append(f"<b>{cat}:</b> {thing}\n<i>{why}</i>\n")
-    return "\n".join(lines)
+        meme_id = None
+        # Try LLM-suggested meme_ref
+        ref = c.get("meme_ref")
+        if ref is not None and isinstance(ref, int) and 0 <= ref < len(liked):
+            meme_id = liked[ref]["meme_id"]
+        # Fallback: random liked meme not yet used
+        if not meme_id and liked:
+            available = [m for m in liked[:15] if m["meme_id"] not in used_ids]
+            if available:
+                pick = random.choice(available)
+                meme_id = pick["meme_id"]
+        if meme_id:
+            used_ids.add(meme_id)
+        result.append(
+            {
+                "category": c.get("category", "?"),
+                "thing": c.get("thing", "?"),
+                "why": c.get("why", ""),
+                "meme_id": meme_id,
+            }
+        )
+    return result
 
 
 def _build_meme_data(meme: dict | None, is_popular: bool) -> dict | None:
     if not meme:
         return None
     lr = meme.get("global_lr_pct", "?")
+    nlikes = meme.get("nlikes")
     if is_popular:
-        caption = (
-            f"🏆 Самый залайканный мем из твоих лайков!\n\n" f"Его лайкнули {lr}% пользователей"
-        )
+        extra = f" ({nlikes} чел.)" if nlikes else ""
+        caption = f"🏆 Самый залайканный мем из твоих лайков!\n\nЕго лайкнули {lr}%{extra}"
     else:
-        caption = f"🤔 А этот мем ты скипнул...\n\n" f"Хотя его лайкнули {lr}% пользователей!"
+        extra = f" ({nlikes} чел.)" if nlikes else ""
+        caption = f"🤔 А этот мем ты скипнул...\n\nХотя его лайкнули {lr}%{extra}!"
     return {"meme_id": meme["meme_id"], "caption": caption}
 
 
