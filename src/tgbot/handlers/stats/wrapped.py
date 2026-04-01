@@ -27,6 +27,7 @@ from src.tgbot.service import (
     create_or_update_user,
     get_meme_by_id,
     get_user_by_id,
+    get_user_languages,
     save_tg_user,
 )
 from src.tgbot.utils import (
@@ -94,6 +95,22 @@ def _log(msg: str) -> None:
 
 def _is_ru(lang_code: str | None) -> bool:
     return (lang_code or "ru") in ALMOST_CIS_LANGUAGES
+
+
+async def _resolve_is_ru(user_id: int, tg_lang: str | None) -> bool:
+    """Check user_language table: if Russian is among user's languages, use Russian.
+    Russian is dominant — many CIS users browse memes in both ru and en."""
+    try:
+        langs = await get_user_languages(user_id)
+        if langs:
+            # If any CIS language is in user's bot language preferences → Russian
+            if langs & set(ALMOST_CIS_LANGUAGES):
+                return True
+            return False
+    except Exception:
+        pass
+    # Fallback to Telegram language
+    return _is_ru(tg_lang)
 
 
 def _loading_msg(is_ru: bool) -> str:
@@ -341,6 +358,13 @@ async def handle_wrapped(
 ) -> None:
     user_id = update.effective_user.id
     _log(f"handle_wrapped called for {user_id}")
+
+    # Send typing immediately so user knows the bot is alive
+    try:
+        await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING)
+    except Exception:
+        pass
+
     await create_or_update_user(id=user_id)
     await save_tg_user(
         id=user_id,
@@ -370,7 +394,7 @@ async def handle_wrapped(
             )
         return await update.message.reply_text(msg)
 
-    is_ru = _is_ru(user_lang)
+    is_ru = await _resolve_is_ru(user_id, user_lang)
 
     cached = await get_user_wrapped(user_id)
     if cached and not cached.get("lock"):
@@ -415,8 +439,8 @@ async def handle_wrapped(
 
     # ── START DEEPSEEK EARLY (while user reads welcome) ──
     user = await get_user_by_id(user_id)
-    lang = get_user_interface_language(user)
-    is_ru = lang == "ru"
+    is_ru = await _resolve_is_ru(user_id, user_lang)
+    lang = "ru" if is_ru else "en"
     stats_report = await get_bot_usage_report(
         user_id,
         user_stats_data,
@@ -429,6 +453,7 @@ async def handle_wrapped(
             descriptions,
             lang,
             stats_report or "",
+            is_ru,
         )
     )
 
@@ -474,7 +499,7 @@ async def handle_wrapped_go(
         return await handle_wrapped_button(update, context)
 
     # Still generating — edit the button message with loading text
-    is_ru = _is_ru(update.effective_user.language_code)
+    is_ru = cached.get("is_ru", _is_ru(update.effective_user.language_code)) if cached else _is_ru(update.effective_user.language_code)
     if cached and cached.get("lock"):
         stats = cached.get("stats_report")
         if stats and update.callback_query:
@@ -512,13 +537,14 @@ async def _generate_and_cache(
     descriptions: list,
     lang: str,
     stats_report: str,
+    is_ru: bool = True,
 ):
     """Background: generate all data and save to cache."""
     try:
         # Save stats immediately so ДА can show them
         await set_user_wrapped(
             user_id,
-            {"lock": True, "stats_report": stats_report},
+            {"lock": True, "stats_report": stats_report, "is_ru": is_ru},
             ttl=300,
         )
         _log(f"starting generation for {user_id}")
@@ -530,6 +556,7 @@ async def _generate_and_cache(
             stats_report,
         )
         if data:
+            data["is_ru"] = is_ru
             await set_user_wrapped(user_id, data)
             _log(f"done for {user_id}")
         else:
@@ -556,7 +583,7 @@ async def handle_wrapped_button(
         _log(f"no cache for {user_id}")
         return
 
-    is_ru = _is_ru(update.effective_user.language_code)
+    is_ru = uw.get("is_ru", _is_ru(update.effective_user.language_code))
     if uw.get("lock"):
         _log(f"lock active for {user_id}, editing message")
         if update.callback_query:
@@ -639,7 +666,7 @@ async def _show_slide(
     user_id: int,
 ) -> None:
     """Send a single slide. Extracted for error isolation."""
-    ru = _is_ru(update.effective_user.language_code)
+    ru = uw.get("is_ru", _is_ru(update.effective_user.language_code))
 
     # ── Slide 0: Stats ──
     if key == 0:
@@ -931,11 +958,7 @@ async def generate_wrapped_data(
     lang: str,
     stats_report: str,
 ) -> dict | None:
-    await set_user_wrapped(
-        user_id,
-        {"lock": True, "stats_report": stats_report},
-        ttl=300,
-    )
+    # Lock is already set by _generate_and_cache (with is_ru), don't overwrite it
 
     try:
         liked = [d for d in descriptions if d.get("reaction_id") == 1]
