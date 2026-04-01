@@ -13,6 +13,7 @@ from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
 from src.config import settings
+from src.localizer import ALMOST_CIS_LANGUAGES
 from src.redis import get_user_wrapped, set_user_wrapped
 from src.stats.service import (
     get_meme_descriptions_for_wrapped,
@@ -21,10 +22,6 @@ from src.stats.service import (
     get_user_stats,
 )
 from src.storage.schemas import MemeData
-from src.tgbot.constants import (
-    TELEGRAM_CHANNEL_RU_CHAT_ID,
-    TELEGRAM_CHANNEL_RU_LINK,
-)
 from src.tgbot.senders.meme import send_new_message_with_meme
 from src.tgbot.service import (
     create_or_update_user,
@@ -32,14 +29,17 @@ from src.tgbot.service import (
     get_user_by_id,
     save_tg_user,
 )
-from src.tgbot.utils import check_if_user_chat_member
+from src.tgbot.utils import (
+    check_if_user_follows_related_channel,
+    get_related_channel_link,
+)
 
 logger = logging.getLogger(__name__)
 
 WRAPPED_MIN_REACTIONS = 30
 WRAPPED_MIN_DESCRIPTIONS = 5
 
-LOADING_MESSAGES = [
+LOADING_MESSAGES_RU = [
     "🔬 Анализируем твои мемы...",
     "👀 Смотрим на лайки...",
     "📊 Много же ты листал...",
@@ -48,12 +48,29 @@ LOADING_MESSAGES = [
     "🎭 Определяем твой вайб...",
 ]
 
-LOADING_BUTTONS = [
+LOADING_MESSAGES_EN = [
+    "🔬 Analyzing your memes...",
+    "👀 Looking at your likes...",
+    "📊 You've scrolled a lot...",
+    "🤖 AI is studying your memes...",
+    "🧠 Analyzing your humor...",
+    "🎭 Figuring out your vibe...",
+]
+
+LOADING_BUTTONS_RU = [
     "Готово? →",
     "Проверить →",
     "Ну давай уже →",
     "Уже? →",
     "Ещё раз →",
+]
+
+LOADING_BUTTONS_EN = [
+    "Ready? →",
+    "Check →",
+    "C'mon already →",
+    "Yet? →",
+    "Try again →",
 ]
 
 ABSURD_CATEGORIES = [
@@ -73,6 +90,22 @@ def _log(msg: str) -> None:
     """Force-log to stderr (bypasses gunicorn log config)."""
     sys.stderr.write(f"[wrapped] {msg}\n")
     sys.stderr.flush()
+
+
+def _is_ru(lang_code: str | None) -> bool:
+    return (lang_code or "ru") in ALMOST_CIS_LANGUAGES
+
+
+def _loading_msg(is_ru: bool) -> str:
+    return random.choice(LOADING_MESSAGES_RU if is_ru else LOADING_MESSAGES_EN)
+
+
+def _loading_btn(is_ru: bool) -> str:
+    return random.choice(LOADING_BUTTONS_RU if is_ru else LOADING_BUTTONS_EN)
+
+
+def _next_label(is_ru: bool) -> str:
+    return "Дальше →" if is_ru else "Next →"
 
 
 # ── LLM ──────────────────────────────────────────────────
@@ -180,17 +213,29 @@ async def get_peak_hour_insight(user_id: int, is_ru: bool = True) -> dict:
     if not row:
         return {}
     hour = int(row["peak_hour"])
-    labels = {
-        (0, 6): "ночной скроллер 🌙",
-        (6, 10): "утренний мемолюб ☀️",
-        (10, 14): "дневной прокрастинатор 💼",
-        (14, 18): "послеобеденный залипатель 🍕",
-        (18, 22): "вечерний мемоман 🌆",
-        (22, 24): "полуночный скроллер 🦉",
-    }
+    if is_ru:
+        labels = {
+            (0, 6): "ночной скроллер 🌙",
+            (6, 10): "утренний мемолюб ☀️",
+            (10, 14): "дневной прокрастинатор 💼",
+            (14, 18): "послеобеденный залипатель 🍕",
+            (18, 22): "вечерний мемоман 🌆",
+            (22, 24): "полуночный скроллер 🦉",
+        }
+        default_label = "мемоман"
+    else:
+        labels = {
+            (0, 6): "night scroller 🌙",
+            (6, 10): "morning meme lover ☀️",
+            (10, 14): "daytime procrastinator 💼",
+            (14, 18): "afternoon meme addict 🍕",
+            (18, 22): "evening meme connoisseur 🌆",
+            (22, 24): "midnight scroller 🦉",
+        }
+        default_label = "meme lover"
     label = next(
         (v for (lo, hi), v in labels.items() if lo <= hour < hi),
-        "мемоман",
+        default_label,
     )
     tz_label = "МСК" if is_ru else "UTC"
     return {"hour": hour, "label": label, "tz": tz_label}
@@ -306,42 +351,67 @@ async def handle_wrapped(
         language_code=update.effective_user.language_code,
     )
 
-    if not await check_if_user_chat_member(
+    user_lang = update.effective_user.language_code or "en"
+    if not await check_if_user_follows_related_channel(
         context.bot,
         user_id,
-        TELEGRAM_CHANNEL_RU_CHAT_ID,
+        user_lang,
     ):
-        return await update.message.reply_text(
-            f"Статистика доступна только подписчикам нашего канала 😉\n\n"
-            f"Подпишись:\n{TELEGRAM_CHANNEL_RU_LINK}"
-        )
+        channel_link = get_related_channel_link(user_lang)
+        if user_lang in ALMOST_CIS_LANGUAGES:
+            msg = (
+                f"Статистика доступна только подписчикам нашего канала 😉\n\n"
+                f"Подпишись:\n{channel_link}"
+            )
+        else:
+            msg = (
+                f"Stats are available for channel subscribers only 😉\n\n"
+                f"Subscribe:\n{channel_link}"
+            )
+        return await update.message.reply_text(msg)
+
+    is_ru = _is_ru(user_lang)
 
     cached = await get_user_wrapped(user_id)
     if cached and not cached.get("lock"):
         return await handle_wrapped_button(update, context)
     if cached and cached.get("lock"):
-        return await update.message.reply_text(
+        msg = (
             "⏳ Уже генерирую твой Wrapped... подожди пару секунд!"
+            if is_ru
+            else "⏳ Already generating your Wrapped... hold on!"
         )
+        return await update.message.reply_text(msg)
 
     # Check conditions BEFORE showing welcome
     user_stats_data = await get_user_stats(user_id)
     if not user_stats_data:
-        return await update.message.reply_text("Маловато ты пользовался ботом 😅 /start")
+        msg = (
+            "Маловато ты пользовался ботом 😅 /start"
+            if is_ru
+            else "You haven't used the bot enough yet 😅 /start"
+        )
+        return await update.message.reply_text(msg)
     nmemes_sent = user_stats_data.get("nmemes_sent", 0)
     if nmemes_sent < WRAPPED_MIN_REACTIONS:
         remaining = WRAPPED_MIN_REACTIONS - nmemes_sent
-        return await update.message.reply_text(
+        msg = (
             f"Посмотри ещё {remaining} мемов и возвращайся! /start"
+            if is_ru
+            else f"Check out {remaining} more memes and come back! /start"
         )
+        return await update.message.reply_text(msg)
     descriptions = await get_meme_descriptions_for_wrapped(
         user_id,
         limit=40,
     )
     if len(descriptions) < WRAPPED_MIN_DESCRIPTIONS:
-        return await update.message.reply_text(
-            "Мы ещё анализируем твои мемы... 🔬\n" "Попробуй через пару часов! /start"
+        msg = (
+            "Мы ещё анализируем твои мемы... 🔬\nПопробуй через пару часов! /start"
+            if is_ru
+            else "We're still analyzing your memes... 🔬\nTry again in a couple of hours! /start"
         )
+        return await update.message.reply_text(msg)
 
     # ── START DEEPSEEK EARLY (while user reads welcome) ──
     user = await get_user_by_id(user_id)
@@ -363,19 +433,20 @@ async def handle_wrapped(
     )
 
     # Welcome message
+    if is_ru:
+        welcome_text = (
+            "🎁 Мы подготовили глубокий анализ твоего чувства юмора.\n\nХочешь посмотреть?"
+        )
+        welcome_btn = "ПОСМОТРЕТЬ 🔮"
+    else:
+        welcome_text = (
+            "🎁 We've prepared a deep analysis of your sense of humor.\n\nWant to see it?"
+        )
+        welcome_btn = "LET'S GO 🔮"
     await update.effective_chat.send_message(
-        text=(
-            "🎁 Мы подготовили глубокий анализ " "твоего чувства юмора.\n\n" "Хочешь посмотреть?"
-        ),
+        text=welcome_text,
         reply_markup=InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton(
-                        "ПОСМОТРЕТЬ 🔮",
-                        callback_data="wrapped_go",
-                    ),
-                ]
-            ]
+            [[InlineKeyboardButton(welcome_btn, callback_data="wrapped_go")]]
         ),
     )
 
@@ -403,6 +474,7 @@ async def handle_wrapped_go(
         return await handle_wrapped_button(update, context)
 
     # Still generating — edit the button message with loading text
+    is_ru = _is_ru(update.effective_user.language_code)
     if cached and cached.get("lock"):
         stats = cached.get("stats_report")
         if stats and update.callback_query:
@@ -411,14 +483,7 @@ async def handle_wrapped_go(
                     text=stats,
                     parse_mode="HTML",
                     reply_markup=InlineKeyboardMarkup(
-                        [
-                            [
-                                InlineKeyboardButton(
-                                    "Дальше →",
-                                    callback_data="wrapped_1",
-                                )
-                            ]
-                        ]
+                        [[InlineKeyboardButton(_next_label(is_ru), callback_data="wrapped_1")]]
                     ),
                 )
             except Exception:
@@ -426,20 +491,11 @@ async def handle_wrapped_go(
             return
         # Still no stats — edit existing message
         if update.callback_query:
-            msg_text = random.choice(LOADING_MESSAGES)
-            btn_text = random.choice(LOADING_BUTTONS)
             try:
                 await update.callback_query.message.edit_text(
-                    text=msg_text,
+                    text=_loading_msg(is_ru),
                     reply_markup=InlineKeyboardMarkup(
-                        [
-                            [
-                                InlineKeyboardButton(
-                                    btn_text,
-                                    callback_data="wrapped_1",
-                                )
-                            ]
-                        ]
+                        [[InlineKeyboardButton(_loading_btn(is_ru), callback_data="wrapped_1")]]
                     ),
                 )
             except Exception:
@@ -447,7 +503,8 @@ async def handle_wrapped_go(
         return
 
     # No cache at all — shouldn't happen, but handle gracefully
-    await update.effective_chat.send_message("Попробуй /wrapped ещё раз")
+    msg = "Попробуй /wrapped ещё раз" if is_ru else "Try /wrapped again"
+    await update.effective_chat.send_message(msg)
 
 
 async def _generate_and_cache(
@@ -499,22 +556,20 @@ async def handle_wrapped_button(
         _log(f"no cache for {user_id}")
         return
 
+    is_ru = _is_ru(update.effective_user.language_code)
     if uw.get("lock"):
         _log(f"lock active for {user_id}, editing message")
         if update.callback_query:
             await update.callback_query.answer()
             # EDIT existing message instead of sending new one
-            msg_text = random.choice(LOADING_MESSAGES)
-            btn_text = random.choice(LOADING_BUTTONS)
             try:
                 await update.callback_query.message.edit_text(
-                    text=msg_text,
+                    text=_loading_msg(is_ru),
                     reply_markup=InlineKeyboardMarkup(
                         [
                             [
                                 InlineKeyboardButton(
-                                    btn_text,
-                                    callback_data=update.callback_query.data,
+                                    _loading_btn(is_ru), callback_data=update.callback_query.data
                                 )
                             ]
                         ]
@@ -584,13 +639,14 @@ async def _show_slide(
     user_id: int,
 ) -> None:
     """Send a single slide. Extracted for error isolation."""
+    ru = _is_ru(update.effective_user.language_code)
 
     # ── Slide 0: Stats ──
     if key == 0:
         await update.effective_chat.send_message(
             text=uw.get("stats_report", "📊"),
             parse_mode="HTML",
-            reply_markup=_next_btn("wrapped_1"),
+            reply_markup=_next_btn("wrapped_1", ru),
         )
 
     # ── Slide 1: Zodiac ──
@@ -601,7 +657,7 @@ async def _show_slide(
                 await update.effective_chat.send_message(
                     text=txt,
                     parse_mode="HTML",
-                    reply_markup=_next_btn("wrapped_2"),
+                    reply_markup=_next_btn("wrapped_2", ru),
                 )
             except Exception as e:
                 _log(f"zodiac slide error: {e}")
@@ -627,7 +683,7 @@ async def _show_slide(
                         context.bot,
                         user_id,
                         meme,
-                        reply_markup=_next_btn("wrapped_3"),
+                        reply_markup=_next_btn("wrapped_3", ru),
                     )
                     sent = True
         except Exception as e:
@@ -643,7 +699,7 @@ async def _show_slide(
                 await update.effective_chat.send_message(
                     text=txt,
                     parse_mode="HTML",
-                    reply_markup=_next_btn("wrapped_4"),
+                    reply_markup=_next_btn("wrapped_4", ru),
                 )
             except Exception as e:
                 _log(f"humor dna error: {e}")
@@ -660,7 +716,12 @@ async def _show_slide(
             try:
                 md = await get_meme_by_id(meme_id)
                 if md and md.get("telegram_file_id"):
-                    caption = f"👀 <b>Твой юмор одной фразой:</b>\n\n<i>{html_escape(oneliner)}</i>"
+                    header = (
+                        "👀 <b>Твой юмор одной фразой:</b>"
+                        if ru
+                        else "👀 <b>Your humor in one line:</b>"
+                    )
+                    caption = f"{header}\n\n<i>{html_escape(oneliner)}</i>"
                     meme = MemeData(
                         id=md["id"],
                         type=md["type"],
@@ -671,14 +732,17 @@ async def _show_slide(
                         context.bot,
                         user_id,
                         meme,
-                        reply_markup=_next_btn("wrapped_5"),
+                        reply_markup=_next_btn("wrapped_5", ru),
                     )
                     sent = True
             except Exception as e:
                 _log(f"oneliner slide error: {e}")
         if not sent and oneliner:
+            header = (
+                "👀 <b>Твой юмор одной фразой:</b>" if ru else "👀 <b>Your humor in one line:</b>"
+            )
             await update.effective_chat.send_message(
-                text=f"👀 <b>Твой юмор одной фразой:</b>\n\n<i>{html_escape(oneliner)}</i>",
+                text=f"{header}\n\n<i>{html_escape(oneliner)}</i>",
                 parse_mode="HTML",
                 reply_markup=_next_btn("wrapped_5"),
             )
@@ -694,9 +758,12 @@ async def _show_slide(
             cat = html_escape(item.get("category", "?"))
             thing = html_escape(item.get("thing", "?"))
             why = html_escape(item.get("why", ""))
-            caption = f"🎰 <b>Если бы ты был — {cat}:</b>\n\n<b>{thing}</b>\n<i>{why}</i>"
+            if ru:
+                caption = f"🎰 <b>Если бы ты был — {cat}:</b>\n\n<b>{thing}</b>\n<i>{why}</i>"
+            else:
+                caption = f"🎰 <b>If you were a {cat}:</b>\n\n<b>{thing}</b>\n<i>{why}</i>"
             mid = item.get("meme_id")
-            markup = _next_btn("wrapped_6") if is_last else None
+            markup = _next_btn("wrapped_6", ru) if is_last else None
             if mid:
                 try:
                     md = await get_meme_by_id(mid)
@@ -742,7 +809,7 @@ async def _show_slide(
                 await update.effective_chat.send_message(
                     text=txt,
                     parse_mode="HTML",
-                    reply_markup=_next_btn("wrapped_7"),
+                    reply_markup=_next_btn("wrapped_7", ru),
                 )
             except Exception as e:
                 _log(f"anti slide error: {e}")
@@ -770,7 +837,7 @@ async def _show_slide(
                             context.bot,
                             user_id,
                             meme,
-                            reply_markup=_next_btn("wrapped_8"),
+                            reply_markup=_next_btn("wrapped_8", ru),
                         )
                         sent = True
                 except Exception as e:
@@ -787,7 +854,14 @@ async def _show_slide(
                     text=txt,
                     parse_mode="HTML",
                     reply_markup=InlineKeyboardMarkup(
-                        [[InlineKeyboardButton("Финалочка →", callback_data="wrapped_9")]]
+                        [
+                            [
+                                InlineKeyboardButton(
+                                    "Финалочка →" if ru else "The finale →",
+                                    callback_data="wrapped_9",
+                                )
+                            ]
+                        ]
                     ),
                 )
             except Exception as e:
@@ -800,32 +874,37 @@ async def _show_slide(
     if key == 9:
         pred = uw.get("prediction", "")
         share_url = "https://t.me/ffmemesbot?start=wrapped"
-        share_text = "Глубокий анализ чувства юмора 🔮"
-        share_link = f"https://t.me/share/url?url={quote(share_url)}&text={quote(share_text)}"
-        await update.effective_chat.send_message(
-            text=(
+        if ru:
+            share_text = "Глубокий анализ чувства юмора 🔮"
+            finale_text = (
                 "🔮 <b>Предсказание на лето 2026:</b>\n\n"
                 f"<i>{html_escape(pred)}</i>\n\n"
                 "❤️ Спасибо за то, что пользуешься ботом.\n\n"
                 "Перешли ссылку другу — пусть тоже узнает "
                 "свой мем-профиль 👇"
-            ),
+            )
+            share_btn = "📤 Отправить другу"
+        else:
+            share_text = "Deep analysis of your sense of humor 🔮"
+            finale_text = (
+                "🔮 <b>Prediction for summer 2026:</b>\n\n"
+                f"<i>{html_escape(pred)}</i>\n\n"
+                "❤️ Thanks for using the bot.\n\n"
+                "Share the link with a friend — let them discover "
+                "their meme profile too 👇"
+            )
+            share_btn = "📤 Share with a friend"
+        share_link = f"https://t.me/share/url?url={quote(share_url)}&text={quote(share_text)}"
+        await update.effective_chat.send_message(
+            text=finale_text,
             parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup(
-                [
-                    [
-                        InlineKeyboardButton(
-                            "📤 Отправить другу",
-                            url=share_link,
-                        )
-                    ]
-                ]
-            ),
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(share_btn, url=share_link)]]),
         )
 
 
-def _next_btn(callback: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton("Дальше →", callback_data=callback)]])
+def _next_btn(callback: str, is_ru: bool = True) -> InlineKeyboardMarkup:
+    label = "Дальше →" if is_ru else "Next →"
+    return InlineKeyboardMarkup([[InlineKeyboardButton(label, callback_data=callback)]])
 
 
 async def handle_wrapped_clear(
@@ -870,7 +949,7 @@ async def generate_wrapped_data(
         )
 
         # DeepSeek + SQL in parallel
-        is_ru = lang == "ru"
+        is_ru = _is_ru(lang)
         prompt = _build_mega_prompt(liked_texts, disliked_texts, lang)
 
         deepseek_task = asyncio.create_task(call_deepseek(prompt))
@@ -878,7 +957,7 @@ async def generate_wrapped_data(
             _safe(get_reaction_speed_insight(user_id)),
             _safe(get_peak_hour_insight(user_id, is_ru)),
             _safe(get_surprise_meme(user_id)),
-            _safe(_build_sources_report(user_id)),
+            _safe(_build_sources_report(user_id, is_ru)),
             _safe(get_most_popular_liked_meme(user_id)),
             _safe(get_unpopular_opinion_meme(user_id)),
         )
@@ -901,16 +980,15 @@ async def generate_wrapped_data(
         # Use surprise meme if LLM didn't pick one
         if not your_meme and surprise:
             lr = surprise.get("global_lr_pct", "?")
-            your_meme = {
-                "meme_id": surprise["meme_id"],
-                "caption": (f"🎲 Этот мем лайкнул только ты\n" f"(глобальный лайк-рейт: {lr}%)"),
-            }
+            if is_ru:
+                cap = f"🎲 Этот мем лайкнул только ты\n(глобальный лайк-рейт: {lr}%)"
+            else:
+                cap = f"🎲 Only you liked this meme\n(global like rate: {lr}%)"
+            your_meme = {"meme_id": surprise["meme_id"], "caption": cap}
         if not your_meme and liked:
             pick = random.choice(liked[:10])
-            your_meme = {
-                "meme_id": pick["meme_id"],
-                "caption": "🎲 А вот мем, который тебе зашёл:",
-            }
+            cap = "🎲 А вот мем, который тебе зашёл:" if is_ru else "🎲 Here's a meme you liked:"
+            your_meme = {"meme_id": pick["meme_id"], "caption": cap}
 
         # Build slides
         # Stats report gets vibe from DeepSeek — replace placeholder vibe
@@ -924,25 +1002,32 @@ async def generate_wrapped_data(
         # Pick random liked memes for absurd comparisons
         absurd_memes = _attach_memes_to_absurd(p, liked)
 
+        default_prediction = (
+            "Летом ты будешь листать мемы вместо работы 🔥"
+            if is_ru
+            else "This summer you'll scroll memes instead of working 🔥"
+        )
         return {
             "stats_report": stats_report,
-            "zodiac": _build_zodiac_slide(p),
+            "zodiac": _build_zodiac_slide(p, is_ru),
             "your_meme": your_meme,
-            "humor_dna": _build_humor_dna_slide(p),
+            "humor_dna": _build_humor_dna_slide(p, is_ru),
             "humor_oneliner": p.get("humor_oneliner", ""),
             "oneliner_meme_id": random.choice(liked[:10])["meme_id"] if liked else None,
             "absurd_items": absurd_memes,
-            "anti_profile": _build_anti_slide(p),
-            "popular_meme": _build_meme_data(popular_meme, is_popular=True),
-            "unpopular_meme": _build_meme_data(unpopular_meme, is_popular=False),
-            "stats_extra": _build_extra_slide(sources, speed, peak),
-            "prediction": p.get(
-                "prediction",
-                "Летом ты будешь листать мемы вместо работы 🔥",
-            ),
+            "anti_profile": _build_anti_slide(p, is_ru),
+            "popular_meme": _build_meme_data(popular_meme, is_popular=True, is_ru=is_ru),
+            "unpopular_meme": _build_meme_data(unpopular_meme, is_popular=False, is_ru=is_ru),
+            "stats_extra": _build_extra_slide(sources, speed, peak, is_ru),
+            "prediction": p.get("prediction", default_prediction),
         }
     except Exception as e:
         logger.error("Wrapped failed user %d: %s", user_id, e, exc_info=True)
+        default_prediction = (
+            "Летом ты будешь листать мемы вместо работы 🔥"
+            if is_ru
+            else "This summer you'll scroll memes instead of working 🔥"
+        )
         return {
             "stats_report": stats_report,
             "zodiac": "",
@@ -955,7 +1040,7 @@ async def generate_wrapped_data(
             "popular_meme": None,
             "unpopular_meme": None,
             "stats_extra": "",
-            "prediction": "Летом ты будешь листать мемы вместо работы 🔥",
+            "prediction": default_prediction,
         }
 
 
@@ -1047,7 +1132,7 @@ def _pick_meme(p: dict, liked: list) -> dict | None:
     return None
 
 
-def _build_humor_dna_slide(p: dict) -> str:
+def _build_humor_dna_slide(p: dict, is_ru: bool = True) -> str:
     """Humor DNA bars only — no roast text."""
     dna = p.get("humor_dna", [])
 
@@ -1055,7 +1140,8 @@ def _build_humor_dna_slide(p: dict) -> str:
         f = round(pct / 10)
         return "█" * f + "░" * (10 - f)
 
-    lines = ["🧬 <b>Твоя ДНК юмора:</b>\n"]
+    header = "🧬 <b>Твоя ДНК юмора:</b>" if is_ru else "🧬 <b>Your Humor DNA:</b>"
+    lines = [header + "\n"]
     for c in dna[:5]:
         pct = min(100, max(0, c.get("pct", 33)))
         lines.append(f"{bar(pct)} {pct}%\n{html_escape(c.get('name', '???'))}\n")
@@ -1063,16 +1149,13 @@ def _build_humor_dna_slide(p: dict) -> str:
     return "\n".join(lines) if len(lines) > 1 else ""
 
 
-def _build_zodiac_slide(p: dict) -> str:
+def _build_zodiac_slide(p: dict, is_ru: bool = True) -> str:
     sign = p.get("zodiac_sign", "")
     why = p.get("zodiac_why", "")
     if not sign:
         return ""
-    return (
-        f"🔮 <b>Твой мем-зодиак:</b>\n\n"
-        f"<b>{html_escape(sign)}</b>\n\n"
-        f"<i>{html_escape(why)}</i>"
-    )
+    header = "🔮 <b>Твой мем-зодиак:</b>" if is_ru else "🔮 <b>Your Meme Zodiac:</b>"
+    return f"{header}\n\n" f"<b>{html_escape(sign)}</b>\n\n" f"<i>{html_escape(why)}</i>"
 
 
 def _attach_memes_to_absurd(p: dict, liked: list) -> list:
@@ -1105,31 +1188,43 @@ def _attach_memes_to_absurd(p: dict, liked: list) -> list:
     return result
 
 
-def _build_meme_data(meme: dict | None, is_popular: bool) -> dict | None:
+def _build_meme_data(meme: dict | None, is_popular: bool, is_ru: bool = True) -> dict | None:
     if not meme:
         return None
     lr = meme.get("global_lr_pct", "?")
     nlikes = meme.get("nlikes")
     if is_popular:
-        extra = f" ({nlikes} чел.)" if nlikes else ""
-        caption = f"🏆 Самый залайканный мем из твоих лайков!\n\nЕго лайкнули {lr}%{extra}"
+        if is_ru:
+            extra = f" ({nlikes} чел.)" if nlikes else ""
+            caption = f"🏆 Самый залайканный мем из твоих лайков!\n\nЕго лайкнули {lr}%{extra}"
+        else:
+            extra = f" ({nlikes} people)" if nlikes else ""
+            caption = f"🏆 The most liked meme from your likes!\n\nLiked by {lr}%{extra}"
     else:
-        extra = f" ({nlikes} чел.)" if nlikes else ""
-        caption = f"🤔 А этот мем ты скипнул...\n\nХотя его лайкнули {lr}%{extra}!"
+        if is_ru:
+            extra = f" ({nlikes} чел.)" if nlikes else ""
+            caption = f"🤔 А этот мем ты скипнул...\n\nХотя его лайкнули {lr}%{extra}!"
+        else:
+            extra = f" ({nlikes} people)" if nlikes else ""
+            caption = f"🤔 You skipped this one...\n\nBut {lr}%{extra} liked it!"
     return {"meme_id": meme["meme_id"], "caption": caption}
 
 
-def _build_anti_slide(p: dict) -> str:
+def _build_anti_slide(p: dict, is_ru: bool = True) -> str:
     anti = p.get("anti_profile", "")
     if not anti:
         return ""
-    return f"🚫 <b>Что говорят твои скипы:</b>\n\n{html_escape(anti)}"
+    header = (
+        "🚫 <b>Что говорят твои скипы:</b>" if is_ru else "🚫 <b>What your skips say about you:</b>"
+    )
+    return f"{header}\n\n{html_escape(anti)}"
 
 
 def _build_extra_slide(
     sources: str,
     speed: dict,
     peak: dict,
+    is_ru: bool = True,
 ) -> str:
     parts = []
     if sources:
@@ -1139,20 +1234,27 @@ def _build_extra_slide(
         med = speed.get("median_sec", 0)
         ml = speed.get("median_like", 0)
         md = speed.get("median_dislike", 0)
-        parts.append(
-            f"⚡ <b>Скорость реакции:</b> {med} сек\n" f"(до лайка: {ml} сек, до скипа: {md} сек)"
-        )
+        if is_ru:
+            parts.append(
+                f"⚡ <b>Скорость реакции:</b> {med} сек\n"
+                f"(до лайка: {ml} сек, до скипа: {md} сек)"
+            )
+        else:
+            parts.append(f"⚡ <b>Reaction speed:</b> {med}s\n" f"(to like: {ml}s, to skip: {md}s)")
 
     if peak:
         h = peak.get("hour", 0)
         label = peak.get("label", "")
         tz = peak.get("tz", "")
-        parts.append(f"🕐 <b>Пик активности:</b> {h}:00 {tz}\n" f"Ты — {label}")
+        if is_ru:
+            parts.append(f"🕐 <b>Пик активности:</b> {h}:00 {tz}\nТы — {label}")
+        else:
+            parts.append(f"🕐 <b>Peak activity:</b> {h}:00 {tz}\nYou're a {label}")
 
     return "\n\n".join(parts) if parts else ""
 
 
-async def _build_sources_report(user_id: int) -> str:
+async def _build_sources_report(user_id: int, is_ru: bool = True) -> str:
     sources = await get_most_liked_meme_source_urls(user_id, limit=10)
     real = [
         s
@@ -1178,7 +1280,8 @@ async def _build_sources_report(user_id: int) -> str:
     if not real:
         return ""
     src_list = "\n".join(f"▪️ {s['url']}" for s in real[:3])
-    return f"📡 <b>Твои топ мем-паблики:</b>\n\n{src_list}"
+    header = "📡 <b>Твои топ мем-паблики:</b>" if is_ru else "📡 <b>Your top meme channels:</b>"
+    return f"{header}\n\n{src_list}"
 
 
 # ── STATS SLIDE ──────────────────────────────────────────
@@ -1204,34 +1307,59 @@ async def get_bot_usage_report(
 
     like_rate = round(100 * likes / max(memes_sent, 1))
 
-    report = (
-        "📊 <b>Meme Wrapped 2026</b>\n\n"
-        "Начнём с цифр.\n\n"
-        f"Ты с нами уже <b>{days}</b> дней.\n\n"
-        f"🤝 Посмотрел <b>{memes_sent}</b> мемов\n"
-        f"👍 Лайкнул <b>{likes}</b> из них "
-        f"(<b>{like_rate}%</b>)\n"
-        f"👋 Заходил <b>{sessions}</b> раз\n"
-    )
-
-    if time_sec > 0:
-        if time_sec < 60:
-            t = f"{time_sec} сек"
-        elif time_sec < 3600:
-            t = f"{time_sec // 60} мин {time_sec % 60} сек"
+    if is_ru:
+        report = (
+            "📊 <b>Meme Wrapped 2026</b>\n\n"
+            "Начнём с цифр.\n\n"
+            f"Ты с нами уже <b>{days}</b> дней.\n\n"
+            f"🤝 Посмотрел <b>{memes_sent}</b> мемов\n"
+            f"👍 Лайкнул <b>{likes}</b> из них "
+            f"(<b>{like_rate}%</b>)\n"
+            f"👋 Заходил <b>{sessions}</b> раз\n"
+        )
+        if time_sec > 0:
+            if time_sec < 60:
+                t = f"{time_sec} сек"
+            elif time_sec < 3600:
+                t = f"{time_sec // 60} мин {time_sec % 60} сек"
+            else:
+                t = f"больше {time_sec // 3600} часов 😳"
+            report += f"🕒 В боте <b>{t}</b>\n"
+        if like_rate > 50:
+            vibe = "Лайкаешь больше половины — тебе всё смешно 😄"
+        elif like_rate > 30:
+            vibe = "Лайкаешь каждый третий — у тебя есть вкус 👌"
+        elif like_rate > 15:
+            vibe = "Лайкаешь каждый пятый — избирательный 🧐"
         else:
-            t = f"больше {time_sec // 3600} часов 😳"
-        report += f"🕒 В боте <b>{t}</b>\n"
-
-    # Placeholder vibe — will be replaced by DeepSeek output
-    if like_rate > 50:
-        vibe = "Лайкаешь больше половины — тебе всё смешно 😄"
-    elif like_rate > 30:
-        vibe = "Лайкаешь каждый третий — у тебя есть вкус 👌"
-    elif like_rate > 15:
-        vibe = "Лайкаешь каждый пятый — избирательный 🧐"
+            vibe = "Менее 15% мемов достойны — мем-сноб 🎩"
     else:
-        vibe = "Менее 15% мемов достойны — мем-сноб 🎩"
+        report = (
+            "📊 <b>Meme Wrapped 2026</b>\n\n"
+            "Let's start with the numbers.\n\n"
+            f"You've been with us for <b>{days}</b> days.\n\n"
+            f"🤝 Seen <b>{memes_sent}</b> memes\n"
+            f"👍 Liked <b>{likes}</b> of them "
+            f"(<b>{like_rate}%</b>)\n"
+            f"👋 Visited <b>{sessions}</b> times\n"
+        )
+        if time_sec > 0:
+            if time_sec < 60:
+                t = f"{time_sec}s"
+            elif time_sec < 3600:
+                t = f"{time_sec // 60}m {time_sec % 60}s"
+            else:
+                t = f"over {time_sec // 3600} hours 😳"
+            report += f"🕒 Time in bot: <b>{t}</b>\n"
+        if like_rate > 50:
+            vibe = "You like more than half — everything's funny to you 😄"
+        elif like_rate > 30:
+            vibe = "You like every third one — you've got taste 👌"
+        elif like_rate > 15:
+            vibe = "You like every fifth one — picky 🧐"
+        else:
+            vibe = "Less than 15% are worthy — meme snob 🎩"
+
     report += f"\n<i>{vibe}</i>"
     return report
 

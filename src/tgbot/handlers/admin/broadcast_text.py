@@ -62,4 +62,4 @@ async def handle_broadcast_text_ru_trigger(
             print(f"Failed to send message to {user_id}: {e}")
             # TODO: proper hanlder & logging
 
-        asyncio.sleep(1)
+        await asyncio.sleep(1)
