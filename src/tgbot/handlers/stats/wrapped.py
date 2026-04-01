@@ -5,6 +5,7 @@ import logging
 import random
 import sys
 from html import escape as html_escape
+from urllib.parse import quote
 
 from openai import AsyncOpenAI
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -536,8 +537,8 @@ async def handle_wrapped_button(
 
     _log(f"user={user_id} key={key}")
 
-    # Delete the loading/button message before showing results
-    if update.callback_query:
+    # Delete only the welcome/loading message (slide 0 transition)
+    if update.callback_query and key == 0:
         try:
             await update.callback_query.message.delete()
         except Exception:
@@ -794,6 +795,9 @@ async def _show_slide(
     # ── Slide 9: Prediction + referral ──
     if key == 9:
         pred = uw.get("prediction", "")
+        share_url = "https://t.me/ffmemesbot?start=wrapped"
+        share_text = "Узнай свой мем-профиль и предсказание на 2026! 🔮"
+        share_link = f"https://t.me/share/url?url={quote(share_url)}&text={quote(share_text)}"
         await update.effective_chat.send_message(
             text=(
                 "🔮 <b>Предсказание на лето 2026:</b>\n\n"
@@ -808,7 +812,7 @@ async def _show_slide(
                     [
                         InlineKeyboardButton(
                             "📤 Отправить другу",
-                            url="https://t.me/ffmemesbot?start=wrapped",
+                            url=share_link,
                         )
                     ]
                 ]
