@@ -39,7 +39,6 @@ async def calculate_meme_reactions_and_engagement(
             SELECT DISTINCT meme_id
             FROM user_meme_reaction
             WHERE reacted_at > NOW() - :lookback_hours * INTERVAL '1 hour'
-               OR sent_at > NOW() - :lookback_hours * INTERVAL '1 hour'
         ),
 
         BASE_REACTIONS AS (
