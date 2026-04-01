@@ -51,7 +51,7 @@ if settings.ENVIRONMENT == Environment.TESTING:
     _engine_kwargs["poolclass"] = NullPool
 else:
     _engine_kwargs.update(
-        max_overflow=20,
+        max_overflow=settings.DATABASE_POOL_MAX_OVERFLOW,
         pool_size=settings.DATABASE_POOL_SIZE,
         pool_recycle=settings.DATABASE_POOL_TTL,
         pool_pre_ping=settings.DATABASE_POOL_PRE_PING,

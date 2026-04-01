@@ -11,7 +11,8 @@ class Config(BaseSettings):
     DATABASE_POOL_SIZE: int = 20
     DATABASE_POOL_TTL: int = 60 * 20  # 20 minutes
     DATABASE_POOL_PRE_PING: bool = True
-    DATABASE_POOL_TIMEOUT: int = 5  # seconds; keep low to fail fast on pool exhaustion
+    DATABASE_POOL_TIMEOUT: int = 15  # seconds; wait up to 15s for a free connection before failing
+    DATABASE_POOL_MAX_OVERFLOW: int = 20
 
     REDIS_URL: RedisDsn
     REDIS_HEALTH_CHECK_INTERVAL: int = 30
