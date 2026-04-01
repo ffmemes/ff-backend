@@ -37,6 +37,8 @@ NOTE: we will not see messages without this command
 
 async def handle_feedback_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_text = update.message.text
+    if not reply_text:
+        return  # Admin sent a non-text message (sticker, voice, etc.) — can't forward
     header, _ = update.message.reply_to_message.text.split("\n", 1)
     user_id, message_id = header.split(":")
 
