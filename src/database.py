@@ -20,10 +20,12 @@ from sqlalchemy import (
     Table,
     UniqueConstraint,
     Update,
+    event,
     func,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -57,6 +59,30 @@ else:
     )
 
 engine = create_async_engine(DATABASE_URL, **_engine_kwargs)
+
+
+@event.listens_for(engine.sync_engine, "handle_error")
+def _mark_stale_connection_as_disconnect(context: object) -> None:
+    """Tell SQLAlchemy to invalidate pool connections that asyncpg reports as closed.
+
+    pool_pre_ping catches most stale connections, but a race is possible: the server
+    closes the connection between the ping and the actual query.  When that happens
+    asyncpg raises ConnectionDoesNotExistError (a subclass of InterfaceError).
+    Marking it as a disconnect causes the pool to discard that connection so it is
+    never handed out again.
+    """
+    original = getattr(context, "original_exception", None)
+    if original is not None and type(original).__name__ == "ConnectionDoesNotExistError":
+        context.is_disconnect = True  # type: ignore[union-attr]
+
+
+def _is_stale_connection_error(exc: BaseException) -> bool:
+    return (
+        isinstance(exc, DBAPIError)
+        and exc.__cause__ is not None
+        and type(exc.__cause__).__name__ == "ConnectionDoesNotExistError"
+    )
+
 
 metadata = MetaData(naming_convention=DB_NAMING_CONVENTION)
 
@@ -507,6 +533,16 @@ async def fetch_one(
     select_query: Select | Insert | Update,
     params: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
+    try:
+        async with engine.begin() as conn:
+            cursor: CursorResult = await conn.execute(select_query, params or {})
+            row = cursor.first()
+            return row._asdict() if row is not None else None
+    except Exception as exc:
+        if not _is_stale_connection_error(exc):
+            raise
+    # Retry once — pool_pre_ping catches most stale connections, but a race can
+    # still return a connection that Postgres closed between the ping and the query.
     async with engine.begin() as conn:
         cursor: CursorResult = await conn.execute(select_query, params or {})
         row = cursor.first()
@@ -517,6 +553,13 @@ async def fetch_all(
     select_query: Select | Insert | Update,
     params: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
+    try:
+        async with engine.begin() as conn:
+            cursor: CursorResult = await conn.execute(select_query, params or {})
+            return [r._asdict() for r in cursor.all()]
+    except Exception as exc:
+        if not _is_stale_connection_error(exc):
+            raise
     async with engine.begin() as conn:
         cursor: CursorResult = await conn.execute(select_query, params or {})
         return [r._asdict() for r in cursor.all()]
@@ -526,5 +569,11 @@ async def execute(
     select_query: Insert | Update,
     params: dict[str, Any] | None = None,
 ) -> CursorResult:
+    try:
+        async with engine.begin() as conn:
+            return await conn.execute(select_query, params or {})
+    except Exception as exc:
+        if not _is_stale_connection_error(exc):
+            raise
     async with engine.begin() as conn:
         return await conn.execute(select_query, params or {})
