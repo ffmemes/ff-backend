@@ -2,6 +2,7 @@ import asyncio
 import logging
 
 from sqlalchemy import text
+from telegram.error import Forbidden, RetryAfter
 
 from src.database import execute, fetch_all
 from src.redis import redis_client
@@ -191,28 +192,27 @@ async def send_broadcast(
             if sent % 100 == 0:
                 print(f"  sent:{sent} blocked:{blocked} failed:{failed} skipped:{skipped}")
 
-        except Exception as e:
-            err = str(e).lower()
-            if "blocked" in err or "deactivated" in err or "not found" in err:
-                blocked += 1
+        except Forbidden:
+            blocked += 1
+            await redis_client.sadd(redis_key, str(user_id))
+            await execute(
+                text("UPDATE \"user\" SET type = 'blocked_bot' WHERE id = :uid"),
+                {"uid": user_id},
+            )
+        except RetryAfter as e:
+            sleep_for = e.retry_after + 1
+            print(f"  rate limited, sleeping {sleep_for}s...")
+            await asyncio.sleep(sleep_for)
+            try:
+                await bot.send_message(chat_id=user_id, text=message)
+                sent += 1
                 await redis_client.sadd(redis_key, str(user_id))
-                await execute(
-                    text("UPDATE \"user\" SET type = 'blocked_bot' WHERE id = :uid"),
-                    {"uid": user_id},
-                )
-            elif "too many requests" in err or "retry after" in err:
-                print("  rate limited, sleeping 10s...")
-                await asyncio.sleep(10)
-                try:
-                    await bot.send_message(chat_id=user_id, text=message)
-                    sent += 1
-                    await redis_client.sadd(redis_key, str(user_id))
-                except Exception:
-                    failed += 1
-            else:
+            except Exception:
                 failed += 1
-                if failed <= 10:
-                    logger.warning("Broadcast %s error for %d: %s", broadcast_id, user_id, e)
+        except Exception as e:
+            failed += 1
+            if failed <= 10:
+                logger.warning("Broadcast %s error for %d: %s", broadcast_id, user_id, e)
 
         await asyncio.sleep(delay)
 
