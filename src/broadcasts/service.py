@@ -100,10 +100,21 @@ async def get_users_active_more_than_days_ago(
 
 
 async def get_all_non_blocked_users() -> list[dict]:
+    """Get all users with their bot content language (from user_language table).
+
+    Uses user_language (bot preference) over user_tg.language_code (Telegram app).
+    A user with Telegram in English but bot content in Russian gets language_code='ru'.
+    """
     return await fetch_all(
         text(
             """
-        SELECT u.id AS user_id, COALESCE(ut.language_code, 'en') AS language_code
+        SELECT u.id AS user_id,
+               COALESCE(
+                   (SELECT ul.language_code FROM user_language ul
+                    WHERE ul.user_id = u.id LIMIT 1),
+                   ut.language_code,
+                   'en'
+               ) AS language_code
         FROM "user" u
         LEFT JOIN user_tg ut ON ut.id = u.id
         WHERE u.type NOT IN ('waitlist', 'blocked_bot')
