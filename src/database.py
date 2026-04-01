@@ -447,7 +447,7 @@ user_deep_link_log = Table(
     metadata,
     Column("id", Integer, Identity(), primary_key=True),
     Column("user_id", BigInteger, ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
-    Column("deep_link", String),
+    Column("deep_link", String, index=True),
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
 )
 
