@@ -643,8 +643,9 @@ async def _show_slide(
 
     # ── Slide 0: Stats ──
     if key == 0:
+        txt = uw.get("stats_report") or "📊"
         await update.effective_chat.send_message(
-            text=uw.get("stats_report", "📊"),
+            text=txt,
             parse_mode="HTML",
             reply_markup=_next_btn("wrapped_1", ru),
         )
