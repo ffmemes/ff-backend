@@ -10,7 +10,13 @@ async def calculate_user_stats() -> None:
     Sole writer to user_stats — no concurrent access, no deadlock risk.
     """
     query = """
-        WITH EVENTS AS (
+        WITH RECENT_USER_IDS AS (
+            SELECT DISTINCT user_id
+            FROM user_meme_reaction
+            WHERE reacted_at > NOW() - INTERVAL '1 day'
+        ),
+
+        EVENTS AS (
             SELECT
                 *,
                 reacted_at - LAG(reacted_at)
@@ -25,6 +31,7 @@ async def calculate_user_stats() -> None:
                     IS NULL
                 THEN 1 ELSE 0 END AS is_new_session
             FROM user_meme_reaction
+            WHERE user_id IN (SELECT user_id FROM RECENT_USER_IDS)
         ),
 
         SESSION_IDS AS (

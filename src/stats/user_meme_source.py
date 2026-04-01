@@ -26,6 +26,11 @@ async def calculate_user_meme_source_stats() -> None:
         INNER JOIN meme M
             ON M.id = R.meme_id
         WHERE reaction_id IS NOT NULL
+            AND R.user_id IN (
+                SELECT DISTINCT user_id
+                FROM user_meme_reaction
+                WHERE reacted_at > NOW() - INTERVAL '7 days'
+            )
         GROUP BY 1,2
         ORDER BY 1,2
         ON CONFLICT (user_id, meme_source_id) DO

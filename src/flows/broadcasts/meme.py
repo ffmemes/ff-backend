@@ -27,8 +27,11 @@ async def broadcast_next_meme_to_users(user_ids: list[int]):
         await check_queue(user_id)
         meme = await get_next_meme_for_user(user_id)
         if meme:
-            await send_meme_to_user(bot, user_id, meme)
-            logger.info(f"Sent meme_id={meme.id} to #{user_id}")
+            try:
+                await send_meme_to_user(bot, user_id, meme)
+                logger.info(f"Sent meme_id={meme.id} to #{user_id}")
+            except Exception:
+                logger.warning(f"Failed to send meme to #{user_id}", exc_info=True)
             await asyncio.sleep(0.2)  # flood control
 
 

@@ -133,6 +133,7 @@ async def calculate_meme_reactions_and_engagement(
                 , NOW() AS updated_at
             FROM user_meme_reaction E
             INNER JOIN meme M ON M.id = E.meme_id
+            WHERE E.meme_id IN (SELECT meme_id FROM RECENT_MEME_IDS)
             GROUP BY 1
         )
 
