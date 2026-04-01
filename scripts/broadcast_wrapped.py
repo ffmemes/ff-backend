@@ -1,11 +1,12 @@
 """
-Broadcast wrapped notification to all qualified users.
+Broadcast wrapped notification to users.
 
 Run inside the app container:
     docker compose exec app python scripts/broadcast_wrapped.py
 
-Or with --dry-run to preview without sending:
-    docker compose exec app python scripts/broadcast_wrapped.py --dry-run
+Flags:
+    --dry-run     Preview without sending
+    --qualified   Only send to users who can complete wrapped now (default: all users)
 """
 
 import asyncio
@@ -17,11 +18,18 @@ from src.database import execute, fetch_all
 from src.localizer import ALMOST_CIS_LANGUAGES
 from src.tgbot.bot import bot
 
-# Only send to users who can actually complete wrapped:
-# - not blocked/waitlist
-# - active in last 90 days
-# - >=30 memes seen
-# - >=5 liked memes with OCR descriptions
+# All non-blocked users
+ALL_USERS_QUERY = text("""
+    SELECT
+        u.id AS user_id,
+        COALESCE(ut.language_code, 'en') AS language_code
+    FROM "user" u
+    LEFT JOIN user_tg ut ON ut.id = u.id
+    WHERE u.type NOT IN ('waitlist', 'blocked_bot')
+    ORDER BY u.last_active_at DESC
+""")
+
+# Only users who can complete wrapped right now
 QUALIFIED_USERS_QUERY = text("""
     SELECT
         us.user_id,
@@ -64,12 +72,17 @@ SEND_DELAY = 0.05  # 50ms between sends (~20/sec, well within TG limits)
 
 async def main():
     dry_run = "--dry-run" in sys.argv
+    qualified_only = "--qualified" in sys.argv
 
-    rows = await fetch_all(QUALIFIED_USERS_QUERY)
+    query = QUALIFIED_USERS_QUERY if qualified_only else ALL_USERS_QUERY
+    mode = "qualified only" if qualified_only else "all users"
+
+    rows = await fetch_all(query)
     ru_users = [r for r in rows if r["language_code"] in ALMOST_CIS_LANGUAGES]
     en_users = [r for r in rows if r["language_code"] not in ALMOST_CIS_LANGUAGES]
 
-    print(f"Qualified users: {len(rows)} total ({len(ru_users)} RU, {len(en_users)} EN)")
+    print(f"Mode: {mode}")
+    print(f"Target: {len(rows)} total ({len(ru_users)} RU, {len(en_users)} EN)")
 
     if dry_run:
         print("\n--- DRY RUN (no messages sent) ---")
@@ -87,20 +100,29 @@ async def main():
             try:
                 await bot.send_message(chat_id=user_id, text=message)
                 sent += 1
-                if sent % 50 == 0:
-                    print(f"  sent: {sent}, failed: {failed}, blocked: {blocked}")
+                if sent % 100 == 0:
+                    print(f"  sent: {sent}, blocked: {blocked}, failed: {failed}")
             except Exception as e:
                 err = str(e).lower()
                 if "blocked" in err or "deactivated" in err or "not found" in err:
                     blocked += 1
-                    # Mark user as blocked_bot
                     await execute(
                         text("UPDATE \"user\" SET type = 'blocked_bot' WHERE id = :uid"),
                         {"uid": user_id},
                     )
+                elif "too many requests" in err or "retry after" in err:
+                    # Telegram flood control — back off and retry
+                    print(f"  rate limited, sleeping 5s...")
+                    await asyncio.sleep(5)
+                    try:
+                        await bot.send_message(chat_id=user_id, text=message)
+                        sent += 1
+                    except Exception:
+                        failed += 1
                 else:
                     failed += 1
-                    print(f"  error for {user_id}: {e}")
+                    if failed <= 10:
+                        print(f"  error for {user_id}: {e}")
 
             await asyncio.sleep(SEND_DELAY)
 
