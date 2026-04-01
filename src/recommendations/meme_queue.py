@@ -60,6 +60,10 @@ async def check_queue(user_id: int) -> bool:
 
         if queue_length <= 8:
             await generate_recommendations(user_id, limit=15)
+    except Exception:
+        # DB connection errors (pool exhaustion, connection killed mid-query)
+        # are expected under traffic spikes. Queue will refill on next attempt.
+        logging.warning("check_queue failed for user %d", user_id, exc_info=True)
     finally:
         # Only release if we still own the lock (token match).
         # If TTL expired and another task acquired it, don't delete theirs.
