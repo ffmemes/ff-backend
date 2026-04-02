@@ -1,0 +1,102 @@
+schema: paperclip/v1
+
+# gstack skills source — update via: POST /api/companies/:id/skills/import {"source": "https://github.com/garrytan/gstack"}
+skills:
+  source: https://github.com/garrytan/gstack
+
+agents:
+  ceo:
+    adapter:
+      type: claude_local
+    inputs:
+      env:
+        ANALYST_DATABASE_URL:
+          kind: secret
+          requirement: optional
+
+  analyst:
+    adapter:
+      type: claude_local
+    inputs:
+      env:
+        ANALYST_DATABASE_URL:
+          kind: secret
+          requirement: required
+
+  cto:
+    adapter:
+      type: claude_local
+    inputs:
+      env:
+        ANALYST_DATABASE_URL:
+          kind: secret
+          requirement: optional
+
+  staff-engineer:
+    adapter:
+      type: claude_local
+    inputs:
+      env:
+        ANALYST_DATABASE_URL:
+          kind: secret
+          requirement: optional
+
+  qa:
+    adapter:
+      type: claude_local
+    inputs:
+      env:
+        ANALYST_DATABASE_URL:
+          kind: secret
+          requirement: required
+        COOLIFY_ACCESS_TOKEN:
+          kind: secret
+          requirement: required
+        COOLIFY_BASE_URL:
+          kind: secret
+          requirement: required
+        SENTRY_AUTH_TOKEN:
+          kind: secret
+          requirement: optional
+        PAPERCLIP_API_KEY:
+          kind: secret
+          requirement: optional
+        PAPERCLIP_URL:
+          kind: secret
+          requirement: optional
+        TELEGRAM_API_ID:
+          kind: secret
+          requirement: optional
+        TELEGRAM_API_HASH:
+          kind: secret
+          requirement: optional
+        TELEGRAM_SESSION_STRING:
+          kind: secret
+          requirement: optional
+
+  release-engineer:
+    adapter:
+      type: claude_local
+    inputs:
+      env:
+        GH_TOKEN:
+          kind: secret
+          requirement: optional
+        COOLIFY_ACCESS_TOKEN:
+          kind: secret
+          requirement: optional
+        COOLIFY_BASE_URL:
+          kind: secret
+          requirement: optional
+
+  comms:
+    adapter:
+      type: claude_local
+    inputs:
+      env:
+        ANALYST_DATABASE_URL:
+          kind: secret
+          requirement: optional
+        FFMEMES_PROD_TELEGRAM_BOT_TOKEN:
+          kind: secret
+          requirement: required
