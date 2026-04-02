@@ -7,7 +7,8 @@ async def calculate_user_stats() -> None:
     """Batch recompute stats for recently active users (every 15 min).
 
     Only upserts users who reacted in the last day.
-    Sole writer to user_stats — no concurrent access, no deadlock risk.
+    Normally the sole writer to user_stats, but Prefect retries can cause
+    concurrent runs. execute() retries on DeadlockDetectedError automatically.
     """
     query = """
         WITH RECENT_USER_IDS AS (

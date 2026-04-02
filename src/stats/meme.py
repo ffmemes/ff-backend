@@ -151,6 +151,7 @@ async def calculate_meme_reactions_and_engagement(
             ) AS engagement_score
         FROM BASIC_COUNTS BC
         LEFT JOIN MEME_SCORES MS ON MS.meme_id = BC.meme_id
+        ORDER BY BC.meme_id
 
         ON CONFLICT (meme_id) DO
         UPDATE SET

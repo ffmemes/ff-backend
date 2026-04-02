@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from typing import Any
 
@@ -81,6 +82,20 @@ def _is_stale_connection_error(exc: BaseException) -> bool:
         isinstance(exc, DBAPIError)
         and exc.__cause__ is not None
         and type(exc.__cause__).__name__ == "ConnectionDoesNotExistError"
+    )
+
+
+def _is_deadlock_error(exc: BaseException) -> bool:
+    """Return True when asyncpg reports a PostgreSQL deadlock.
+
+    Deadlocks are transient — PostgreSQL rolls back one victim transaction
+    automatically.  Retrying the statement (with a small backoff to let the
+    winning transaction finish) is the standard resolution per PG docs.
+    """
+    return (
+        isinstance(exc, DBAPIError)
+        and exc.__cause__ is not None
+        and type(exc.__cause__).__name__ == "DeadlockDetectedError"
     )
 
 
@@ -570,11 +585,31 @@ async def execute(
     select_query: Insert | Update,
     params: dict[str, Any] | None = None,
 ) -> CursorResult:
-    try:
-        async with engine.begin() as conn:
-            return await conn.execute(select_query, params or {})
-    except Exception as exc:
-        if not _is_stale_connection_error(exc):
+    """Execute a write statement, retrying on stale connections and deadlocks.
+
+    Deadlocks are caused by concurrent stats flows (retries + scheduled runs)
+    both upserting the same rows in different lock-acquisition orders.
+    PostgreSQL rolls back the victim transaction automatically; retrying it
+    (after a short backoff) is the standard resolution.
+
+    Retry policy:
+        - Stale connection (ConnectionDoesNotExistError): 1 immediate retry
+        - Deadlock (DeadlockDetectedError): up to 2 retries, 100 ms / 200 ms backoff
+    """
+    _DEADLOCK_MAX_RETRIES = 2
+
+    for attempt in range(_DEADLOCK_MAX_RETRIES + 1):
+        try:
+            async with engine.begin() as conn:
+                return await conn.execute(select_query, params or {})
+        except Exception as exc:
+            if _is_stale_connection_error(exc) and attempt == 0:
+                # Stale connection: retry once immediately (existing behaviour)
+                continue
+            if _is_deadlock_error(exc) and attempt < _DEADLOCK_MAX_RETRIES:
+                # Deadlock: short exponential backoff then retry
+                await asyncio.sleep(0.1 * (2**attempt))  # 100 ms, 200 ms
+                continue
             raise
-    async with engine.begin() as conn:
-        return await conn.execute(select_query, params or {})
+    # Unreachable — loop always returns or raises
+    raise RuntimeError("execute retry loop exhausted without returning")  # pragma: no cover
