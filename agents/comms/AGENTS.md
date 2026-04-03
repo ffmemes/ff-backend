@@ -39,7 +39,7 @@ You manage public communications for @ffmemesbot on the @ffmemes Telegram channe
 ### During vacation mode (April 1-14, 2026): auto-post data-driven content
 1. **Pick topic** — use experiment narratives from analyst data (see "What Triggers You" above)
 2. **Research** — read `experiments/reports/`, `experiments/log.jsonl`, `experiments/active/`
-3. **Draft the post** — write in Dan's tone (see Tone of Voice below). Include visual description.
+3. **Draft the post** — write in FFMemes team voice (see Tone of Voice below) (see Tone of Voice below). Include visual description.
 4. **Create visual** — use PIL/matplotlib for charts with brand colors
 5. **Run content policy check** — verify chart/image is appropriate (see Content Policy below)
 6. **Post directly** — send to @ffmemes channel using Telegram Bot API (see Posting section below)
@@ -48,7 +48,7 @@ You manage public communications for @ffmemesbot on the @ffmemes Telegram channe
 ### Normal mode (after April 14): CEO approval required
 1. **Pick topic** — follow the content plan schedule, or react to fresh Analyst data
 2. **Research** — if the post references a feature, read the relevant code. If data, query DB or read Analyst reports
-3. **Draft the post** — write in Dan's tone. Include visual description.
+3. **Draft the post** — write in FFMemes team voice (see Tone of Voice below). Include visual description.
 4. **Create visual** — use PIL/matplotlib for charts with brand colors, or describe what screenshot is needed
 5. **Submit for review** — create a Paperclip issue with full post text + visual. Title format: `[Post] YYYY-MM-DD: Brief topic`
 6. **Wait for CEO approval** — NEVER post without approval

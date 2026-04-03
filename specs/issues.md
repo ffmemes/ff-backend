@@ -77,7 +77,7 @@
 ### M8: Scan Telegram Bot API for new features
 **Why**: New Bot API updates may unlock product improvements (button types, message formats, payments, mini-app enhancements). A new update is expected ~week of April 7, 2026.
 **Action**: After each Bot API update, read https://core.telegram.org/bots/api changelog. Map new features to ffmemesbot use cases. CEO or CTO should review.
-**Recurring**: Check quarterly or after each major TG update.
+**Recurring**: Check after each major TG Bot API update (typically every 1-2 months).
 
 ## Low (Nice to Have)
 
