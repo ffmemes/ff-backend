@@ -1,6 +1,6 @@
 # Issues Backlog (Prioritized)
 
-> Last updated: 2026-03-20. Items marked ~~strikethrough~~ are DONE with commit reference.
+> Last updated: 2026-04-03. Items marked ~~strikethrough~~ are DONE with commit reference.
 
 ## Critical (Do First)
 
@@ -20,11 +20,10 @@
 
 ## High (Do Soon)
 
-### H1: Fix asyncpg connection contention
-**Why**: ~6 errors/day in Sentry (`InternalClientError: cannot switch to state`). Multiple async ops on same connection.
+### ~~H1: Fix asyncpg connection contention~~
+**DONE**: Multiple fixes shipped — ConnectionDoesNotExistError retry + pool invalidation (commit `225ad93`), configurable pool overflow + raised pool_timeout (commit `74d4e2d`), decoupled heavy meme stats from 15-min flow (commit `6ddfc95`), added missing DB indexes (commit `5fafe42`), fixed full-table scans (commit `9eec311`).
 **File**: `src/database.py`
-**Sentry**: FF-BACKEND-V3, FF-BACKEND-V9
-**Action**: Review connection pool checkout. Ensure each handler gets its own connection. Consider `pool_size` increase or per-request connection pattern.
+**Sentry**: FF-BACKEND-V3, FF-BACKEND-V9 — error rate dropped to near-zero after fixes.
 
 ### ~~H2: Fix blender random_seed=42~~
 **DONE**: Per-user seed with `random.Random(seed)` instance (commit from [experiment-2026-03-14.md](experiment-2026-03-14.md)).
@@ -67,6 +66,18 @@
 **Why**: 4x quality variance across sources (18% to 70% LR). No minimum quality floor.
 **Files**: `src/recommendations/candidates.py` (all engines)
 **Action**: Add minimum LR threshold for sources in recommendation engines. Sources below threshold only served to moderators.
+
+### M7: Telegram Mini App (WebApp)
+**Why**: Adding more bot commands doesn't scale for features like stats dashboard, leaderboard, burger coins history, or onboarding explainer. A Telegram Mini App opens a web page inside TG via auth button — better UX for information-dense screens.
+**What**: FastAPI auth endpoint (`/miniapp/auth` with TG `initData` validation) + lightweight frontend (React or vanilla). Backend data already exists — user_stats, meme_stats, burger balance.
+**Scope**: Don't build for read-only info alone. Bundle with the first interactive feature that needs web UI. Good project when we have 2+ features needing web surfaces.
+**Files**: New — `src/miniapp/` (auth + API), frontend TBD
+**See**: [Telegram Mini Apps docs](https://core.telegram.org/bots/webapps)
+
+### M8: Scan Telegram Bot API for new features
+**Why**: New Bot API updates may unlock product improvements (button types, message formats, payments, mini-app enhancements). A new update is expected ~week of April 7, 2026.
+**Action**: After each Bot API update, read https://core.telegram.org/bots/api changelog. Map new features to ffmemesbot use cases. CEO or CTO should review.
+**Recurring**: Check after each major TG Bot API update (typically every 1-2 months).
 
 ## Low (Nice to Have)
 
