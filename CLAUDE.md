@@ -28,14 +28,35 @@ just downgrade -1              # Rollback one migration
 just backup                    # pg_dump + gzip
 just restore <file>            # pg_restore
 
-# Code quality
-just lint                      # ruff fix + format
+# Code quality (MANDATORY before every commit)
+ruff check --fix src/          # fix lint errors
+ruff format src/               # format code
+just lint                      # shortcut: ruff fix + format via docker
 
 # Tests (all integration tests, require DB)
 docker compose exec app pytest
 docker compose exec app pytest tests/recommendations/
 docker compose exec app pytest tests/recommendations/test_blender.py
 ```
+
+## Pre-commit Hook (ruff lint + secrets enforcement)
+
+A git pre-commit hook runs `ruff check` on all staged Python files and checks for secrets. **Commits will be blocked if ruff finds lint errors or secrets are detected.**
+
+Install/update the hook:
+```bash
+cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+```
+
+Before committing, always run:
+```bash
+ruff check --fix src/
+ruff format src/
+```
+
+If ruff is not installed locally: `curl -LsSf https://astral.sh/ruff/install.sh | sh`
+
+**Do NOT skip the hook with `--no-verify`.** Fix the lint errors instead.
 
 ## Architecture
 

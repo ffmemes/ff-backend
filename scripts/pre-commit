@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Combined pre-commit hook: secrets check + ruff lint
+# Install: cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+set -euo pipefail
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
+# --- Part 1: Secrets check (from pre-commit-secrets-check.sh) ---
+
+DIFF=$(git diff --cached --diff-filter=ACM)
+
+if [ -n "$DIFF" ]; then
+    # Run the existing secrets check script if present
+    if [ -x "$REPO_ROOT/scripts/pre-commit-secrets-check.sh" ]; then
+        "$REPO_ROOT/scripts/pre-commit-secrets-check.sh"
+    fi
+fi
+
+# --- Part 2: Ruff lint check ---
+
+STAGED_PY_FILES=$(git diff --cached --name-only --diff-filter=AMR -- '*.py' || true)
+
+if [ -z "$STAGED_PY_FILES" ]; then
+    exit 0
+fi
+
+# Find ruff: check PATH, common local installs, then repo .venv
+RUFF=""
+if command -v ruff &>/dev/null; then
+    RUFF="ruff"
+elif [ -x "$HOME/.local/bin/ruff" ]; then
+    RUFF="$HOME/.local/bin/ruff"
+elif [ -x "$REPO_ROOT/.venv/bin/ruff" ]; then
+    RUFF="$REPO_ROOT/.venv/bin/ruff"
+fi
+
+if [ -z "$RUFF" ]; then
+    echo "ERROR: ruff not found. Install it: curl -LsSf https://astral.sh/ruff/install.sh | sh"
+    echo "Commit blocked — ruff lint is required before committing."
+    exit 1
+fi
+
+echo "Running ruff check on staged Python files..."
+
+if ! echo "$STAGED_PY_FILES" | xargs "$RUFF" check --no-fix; then
+    echo ""
+    echo "Ruff found lint errors. Fix them before committing:"
+    echo "  ruff check --fix src/"
+    echo "  ruff format src/"
+    echo "  git add <fixed files>"
+    exit 1
+fi
+
+echo "Ruff check passed."
