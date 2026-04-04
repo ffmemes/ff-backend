@@ -239,19 +239,6 @@ Available skills: `/plan-ceo-review`, `/plan-eng-review`, `/review`, `/ship`, `/
 - Queue refill threshold=2 is too low for fast users
 - No exploration mechanism in recommendations (all engines optimize exploitation)
 
-## Code References
-
-When mentioning code (files, functions, classes, specific lines) in your responses, always include a clickable GitHub hyperlink to the exact location. This repo is public at `https://github.com/ffmemes/ff-backend`.
-
-Format: `[src/recommendations/blender.py:42](https://github.com/ffmemes/ff-backend/blob/main/src/recommendations/blender.py#L42)`
-
-Rules:
-- Use the `main` branch for links (not a feature branch), unless discussing code that only exists on another branch
-- For line ranges use `#L10-L25` format
-- For directories link without `blob`: `https://github.com/ffmemes/ff-backend/tree/main/src/recommendations/`
-- Always include the line number anchor (`#L...`) when referencing a specific function, class, or code block — don't just link to the file
-- When referencing multiple related locations, provide a link for each one
-
 ## Skill routing
 
 When the user's request matches an available skill, ALWAYS invoke it using the Skill

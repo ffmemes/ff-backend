@@ -294,6 +294,30 @@ curl -s -X POST "https://api.telegram.org/bot${FFMEMES_PROD_TELEGRAM_BOT_TOKEN}/
 - If no new messages since last check, skip silently
 - Use this intel for C-category content posts (data insights with moderator context)
 
+## Code Reference Links in Posts
+
+When a post mentions a feature, algorithm, or technical detail — **link to the actual code on GitHub**. The repo is public: `https://github.com/ffmemes/ff-backend`
+
+This makes "build in public" posts real — readers can click through and see the actual implementation.
+
+### How to add links
+
+Posts use HTML parse_mode, so use `<a href="...">text</a>` format:
+
+- **Feature mention**: `Рекомендации работают через <a href="https://github.com/ffmemes/ff-backend/blob/main/src/recommendations/blender.py">блендер</a> — 9 движков смешиваются с весами`
+- **Specific logic**: `Холодный старт — <a href="https://github.com/ffmemes/ff-backend/blob/main/src/recommendations/candidates.py#L45-L60">первые 30 мемов</a> подбираются отдельно`
+- **Whole module**: `Весь <a href="https://github.com/ffmemes/ff-backend/tree/main/src/recommendations">recommendation engine</a> — чистый SQL, без ML`
+
+### Rules
+
+- Always use `main` branch in URLs
+- Include `#L42` or `#L10-L25` line anchors when referencing specific functions or logic — don't just link to the file
+- **Read the code first** to find the exact file and line numbers before linking. Don't guess — verify the path exists and the line numbers are correct
+- Don't overdo it — 1-3 links per post max. Link the most interesting/relevant parts
+- Use natural anchor text in Russian, not raw file paths. "движок рекомендаций", not "src/recommendations/candidates.py"
+- For F-category (behind-the-scenes) posts, links are especially valuable — readers want to see the actual code
+- For C-category (data insights) posts, link to the SQL queries or stats computation if relevant
+
 ## What NOT To Do
 
 - Do NOT post without CEO approval (exception: vacation mode April 1-14, data-driven posts only)
