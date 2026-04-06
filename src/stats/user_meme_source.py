@@ -6,7 +6,8 @@ from src.database import execute
 async def calculate_user_meme_source_stats() -> None:
     """Batch recompute per-user per-source stats (every 5 min).
 
-    Sole writer to user_meme_source_stats — no concurrent access, no deadlock risk.
+    Normally the sole writer to user_meme_source_stats, but Prefect retries can
+    cause concurrent runs. execute() retries on DeadlockDetectedError automatically.
     """
     query = """
         INSERT INTO user_meme_source_stats (

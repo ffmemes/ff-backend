@@ -28,6 +28,7 @@ async def calculate_meme_source_stats() -> None:
         LEFT JOIN user_meme_reaction E
             ON M.id = E.meme_id
         GROUP BY 1
+        ORDER BY 1
 
         ON CONFLICT (meme_source_id) DO
         UPDATE SET

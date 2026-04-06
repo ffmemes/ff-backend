@@ -19,20 +19,26 @@ _BROADCAST_FLOW_OPTS = dict(
 )
 
 
+async def _send_to_user(user_id: int) -> None:
+    await check_queue(user_id)
+    meme = await get_next_meme_for_user(user_id)
+    if meme:
+        await send_meme_to_user(bot, user_id, meme)
+
+
 async def broadcast_next_meme_to_users(user_ids: list[int]):
     logger = get_run_logger()
     logger.info(f"Going to sent next meme to {len(user_ids)} users")
 
     for user_id in user_ids:
-        await check_queue(user_id)
-        meme = await get_next_meme_for_user(user_id)
-        if meme:
-            try:
-                await send_meme_to_user(bot, user_id, meme)
-                logger.info(f"Sent meme_id={meme.id} to #{user_id}")
-            except Exception:
-                logger.warning(f"Failed to send meme to #{user_id}", exc_info=True)
-            await asyncio.sleep(0.2)  # flood control
+        try:
+            await asyncio.wait_for(_send_to_user(user_id), timeout=20)
+            logger.info(f"Sent meme to #{user_id}")
+        except asyncio.TimeoutError:
+            logger.warning(f"Timed out processing user #{user_id} (>20s), skipping")
+        except Exception:
+            logger.warning(f"Failed to send meme to #{user_id}", exc_info=True)
+        await asyncio.sleep(0.2)  # flood control
 
 
 @flow(**_BROADCAST_FLOW_OPTS)

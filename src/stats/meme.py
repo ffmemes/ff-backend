@@ -39,7 +39,6 @@ async def calculate_meme_reactions_and_engagement(
             SELECT DISTINCT meme_id
             FROM user_meme_reaction
             WHERE reacted_at > NOW() - :lookback_hours * INTERVAL '1 hour'
-               OR sent_at > NOW() - :lookback_hours * INTERVAL '1 hour'
         ),
 
         BASE_REACTIONS AS (
@@ -152,6 +151,7 @@ async def calculate_meme_reactions_and_engagement(
             ) AS engagement_score
         FROM BASIC_COUNTS BC
         LEFT JOIN MEME_SCORES MS ON MS.meme_id = BC.meme_id
+        ORDER BY BC.meme_id
 
         ON CONFLICT (meme_id) DO
         UPDATE SET

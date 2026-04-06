@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from typing import Any
 
@@ -62,17 +63,26 @@ engine = create_async_engine(DATABASE_URL, **_engine_kwargs)
 
 
 @event.listens_for(engine.sync_engine, "handle_error")
-def _mark_stale_connection_as_disconnect(context: object) -> None:
-    """Tell SQLAlchemy to invalidate pool connections that asyncpg reports as closed.
+def _mark_bad_connection_as_disconnect(context: object) -> None:
+    """Tell SQLAlchemy to invalidate pool connections that asyncpg reports as broken.
 
     pool_pre_ping catches most stale connections, but a race is possible: the server
     closes the connection between the ping and the actual query.  When that happens
     asyncpg raises ConnectionDoesNotExistError (a subclass of InterfaceError).
-    Marking it as a disconnect causes the pool to discard that connection so it is
-    never handed out again.
+
+    Similarly, under high concurrency the pool can hand out a connection whose
+    previous async operation hasn't fully completed.  asyncpg raises
+    InternalClientError ("cannot switch to state …; another operation is in
+    progress") in this case.
+
+    Marking either as a disconnect causes the pool to discard that connection so
+    it is never handed out again.
     """
     original = getattr(context, "original_exception", None)
-    if original is not None and type(original).__name__ == "ConnectionDoesNotExistError":
+    if original is not None and type(original).__name__ in (
+        "ConnectionDoesNotExistError",
+        "InternalClientError",
+    ):
         context.is_disconnect = True  # type: ignore[union-attr]
 
 
@@ -81,6 +91,35 @@ def _is_stale_connection_error(exc: BaseException) -> bool:
         isinstance(exc, DBAPIError)
         and exc.__cause__ is not None
         and type(exc.__cause__).__name__ == "ConnectionDoesNotExistError"
+    )
+
+
+def _is_concurrent_use_error(exc: BaseException) -> bool:
+    """Return True when asyncpg reports concurrent use of a single connection.
+
+    Under high webhook concurrency the pool can hand out a connection whose
+    previous async commit/rollback hasn't fully completed.  asyncpg raises
+    InternalClientError("cannot switch to state …; another operation … is in
+    progress").  Retrying with a fresh connection resolves the issue.
+    """
+    return (
+        isinstance(exc, DBAPIError)
+        and exc.__cause__ is not None
+        and type(exc.__cause__).__name__ == "InternalClientError"
+    )
+
+
+def _is_deadlock_error(exc: BaseException) -> bool:
+    """Return True when asyncpg reports a PostgreSQL deadlock.
+
+    Deadlocks are transient — PostgreSQL rolls back one victim transaction
+    automatically.  Retrying the statement (with a small backoff to let the
+    winning transaction finish) is the standard resolution per PG docs.
+    """
+    return (
+        isinstance(exc, DBAPIError)
+        and exc.__cause__ is not None
+        and type(exc.__cause__).__name__ == "DeadlockDetectedError"
     )
 
 
@@ -530,6 +569,10 @@ experiment_assignment = Table(
 )
 
 
+def _is_transient_connection_error(exc: BaseException) -> bool:
+    return _is_stale_connection_error(exc) or _is_concurrent_use_error(exc)
+
+
 async def fetch_one(
     select_query: Select | Insert | Update,
     params: dict[str, Any] | None = None,
@@ -540,10 +583,10 @@ async def fetch_one(
             row = cursor.first()
             return row._asdict() if row is not None else None
     except Exception as exc:
-        if not _is_stale_connection_error(exc):
+        if not _is_transient_connection_error(exc):
             raise
-    # Retry once — pool_pre_ping catches most stale connections, but a race can
-    # still return a connection that Postgres closed between the ping and the query.
+    # Retry once — covers stale connections (server closed between ping and query)
+    # and concurrent-use errors (pool handed out a busy connection).
     async with engine.begin() as conn:
         cursor: CursorResult = await conn.execute(select_query, params or {})
         row = cursor.first()
@@ -559,7 +602,7 @@ async def fetch_all(
             cursor: CursorResult = await conn.execute(select_query, params or {})
             return [r._asdict() for r in cursor.all()]
     except Exception as exc:
-        if not _is_stale_connection_error(exc):
+        if not _is_transient_connection_error(exc):
             raise
     async with engine.begin() as conn:
         cursor: CursorResult = await conn.execute(select_query, params or {})
@@ -570,11 +613,31 @@ async def execute(
     select_query: Insert | Update,
     params: dict[str, Any] | None = None,
 ) -> CursorResult:
-    try:
-        async with engine.begin() as conn:
-            return await conn.execute(select_query, params or {})
-    except Exception as exc:
-        if not _is_stale_connection_error(exc):
+    """Execute a write statement, retrying on stale connections and deadlocks.
+
+    Deadlocks are caused by concurrent stats flows (retries + scheduled runs)
+    both upserting the same rows in different lock-acquisition orders.
+    PostgreSQL rolls back the victim transaction automatically; retrying it
+    (after a short backoff) is the standard resolution.
+
+    Retry policy:
+        - Stale connection (ConnectionDoesNotExistError): 1 immediate retry
+        - Deadlock (DeadlockDetectedError): up to 2 retries, 100 ms / 200 ms backoff
+    """
+    _DEADLOCK_MAX_RETRIES = 2
+
+    for attempt in range(_DEADLOCK_MAX_RETRIES + 1):
+        try:
+            async with engine.begin() as conn:
+                return await conn.execute(select_query, params or {})
+        except Exception as exc:
+            if _is_transient_connection_error(exc) and attempt == 0:
+                # Stale / concurrent-use connection: retry once immediately
+                continue
+            if _is_deadlock_error(exc) and attempt < _DEADLOCK_MAX_RETRIES:
+                # Deadlock: short exponential backoff then retry
+                await asyncio.sleep(0.1 * (2**attempt))  # 100 ms, 200 ms
+                continue
             raise
-    async with engine.begin() as conn:
-        return await conn.execute(select_query, params or {})
+    # Unreachable — loop always returns or raises
+    raise RuntimeError("execute retry loop exhausted without returning")  # pragma: no cover

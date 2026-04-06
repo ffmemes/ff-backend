@@ -20,6 +20,7 @@ Circuit breaker: auto-paused after 3 failures in 1 hour.
 import asyncio
 import base64
 import json
+import re
 from datetime import datetime, timezone
 
 import httpx
@@ -34,12 +35,13 @@ from src.storage.upload import download_meme_content_from_tg
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 # Ordered by preference. Falls back to next model on 429/error.
-# Verified available on OpenRouter as of 2026-03-30 (mistral-small 404, removed from OR)
+# Verified available on OpenRouter as of 2026-04-02 (mistral-small 404, removed from OR)
+# Removed: nvidia/nemotron-nano-12b-v2-vl:free (invalid JSON/unterminated strings, empty content)
+# Removed: google/gemma-3-4b-it:free (invalid JSON escape sequences, unreliable output)
 VISION_MODELS = [
     "google/gemma-3-27b-it:free",  # best quality, 140+ languages, 131k context
     "google/gemma-3-12b-it:free",  # good fallback, smaller, 32k context
-    "google/gemma-3-4b-it:free",  # smallest Gemma, lowest rate limits hit
-    "nvidia/nemotron-nano-12b-v2-vl:free",  # last resort: still listed but unreliable JSON
+    "meta-llama/llama-3.2-11b-vision-instruct:free",  # reliable structured output
 ]
 
 DESCRIBE_PROMPT = (
@@ -96,7 +98,11 @@ async def get_memes_to_describe(limit: int = 30) -> list[dict]:
 
 
 def _parse_vision_response(raw_content: str) -> dict:
-    """Parse JSON from model response, stripping markdown fences if present."""
+    """Parse JSON from model response, stripping markdown fences if present.
+
+    Falls back to escape-fixing and regex extraction to handle common LLM JSON issues
+    (invalid escape sequences, unterminated strings from lower-quality models).
+    """
     content = raw_content.strip()
     if content.startswith("```"):
         content = content.split("\n", 1)[1] if "\n" in content else content[3:]
@@ -106,7 +112,32 @@ def _parse_vision_response(raw_content: str) -> dict:
     if content.startswith("json"):
         content = content[4:].strip()
 
-    return json.loads(content)
+    # 1. Standard parse
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        pass
+
+    # 2. Fix invalid escape sequences (e.g. \' or \k not valid in JSON)
+    try:
+        fixed = re.sub(r'\\(?!["\\/bfnrtu])', r"\\\\", content)
+        return json.loads(fixed)
+    except (json.JSONDecodeError, Exception):
+        pass
+
+    # 3. Regex extraction — last resort for severely malformed output
+    result = {}
+    for key in ("ocr_text", "description", "language"):
+        match = re.search(rf'"{key}"\s*:\s*"((?:[^"\\]|\\.)*)"', content, re.DOTALL)
+        if match:
+            try:
+                result[key] = json.loads(f'"{match.group(1)}"')
+            except json.JSONDecodeError:
+                result[key] = match.group(1)
+    if result:
+        return result
+
+    raise json.JSONDecodeError("Could not parse model response", content, 0)
 
 
 async def call_openrouter_vision(image_b64: str, log) -> dict:
@@ -331,7 +362,7 @@ async def describe_memes_flow(batch_size: int = 30) -> None:
             log.info("Described meme %d (%d/%d)", meme_row["id"], i + 1, len(memes))
         elif status == "rate_limited":
             log.warning(
-                "All models rate-limited at meme %d (%d/%d). " "Stopping batch — quota exhausted.",
+                "All models rate-limited at meme %d (%d/%d). Stopping batch — quota exhausted.",
                 meme_row["id"],
                 i + 1,
                 len(memes),
