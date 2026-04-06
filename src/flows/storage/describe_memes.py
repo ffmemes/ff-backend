@@ -120,7 +120,7 @@ def _parse_vision_response(raw_content: str) -> dict:
 
     # 2. Fix invalid escape sequences (e.g. \' or \k not valid in JSON)
     try:
-        fixed = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', content)
+        fixed = re.sub(r'\\(?!["\\/bfnrtu])', r"\\\\", content)
         return json.loads(fixed)
     except (json.JSONDecodeError, Exception):
         pass
@@ -362,7 +362,7 @@ async def describe_memes_flow(batch_size: int = 30) -> None:
             log.info("Described meme %d (%d/%d)", meme_row["id"], i + 1, len(memes))
         elif status == "rate_limited":
             log.warning(
-                "All models rate-limited at meme %d (%d/%d). " "Stopping batch — quota exhausted.",
+                "All models rate-limited at meme %d (%d/%d). Stopping batch — quota exhausted.",
                 meme_row["id"],
                 i + 1,
                 len(memes),
