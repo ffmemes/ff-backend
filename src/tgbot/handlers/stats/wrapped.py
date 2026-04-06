@@ -499,7 +499,11 @@ async def handle_wrapped_go(
         return await handle_wrapped_button(update, context)
 
     # Still generating — edit the button message with loading text
-    is_ru = cached.get("is_ru", _is_ru(update.effective_user.language_code)) if cached else _is_ru(update.effective_user.language_code)
+    is_ru = (
+        cached.get("is_ru", _is_ru(update.effective_user.language_code))
+        if cached
+        else _is_ru(update.effective_user.language_code)
+    )
     if cached and cached.get("lock"):
         stats = cached.get("stats_report")
         if stats and update.callback_query:
