@@ -35,14 +35,12 @@ from src.storage.upload import download_meme_content_from_tg
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 # Ordered by preference. Falls back to next model on 429/error.
-# Verified available on OpenRouter as of 2026-04-06
-# Removed: nvidia/nemotron-nano-12b-v2-vl:free (invalid JSON/unterminated strings, empty content)
-# Removed: google/gemma-3-4b-it:free (invalid JSON escape sequences, unreliable output)
-# Removed: meta-llama/llama-3.2-11b-vision-instruct:free (404, removed from OpenRouter)
+# Verified available on OpenRouter as of 2026-04-08
+# Removed: google/gemma-3-27b-it:free, gemma-3-12b-it:free (removed from OpenRouter)
+# Removed: qwen/qwen3.6-plus:free (never existed, actual model is paid qwen3.6-plus-04-02)
 VISION_MODELS = [
-    "google/gemma-3-27b-it:free",  # best quality, 140+ languages, 131k context
-    "google/gemma-3-12b-it:free",  # good fallback, smaller, 32k context
-    "qwen/qwen3.6-plus:free",  # 1M context, image+video, strong structured output
+    "google/gemma-4-31b-it:free",     # best quality, 262k context, image+video
+    "google/gemma-4-26b-a4b-it:free",  # MoE variant, 262k context, image+video
 ]
 
 DESCRIBE_PROMPT = (
