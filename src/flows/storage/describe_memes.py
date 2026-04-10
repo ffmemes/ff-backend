@@ -39,8 +39,10 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 # Removed: google/gemma-3-27b-it:free, gemma-3-12b-it:free (removed from OpenRouter)
 # Removed: qwen/qwen3.6-plus:free (never existed, actual model is paid qwen3.6-plus-04-02)
 VISION_MODELS = [
-    "google/gemma-4-31b-it:free",     # best quality, 262k context, image+video
+    "google/gemma-4-31b-it:free",  # best quality, 262k context, image+video
     "google/gemma-4-26b-a4b-it:free",  # MoE variant, 262k context, image+video
+    "google/gemma-4-31b-it",  # paid fallback (~$0.0002/call) when free quota exhausted
+    "google/gemma-4-26b-a4b-it",  # paid fallback, MoE variant
 ]
 
 DESCRIBE_PROMPT = (
