@@ -9,11 +9,14 @@ Source Channels (TG/VK/IG)
   -> Download from source URL
   -> Watermark (image only, @ffmemesbot, 35% opacity, adaptive corner)
   -> Upload to TG storage chat -> telegram_file_id
-  -> OCR (if enabled, currently OFF)
   -> Ad filter (caption keyword check, 48 stop words)
   -> Dedup (OCR text trigram similarity, if OCR enabled)
   -> status='ok' (enters recommendation pool)
+  -> Describe Memes (async, every 30min, OpenRouter free vision) -> ocr_result JSONB
 ```
+
+Note: Legacy OCR (Modal, `OCR_ENABLED`) is OFF. Describe Memes is the active system.
+See [describe-memes.md](describe-memes.md) for details.
 
 ## Parsing Schedule
 

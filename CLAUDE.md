@@ -46,7 +46,7 @@ docker compose exec app pytest tests/recommendations/test_blender.py
 - **Jobs**: Prefect 3.4 (parsing, stats, crossposting crons)
 - **OCR/Describe**: Two systems exist:
   - **Legacy OCR**: Modal microservice (toggle: `OCR_ENABLED`, currently off)
-  - **Describe Memes**: OpenRouter free vision models (`describe_memes.py`), runs every 30 min, ~500-600 memes/day. Populates `meme.ocr_result` JSONB with description + text + language. Uses `calculated_at` field (NOT `meme.created_at`) for monitoring. Circuit breaker auto-pauses after 3 failures/hour
+  - **Describe Memes**: OpenRouter FREE vision models only (`describe_memes.py`), runs every 30 min, ~30/batch. **NEVER add paid models** — balance below $0 blocks ALL models incl free (402). Need $10+ lifetime purchases for 1,000 req/day. See [specs/describe-memes.md](specs/describe-memes.md). Circuit breaker auto-pauses after 3 failures/hour
 - **Python**: 3.10 (dev), 3.12 (prod)
 
 ### Docker Compose Services

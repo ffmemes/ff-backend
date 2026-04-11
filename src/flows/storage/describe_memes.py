@@ -1,5 +1,5 @@
 """
-Background job: describe memes using OpenRouter free vision models.
+Background job: describe memes using OpenRouter FREE vision models only.
 
 Populates meme.ocr_result JSONB with:
 - description: what the meme shows, the joke
@@ -11,10 +11,15 @@ Populates meme.ocr_result JSONB with:
 Processes most popular memes first (by nlikes DESC).
 Runs every 30 min via Prefect cron, ~30 memes per batch.
 
-Throughput: ~500-600 memes/day on OpenRouter free tier.
-Bottleneck: free model rate limits (20 rpm, ~1000 req/day with $10+ credits).
+IMPORTANT — OpenRouter free tier rules:
+- Need $10+ lifetime purchases for 1,000 req/day (otherwise only 50/day).
+- NEVER add paid models — if balance drops below $0, ALL models (incl free) get 402.
+- Current balance must stay >= $0. Monitor at https://openrouter.ai/settings/credits
+- Free model rate limit: 20 rpm across all free models.
+- See specs/describe-memes.md for full constraints.
+
 Circuit breaker: auto-paused after 3 failures in 1 hour.
-  Resume: PATCH /api/deployments/{id} {"paused": false}
+  Resume: prefect deployment resume "describe-memes-flow/describe-memes"
 """
 
 import asyncio
@@ -34,20 +39,20 @@ from src.storage.upload import download_meme_content_from_tg
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
+# FREE models only. Never add paid models here — spending balance below $0
+# blocks ALL models (even free ones) with HTTP 402. Free tier requires $10+
+# lifetime purchases for 1,000 req/day (vs 50/day without).
+# See specs/describe-memes.md for full OpenRouter constraints.
+#
+# Verified available on OpenRouter API as of 2026-04-11.
 # Ordered by preference. Falls back to next model on 429/403/error.
-# Verified available on OpenRouter API as of 2026-04-11
-# Diversified across providers to avoid shared rate limits.
-# Removed: Gemma 4 free models (persistent HTTP 403)
-# Removed: nvidia/nemotron-nano-12b-v2-vl:free (invalid JSON, empty content)
 VISION_MODELS = [
-    # --- Free tier ---
     "google/gemma-3-27b-it:free",  # proven workhorse, 131k context
     "google/gemma-3-12b-it:free",  # good fallback, 32k context
-    "nvidia/nemotron-3-super-120b-a12b-20230311:free",  # 120B MoE, 262k context
-    # --- Cheap paid fallbacks (< $0.5/M tokens) ---
-    "mistralai/mistral-small-3.1-24b-instruct",  # $0.03/$0.11 per M tokens
-    "meta-llama/llama-4-scout-17b-16e-instruct",  # $0.08/$0.30 per M tokens
-    "google/gemma-3-27b-it",  # paid Gemma 3 as last resort
+    "google/gemma-3-4b-it:free",  # small but fast, 32k context
+    "google/gemma-4-31b-it:free",  # 262k context (may 403 — will skip to next)
+    "google/gemma-4-26b-a4b-it:free",  # 262k MoE (may 403 — will skip to next)
+    "nvidia/nemotron-nano-12b-v2-vl:free",  # 128k, different provider (JSON quirky)
 ]
 
 DESCRIBE_PROMPT = (
