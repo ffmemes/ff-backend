@@ -17,7 +17,7 @@ Deep dives into what the bot can do. One feature per post.
 | A1 | Inline meme search | BLOCKED | Bot screenshot of inline results | Wait for E2E test |
 | A2 | Group chat AI agent | READY | Screenshot of bot replying in group | Include "Add to chat" deep link button |
 | A3 | Burger economy | READY | Screenshot of /kitchen + /leaderboard | What burgers are, how to earn/spend |
-| A4 | OCR meme descriptions | BLOCKED | Before/after: meme + extracted text | Wait for OCR_ENABLED=True |
+| A4 | OCR meme descriptions | READY | Before/after: meme + extracted text | Describe Memes runs via OpenRouter free vision |
 | A5 | Stars purchases | READY | Screenshot of buy menu | Buy burgers with Telegram Stars |
 | A6 | How recommendations work | READY | Diagram: "your like -> better memes" | Non-technical, simplified |
 | A7 | Upload your own memes | READY | Screenshot of upload flow | Show the moderation queue |
@@ -126,7 +126,7 @@ See [brand-guide.md](brand-guide.md) for colors, fonts, and chart styling.
 | What | Blocks | Action needed |
 |------|--------|---------------|
 | E2E test of inline search | A1 | Run E2E tests on bot |
-| OCR_ENABLED=False | A4 | Enable OCR in prod |
+| ~~OCR_ENABLED=False~~ | ~~A4~~ | Resolved: Describe Memes active |
 | Giveaway deep link handler | D1 | Code: new handler in start.py |
 | Star voting handler | D2 | Code: new InlineKeyboard handler |
 | Personalized stats card | D4 | Code: PIL card generation |

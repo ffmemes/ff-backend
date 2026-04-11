@@ -39,9 +39,6 @@ class Config(BaseSettings):
     VK_TOKEN: str | None = None
     HIKERAPI_TOKEN: str | None = None
 
-    MYSTIC_TOKEN: str | None = None
-    MODAL_ENDPOINT: str | None = None
-
     REDIS_MAX_CONNECTIONS: int = 128
 
     OPENAI_API_KEY: str | None = None
@@ -50,8 +47,6 @@ class Config(BaseSettings):
     DEEPSEEK_API_KEY: str | None = None
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
     CHAT_AGENT_ENABLED: bool = False
-
-    OCR_ENABLED: bool = False
 
     PAPERCLIP_QA_TRIGGER_URL: str | None = None
     PAPERCLIP_QA_TRIGGER_SECRET: str | None = None

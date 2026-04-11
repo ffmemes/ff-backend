@@ -6,7 +6,7 @@
 
 1. **ETL single-media filter** (~80% of the 17%) — carousel posts removed. Not true dedup.
 2. **Telegram forwarded_url** — same-source repost detection at ETL time.
-3. **OCR text trigram similarity** (DISABLED) — PostgreSQL `pg_trgm` operator `%` on extracted text. Min 12 chars. Requires `OCR_ENABLED=true`.
+3. **OCR text trigram similarity** — PostgreSQL `pg_trgm` operator `%` on extracted text. Min 12 chars. Works on memes with `ocr_result` populated by [Describe Memes](describe-memes.md) (OpenRouter vision).
 
 The text-based dedup (`find_meme_duplicate()` in `src/storage/service.py:205`) uses:
 ```sql

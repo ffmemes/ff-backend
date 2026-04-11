@@ -1,7 +1,6 @@
-from datetime import datetime
 from typing import Any
 
-from pydantic import Field, model_validator
+from pydantic import model_validator
 
 from src.models import CustomModel
 from src.storage.constants import MemeType
@@ -21,10 +20,3 @@ class MemeData(CustomModel):
         if caption is not None:
             values["caption"] = caption[:1000]
         return values
-
-
-class OcrResult(CustomModel):
-    text: str
-    model: str
-    raw_result: dict
-    calculated_at: datetime = Field(default_factory=datetime.utcnow)

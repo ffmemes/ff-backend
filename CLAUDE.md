@@ -44,9 +44,7 @@ docker compose exec app pytest tests/recommendations/test_blender.py
 - **DB**: PostgreSQL 14 (asyncpg + SQLAlchemy 2.0 raw `Table` objects, NOT declarative ORM)
 - **Cache/Queue**: Redis 6.2 (recommendation queues per user, user info cache, 1h TTL)
 - **Jobs**: Prefect 3.4 (parsing, stats, crossposting crons)
-- **OCR/Describe**: Two systems exist:
-  - **Legacy OCR**: Modal microservice (toggle: `OCR_ENABLED`, currently off)
-  - **Describe Memes**: OpenRouter FREE vision models only (`describe_memes.py`), runs every 30 min, ~30/batch. **NEVER add paid models** — balance below $0 blocks ALL models incl free (402). Need $10+ lifetime purchases for 1,000 req/day. See [specs/describe-memes.md](specs/describe-memes.md). Circuit breaker auto-pauses after 3 failures/hour
+- **Describe Memes**: OpenRouter FREE vision models only ([`src/flows/storage/describe_memes.py`](src/flows/storage/describe_memes.py)), runs every 30 min, ~30/batch. **NEVER add paid models** — balance below $0 blocks ALL models incl free (402). Need $10+ lifetime purchases for 1,000 req/day. See [specs/describe-memes.md](specs/describe-memes.md). Circuit breaker auto-pauses after 3 failures/hour
 - **Python**: 3.10 (dev), 3.12 (prod)
 
 ### Docker Compose Services
@@ -157,7 +155,7 @@ Queue refills when length <= 2, generating 5 memes per refill.
 
 Required in `.env`: `DATABASE_URL`, `REDIS_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_BOT_WEBHOOK_SECRET`, `MEME_STORAGE_TELEGRAM_CHAT_ID`, `UPLOADED_MEMES_REVIEW_CHAT_ID`, `ADMIN_LOGS_CHAT_ID`
 
-Optional: `OCR_ENABLED` (default false), `VK_TOKEN`, `OPENAI_API_KEY`, `SENTRY_DSN`
+Optional: `VK_TOKEN`, `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, `SENTRY_DSN`
 
 ### Credential Safety
 

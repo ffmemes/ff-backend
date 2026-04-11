@@ -12,17 +12,13 @@ from telegram.ext import ContextTypes
 from src.config import settings
 from src.flows.storage.memes import (
     add_watermark_to_meme_content,
-    # ocr_meme_content,
     upload_meme_content_to_tg,
 )
 from src.recommendations.service import create_user_meme_reaction
 from src.stats.meme import calculate_meme_reactions_and_engagement
 from src.stats.meme_source import calculate_meme_source_stats
 from src.storage.constants import MemeStatus, MemeType
-from src.storage.service import (
-    # find_meme_duplicate,
-    update_meme,
-)
+from src.storage.service import update_meme
 from src.storage.upload import download_meme_content_from_tg
 from src.tgbot.constants import UserType
 from src.tgbot.handlers.treasury.constants import TrxType
@@ -48,23 +44,6 @@ async def uploaded_meme_auto_review(
 ) -> None:
     logging.info(f"Downloading meme {meme['id']} content")
     image_bytes = await download_meme_content_from_tg(meme["telegram_file_id"])
-
-    # OCR doesnt work anymore
-    #     logging.info(f"OCR meme {meme['id']} content")
-    #     meme = await ocr_meme_content(
-    #         meme["id"],
-    #         image_bytes,
-    #         meme["language_code"],
-    #     )
-    #     if meme is None:
-    #         return await bot.send_message(
-    #             chat_id=meme_upload["user_id"],
-    #             reply_to_message_id=meme_upload["message_id"],
-    #             text="""
-    # ❌ MEME REJECTED:
-    # Something went wrong when we tried read text on your meme. Just try again.
-    #             """,
-    #         )
 
     logging.info(f"Adding watermark to meme {meme['id']} content")
     watermarked_meme_content = await add_watermark_to_meme_content(image_bytes, meme["type"])

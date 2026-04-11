@@ -4,7 +4,7 @@
 - The Prefect flows in [`src/flows/storage/memes.py`](src/flows/storage/memes.py) orchestrate ingestion from all automated sources:
   - `tg_meme_pipeline`, `vk_meme_pipeline`, and `ig_meme_pipeline` ETL raw posts, download media, watermark images, push them into the storage bot chat, and hand off to `final_meme_pipeline`.
   - `final_meme_pipeline` performs duplicate checks, normalizes captions, and promotes records by calling `update_meme_status_of_ready_memes`.
-- **Legacy OCR** (Modal, `OCR_ENABLED` toggle) is OFF and unused. The active system is **Describe Memes** (see below).
+- Legacy Modal OCR has been removed. The active image analysis system is **Describe Memes** (see below).
 
 ## Manual upload & moderation workflow
 - User uploads arrive via the upload handler, then `uploaded_meme_auto_review` in [`src/tgbot/handlers/upload/moderation.py`](src/tgbot/handlers/upload/moderation.py) downloads the submission, watermarks it, and sends it to the storage chat.

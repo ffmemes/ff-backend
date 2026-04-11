@@ -15,8 +15,7 @@ Source Channels (TG/VK/IG)
   -> Describe Memes (async, every 30min, OpenRouter free vision) -> ocr_result JSONB
 ```
 
-Note: Legacy OCR (Modal, `OCR_ENABLED`) is OFF. Describe Memes is the active system.
-See [describe-memes.md](describe-memes.md) for details.
+Note: Legacy Modal OCR has been removed. [Describe Memes](describe-memes.md) (OpenRouter free vision) is the active system for image analysis.
 
 ## Parsing Schedule
 
