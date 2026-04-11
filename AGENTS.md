@@ -2,10 +2,9 @@
 
 ## Automated parsing & Prefect storage flows
 - The Prefect flows in [`src/flows/storage/memes.py`](src/flows/storage/memes.py) orchestrate ingestion from all automated sources:
-  - `tg_meme_pipeline`, `vk_meme_pipeline`, and `ig_meme_pipeline` ETL raw posts collected from Telegram, VK, and Instagram tables, respectively. They download media, watermark images, push them into the storage bot chat, and (when enabled) trigger OCR before handing off to `final_meme_pipeline`.
-  - `ocr_uploaded_memes` periodically re-downloads originals (either from cloud storage URLs or the uploader's Telegram file) to perform OCR on backlogged memes and then routes them into the final normalization step.
-  - `final_meme_pipeline` performs duplicate checks via OCR text, normalizes captions, and promotes records by calling `update_meme_status_of_ready_memes`.
-- OCR is globally toggled through `settings.OCR_ENABLED` (see [`src/config.py`](src/config.py)). Until the OCR service is restored, flows log that they are skipping OCR; flip the flag back to `True` once the Modal OCR endpoint is available again.
+  - `tg_meme_pipeline`, `vk_meme_pipeline`, and `ig_meme_pipeline` ETL raw posts, download media, watermark images, push them into the storage bot chat, and hand off to `final_meme_pipeline`.
+  - `final_meme_pipeline` performs duplicate checks, normalizes captions, and promotes records by calling `update_meme_status_of_ready_memes`.
+- **Legacy OCR** (Modal, `OCR_ENABLED` toggle) is OFF and unused. The active system is **Describe Memes** (see below).
 
 ## Manual upload & moderation workflow
 - User uploads arrive via the upload handler, then `uploaded_meme_auto_review` in [`src/tgbot/handlers/upload/moderation.py`](src/tgbot/handlers/upload/moderation.py) downloads the submission, watermarks it, and sends it to the storage chat.
@@ -21,39 +20,33 @@
 
 ## Operational notes
 - Manual review happens entirely inside the designated Telegram moderator chat. Keep communications and escalations there for traceability.
-- OCR is optional while the external service is offline; leave `OCR_ENABLED=False` to avoid wasting quota. Once Modal OCR is healthy, update the environment variable (or `.env`) and redeploy.
-- Weekly maintenance (Prefect flow health checks, data hygiene jobs, etc.) runs through the Prefect deployment definitions under `flow_deployments/`. Use Docker Compose (`docker-compose.yml`) plus Prefect CLI to register or trigger flows during scheduled operations.
-- For ad-hoc debugging, remember that Prefect logs surface in the worker containers defined in the Compose stack; keep an eye on OCR warnings for signal that the toggle needs to flip back on.
+- Weekly maintenance (Prefect flow health checks, data hygiene jobs, etc.) runs through Prefect deployment definitions. Use Prefect CLI to trigger flows during scheduled operations.
 
 ## Describe Memes (OpenRouter Vision)
 
-The `describe_memes` flow (`src/flows/storage/describe_memes.py`) uses free OpenRouter vision models to extract text and descriptions from meme images. This is **separate from the legacy OCR** (Modal, `OCR_ENABLED` toggle).
+The `describe_memes` flow (`src/flows/storage/describe_memes.py`) uses **FREE OpenRouter vision models only** to extract text and descriptions from meme images.
 
 - **Schedule**: every 30 min, 30 memes/batch
-- **Throughput**: ~500-600 memes/day (limited by OpenRouter free tier: 20 rpm, ~1000 req/day)
 - **Priority**: processes most-liked memes first (`nlikes DESC`)
 - **Storage**: writes to `meme.ocr_result` JSONB with `calculated_at` timestamp
 - **Monitoring**: use `ocr_result->>'calculated_at'` to check recency, NOT `meme.created_at`
 - **Circuit breaker**: auto-pauses after 3 failures in 1 hour
 
+### OpenRouter constraints (CRITICAL)
+
+- **NEVER add paid models** to `VISION_MODELS` list — balance below $0 blocks ALL models (402)
+- Need $10+ lifetime purchases for 1,000 req/day (otherwise only 50/day)
+- Free model rate limit: 20 rpm
+- See [specs/describe-memes.md](specs/describe-memes.md) for full constraints
+
 ### Handling circuit breaker pauses
 
-When the circuit breaker fires, the deployment is paused and a Prefect automation event is emitted. To resume:
-
 ```bash
-# Via Prefect API (preferred — no SSH needed):
-curl -s -X PATCH "https://prefect.swanrate.com/api/deployments/<deployment-id>" \
-  -u "$PREFECT_AUTH_STRING" \
-  -H "Content-Type: application/json" \
-  -d '{"paused": false}'
+prefect deployment resume "Describe Memes (OpenRouter Vision)/Describe Memes (OpenRouter)"
 ```
 
-Auth credentials are in the Coolify environment variables (`PREFECT_AUTH_STRING`).
-Before resuming, verify the root cause is fixed (check recent flow run logs for error details).
+Before resuming, verify the root cause is fixed (check recent flow run logs).
 
 ## Key settings & environment toggles
-- Redis, Postgres, and Telegram configuration live in [`src/config.py`](src/config.py). Update `.env` or deployment secrets with:
-  - `DATABASE_URL` / pooling parameters for Postgres.
-  - `REDIS_URL` and connection limits for the queue + cache layer.
-  - `TELEGRAM_BOT_TOKEN`, `MEME_STORAGE_TELEGRAM_CHAT_ID`, and `UPLOADED_MEMES_REVIEW_CHAT_ID` for bot routing.
-- When OCR support returns, enable it by setting `OCR_ENABLED=true` (environment variable) before restarting Prefect workers and bot services.
+- Redis, Postgres, and Telegram configuration live in [`src/config.py`](src/config.py).
+- `OPENROUTER_API_KEY` — required for describe_memes. Balance must stay >= $0.
