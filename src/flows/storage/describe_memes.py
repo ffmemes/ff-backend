@@ -35,14 +35,19 @@ from src.storage.upload import download_meme_content_from_tg
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 # Ordered by preference. Falls back to next model on 429/403/error.
-# Verified available on OpenRouter API as of 2026-04-10
-# Gemma 4 models return HTTP 403 (access denied) — demoted to fallback
+# Verified available on OpenRouter API as of 2026-04-11
+# Diversified across providers to avoid shared rate limits.
+# Removed: Gemma 4 free models (persistent HTTP 403)
+# Removed: nvidia/nemotron-nano-12b-v2-vl:free (invalid JSON, empty content)
 VISION_MODELS = [
+    # --- Free tier ---
     "google/gemma-3-27b-it:free",  # proven workhorse, 131k context
     "google/gemma-3-12b-it:free",  # good fallback, 32k context
-    "google/gemma-4-31b-it:free",  # 262k context — may need account permissions
-    "google/gemma-4-26b-a4b-it:free",  # MoE variant — may need account permissions
-    "google/gemma-3-27b-it",  # paid fallback when all free models exhausted
+    "nvidia/nemotron-3-super-120b-a12b-20230311:free",  # 120B MoE, 262k context
+    # --- Cheap paid fallbacks (< $0.5/M tokens) ---
+    "mistralai/mistral-small-3.1-24b-instruct",  # $0.03/$0.11 per M tokens
+    "meta-llama/llama-4-scout-17b-16e-instruct",  # $0.08/$0.30 per M tokens
+    "google/gemma-3-27b-it",  # paid Gemma 3 as last resort
 ]
 
 DESCRIBE_PROMPT = (
@@ -186,7 +191,7 @@ async def call_openrouter_vision(image_b64: str, log) -> dict:
             if response.status_code == 429:
                 log.debug("Model %s rate-limited, trying next...", model_id)
                 rate_limited_count += 1
-                await asyncio.sleep(1)
+                await asyncio.sleep(3)
                 continue
 
             if response.status_code == 403:
