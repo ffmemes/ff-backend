@@ -42,6 +42,7 @@ Sources (TG/VK/IG) -> Parsers (hourly) -> meme_raw_* tables
   -> ETL (filter, type detect) -> meme (status=created)
   -> Download + Watermark + Upload to TG -> telegram_file_id
   -> Ad filter + Dedup -> status='ok'
+  -> Describe Memes (async, every 30min) -> ocr_result JSONB (description, text, language)
   -> Recommendation engines -> Blender -> Redis queue -> User
 ```
 
@@ -56,6 +57,7 @@ See [specs/](specs/) for subsystem documentation:
 | [specs/parsing-etl.md](specs/parsing-etl.md) | Source parsing, ETL, status pipeline |
 | [specs/dedup.md](specs/dedup.md) | Dedup mechanisms + improvement plan |
 | [specs/testing.md](specs/testing.md) | Test strategy and coverage gaps |
+| [specs/describe-memes.md](specs/describe-memes.md) | Vision OCR: OpenRouter free tier, model chain, constraints |
 | [specs/issues.md](specs/issues.md) | Prioritized issue backlog |
 | [specs/error-profile.md](specs/error-profile.md) | Production error analysis |
 | [specs/data-hypotheses.md](specs/data-hypotheses.md) | Data analysis findings (H1-H7) |
