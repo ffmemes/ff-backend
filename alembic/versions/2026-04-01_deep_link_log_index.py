@@ -5,7 +5,7 @@ sequential scan of user_deep_link_log on every stats run (hourly). The pattern
 has a constant prefix 's_' so a B-tree index is sufficient for the planner to
 use an index scan.
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: 6c67d32f7db5
 Revises: f6a7b8c9d0e1
 Create Date: 2026-04-01 00:00:00.000000
 
@@ -14,7 +14,7 @@ Create Date: 2026-04-01 00:00:00.000000
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "a1b2c3d4e5f6"
+revision = "6c67d32f7db5"
 down_revision = "f6a7b8c9d0e1"
 branch_labels = None
 depends_on = None
