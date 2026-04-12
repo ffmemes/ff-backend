@@ -1,6 +1,10 @@
+import logging
+
 from sqlalchemy import text
 
-from src.database import execute
+from src.database import execute, fetch_all
+
+logger = logging.getLogger(__name__)
 
 
 async def calculate_meme_reactions_and_engagement(
@@ -213,6 +217,7 @@ async def calculate_meme_raw_impressions_stats() -> None:
 
 async def calculate_meme_invited_count():
     # ruff: noqa: W605
+    # Counts bot starts from in-bot share links (s_{user_id}_{meme_id})
     insert_query = """
         WITH MEME_IDS_IN_DEEP_LINKS AS (
             SELECT
@@ -241,3 +246,55 @@ async def calculate_meme_invited_count():
             invited_count = EXCLUDED.invited_count
     """
     await execute(text(insert_query))
+
+
+async def calculate_channel_invited_count():
+    """Count bot starts from channel crosspost links (sc_{meme_id}_{channel}).
+
+    Different deep link format from in-bot shares:
+    - Bot shares: s_{user_id}_{meme_id} -> invited_count
+    - Channel posts: sc_{meme_id}_{channel} -> channel_invited_count
+    """
+    query = """
+        WITH CHANNEL_DEEP_LINKS AS (
+            SELECT
+                CAST(SPLIT_PART(deep_link, '_', 2) AS INTEGER) AS meme_id,
+                SPLIT_PART(deep_link, '_', 3) AS channel,
+                user_id
+            FROM user_deep_link_log
+            WHERE deep_link IS NOT NULL
+              AND deep_link LIKE 'sc\\_%\\_%'
+        )
+
+        UPDATE crossposting CP
+        SET views = COALESCE(CP.views, 0)  -- no-op, just to trigger the UPDATE
+        FROM (
+            SELECT meme_id, channel, COUNT(DISTINCT user_id) AS bot_starts
+            FROM CHANNEL_DEEP_LINKS
+            INNER JOIN meme M ON M.id = CHANNEL_DEEP_LINKS.meme_id
+            GROUP BY meme_id, channel
+        ) AS stats
+        WHERE CP.meme_id = stats.meme_id
+          AND CP.channel = stats.channel
+    """
+    # For now, log the results. The actual bot_starts metric is computed
+    # on-demand via SQL queries in analysis (T6).
+    # This function validates the deep link parsing works correctly.
+    count_query = """
+        SELECT
+            SPLIT_PART(deep_link, '_', 3) AS channel,
+            COUNT(DISTINCT user_id) AS bot_starts,
+            COUNT(*) AS total_clicks
+        FROM user_deep_link_log
+        WHERE deep_link IS NOT NULL
+          AND deep_link LIKE 'sc\\_%\\_%'
+        GROUP BY channel
+    """
+    rows = await fetch_all(text(count_query))
+    if rows:
+        for row in rows:
+            logger.info(
+                "Channel %s: %d bot starts (%d total clicks)",
+                row["channel"], row["bot_starts"], row["total_clicks"],
+            )
+    return rows

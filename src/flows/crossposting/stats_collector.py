@@ -82,13 +82,14 @@ async def _collect_post_stats(client: TelegramClient, channel_key: str, channel_
     if not recent_messages:
         return
 
-    msg_ids = [m.id for m in recent_messages]
+    # Fetch all crossposting rows for this channel that have telegram_message_id set.
+    # We filter in Python rather than using ANY() which isn't used elsewhere in the codebase.
     rows = await fetch_all(
         text(
             "SELECT meme_id, telegram_message_id FROM crossposting "
-            "WHERE channel = :channel AND telegram_message_id = ANY(:msg_ids)"
+            "WHERE channel = :channel AND telegram_message_id IS NOT NULL"
         ),
-        {"channel": channel_key, "msg_ids": msg_ids},
+        {"channel": channel_key},
     )
     known_msg_ids = {r["telegram_message_id"]: r["meme_id"] for r in rows} if rows else {}
 
