@@ -19,3 +19,7 @@ async def calculate_meme_stats_heavy() -> None:
 
     # invited_count: full scan of user_deep_link_log. Hourly is more than enough.
     await meme.calculate_meme_invited_count()
+
+    # channel_invited_count: bot starts from channel crosspost links (sc_% deep links).
+    # Separate from invited_count which only counts in-bot shares (s_% links).
+    await meme.calculate_channel_invited_count()

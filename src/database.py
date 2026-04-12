@@ -7,6 +7,7 @@ from sqlalchemy import (
     Boolean,
     Column,
     CursorResult,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -437,8 +438,45 @@ crossposting = Table(
     Column("channel", String, primary_key=True),
     Column("meme_id", ForeignKey("meme.id", ondelete="CASCADE"), primary_key=True),
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
-    # store stats from each source in json
-    # updated_at to track stats update
+    Column("telegram_message_id", BigInteger),
+    Column("caption_text", String),
+    Column("score_version", Integer, server_default="1"),
+    Column("views", Integer),
+    Column("forwards", Integer),
+    Column("reactions", Integer),
+    Column("comments", Integer),
+    Column("reactions_detail", JSONB),  # {"😁": 6, "❤": 4, ...}
+    Column("stats_updated_at", DateTime),
+)
+
+crossposting_snapshots = Table(
+    "crossposting_snapshots",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("channel", String, nullable=False),
+    Column("meme_id", ForeignKey("meme.id", ondelete="CASCADE"), nullable=False),
+    Column("telegram_message_id", BigInteger, nullable=False),
+    Column("views", Integer),
+    Column("forwards", Integer),
+    Column("reactions", Integer),
+    Column("comments", Integer),
+    Column("reactions_detail", JSONB),  # {"😁": 6, "❤": 4, ...}
+    Column("message_text", String),
+    Column("snapshot_at", DateTime, server_default=func.now(), nullable=False),
+)
+
+channel_daily_stats = Table(
+    "channel_daily_stats",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("channel", String, nullable=False),
+    Column("date", Date, nullable=False),
+    Column("subscriber_count", Integer),
+    Column("posts_count", Integer),
+    Column("total_forwards", Integer),
+    Column("total_views", Integer),
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+    UniqueConstraint("channel", "date"),
 )
 
 user_popup_logs = Table(
