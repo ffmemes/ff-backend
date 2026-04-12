@@ -10,6 +10,7 @@ Uses the same Telethon session string as e2e_smoke.py (TELEGRAM_API_ID,
 TELEGRAM_API_HASH, TELEGRAM_SESSION_STRING env vars).
 """
 
+import json
 import logging
 from datetime import datetime, timedelta
 
@@ -97,41 +98,56 @@ async def _collect_post_stats(client: TelegramClient, channel_key: str, channel_
     for msg in recent_messages:
         views = getattr(msg, "views", None) or 0
         forwards = getattr(msg, "forwards", None) or 0
-        # Telethon message.reactions is a MessageReactions object
+
+        # Reactions: total count + per-emoji breakdown
         reaction_count = 0
-        if hasattr(msg, "reactions") and msg.reactions and hasattr(msg.reactions, "results"):
-            reaction_count = sum(r.count for r in msg.reactions.results)
+        reactions_detail = {}
+        if msg.reactions and hasattr(msg.reactions, "results"):
+            for r in msg.reactions.results:
+                reaction_count += r.count
+                emoji = getattr(r.reaction, "emoticon", str(r.reaction))
+                reactions_detail[emoji] = r.count
+
+        # Comments count
+        comments = 0
+        if msg.replies:
+            comments = getattr(msg.replies, "replies", 0) or 0
 
         meme_id = known_msg_ids.get(msg.id)
         if meme_id is None:
-            # Post not tracked in crossposting table (pre-T2 post or manual post)
+            # Post not tracked in crossposting table (pre-T2 or manual)
             continue
 
         # Insert time-series snapshot
-        snapshot_stmt = (
-            insert(crossposting_snapshots)
-            .values(
+        await execute(
+            insert(crossposting_snapshots).values(
                 channel=channel_key,
                 meme_id=meme_id,
                 telegram_message_id=msg.id,
                 views=views,
                 forwards=forwards,
                 reactions=reaction_count,
+                comments=comments,
+                reactions_detail=reactions_detail or None,
                 message_text=(msg.text or "")[:500],
             )
         )
-        await execute(snapshot_stmt)
         snapshots_inserted += 1
 
         # Update latest values on crossposting table
         await execute(
             text(
-                "UPDATE crossposting SET views = :views, forwards = :forwards, "
-                "reactions = :reactions, stats_updated_at = NOW() "
-                "WHERE channel = :channel AND telegram_message_id = :msg_id"
+                "UPDATE crossposting SET views = :views, forwards = :fwd, "
+                "reactions = :react, comments = :comments, "
+                "reactions_detail = :rdetail, stats_updated_at = NOW() "
+                "WHERE channel = :ch AND telegram_message_id = :msg_id"
             ),
-            {"views": views, "forwards": forwards, "reactions": reaction_count,
-             "channel": channel_key, "msg_id": msg.id},
+            {
+                "views": views, "fwd": forwards, "react": reaction_count,
+                "comments": comments,
+                "rdetail": json.dumps(reactions_detail) if reactions_detail else None,
+                "ch": channel_key, "msg_id": msg.id,
+            },
         )
 
     log.info(f"@{channel_username}: {snapshots_inserted} snapshots inserted")

@@ -444,6 +444,8 @@ crossposting = Table(
     Column("views", Integer),
     Column("forwards", Integer),
     Column("reactions", Integer),
+    Column("comments", Integer),
+    Column("reactions_detail", JSONB),  # {"😁": 6, "❤": 4, ...}
     Column("stats_updated_at", DateTime),
 )
 
@@ -457,6 +459,8 @@ crossposting_snapshots = Table(
     Column("views", Integer),
     Column("forwards", Integer),
     Column("reactions", Integer),
+    Column("comments", Integer),
+    Column("reactions_detail", JSONB),  # {"😁": 6, "❤": 4, ...}
     Column("message_text", String),
     Column("snapshot_at", DateTime, server_default=func.now(), nullable=False),
 )

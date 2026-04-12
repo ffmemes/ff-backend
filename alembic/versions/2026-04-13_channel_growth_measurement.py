@@ -6,8 +6,9 @@ Create Date: 2026-04-13 00:00:00.000000
 
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB
 
 revision = "a1b2c3d4e5f6"
 down_revision = "f6a7b8c9d0e1"
@@ -23,6 +24,8 @@ def upgrade() -> None:
     op.add_column("crossposting", sa.Column("views", sa.Integer()))
     op.add_column("crossposting", sa.Column("forwards", sa.Integer()))
     op.add_column("crossposting", sa.Column("reactions", sa.Integer()))
+    op.add_column("crossposting", sa.Column("comments", sa.Integer()))
+    op.add_column("crossposting", sa.Column("reactions_detail", JSONB))
     op.add_column("crossposting", sa.Column("stats_updated_at", sa.DateTime()))
 
     # Index for stats collector lookups
@@ -47,6 +50,8 @@ def upgrade() -> None:
         sa.Column("views", sa.Integer()),
         sa.Column("forwards", sa.Integer()),
         sa.Column("reactions", sa.Integer()),
+        sa.Column("comments", sa.Integer()),
+        sa.Column("reactions_detail", JSONB),
         sa.Column("message_text", sa.String()),
         sa.Column(
             "snapshot_at", sa.DateTime(), server_default=sa.func.now(), nullable=False
@@ -81,6 +86,8 @@ def downgrade() -> None:
     op.drop_table("crossposting_snapshots")
     op.drop_index("ix_crossposting_telegram_message_id")
     op.drop_column("crossposting", "stats_updated_at")
+    op.drop_column("crossposting", "reactions_detail")
+    op.drop_column("crossposting", "comments")
     op.drop_column("crossposting", "reactions")
     op.drop_column("crossposting", "forwards")
     op.drop_column("crossposting", "views")
