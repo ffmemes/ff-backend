@@ -80,6 +80,41 @@
 ### ~~Audit all handlers for unhandled Forbidden~~ — DONE
 **Context:** Done 2026-03-20. Fixed 4 handlers: `language.py`, `send_tokens.py`, `feedback.py`, `treasury/payments.py`. All now catch `Forbidden` for cross-user message sends. Error handler already protects moderators/admins from demotion.
 
+## Channel Growth
+
+### DRY crossposting scoring functions
+**What:** Merge get_next_meme_for_tgchannelru() and get_next_meme_for_tgchannelen() into get_next_meme_for_channel(channel, language_code, weights).
+**Why:** 90% identical SQL. When formula changes, need to update in two places. The weights dict becomes the experiment variable for future A/B testing.
+**File:** `src/crossposting/service.py`
+**Depends on:** Channel growth baseline data (2 weeks after deploy of stats collector)
+
+### Autoresearch loop for channel growth
+**What:** AI agent generates scoring formula variants, tags posts with score_version, measures forwards_per_1k_views, keeps winners. Karpathy-inspired automated experimentation.
+**Why:** At 6 posts/day, convergence takes weeks manually. Automated loop can test more variants faster.
+**Depends on:** 4+ weeks of Telethon stats data + DRY scoring functions
+
+### Fix non-idempotent crossposting flow
+**What:** Current flow sends to Telegram BEFORE writing to DB. Failure after send = live post with no DB record (ghost post). Fix: write DB row first with status='pending', send, then update status='sent' + message_id.
+**Why:** Stats collector can't match ghost posts. Data loss on retries.
+**File:** `src/flows/crossposting/meme.py`
+**Depends on:** Nothing
+
+### Channel audience study via giveaway
+**What:** Post a deep link button in channel offering +10 burger coins. Track who clicks. Cross-reference with bot users. Use Telethon to analyze their profiles (linked channels, gift exchanges).
+**Why:** Understand who reads the channel, what they look like, whether they're already bot users.
+**Depends on:** Telethon admin access to channel
+
+### Track channel join/leave events
+**What:** Use Telethon admin log to record join/leave events for both channels. Cross-reference with bot user data.
+**Why:** Understand churn. Are people who leave the channel still using the bot? Are new joiners converting?
+**Depends on:** Telethon admin access to channel
+
+### Backfill historical channel posts to DB
+**What:** Bulk-insert the 15K posts from channel_posts_snapshot.json into crossposting_snapshots table after migration.
+**Why:** Full historical data for analysis. Currently only new posts (after T2 deploy) will have telegram_message_id.
+**File:** channel_posts_snapshot.json -> crossposting_snapshots
+**Depends on:** Migration deployed
+
 ## P3 — Nice to Have
 
 ### Daily north star log message
