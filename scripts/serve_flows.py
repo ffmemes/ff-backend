@@ -134,8 +134,11 @@ if __name__ == "__main__":
         # ── Crossposting (Moscow timezone) ──
         post_meme_to_tgchannelru.to_deployment(
             name="Post to TG Channel RU",
+            # Experiment: dropped 18:00 MSK (21:00 UTC, 10.2 fwd/1k — worst slot).
+            # Added 11:00 MSK. Data: 10:00 MSK = 25.6 fwd/1k (best), 18:00 MSK = 15.6 fwd/1k.
+            # Baseline (pre-2026-04-13): 8,10,12,14,16,18 MSK (6x/day)
             schedules=[
-                CronSchedule(cron="20 8,10,12,14,16,18 * * *", timezone=MSK)
+                CronSchedule(cron="20 8,10,11,12,14,16 * * *", timezone=MSK)
             ],
         ),
         post_meme_to_tgchannelen.to_deployment(
