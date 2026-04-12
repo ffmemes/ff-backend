@@ -7,9 +7,23 @@ from src.crossposting.constants import Channel
 from src.database import crossposting, execute, fetch_one
 
 
-async def log_meme_sent(meme_id: int, channel: Channel) -> None:
+async def log_meme_sent(
+    meme_id: int,
+    channel: Channel,
+    telegram_message_id: int | None = None,
+    caption_text: str | None = None,
+    score_version: int = 1,
+) -> None:
     insert_statement = (
-        insert(crossposting).values(meme_id=meme_id, channel=channel.value).on_conflict_do_nothing()
+        insert(crossposting)
+        .values(
+            meme_id=meme_id,
+            channel=channel.value,
+            telegram_message_id=telegram_message_id,
+            caption_text=caption_text,
+            score_version=score_version,
+        )
+        .on_conflict_do_nothing()
     )
 
     await execute(insert_statement)

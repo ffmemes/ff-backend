@@ -167,12 +167,17 @@ async def post_meme_to_tgchannelen():
     next_meme = MemeData(**meme_data)
     logger.info(f"Next meme for TG Channel EN: {next_meme.id}")
 
-    next_meme.caption = _get_en_caption_for_crossposting_meme(next_meme, Channel.TG_CHANNEL_EN)
+    caption_text = _get_en_caption_for_crossposting_meme(next_meme, Channel.TG_CHANNEL_EN)
+    next_meme.caption = caption_text
     msg = await send_new_message_with_meme(
         bot, TELEGRAM_CHANNEL_EN_CHAT_ID, next_meme, reply_markup=None
     )
 
-    await log_meme_sent(next_meme.id, Channel.TG_CHANNEL_EN)
+    await log_meme_sent(
+        next_meme.id, Channel.TG_CHANNEL_EN,
+        telegram_message_id=msg.message_id,
+        caption_text=caption_text,
+    )
     await update_meme(next_meme.id, status=MemeStatus.PUBLISHED)
 
     uploader_user_id = await get_meme_uploader_user_id(next_meme.id)
@@ -203,13 +208,18 @@ async def post_meme_to_tgchannelru():
     next_meme = MemeData(**meme_data)
     logger.info(f"Next meme for TG Channel RU: {next_meme.id}")
 
-    next_meme.caption = _get_ru_caption_for_crossposting_meme(next_meme, Channel.TG_CHANNEL_RU)
+    caption_text = _get_ru_caption_for_crossposting_meme(next_meme, Channel.TG_CHANNEL_RU)
+    next_meme.caption = caption_text
 
     msg = await send_new_message_with_meme(
         bot, TELEGRAM_CHANNEL_RU_CHAT_ID, next_meme, reply_markup=None
     )
 
-    await log_meme_sent(next_meme.id, Channel.TG_CHANNEL_RU)
+    await log_meme_sent(
+        next_meme.id, Channel.TG_CHANNEL_RU,
+        telegram_message_id=msg.message_id,
+        caption_text=caption_text,
+    )
     await update_meme(next_meme.id, status=MemeStatus.PUBLISHED)
 
     uploader_user_id = await get_meme_uploader_user_id(next_meme.id)
