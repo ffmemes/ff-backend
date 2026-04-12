@@ -625,6 +625,9 @@ async def fetch_one(
             raise
     # Retry once — covers stale connections (server closed between ping and query)
     # and concurrent-use errors (pool handed out a busy connection).
+    # Brief yield lets the event loop process connection disposal so the pool
+    # doesn't hand out another stale connection on the retry.
+    await asyncio.sleep(0.01)
     async with engine.begin() as conn:
         cursor: CursorResult = await conn.execute(select_query, params or {})
         row = cursor.first()
@@ -642,6 +645,7 @@ async def fetch_all(
     except Exception as exc:
         if not _is_transient_connection_error(exc):
             raise
+    await asyncio.sleep(0.01)
     async with engine.begin() as conn:
         cursor: CursorResult = await conn.execute(select_query, params or {})
         return [r._asdict() for r in cursor.all()]
@@ -659,7 +663,7 @@ async def execute(
     (after a short backoff) is the standard resolution.
 
     Retry policy:
-        - Stale connection (ConnectionDoesNotExistError): 1 immediate retry
+        - Stale/concurrent-use connection: 1 retry after 10 ms yield
         - Deadlock (DeadlockDetectedError): up to 2 retries, 100 ms / 200 ms backoff
     """
     _DEADLOCK_MAX_RETRIES = 2
@@ -670,7 +674,9 @@ async def execute(
                 return await conn.execute(select_query, params or {})
         except Exception as exc:
             if _is_transient_connection_error(exc) and attempt == 0:
-                # Stale / concurrent-use connection: retry once immediately
+                # Stale / concurrent-use connection: brief yield lets the
+                # event loop process connection disposal before retry.
+                await asyncio.sleep(0.01)
                 continue
             if _is_deadlock_error(exc) and attempt < _DEADLOCK_MAX_RETRIES:
                 # Deadlock: short exponential backoff then retry
