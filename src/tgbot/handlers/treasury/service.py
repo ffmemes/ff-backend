@@ -49,7 +49,7 @@ async def get_leaderboard(limit=10) -> list[dict[str, Any]]:
 
     select_statement = (
         select(user, recent_earnings.c.weekly_earned)
-        .join(recent_earnings, recent_earnings.c.user_id == user.c.id)
+        .select_from(user.join(recent_earnings, recent_earnings.c.user_id == user.c.id))
         .order_by(recent_earnings.c.weekly_earned.desc(), user.c.id.asc())
         .limit(limit)
     )
@@ -81,7 +81,7 @@ async def get_user_place_in_leaderboard(user_id: int) -> int:
             )
             .label("place"),
         )
-        .join(recent_earnings, recent_earnings.c.user_id == user.c.id)
+        .select_from(user.join(recent_earnings, recent_earnings.c.user_id == user.c.id))
         .subquery()
     )
 
