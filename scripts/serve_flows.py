@@ -27,6 +27,7 @@ from src.flows.crossposting.meme import (
     post_meme_to_tgchannelen,
     post_meme_to_tgchannelru,
 )
+from src.flows.crossposting.stats_collector import collect_channel_stats
 from src.flows.crossposting.weekly_report import post_weekly_burger_report
 from src.flows.parsers.ig import parse_ig_sources
 
@@ -142,6 +143,11 @@ if __name__ == "__main__":
             schedules=[
                 CronSchedule(cron="40 8,10,14,18,20 * * *", timezone=MSK)
             ],
+        ),
+        # ── Channel Stats (every 6h) ──
+        collect_channel_stats.to_deployment(
+            name="Collect Channel Stats",
+            schedules=[CronSchedule(cron="0 */6 * * *", timezone=LON)],
         ),
         # ── Editorial (on-demand + weekly report) ──
         post_editorial_to_channel.to_deployment(
