@@ -1,6 +1,6 @@
 """Add channel growth measurement tables and crossposting columns
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: 5a9d22dbecb6
 Revises: f6a7b8c9d0e1
 Create Date: 2026-04-13 00:00:00.000000
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB
 
-revision = "a1b2c3d4e5f6"
+revision = "5a9d22dbecb6"
 down_revision = "f6a7b8c9d0e1"
 branch_labels = None
 depends_on = None
