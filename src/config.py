@@ -53,6 +53,9 @@ class Config(BaseSettings):
 
     OCR_ENABLED: bool = False
 
+    PREFECT_API_URL: str | None = None
+    PREFECT_AUTH_STRING: str | None = None
+
     PAPERCLIP_QA_TRIGGER_URL: str | None = None
     PAPERCLIP_QA_TRIGGER_SECRET: str | None = None
     WEBHOOK_PROXY_SECRET: str | None = None
