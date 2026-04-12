@@ -24,3 +24,5 @@ Pillow==11.3.*
 
 openai==2.8.*
 openai-agents==0.4.*
+
+telethon==1.37.*
