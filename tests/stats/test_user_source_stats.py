@@ -63,10 +63,10 @@ async def _get_umss(user_id: int, meme_source_id: int) -> dict | None:
 @pytest.mark.asyncio
 async def test_calculates_nlikes_ndislikes(setup):
     async with engine.connect() as conn:
-        await create_reaction(conn, 10001, 10001, reaction_id=1, reacted_at=FIXED_DT)
-        await create_reaction(conn, 10001, 10002, reaction_id=1, reacted_at=FIXED_DT)
-        await create_reaction(conn, 10001, 10003, reaction_id=1, reacted_at=FIXED_DT)
-        await create_reaction(conn, 10001, 10004, reaction_id=2, reacted_at=FIXED_DT)
+        await create_reaction(conn, 10001, 10001, reaction_id=1, reacted_at=datetime.utcnow())
+        await create_reaction(conn, 10001, 10002, reaction_id=1, reacted_at=datetime.utcnow())
+        await create_reaction(conn, 10001, 10003, reaction_id=1, reacted_at=datetime.utcnow())
+        await create_reaction(conn, 10001, 10004, reaction_id=2, reacted_at=datetime.utcnow())
         await conn.commit()
 
     await calculate_user_meme_source_stats()
@@ -81,9 +81,9 @@ async def test_calculates_nlikes_ndislikes(setup):
 async def test_multiple_sources_separate(setup):
     async with engine.connect() as conn:
         # Reactions to source 10001
-        await create_reaction(conn, 10001, 10001, reaction_id=1, reacted_at=FIXED_DT)
+        await create_reaction(conn, 10001, 10001, reaction_id=1, reacted_at=datetime.utcnow())
         # Reactions to source 10002
-        await create_reaction(conn, 10001, 10005, reaction_id=2, reacted_at=FIXED_DT)
+        await create_reaction(conn, 10001, 10005, reaction_id=2, reacted_at=datetime.utcnow())
         await conn.commit()
 
     await calculate_user_meme_source_stats()
@@ -103,7 +103,7 @@ async def test_ignores_unreacted(setup):
     async with engine.connect() as conn:
         # reaction_id=None means user hasn't reacted yet (just sent)
         await create_reaction(conn, 10001, 10001, reaction_id=None, reacted_at=None)
-        await create_reaction(conn, 10001, 10002, reaction_id=1, reacted_at=FIXED_DT)
+        await create_reaction(conn, 10001, 10002, reaction_id=1, reacted_at=datetime.utcnow())
         await conn.commit()
 
     await calculate_user_meme_source_stats()
@@ -117,7 +117,7 @@ async def test_ignores_unreacted(setup):
 @pytest.mark.asyncio
 async def test_updates_on_rerun(setup):
     async with engine.connect() as conn:
-        await create_reaction(conn, 10001, 10001, reaction_id=1, reacted_at=FIXED_DT)
+        await create_reaction(conn, 10001, 10001, reaction_id=1, reacted_at=datetime.utcnow())
         await conn.commit()
 
     await calculate_user_meme_source_stats()
@@ -126,8 +126,8 @@ async def test_updates_on_rerun(setup):
 
     # Add more reactions and rerun
     async with engine.connect() as conn:
-        await create_reaction(conn, 10001, 10002, reaction_id=1, reacted_at=FIXED_DT)
-        await create_reaction(conn, 10001, 10003, reaction_id=2, reacted_at=FIXED_DT)
+        await create_reaction(conn, 10001, 10002, reaction_id=1, reacted_at=datetime.utcnow())
+        await create_reaction(conn, 10001, 10003, reaction_id=2, reacted_at=datetime.utcnow())
         await conn.commit()
 
     await calculate_user_meme_source_stats()
@@ -139,8 +139,8 @@ async def test_updates_on_rerun(setup):
 @pytest.mark.asyncio
 async def test_multiple_users_independent(setup):
     async with engine.connect() as conn:
-        await create_reaction(conn, 10001, 10001, reaction_id=1, reacted_at=FIXED_DT)
-        await create_reaction(conn, 10002, 10001, reaction_id=2, reacted_at=FIXED_DT)
+        await create_reaction(conn, 10001, 10001, reaction_id=1, reacted_at=datetime.utcnow())
+        await create_reaction(conn, 10002, 10001, reaction_id=2, reacted_at=datetime.utcnow())
         await conn.commit()
 
     await calculate_user_meme_source_stats()
