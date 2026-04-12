@@ -266,6 +266,12 @@ async def goat(
                 AND (MS.nlikes + MS.ndislikes) >= {GOAT_MIN_REACTIONS}
                 AND MS.lr_smoothed >= {GOAT_MIN_LR}
                 AND M.created_at <= NOW() - INTERVAL '{GOAT_MIN_AGE_DAYS} days'
+                AND NOT EXISTS (
+                    SELECT 1 FROM user_meme_reaction umr
+                    WHERE umr.user_id = :user_id
+                      AND umr.meme_id = M.id
+                      AND umr.reacted_at > NOW() - INTERVAL '30 days'
+                )
         )
 
 
@@ -281,13 +287,7 @@ async def goat(
             ON L.user_id = :user_id
             AND L.language_code = M.language_code
 
-        LEFT JOIN user_meme_reaction R
-                ON R.meme_id = M.id
-                AND R.user_id = :user_id
-                AND R.sent_at > NOW() - INTERVAL '30 days'
-
         WHERE 1=1
-            AND R.meme_id IS NULL
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
         ORDER BY SCORES.score DESC NULLS LAST
         LIMIT :limit

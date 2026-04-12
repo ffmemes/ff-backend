@@ -48,6 +48,7 @@ services:
     restart: unless-stopped
 
   app_tgbot_polling:
+    profiles: ["dev"]
     container_name: app_tgbot_polling
     image: app_image
     env_file:
