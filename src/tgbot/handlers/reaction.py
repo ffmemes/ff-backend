@@ -31,7 +31,7 @@ async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # do that in sync since we'll use counters in next_message
     user_info = await update_user_info_counters(user_id)
     await maybe_send_moderator_invite(context.bot, user_id, user_info)
-    _fire_and_forget(update_user_last_active_at(user_id))
+    await update_user_last_active_at(user_id)
     _fire_and_forget(reward_user_for_daily_activity(user_id))
 
     reaction_is_new = await update_user_meme_reaction(
