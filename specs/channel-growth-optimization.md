@@ -25,14 +25,28 @@
 - Secondary: bot_starts via deep link (user_deep_link_log WHERE deep_link LIKE 'sc_%')
 - Supporting: subscriber_count delta per day, in-channel reactions
 
-## Next Experiments (prioritized)
-1. Monitor video priority impact (deployed, measure in 2 weeks)
-2. Monitor CTA weighting impact (deployed, measure in 2 weeks)
-3. Monitor time slot change impact (deployed, measure in 2 weeks)
-4. Reduce posting frequency to 4/day with only top-scored memes (hypothesis: fewer but better posts = more forwards per post)
-5. Channel audience study: giveaway with deep link to identify who reads the channel, cross-reference with bot users
-6. Track channel join/leave events via Telethon admin log
-7. Add Telethon account as channel admin to unlock GetMessagePublicForwardsRequest (see who reposts publicly)
+## Current Experiment (deployed 2026-04-13, measure until 2026-04-27)
+- Video 1.8x scoring boost
+- Weighted CTAs (top 11 get 3x weight, 10 worst removed)
+- Time slot: dropped 18:00 MSK, added 11:00 MSK
+- **DO NOT change scoring formula until baseline comparison is done**
+- Compare: avg fwd/1k for posts after deploy vs historical baseline (18.2 fwd/1k)
+
+## Deep Analysis Findings (from 3,400 matched DB posts, 2026-04-13)
+- **Bot engagement does NOT predict channel virality.** Correlation between nlikes/lr_smoothed/engagement_score and fwd/1k is r=0.03-0.04 (essentially zero). Like rate in the formula is noise.
+- **Source matters 1.8x.** Best sources avg 24.5 fwd/1k, worst avg 13.6. Source predicts forwards better than any bot metric.
+- **Meme age doesn't matter.** <1 week (19.2) vs 1+ year (19.0). Recency bonus is noise.
+- **Captions hurt -23%.** No caption: 18.6, has caption: 14.4 fwd/1k.
+- **😁 reaction is the best forward signal.** Top quartile posts get 12.4 avg 😁 vs 6.4 in bottom quartile.
+- **Forwards and bot_starts are weakly correlated.** CTA matters more than meme for conversion.
+
+## Next Experiments (after current experiment concludes ~2026-04-27)
+1. **Source-based scoring** — add meme_source bonus/penalty based on historical fwd/1k per source. Biggest untapped lever.
+2. **Remove like_rate and recency from formula** — they're noise. New formula: `no_caption_bonus * video_bonus * source_quality_bonus * reach_ratio`
+3. Reduce posting frequency to 5/day (data shows 5-6 is sweet spot, we're at 6)
+4. Channel audience study: giveaway with deep link to identify who reads the channel
+5. Track channel join/leave events via Telethon admin log
+6. Add Telethon account as channel admin to unlock GetMessagePublicForwardsRequest
 
 ## Architecture
 - Stats collector: src/flows/crossposting/stats_collector.py (Prefect flow, every 6h)
