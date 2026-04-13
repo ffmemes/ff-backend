@@ -295,6 +295,8 @@ async def calculate_channel_invited_count():
         for row in rows:
             logger.info(
                 "Channel %s: %d bot starts (%d total clicks)",
-                row["channel"], row["bot_starts"], row["total_clicks"],
+                row["channel"],
+                row["bot_starts"],
+                row["total_clicks"],
             )
     return rows
