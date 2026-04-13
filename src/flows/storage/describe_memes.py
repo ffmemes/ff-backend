@@ -26,6 +26,7 @@ import asyncio
 import base64
 import json
 import re
+import time
 from datetime import datetime, timezone
 
 import httpx
@@ -367,8 +368,22 @@ async def describe_memes_flow(batch_size: int = 30) -> None:
     ok = 0
     failed = 0
     consecutive_fails = 0
+    batch_start = time.monotonic()
+    # Stop processing before hitting the 900s flow timeout (60s buffer for final DB writes)
+    max_batch_seconds = 840
+    # Minimum interval between request starts to stay under 20 rpm rate limit
+    min_request_interval = 3.5
 
     for i, meme_row in enumerate(memes):
+        elapsed = time.monotonic() - batch_start
+        if elapsed >= max_batch_seconds:
+            log.warning(
+                "Approaching timeout (%.0fs elapsed). Stopping batch at %d/%d.",
+                elapsed, i, len(memes),
+            )
+            break
+
+        request_start = time.monotonic()
         status = await describe_single_meme(meme_row, log)
 
         if status == "ok":
@@ -398,7 +413,10 @@ async def describe_memes_flow(batch_size: int = 30) -> None:
                 break
 
         if i < len(memes) - 1:
-            await asyncio.sleep(4)
+            request_elapsed = time.monotonic() - request_start
+            sleep_needed = max(0, min_request_interval - request_elapsed)
+            if sleep_needed > 0:
+                await asyncio.sleep(sleep_needed)
 
     log.info("Batch: %d described, %d failed out of %d.", ok, failed, len(memes))
 
