@@ -28,8 +28,11 @@ just downgrade -1              # Rollback one migration
 just backup                    # pg_dump + gzip
 just restore <file>            # pg_restore
 
-# Code quality
-just lint                      # ruff fix + format
+# Code quality — MUST run before every commit
+ruff check --fix src/ tests/   # fix lint errors
+ruff format src/ tests/        # fix formatting (CI checks this!)
+# Or equivalently:
+just lint                      # runs both ruff fix + format
 
 # Tests (all integration tests, require DB)
 docker compose exec app pytest
