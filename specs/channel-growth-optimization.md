@@ -48,6 +48,9 @@
 5. Track channel join/leave events via Telethon admin log
 6. Add Telethon account as channel admin to unlock GetMessagePublicForwardsRequest
 
+## Future: Per-Channel Prediction Model
+Train a model that predicts whether a meme will grow the channel (high fwd/1k) BEFORE posting it. Each channel gets its own model since RU and EN audiences behave very differently (RU avg 19.4 fwd, EN avg 1.6 fwd). Features to explore: meme source, media type, OCR text length, description embeddings, time-of-day, day-of-week, meme_stats signals (even if weak individually, they may combine). Target: binary classification (above/below median fwd/1k) or regression on fwd/1k. Start simple (logistic regression on source_id + type + caption_length), graduate to embeddings if signal exists. Needs 4+ weeks of snapshot data with score_version tagging for train/test split.
+
 ## Architecture
 - Stats collector: src/flows/crossposting/stats_collector.py (Prefect flow, every 6h)
 - Scoring: src/crossposting/service.py (get_next_meme_for_tgchannelru/en)
