@@ -37,6 +37,8 @@ The most important code path in the system. A bug here breaks the core UX.
 
 ## Production Errors (from this path)
 
+*Historical counts from 2026-03-12/13. asyncpg contention has since been fixed (see PR #163).*
+
 - asyncpg contention: 8/day — multiple async ops on same connection
 - Telegram timeouts: 5/day — send_video/edit_media fails
 - Queue exhaustion: 22 warnings/day — 10 retries all hit already-seen memes
@@ -54,4 +56,4 @@ The most important code path in the system. A bug here breaks the core UX.
 
 ## Test Coverage
 
-**Current: 0%** — No tests cover any function in this path. This is the #1 testing priority.
+Tests now exist: `tests/tgbot/test_reaction_handler.py` and `tests/recommendations/test_reaction_service.py`.

@@ -25,7 +25,7 @@ Note: Legacy Modal OCR has been removed. [Describe Memes](describe-memes.md) (Op
 | VK | `20 * * * *` | Hourly at :20 | `src/storage/parsers/vk.py` |
 | Instagram | `30 0 * * *` | Daily at 00:30 | `src/storage/parsers/ig.py` |
 
-Cron definitions: `flow_deployments/parsers.py`
+Cron definitions: `scripts/serve_flows.py`
 
 ## Parsers
 
@@ -87,4 +87,4 @@ See [dedup.md](dedup.md) for improvement plan.
 | `src/storage/watermark.py` | Image watermarking (Pillow) |
 | `src/storage/ads.py` | Ad keyword detection |
 | `src/flows/storage/memes.py` | Pipeline orchestration (tg/vk/ig_meme_pipeline) |
-| `flow_deployments/parsers.py` | Cron schedule definitions |
+| `scripts/serve_flows.py` | Cron schedule definitions |
