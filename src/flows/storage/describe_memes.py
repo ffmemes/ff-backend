@@ -53,7 +53,9 @@ VISION_MODELS = [
     "google/gemma-3-4b-it:free",  # small but fast, 32k context
     "google/gemma-4-31b-it:free",  # 262k context (may 403 — will skip to next)
     "google/gemma-4-26b-a4b-it:free",  # 262k MoE (may 403 — will skip to next)
-    "nvidia/nemotron-nano-12b-v2-vl:free",  # 128k, different provider (JSON quirky)
+    # nvidia/nemotron-nano-12b-v2-vl:free removed — returns 504s and invalid
+    # JSON/empty content (see specs/describe-memes.md). Wasted 30s per meme
+    # at end of fallback chain, contributing to batch timeouts.
 ]
 
 DESCRIBE_PROMPT = (

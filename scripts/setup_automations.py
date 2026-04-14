@@ -62,11 +62,16 @@ async def delete_existing_automations():
 
 
 def _deployment_trigger(
-    deployment_id, event: str, posture=Posture.Reactive, threshold=1, within_minutes=0
+    deployment_id,
+    event: str | set[str],
+    posture=Posture.Reactive,
+    threshold=1,
+    within_minutes=0,
 ) -> EventTrigger:
+    expect = event if isinstance(event, set) else {event}
     return EventTrigger(
         posture=posture,
-        expect={event},
+        expect=expect,
         match_related={
             "prefect.resource.id": f"prefect.deployment.{deployment_id}",
             "prefect.resource.role": "deployment",
@@ -149,6 +154,13 @@ async def create_automations(ids: dict):
         created.append(auto.name)
 
     # ── Circuit breakers: pause deployment after repeated failures ──
+    # Match Failed, TimedOut, and Crashed — all are terminal failure states.
+    # Previously only matched Failed, so timeouts never triggered the breaker.
+    circuit_failure_events = {
+        "prefect.flow-run.Failed",
+        "prefect.flow-run.TimedOut",
+        "prefect.flow-run.Crashed",
+    }
     circuits = [
         ("parse_tg", 3, 30, "Pause TG parser after 3 failures in 30 min"),
         ("parse_vk", 3, 30, "Pause VK parser after 3 failures in 30 min"),
@@ -161,7 +173,7 @@ async def create_automations(ids: dict):
                 description=desc,
                 trigger=_deployment_trigger(
                     ids[dep_key],
-                    "prefect.flow-run.Failed",
+                    circuit_failure_events,
                     threshold=failures,
                     within_minutes=minutes,
                 ),
