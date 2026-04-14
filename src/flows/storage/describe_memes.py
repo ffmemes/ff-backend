@@ -76,6 +76,7 @@ DESCRIBE_PROMPT = (
 # Sentinel return values from call_openrouter_vision
 RATE_LIMITED = "__rate_limited"
 ALL_FAILED = "__all_failed"
+QUOTA_EXHAUSTED = "__quota_exhausted"
 
 
 async def get_memes_to_describe(limit: int = 30) -> list[dict]:
@@ -204,6 +205,14 @@ async def call_openrouter_vision(image_b64: str, log, *, deadline: float | None 
                     json=payload,
                 )
 
+                if response.status_code == 402:
+                    log.warning(
+                        "OpenRouter quota exhausted (HTTP 402). "
+                        "Balance likely below $0 — all models blocked. "
+                        "Check https://openrouter.ai/settings/credits"
+                    )
+                    return {QUOTA_EXHAUSTED: True}
+
                 if response.status_code == 429:
                     log.debug("Model %s rate-limited, trying next...", model_id)
                     rate_limited_count += 1
@@ -300,6 +309,9 @@ async def describe_single_meme(meme_row: dict, log, *, deadline: float | None = 
 
     if result.get(RATE_LIMITED):
         return "rate_limited"
+
+    if result.get(QUOTA_EXHAUSTED):
+        return "quota_exhausted"
 
     if result.get(ALL_FAILED):
         await _increment_describe_failures(meme_id, existing_ocr, "all models failed")
@@ -433,7 +445,17 @@ async def describe_memes_flow(batch_size: int = 20) -> None:
             log.info("Described meme %d (%d/%d)", meme_row["id"], i + 1, len(memes))
         elif status == "rate_limited":
             log.warning(
-                "All models rate-limited at meme %d (%d/%d). Stopping batch — quota exhausted.",
+                "All models rate-limited at meme %d (%d/%d). Stopping batch.",
+                meme_row["id"],
+                i + 1,
+                len(memes),
+            )
+            break
+        elif status == "quota_exhausted":
+            log.warning(
+                "OpenRouter quota exhausted at meme %d (%d/%d). "
+                "Stopping batch — balance likely below $0. "
+                "Top up at https://openrouter.ai/settings/credits",
                 meme_row["id"],
                 i + 1,
                 len(memes),
