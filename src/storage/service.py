@@ -203,7 +203,7 @@ async def get_unloaded_ig_memes(limit: int) -> list[dict[str, Any]]:
         SELECT
             meme.id,
             meme.type,
-            media->0->>'url' content_url
+            MRI.media->0->>'url' content_url
         FROM meme
         INNER JOIN meme_source
             ON meme_source.id = meme.meme_source_id
@@ -213,6 +213,8 @@ async def get_unloaded_ig_memes(limit: int) -> list[dict[str, Any]]:
             AND MRI.meme_source_id = meme.meme_source_id
         WHERE 1=1
             AND meme.telegram_file_id IS NULL
+            AND MRI.media->0->>'url' IS NOT NULL
+            AND COALESCE(MRI.updated_at, MRI.created_at) >= NOW() - INTERVAL '24 hours'
         ORDER BY meme.published_at DESC
         LIMIT {limit}
     """
