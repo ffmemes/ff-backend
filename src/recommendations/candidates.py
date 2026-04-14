@@ -241,10 +241,11 @@ async def goat(
     logger.info("goat pool_size=%d", pool_size)
 
     query = f"""
-        WITH SCORES AS (
+        WITH SCORES AS MATERIALIZED (
             SELECT
                 MS.meme_id,
-                1.0
+                (
+                    1.0
                     * (MS.nlikes - MS.ndislikes)::float / (MS.nmemes_sent + 1)
                     * MS.lr_smoothed
                     * (MS.nlikes + MS.ndislikes)::float / (MS.nmemes_sent + 1)
@@ -253,7 +254,7 @@ async def goat(
                     * CASE WHEN MS.raw_impr_rank < 1 THEN 1 ELSE 0.8 END
                     * (MSS.nlikes + MSS.ndislikes)::float / (MSS.nmemes_sent_events + 1.)
                     * (UMSS.nlikes + 1.)::float / (UMSS.nlikes + UMSS.ndislikes + 1.)
-                AS score
+                ) AS score
             FROM meme M
             INNER JOIN meme_stats MS
                 ON M.id = MS.meme_id
@@ -499,5 +500,12 @@ class CandidatesRetriever:
             engine: self.get_candidates(engine, user_id, limit, exclude_mem_ids)
             for engine in engines
         }
-        results = await asyncio.gather(*tasks.values())
-        return dict(zip(engines, results))
+        results = await asyncio.gather(*tasks.values(), return_exceptions=True)
+        out: dict[str, list[dict[str, Any]]] = {}
+        for engine, result in zip(engines, results):
+            if isinstance(result, BaseException):
+                logger.warning("engine %s failed for user %d", engine, user_id, exc_info=result)
+                out[engine] = []
+            else:
+                out[engine] = result
+        return out
