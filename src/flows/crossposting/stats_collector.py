@@ -143,10 +143,13 @@ async def _collect_post_stats(client: TelegramClient, channel_key: str, channel_
                 "WHERE channel = :ch AND telegram_message_id = :msg_id"
             ),
             {
-                "views": views, "fwd": forwards, "react": reaction_count,
+                "views": views,
+                "fwd": forwards,
+                "react": reaction_count,
                 "comments": comments,
                 "rdetail": json.dumps(reactions_detail) if reactions_detail else None,
-                "ch": channel_key, "msg_id": msg.id,
+                "ch": channel_key,
+                "msg_id": msg.id,
             },
         )
 
@@ -154,7 +157,9 @@ async def _collect_post_stats(client: TelegramClient, channel_key: str, channel_
 
 
 async def _collect_subscriber_count(
-    client: TelegramClient, channel_key: str, channel_username: str,
+    client: TelegramClient,
+    channel_key: str,
+    channel_username: str,
 ):
     """Snapshot daily subscriber count for a channel."""
     log = get_run_logger()

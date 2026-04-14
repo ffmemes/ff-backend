@@ -1,7 +1,9 @@
 # Error Profile
 
+> Note: This is a historical snapshot from 2026-03-12. Sentry is now enabled (sentry_sdk.init() in src/main.py). See current errors via `sentry issues list`.
+
 > Source: Coolify logs, 2026-03-12 to 2026-03-13
-> Sentry is DISABLED (commented out in src/main.py)
+> Sentry was DISABLED at the time of this snapshot (now enabled)
 
 ## Errors (ERROR level)
 

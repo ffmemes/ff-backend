@@ -9,7 +9,9 @@ User presses /start -> receives meme with Like/Dislike buttons -> reaction trigg
 
 **Goal**: Viral growth through better memes -> better crossposting -> more users -> better signal -> better memes.
 
-## Key Numbers (2026-03-13)
+## Key Numbers (2026-03-13, historical)
+
+For current numbers, query the production database (see CLAUDE.md health check query).
 
 | Metric | Value |
 |--------|-------|
@@ -61,6 +63,11 @@ See [specs/](specs/) for subsystem documentation:
 | [specs/issues.md](specs/issues.md) | Prioritized issue backlog |
 | [specs/error-profile.md](specs/error-profile.md) | Production error analysis |
 | [specs/data-hypotheses.md](specs/data-hypotheses.md) | Data analysis findings (H1-H7) |
+| [specs/experiment-2026-03-14.md](specs/experiment-2026-03-14.md) | Experiment: queue refill threshold + removed fast_dopamine |
+| [specs/experiment-2026-03-16-es-ranked.md](specs/experiment-2026-03-16-es-ranked.md) | Experiment: engagement_score ranked engine |
+| [specs/experiment-2026-03-20-adaptive-cold-start.md](specs/experiment-2026-03-20-adaptive-cold-start.md) | Experiment: adaptive cold start (3-phase) |
+| [specs/cohort-analysis-2026-03-29.md](specs/cohort-analysis-2026-03-29.md) | Cohort analysis: super users vs churned |
+| [specs/channel-growth-optimization.md](specs/channel-growth-optimization.md) | Channel growth: Telethon stats, scoring experiments, analysis |
 
 ## Invariants
 

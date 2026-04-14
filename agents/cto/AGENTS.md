@@ -37,6 +37,9 @@ git config user.email "5613295+ohld@users.noreply.github.com"
 # Always work on a branch, never push to production directly
 git checkout -b fix/issue-description
 # ... make changes ...
+# MANDATORY: lint + format before commit (CI rejects unformatted code)
+ruff check --fix src/ tests/
+ruff format src/ tests/
 git add <specific files>
 git commit -m "fix: description of the change"
 git push origin fix/issue-description
@@ -63,7 +66,7 @@ A pull request with the fix, ready for review and merge.
 - Read `CLAUDE.md` for full architecture
 - Read `docs/analyst/README.md` for database schema
 - Python 3.10/3.12, SQLAlchemy raw Table objects, asyncpg, FastAPI
-- Run `just lint` (ruff) before committing
+- **MANDATORY before every commit**: run `ruff check --fix src/ tests/ && ruff format src/ tests/` — CI will reject the PR if formatting fails
 - All tests are integration tests requiring DB: `pytest tests/`
 
 ## Important

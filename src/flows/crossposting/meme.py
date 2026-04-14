@@ -194,7 +194,8 @@ async def post_meme_to_tgchannelen():
     )
 
     await log_meme_sent(
-        next_meme.id, Channel.TG_CHANNEL_EN,
+        next_meme.id,
+        Channel.TG_CHANNEL_EN,
         telegram_message_id=msg.message_id,
         caption_text=caption_text,
     )
@@ -236,7 +237,8 @@ async def post_meme_to_tgchannelru():
     )
 
     await log_meme_sent(
-        next_meme.id, Channel.TG_CHANNEL_RU,
+        next_meme.id,
+        Channel.TG_CHANNEL_RU,
         telegram_message_id=msg.message_id,
         caption_text=caption_text,
     )

@@ -8,7 +8,7 @@
 2. **Telegram forwarded_url** — same-source repost detection at ETL time.
 3. **OCR text trigram similarity** — PostgreSQL `pg_trgm` operator `%` on extracted text. Min 12 chars. Works on memes with `ocr_result` populated by [Describe Memes](describe-memes.md) (OpenRouter vision).
 
-The text-based dedup (`find_meme_duplicate()` in `src/storage/service.py:205`) uses:
+The text-based dedup (`find_meme_duplicate()` in `src/storage/service.py`) uses:
 ```sql
 AND (M.ocr_result ->> 'text') % '{imagetext}'  -- trigram similarity > 0.3
 ```
@@ -51,7 +51,7 @@ GIN index exists: `idx_meme_ocr_text_gin`
 ### Stage E: OCR only for uncertain bucket
 - Run cheap OCR (Tesseract, free) only on visually-similar-but-not-identical pairs
 - This reduces OCR volume from "all memes" to "~5% of memes"
-- Cost: Tesseract is free but accuracy is lower than Modal
+- Cost: Tesseract is free but accuracy is lower than vision LLMs
 
 ## Implementation Priority
 
