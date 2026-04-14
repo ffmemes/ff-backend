@@ -382,10 +382,10 @@ async def update_or_create_memes(transformed_memes, memes_not_in_memes_table):
             FROM meme_source
             JOIN meme_raw_ig MRI
               ON MRI.meme_source_id = meme_source.id
-              AND MRI.id = meme.raw_meme_id
             WHERE meme.status = 'broken_content_link'
               AND meme_source.id = meme.meme_source_id
               AND meme_source.type = 'instagram'
+              AND MRI.id = meme.raw_meme_id
               AND COALESCE(MRI.updated_at, MRI.created_at) >= NOW() - INTERVAL '24 hours'
             """
         )
@@ -399,10 +399,10 @@ async def update_or_create_memes(transformed_memes, memes_not_in_memes_table):
             FROM meme_source
             JOIN meme_raw_ig MRI
               ON MRI.meme_source_id = meme_source.id
-              AND MRI.id = meme.raw_meme_id
             WHERE meme.status = 'broken_content_link'
               AND meme_source.id = meme.meme_source_id
               AND meme_source.type = 'instagram'
+              AND MRI.id = meme.raw_meme_id
               AND COALESCE(MRI.updated_at, MRI.created_at) < NOW() - INTERVAL '24 hours'
             """
         )
