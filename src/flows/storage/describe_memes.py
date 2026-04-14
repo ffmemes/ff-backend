@@ -363,6 +363,10 @@ async def describe_single_meme(meme_row: dict, log, *, deadline: float | None = 
 async def describe_memes_flow(batch_size: int = 20) -> None:
     log = get_run_logger()
 
+    # Anchor to flow start, not batch start — the Prefect flow timeout (900s)
+    # ticks from here, so our deadline must be relative to this moment.
+    flow_start = time.monotonic()
+
     if not settings.OPENROUTER_API_KEY:
         log.warning("OPENROUTER_API_KEY not set. Skipping.")
         return
@@ -376,9 +380,9 @@ async def describe_memes_flow(batch_size: int = 20) -> None:
     ok = 0
     failed = 0
     consecutive_fails = 0
-    batch_start = time.monotonic()
-    # Hard deadline: stop well before the 900s flow timeout
-    batch_deadline = batch_start + 780
+    # Hard deadline: stop 120s before the 900s flow timeout.
+    # Anchored to flow_start so pre-batch query time is accounted for.
+    batch_deadline = flow_start + 780
     # Per-meme timeout: no single meme should block the batch
     per_meme_timeout = 120
     # Minimum interval between request starts to stay under 20 rpm rate limit
@@ -386,35 +390,38 @@ async def describe_memes_flow(batch_size: int = 20) -> None:
 
     for i, meme_row in enumerate(memes):
         remaining = batch_deadline - time.monotonic()
-        if remaining < 45:
+        if remaining < per_meme_timeout + 15:
             log.warning(
-                "Approaching timeout (%.0fs remaining). Stopping batch at %d/%d.",
+                "Approaching timeout (%.0fs remaining, need %ds). Stopping batch at %d/%d.",
                 remaining,
+                per_meme_timeout + 15,
                 i,
                 len(memes),
             )
             break
 
         request_start = time.monotonic()
-        meme_deadline = min(time.monotonic() + per_meme_timeout, batch_deadline - 30)
+        # Cap the per-meme timeout to actual remaining time minus a safety buffer
+        effective_timeout = min(per_meme_timeout, remaining - 15)
+        meme_deadline = min(time.monotonic() + effective_timeout, batch_deadline - 10)
 
         try:
             status = await asyncio.wait_for(
                 describe_single_meme(meme_row, log, deadline=meme_deadline),
-                timeout=per_meme_timeout,
+                timeout=effective_timeout,
             )
         except asyncio.TimeoutError:
             log.warning(
                 "Meme %d timed out after %ds (%d/%d)",
                 meme_row["id"],
-                per_meme_timeout,
+                effective_timeout,
                 i + 1,
                 len(memes),
             )
             await _increment_describe_failures(
                 meme_row["id"],
                 meme_row["ocr_result"] or {},
-                f"per-meme timeout ({per_meme_timeout}s)",
+                f"per-meme timeout ({effective_timeout:.0f}s)",
             )
             status = "failed"
 
