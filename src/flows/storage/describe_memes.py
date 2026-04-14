@@ -26,6 +26,7 @@ import asyncio
 import base64
 import json
 import re
+import time
 from datetime import datetime, timezone
 
 import httpx
@@ -52,7 +53,9 @@ VISION_MODELS = [
     "google/gemma-3-4b-it:free",  # small but fast, 32k context
     "google/gemma-4-31b-it:free",  # 262k context (may 403 — will skip to next)
     "google/gemma-4-26b-a4b-it:free",  # 262k MoE (may 403 — will skip to next)
-    "nvidia/nemotron-nano-12b-v2-vl:free",  # 128k, different provider (JSON quirky)
+    # nvidia/nemotron-nano-12b-v2-vl:free removed — returns 504s and invalid
+    # JSON/empty content (see specs/describe-memes.md). Wasted 30s per meme
+    # at end of fallback chain, contributing to batch timeouts.
 ]
 
 DESCRIBE_PROMPT = (
@@ -151,8 +154,11 @@ def _parse_vision_response(raw_content: str) -> dict:
     raise json.JSONDecodeError("Could not parse model response", content, 0)
 
 
-async def call_openrouter_vision(image_b64: str, log) -> dict:
+async def call_openrouter_vision(image_b64: str, log, *, deadline: float | None = None) -> dict:
     """Call OpenRouter vision model with fallback chain.
+
+    Args:
+        deadline: monotonic timestamp after which we stop trying models.
 
     Returns:
         dict with result on success, or {RATE_LIMITED: True} / {ALL_FAILED: True}
@@ -164,83 +170,88 @@ async def call_openrouter_vision(image_b64: str, log) -> dict:
 
     rate_limited_count = 0
 
-    for model_id in VISION_MODELS:
-        payload = {
-            "model": model_id,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": DESCRIBE_PROMPT},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{image_b64}",
-                            },
-                        },
-                    ],
-                }
-            ],
-            "max_tokens": 500,
-            "temperature": 0.2,
-        }
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        for model_id in VISION_MODELS:
+            # Stop trying more models if we're running out of time
+            if deadline is not None and time.monotonic() > deadline - 35:
+                log.warning("Skipping remaining models — approaching deadline")
+                break
 
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            payload = {
+                "model": model_id,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": DESCRIBE_PROMPT},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{image_b64}",
+                                },
+                            },
+                        ],
+                    }
+                ],
+                "max_tokens": 500,
+                "temperature": 0.2,
+            }
+
+            try:
                 response = await client.post(
                     f"{OPENROUTER_BASE_URL}/chat/completions",
                     headers=headers,
                     json=payload,
                 )
 
-            if response.status_code == 429:
-                log.debug("Model %s rate-limited, trying next...", model_id)
-                rate_limited_count += 1
-                await asyncio.sleep(3)
+                if response.status_code == 429:
+                    log.debug("Model %s rate-limited, trying next...", model_id)
+                    rate_limited_count += 1
+                    await asyncio.sleep(3)
+                    continue
+
+                if response.status_code == 403:
+                    log.warning("Model %s HTTP 403 (access denied), trying next...", model_id)
+                    continue
+
+                response.raise_for_status()
+
+                body = response.text.strip()
+                json_start = body.find("{")
+                if json_start < 0:
+                    log.warning("Model %s returned no JSON: %s", model_id, body[:100])
+                    continue
+                data = json.loads(body[json_start:])
+
+                if "choices" not in data:
+                    log.warning("Model %s no choices: %s", model_id, str(data)[:200])
+                    continue
+
+                content = data["choices"][0]["message"]["content"]
+                if not content:
+                    log.warning("Model %s empty content", model_id)
+                    continue
+                result = _parse_vision_response(content)
+
+                if "description" not in result and "ocr_text" not in result:
+                    log.warning("Model %s bad JSON: %s", model_id, str(result)[:200])
+                    continue
+
+                result["__model"] = model_id
+                return result
+
+            except json.JSONDecodeError as e:
+                log.warning("Model %s invalid JSON: %s", model_id, e)
                 continue
-
-            if response.status_code == 403:
-                log.warning("Model %s HTTP 403 (access denied), trying next...", model_id)
+            except httpx.HTTPStatusError as e:
+                log.warning("Model %s HTTP %s", model_id, e.response.status_code)
                 continue
-
-            response.raise_for_status()
-
-            body = response.text.strip()
-            json_start = body.find("{")
-            if json_start < 0:
-                log.warning("Model %s returned no JSON: %s", model_id, body[:100])
+            except (httpx.ReadTimeout, httpx.ConnectTimeout) as e:
+                log.warning("Model %s timeout: %s", model_id, type(e).__name__)
                 continue
-            data = json.loads(body[json_start:])
-
-            if "choices" not in data:
-                log.warning("Model %s no choices: %s", model_id, str(data)[:200])
+            except Exception as e:
+                log.warning("Model %s error: %s", model_id, e)
                 continue
-
-            content = data["choices"][0]["message"]["content"]
-            if not content:
-                log.warning("Model %s empty content", model_id)
-                continue
-            result = _parse_vision_response(content)
-
-            if "description" not in result and "ocr_text" not in result:
-                log.warning("Model %s bad JSON: %s", model_id, str(result)[:200])
-                continue
-
-            result["__model"] = model_id
-            return result
-
-        except json.JSONDecodeError as e:
-            log.warning("Model %s invalid JSON: %s", model_id, e)
-            continue
-        except httpx.HTTPStatusError as e:
-            log.warning("Model %s HTTP %s", model_id, e.response.status_code)
-            continue
-        except (httpx.ReadTimeout, httpx.ConnectTimeout) as e:
-            log.warning("Model %s timeout: %s", model_id, type(e).__name__)
-            continue
-        except Exception as e:
-            log.warning("Model %s error: %s", model_id, e)
-            continue
 
     # All models exhausted
     if rate_limited_count == len(VISION_MODELS):
@@ -256,7 +267,7 @@ async def _increment_describe_failures(meme_id: int, existing_ocr: dict, reason:
     await execute(update_query)
 
 
-async def describe_single_meme(meme_row: dict, log) -> str:
+async def describe_single_meme(meme_row: dict, log, *, deadline: float | None = None) -> str:
     """Download, analyze, and update a single meme.
 
     Returns: "ok", "rate_limited", "failed"
@@ -277,7 +288,7 @@ async def describe_single_meme(meme_row: dict, log) -> str:
 
     # Call vision model
     try:
-        result = await call_openrouter_vision(image_b64, log)
+        result = await call_openrouter_vision(image_b64, log, deadline=deadline)
     except Exception as e:
         log.warning("Meme %s: OpenRouter error: %s", meme_id, e)
         await _increment_describe_failures(meme_id, existing_ocr, str(e))
@@ -351,8 +362,12 @@ async def describe_single_meme(meme_row: dict, log) -> str:
     timeout_seconds=900,
     on_failure=[notify_telegram_on_failure],
 )
-async def describe_memes_flow(batch_size: int = 30) -> None:
+async def describe_memes_flow(batch_size: int = 20) -> None:
     log = get_run_logger()
+
+    # Anchor to flow start, not batch start — the Prefect flow timeout (900s)
+    # ticks from here, so our deadline must be relative to this moment.
+    flow_start = time.monotonic()
 
     if not settings.OPENROUTER_API_KEY:
         log.warning("OPENROUTER_API_KEY not set. Skipping.")
@@ -367,9 +382,50 @@ async def describe_memes_flow(batch_size: int = 30) -> None:
     ok = 0
     failed = 0
     consecutive_fails = 0
+    # Hard deadline: stop 120s before the 900s flow timeout.
+    # Anchored to flow_start so pre-batch query time is accounted for.
+    batch_deadline = flow_start + 780
+    # Per-meme timeout: no single meme should block the batch
+    per_meme_timeout = 120
+    # Minimum interval between request starts to stay under 20 rpm rate limit
+    min_request_interval = 3.5
 
     for i, meme_row in enumerate(memes):
-        status = await describe_single_meme(meme_row, log)
+        remaining = batch_deadline - time.monotonic()
+        if remaining < per_meme_timeout + 15:
+            log.warning(
+                "Approaching timeout (%.0fs remaining, need %ds). Stopping batch at %d/%d.",
+                remaining,
+                per_meme_timeout + 15,
+                i,
+                len(memes),
+            )
+            break
+
+        request_start = time.monotonic()
+        # Cap the per-meme timeout to actual remaining time minus a safety buffer
+        effective_timeout = min(per_meme_timeout, remaining - 15)
+        meme_deadline = min(time.monotonic() + effective_timeout, batch_deadline - 10)
+
+        try:
+            status = await asyncio.wait_for(
+                describe_single_meme(meme_row, log, deadline=meme_deadline),
+                timeout=effective_timeout,
+            )
+        except asyncio.TimeoutError:
+            log.warning(
+                "Meme %d timed out after %ds (%d/%d)",
+                meme_row["id"],
+                effective_timeout,
+                i + 1,
+                len(memes),
+            )
+            await _increment_describe_failures(
+                meme_row["id"],
+                meme_row["ocr_result"] or {},
+                f"per-meme timeout ({effective_timeout:.0f}s)",
+            )
+            status = "failed"
 
         if status == "ok":
             ok += 1
@@ -398,7 +454,10 @@ async def describe_memes_flow(batch_size: int = 30) -> None:
                 break
 
         if i < len(memes) - 1:
-            await asyncio.sleep(4)
+            request_elapsed = time.monotonic() - request_start
+            sleep_needed = max(0, min_request_interval - request_elapsed)
+            if sleep_needed > 0:
+                await asyncio.sleep(sleep_needed)
 
     log.info("Batch: %d described, %d failed out of %d.", ok, failed, len(memes))
 

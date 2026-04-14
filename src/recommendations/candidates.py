@@ -275,7 +275,6 @@ async def goat(
                 )
         )
 
-
         SELECT
             M.id
            , M.type, M.telegram_file_id, M.caption

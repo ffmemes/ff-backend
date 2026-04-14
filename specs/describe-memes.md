@@ -58,7 +58,7 @@ Falls through sequentially on 429 (rate limit), 403 (access denied), timeout, or
 | `google/gemma-3-4b-it:free` | 32K | Smallest, fastest |
 | `google/gemma-4-31b-it:free` | 262K | Returned 403 in April 2026, may be fixed |
 | `google/gemma-4-26b-a4b-it:free` | 262K | Same 403 issue |
-| `nvidia/nemotron-nano-12b-v2-vl:free` | 128K | Previously returned invalid JSON/empty content |
+| `nvidia/nemotron-nano-12b-v2-vl:free` | 128K | **Removed** — returns 504s and invalid JSON/empty content, causes batch timeouts |
 
 Check current availability: `curl https://openrouter.ai/api/v1/models | jq '.data[] | select(.id | endswith(":free")) | select(.architecture.modality | contains("image")) | .id'`
 

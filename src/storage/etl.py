@@ -360,6 +360,50 @@ async def update_or_create_memes(transformed_memes, memes_not_in_memes_table):
 
     # Retry broken uploads: reset broken_content_link → created
     # so the upload pipeline picks them up again.
+    # For IG memes, only retry if the raw post is still fresh (CDN URLs expire).
     await execute(
-        meme.update().where(meme.c.status == "broken_content_link").values(status="created"),
+        text(
+            """
+            UPDATE meme
+            SET status = 'created'
+            FROM meme_source
+            WHERE meme.status = 'broken_content_link'
+              AND meme_source.id = meme.meme_source_id
+              AND meme_source.type != 'instagram'
+            """
+        )
+    )
+    # IG memes: retry only if raw post is fresh enough for CDN URLs to still work.
+    await execute(
+        text(
+            """
+            UPDATE meme
+            SET status = 'created'
+            FROM meme_source
+            JOIN meme_raw_ig MRI
+              ON MRI.meme_source_id = meme_source.id
+              AND MRI.id = meme.raw_meme_id
+            WHERE meme.status = 'broken_content_link'
+              AND meme_source.id = meme.meme_source_id
+              AND meme_source.type = 'instagram'
+              AND COALESCE(MRI.updated_at, MRI.created_at) >= NOW() - INTERVAL '24 hours'
+            """
+        )
+    )
+    # IG memes with expired CDN URLs: mark as permanently failed.
+    await execute(
+        text(
+            """
+            UPDATE meme
+            SET status = 'expired_content_link'
+            FROM meme_source
+            JOIN meme_raw_ig MRI
+              ON MRI.meme_source_id = meme_source.id
+              AND MRI.id = meme.raw_meme_id
+            WHERE meme.status = 'broken_content_link'
+              AND meme_source.id = meme.meme_source_id
+              AND meme_source.type = 'instagram'
+              AND COALESCE(MRI.updated_at, MRI.created_at) < NOW() - INTERVAL '24 hours'
+            """
+        )
     )

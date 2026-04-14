@@ -58,6 +58,7 @@ else:
         pool_recycle=settings.DATABASE_POOL_TTL,
         pool_pre_ping=settings.DATABASE_POOL_PRE_PING,
         pool_timeout=settings.DATABASE_POOL_TIMEOUT,
+        pool_use_lifo=True,
     )
 
 engine = create_async_engine(DATABASE_URL, **_engine_kwargs)
@@ -611,40 +612,49 @@ def _is_transient_connection_error(exc: BaseException) -> bool:
     return _is_stale_connection_error(exc) or _is_concurrent_use_error(exc)
 
 
+# Shared retry budget for stale / concurrent-use connection errors.
+# Three retries (25 ms + 50 ms + 100 ms backoff) give the event loop enough
+# time to dispose dirty connections under burst webhook concurrency.
+# Under traffic spikes the LIFO pool can hand out several consecutively
+# dirty connections; 2 retries proved insufficient (9 Sentry events on
+# 2026-04-12).  Bumping to 3 retries with wider backoff makes exhaustion
+# astronomically unlikely while adding only ~175 ms worst-case latency.
+_TRANSIENT_MAX_RETRIES = 3
+
+
 async def fetch_one(
     select_query: Select | Insert | Update,
     params: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
-    try:
-        async with engine.begin() as conn:
-            cursor: CursorResult = await conn.execute(select_query, params or {})
-            row = cursor.first()
-            return row._asdict() if row is not None else None
-    except Exception as exc:
-        if not _is_transient_connection_error(exc):
+    for attempt in range(_TRANSIENT_MAX_RETRIES + 1):
+        try:
+            async with engine.begin() as conn:
+                cursor: CursorResult = await conn.execute(select_query, params or {})
+                row = cursor.first()
+                return row._asdict() if row is not None else None
+        except Exception as exc:
+            if _is_transient_connection_error(exc) and attempt < _TRANSIENT_MAX_RETRIES:
+                await asyncio.sleep(0.025 * (2**attempt))  # 25 ms, 50 ms, 100 ms
+                continue
             raise
-    # Retry once — covers stale connections (server closed between ping and query)
-    # and concurrent-use errors (pool handed out a busy connection).
-    async with engine.begin() as conn:
-        cursor: CursorResult = await conn.execute(select_query, params or {})
-        row = cursor.first()
-        return row._asdict() if row is not None else None
+    raise RuntimeError("fetch_one retry loop exhausted")  # pragma: no cover
 
 
 async def fetch_all(
     select_query: Select | Insert | Update,
     params: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    try:
-        async with engine.begin() as conn:
-            cursor: CursorResult = await conn.execute(select_query, params or {})
-            return [r._asdict() for r in cursor.all()]
-    except Exception as exc:
-        if not _is_transient_connection_error(exc):
+    for attempt in range(_TRANSIENT_MAX_RETRIES + 1):
+        try:
+            async with engine.begin() as conn:
+                cursor: CursorResult = await conn.execute(select_query, params or {})
+                return [r._asdict() for r in cursor.all()]
+        except Exception as exc:
+            if _is_transient_connection_error(exc) and attempt < _TRANSIENT_MAX_RETRIES:
+                await asyncio.sleep(0.025 * (2**attempt))  # 25 ms, 50 ms, 100 ms
+                continue
             raise
-    async with engine.begin() as conn:
-        cursor: CursorResult = await conn.execute(select_query, params or {})
-        return [r._asdict() for r in cursor.all()]
+    raise RuntimeError("fetch_all retry loop exhausted")  # pragma: no cover
 
 
 async def execute(
@@ -659,18 +669,21 @@ async def execute(
     (after a short backoff) is the standard resolution.
 
     Retry policy:
-        - Stale connection (ConnectionDoesNotExistError): 1 immediate retry
+        - Stale/concurrent-use connection: up to 3 retries, 25 / 50 / 100 ms backoff
         - Deadlock (DeadlockDetectedError): up to 2 retries, 100 ms / 200 ms backoff
     """
     _DEADLOCK_MAX_RETRIES = 2
+    _max_attempts = max(_TRANSIENT_MAX_RETRIES, _DEADLOCK_MAX_RETRIES) + 1
+    _transient_attempts = 0
 
-    for attempt in range(_DEADLOCK_MAX_RETRIES + 1):
+    for attempt in range(_max_attempts):
         try:
             async with engine.begin() as conn:
                 return await conn.execute(select_query, params or {})
         except Exception as exc:
-            if _is_transient_connection_error(exc) and attempt == 0:
-                # Stale / concurrent-use connection: retry once immediately
+            if _is_transient_connection_error(exc) and _transient_attempts < _TRANSIENT_MAX_RETRIES:
+                await asyncio.sleep(0.025 * (2**_transient_attempts))  # 25 ms, 50 ms, 100 ms
+                _transient_attempts += 1
                 continue
             if _is_deadlock_error(exc) and attempt < _DEADLOCK_MAX_RETRIES:
                 # Deadlock: short exponential backoff then retry
