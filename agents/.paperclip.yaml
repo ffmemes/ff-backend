@@ -10,6 +10,9 @@ agents:
       type: claude_local
     inputs:
       env:
+        OPENCLAW_SESSION:
+          kind: literal
+          value: "1"
         ANALYST_DATABASE_URL:
           kind: secret
           requirement: optional
@@ -19,6 +22,9 @@ agents:
       type: claude_local
     inputs:
       env:
+        OPENCLAW_SESSION:
+          kind: literal
+          value: "1"
         ANALYST_DATABASE_URL:
           kind: secret
           requirement: required
@@ -28,6 +34,9 @@ agents:
       type: claude_local
     inputs:
       env:
+        OPENCLAW_SESSION:
+          kind: literal
+          value: "1"
         ANALYST_DATABASE_URL:
           kind: secret
           requirement: optional
@@ -37,6 +46,9 @@ agents:
       type: claude_local
     inputs:
       env:
+        OPENCLAW_SESSION:
+          kind: literal
+          value: "1"
         ANALYST_DATABASE_URL:
           kind: secret
           requirement: optional
@@ -46,6 +58,9 @@ agents:
       type: claude_local
     inputs:
       env:
+        OPENCLAW_SESSION:
+          kind: literal
+          value: "1"
         ANALYST_DATABASE_URL:
           kind: secret
           requirement: required
@@ -79,6 +94,9 @@ agents:
       type: claude_local
     inputs:
       env:
+        OPENCLAW_SESSION:
+          kind: literal
+          value: "1"
         GH_TOKEN:
           kind: secret
           requirement: optional
@@ -94,6 +112,9 @@ agents:
       type: claude_local
     inputs:
       env:
+        OPENCLAW_SESSION:
+          kind: literal
+          value: "1"
         ANALYST_DATABASE_URL:
           kind: secret
           requirement: optional

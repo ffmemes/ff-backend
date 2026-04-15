@@ -6,7 +6,7 @@
 # Override server: PAPERCLIP_SSH_HOST=user@host ./agents/deploy.sh
 #
 # What it does:
-#   1. Runs backup.sh first (safety net)
+#   1. Runs CLI company export as backup (safety net)
 #   2. For each agent with AGENTS.md, copies it to the Paperclip container
 #   3. Verifies file sizes match after copy
 #
@@ -45,12 +45,16 @@ fi
 echo "Container: $CONT"
 echo ""
 
-# Run backup first
-if [ -x "$SCRIPT_DIR/backup/backup.sh" ]; then
-  echo "Running backup..."
-  "$SCRIPT_DIR/backup/backup.sh"
-  echo ""
-fi
+# Run backup via CLI company export (preferred over legacy backup.sh)
+echo "Running backup via CLI company export..."
+BACKUP_DIR="$SCRIPT_DIR/backup"
+mkdir -p "$BACKUP_DIR"
+ssh "$SERVER" "docker exec $CONT npx paperclipai company export $COMPANY_ID --include company,agents --out /tmp/paperclip-export 2>/dev/null" \
+  && scp -rq "$SERVER:/tmp/paperclip-export" "$BACKUP_DIR/export-$(date +%Y%m%d-%H%M%S)" \
+  && ssh "$SERVER" "rm -rf /tmp/paperclip-export" \
+  && echo "  Backup saved to $BACKUP_DIR/export-$(date +%Y%m%d-%H%M%S)" \
+  || echo "  WARNING: CLI backup failed, continuing without backup"
+echo ""
 
 # Sync each agent
 SYNCED=0
