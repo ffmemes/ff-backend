@@ -80,9 +80,12 @@ QUOTA_EXHAUSTED = "__quota_exhausted"
 
 
 async def get_memes_to_describe(limit: int = 30) -> list[dict]:
-    """Get image memes without descriptions, ordered by likes (most liked first).
+    """Get image memes without descriptions.
 
-    Prioritizes memes that active users have liked — directly improves Wrapped coverage.
+    Priority order:
+    1. Recently uploaded memes (last 24h) — enables dedup for user uploads
+    2. Most liked memes — improves Wrapped coverage
+
     Skips memes that have failed 3+ times (tracked in ocr_result.describe_failures).
     """
     from sqlalchemy import text
@@ -96,6 +99,7 @@ async def get_memes_to_describe(limit: int = 30) -> list[dict]:
             M.language_code
         FROM meme M
         LEFT JOIN meme_stats MS ON MS.meme_id = M.id
+        LEFT JOIN meme_source SRC ON SRC.id = M.meme_source_id
         WHERE M.type = 'image'
             AND M.status = 'ok'
             AND M.telegram_file_id IS NOT NULL
@@ -104,7 +108,12 @@ async def get_memes_to_describe(limit: int = 30) -> list[dict]:
                 OR M.ocr_result->>'description' IS NULL
             )
             AND COALESCE((M.ocr_result->>'describe_failures')::int, 0) < 3
-        ORDER BY COALESCE(MS.nlikes, 0) DESC, M.id DESC
+        ORDER BY
+            CASE WHEN SRC.type = 'user upload'
+                 AND M.created_at > now() - interval '24 hours'
+                 THEN 0 ELSE 1 END,
+            COALESCE(MS.nlikes, 0) DESC,
+            M.id DESC
         LIMIT :limit
     """
     ).bindparams(limit=limit)
