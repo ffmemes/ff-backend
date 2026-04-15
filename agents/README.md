@@ -14,6 +14,15 @@ Autonomous AI team for @ffmemesbot, managed by [Paperclip](https://paperclip.ing
 | Release Engineer | Release Engineer | CTO | On-demand (wakeOnDemand via task assignment) | **off** | ship, land-and-deploy, document-release, setup-deploy |
 | Comms Manager | Communications | CEO | Daily heartbeat | 24h | browse, frontend-design |
 
+### Autonomous Mode (OPENCLAW_SESSION)
+
+All agents run with `OPENCLAW_SESSION=1` (set in `.paperclip.yaml`). This activates gstack's built-in spawned-session mode:
+- Skills auto-choose recommended options instead of calling `AskUserQuestion`
+- Telemetry, upgrade checks, and routing prompts are skipped
+- `/autoplan` mandatory gates (premise confirmation, user challenges) are handled by explicit instructions in each agent's AGENTS.md
+
+Each agent also has an **Autonomous Mode** section in its AGENTS.md reinforcing: "NEVER call `AskUserQuestion`."
+
 ### Heartbeats vs Routines
 
 - **Routines** = deterministic scheduled/triggered jobs with specific prompts. Preferred for all recurring work.
@@ -63,11 +72,13 @@ Bug detected (Sentry webhook or QA scan)
 | Routine | Agent | Schedule (UTC) | Trigger Type | What it does |
 |---------|-------|----------------|-------------|--------------|
 | Daily Analyst Report | Analyst | `19 6 * * *` | schedule + API | Query metrics, detect anomalies, write report for CEO |
-| QA Log Scan | QA | `7 * * * *` | schedule + 2 webhooks + API | Sentry + Coolify logs + DB health. Auto-escalate critical bugs to CTO |
+| QA Log Scan | QA | `7 * * * *` | 2 schedules + 2 webhooks + API | Sentry + Coolify logs + DB health. Auto-escalate critical bugs to CTO |
 | Process Health Check | QA | `37 12 * * *` | schedule | Watchdog: verify all routines are running and succeeding |
 | Weekly CEO Review | CEO | `11 9 * * 1` | schedule | Retro, experiments, priorities, backlog review |
 | Weekly Analyst Summary | Analyst | `23 9 * * 1` | schedule | Weekly summary for CEO review |
 | gstack Update Check | CEO | `17 3 * * *` | schedule | Update skills, review changelog |
+| Paperclip Update Check | CTO | `0 4 * * *` | schedule | Check for Paperclip updates |
+| Daily Channel Post | Comms | `0 7 * * *` | schedule | Daily @ffmemes TG channel post |
 | PR Review | Staff Engineer | on PR event | 2 webhooks + API | Review PRs via GitHub Actions trigger |
 
 **Schedule design**: Prime-minute offsets ensure no two routines fire in the same minute. This avoids resource contention and makes debugging easier.
@@ -89,12 +100,19 @@ Requires env vars: `PAPERCLIP_QA_TRIGGER_URL`, `PAPERCLIP_QA_TRIGGER_SECRET`, `S
 
 ## Backup & Restore
 
+**Preferred (Paperclip CLI):**
 ```bash
-# Take a snapshot of all agents, routines, skills
-./agents/backup/backup.sh
+# Export full company (agents, projects, issues, skills) as portable markdown package
+npx paperclipai company export
 
-# Restore from backup (after data loss)
-./agents/backup/restore.sh [backup-file.json]
+# Import from local path, URL, or GitHub
+npx paperclipai company import <path-or-url>
+```
+
+**Legacy scripts** (kept for quick JSON snapshots):
+```bash
+./agents/backup/backup.sh       # JSON snapshot of agents, routines, skills
+./agents/backup/restore.sh      # Restore from JSON (incomplete — many manual steps)
 ```
 
 Backups are saved to `agents/backup/paperclip-state-*.json` (gitignored). The script keeps the last 10 snapshots. Run before any major config changes.
@@ -125,8 +143,7 @@ agents/
 ### Update gstack skills
 
 ```bash
-# All secrets come from env vars: $PAPERCLIP_URL, $PAPERCLIP_API_KEY
-# Set these in ~/.zshrc (never commit to repo)
+# Via API (secrets from env: $PAPERCLIP_URL, $PAPERCLIP_API_KEY in ~/.zshrc)
 curl -X POST "$PAPERCLIP_URL/api/companies/$COMPANY_ID/skills/import" \
   -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
   -H "Content-Type: application/json" \
@@ -142,6 +159,15 @@ curl -s -X PATCH "$PAPERCLIP_URL/api/agents/<agent-id>" \
   -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"adapterConfig": {"paperclipSkillSync": {"desiredSkills": ["garrytan/gstack/skill-name"]}}}'
+```
+
+### Local CLI setup for agents
+
+Create an API key and install Paperclip skills for local Claude/Codex (v2026.403.0+):
+
+```bash
+npx paperclipai agent local-cli <agent-id> --company-id $COMPANY_ID \
+  --api-base $PAPERCLIP_URL --api-key $PAPERCLIP_API_KEY
 ```
 
 ### Deploy instructions to server
