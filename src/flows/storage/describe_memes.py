@@ -9,7 +9,7 @@ Populates meme.ocr_result JSONB with:
 - calculated_at: timestamp (use this field, NOT meme.created_at, for monitoring)
 
 Processes most popular memes first (by nlikes DESC).
-Runs every 30 min via Prefect cron, ~30 memes per batch.
+Runs every 60 min via Prefect cron, ~20 memes per batch.
 
 IMPORTANT — OpenRouter free tier rules:
 - Need $10+ lifetime purchases for 1,000 req/day (otherwise only 50/day).
@@ -51,11 +51,12 @@ VISION_MODELS = [
     "google/gemma-3-27b-it:free",  # proven workhorse, 131k context
     "google/gemma-3-12b-it:free",  # good fallback, 32k context
     "google/gemma-3-4b-it:free",  # small but fast, 32k context
-    "google/gemma-4-31b-it:free",  # 262k context (may 403 — will skip to next)
-    "google/gemma-4-26b-a4b-it:free",  # 262k MoE (may 403 — will skip to next)
+    # google/gemma-4-31b-it:free removed — consistently returns 403 (Apr 2026),
+    # wasting daily quota on guaranteed failures. Each 403 counts toward the
+    # 1,000 req/day free-tier limit. Re-add only after verifying access is restored.
+    # google/gemma-4-26b-a4b-it:free removed — same 403 issue as gemma-4-31b.
     # nvidia/nemotron-nano-12b-v2-vl:free removed — returns 504s and invalid
-    # JSON/empty content (see specs/describe-memes.md). Wasted 30s per meme
-    # at end of fallback chain, contributing to batch timeouts.
+    # JSON/empty content (see specs/describe-memes.md).
 ]
 
 DESCRIBE_PROMPT = (
@@ -169,8 +170,6 @@ async def call_openrouter_vision(image_b64: str, log, *, deadline: float | None 
         "Content-Type": "application/json",
     }
 
-    rate_limited_count = 0
-
     async with httpx.AsyncClient(timeout=30.0) as client:
         for model_id in VISION_MODELS:
             # Stop trying more models if we're running out of time
@@ -214,10 +213,11 @@ async def call_openrouter_vision(image_b64: str, log, *, deadline: float | None 
                     return {QUOTA_EXHAUSTED: True}
 
                 if response.status_code == 429:
-                    log.debug("Model %s rate-limited, trying next...", model_id)
-                    rate_limited_count += 1
-                    await asyncio.sleep(3)
-                    continue
+                    # Rate limit is global across all free models (20 rpm),
+                    # so trying the next model will also 429. Return immediately
+                    # instead of wasting requests and time on the fallback chain.
+                    log.info("Rate-limited (429) on %s — limit is global, stopping.", model_id)
+                    return {RATE_LIMITED: True}
 
                 if response.status_code == 403:
                     log.warning("Model %s HTTP 403 (access denied), trying next...", model_id)
@@ -262,9 +262,7 @@ async def call_openrouter_vision(image_b64: str, log, *, deadline: float | None 
                 log.warning("Model %s error: %s", model_id, e)
                 continue
 
-    # All models exhausted
-    if rate_limited_count == len(VISION_MODELS):
-        return {RATE_LIMITED: True}
+    # All models exhausted (403, timeout, bad response — not 429, which returns early)
     return {ALL_FAILED: True}
 
 
@@ -399,8 +397,9 @@ async def describe_memes_flow(batch_size: int = 20) -> None:
     batch_deadline = flow_start + 780
     # Per-meme timeout: no single meme should block the batch
     per_meme_timeout = 120
-    # Minimum interval between request starts to stay under 20 rpm rate limit
-    min_request_interval = 3.5
+    # Minimum interval between request starts to stay under 20 rpm rate limit.
+    # 4.0s = 15 rpm effective, well under the 20 rpm cap with margin for bursts.
+    min_request_interval = 4.0
 
     for i, meme_row in enumerate(memes):
         remaining = batch_deadline - time.monotonic()

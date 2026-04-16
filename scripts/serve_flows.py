@@ -137,15 +137,11 @@ if __name__ == "__main__":
             # Experiment: dropped 18:00 MSK (21:00 UTC, 10.2 fwd/1k — worst slot).
             # Added 11:00 MSK. Data: 10:00 MSK = 25.6 fwd/1k (best), 18:00 MSK = 15.6 fwd/1k.
             # Baseline (pre-2026-04-13): 8,10,12,14,16,18 MSK (6x/day)
-            schedules=[
-                CronSchedule(cron="20 8,10,11,12,14,16 * * *", timezone=MSK)
-            ],
+            schedules=[CronSchedule(cron="20 8,10,11,12,14,16 * * *", timezone=MSK)],
         ),
         post_meme_to_tgchannelen.to_deployment(
             name="Post to TG Channel EN",
-            schedules=[
-                CronSchedule(cron="40 8,10,14,18,20 * * *", timezone=MSK)
-            ],
+            schedules=[CronSchedule(cron="40 8,10,14,18,20 * * *", timezone=MSK)],
         ),
         # ── Channel Stats (every 6h) ──
         collect_channel_stats.to_deployment(
@@ -172,6 +168,10 @@ if __name__ == "__main__":
         # ── Storage ──
         describe_memes_flow.to_deployment(
             name="Describe Memes (OpenRouter)",
-            schedules=[CronSchedule(cron="*/30 * * * *", timezone=LON)],
+            # Changed from */30 to hourly: 48 runs/day × 20 memes was consuming
+            # ~960+ daily quota (1,000 limit), leaving no headroom for fallback
+            # retries. At 24 runs/day × 20 = 480 base requests, comfortably
+            # under quota even with fallback cascades. See FFM-520.
+            schedules=[CronSchedule(cron="15 * * * *", timezone=LON)],
         ),
     )
