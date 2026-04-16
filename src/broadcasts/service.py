@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 from sqlalchemy import text
-from telegram.error import Forbidden, RetryAfter
+from telegram.error import BadRequest, Forbidden, RetryAfter
 
 from src.database import execute, fetch_all
 from src.redis import redis_client
@@ -192,13 +192,19 @@ async def send_broadcast(
             if sent % 100 == 0:
                 print(f"  sent:{sent} blocked:{blocked} failed:{failed} skipped:{skipped}")
 
-        except Forbidden:
-            blocked += 1
-            await redis_client.sadd(redis_key, str(user_id))
-            await execute(
-                text("UPDATE \"user\" SET type = 'blocked_bot' WHERE id = :uid"),
-                {"uid": user_id},
-            )
+        except (Forbidden, BadRequest) as e:
+            err_msg = str(e).lower()
+            if isinstance(e, Forbidden) or "not found" in err_msg:
+                blocked += 1
+                await redis_client.sadd(redis_key, str(user_id))
+                await execute(
+                    text("UPDATE \"user\" SET type = 'blocked_bot' WHERE id = :uid"),
+                    {"uid": user_id},
+                )
+            else:
+                failed += 1
+                if failed <= 10:
+                    logger.warning("Broadcast %s error for %d: %s", broadcast_id, user_id, e)
         except RetryAfter as e:
             sleep_for = e.retry_after + 1
             print(f"  rate limited, sleeping {sleep_for}s...")
