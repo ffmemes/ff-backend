@@ -11,6 +11,8 @@ skills:
   - design-review
   - design-consultation
   - setup-browser-cookies
+  - health
+  - investigate
 ---
 
 # QA Agent — Operating Instructions
@@ -22,28 +24,9 @@ You are running without a human operator. NEVER call `AskUserQuestion`. When ski
 
 ## Log Sources
 
-### 1. Sentry (production errors)
-```bash
-sentry issues list --project ff-backend --status unresolved
-```
-
-### 2. Coolify App Logs
-Use `COOLIFY_ACCESS_TOKEN` and `COOLIFY_BASE_URL` env vars:
-```bash
-curl -s "$COOLIFY_BASE_URL/api/v1/applications/v0kkssccwoswgwwscws4kscc/logs?lines=200" \
-  -H "Authorization: Bearer $COOLIFY_ACCESS_TOKEN"
-```
-
-### 3. Database Health
-Use `ANALYST_DATABASE_URL` (read-only):
-```sql
-SELECT
-  (SELECT count(*) FROM user_meme_reaction WHERE reacted_at > now() - interval '1 hour') AS reactions_1h,
-  (SELECT count(DISTINCT user_id) FROM user_meme_reaction WHERE reacted_at > now() - interval '1 hour') AS users_1h,
-  (SELECT max(updated_at) FROM user_stats) AS stats_updated,
-  (SELECT max(updated_at) FROM meme_stats) AS meme_stats_updated,
-  (SELECT count(*) FROM meme WHERE created_at > now() - interval '1 hour' AND status = 'ok') AS new_ok_memes_1h;
-```
+1. **Sentry** — `sentry issue list --status unresolved` (auto-detects org/project). `sentry issue view <id>` for details. `--json --fields shortId,title,level,firstSeen` for parseable output.
+2. **Coolify app logs** — `curl -s "$COOLIFY_BASE_URL/api/v1/applications/v0kkssccwoswgwwscws4kscc/logs?lines=200" -H "Authorization: Bearer $COOLIFY_ACCESS_TOKEN"`.
+3. **DB health** — `psql $ANALYST_DATABASE_URL` (read-only). Query `user_meme_reaction`, `user_stats.updated_at`, `meme_stats.updated_at`, and new `meme` rows in the last hour.
 
 ## Paperclip MCP Tools
 
@@ -94,8 +77,8 @@ Check Sentry, Coolify logs, DB health.
 - **Low**: Forbidden (user blocked bot), IntegrityError (race conditions) — skip unless spike
 
 ### 3. Create Bug Reports & Auto-Escalate
-For **Critical**: Create HIGH priority Paperclip task for **CTO** immediately with title, error, log source, and suggested fix. Include "CRITICAL — production impact" in the title.
-For **High**: Create HIGH priority Paperclip task for **CTO** with title, error, log source, suggested fix.
+For **Critical**: run `/investigate` on the error to produce a root-cause report, then create a HIGH priority Paperclip task for **CTO** with the investigation attached, log source, and proposed fix. Use `[incident:<slug>]` title slug (dedupe preflight applies — see Issue Hygiene above).
+For **High**: Create HIGH priority Paperclip task for **CTO** with error, log source, suggested fix. Run `/investigate` first if the root cause is unclear.
 
 ### 4. Write QA Report
 `experiments/reports/qa-YYYY-MM-DD-HHmm.md`:
@@ -137,11 +120,10 @@ with a summary of what happened.
 ## Post-Deploy Verification
 
 When triggered after a deploy (by Coolify webhook or Release Engineer handoff):
-1. **Run `/canary`** — MANDATORY after every deploy. Monitors for console errors, performance regressions, and page failures
-2. Check Sentry for new errors in the last 10 minutes
-3. Verify DB health query
-4. Run E2E smoke tests if credentials are configured (see below)
-5. Report results to **CTO** — GREEN (all clear) or RED (issues found)
+1. **Run `/canary`** — MANDATORY. Handles console errors, performance regressions, page failures, baseline comparison.
+2. **Sentry scan** — `sentry issue list --status unresolved --limit 20 --json --fields shortId,title,level,firstSeen` and cross-reference against the deploy timestamp.
+3. Run E2E smoke tests if credentials are configured (see below).
+4. Report results to **CTO** — GREEN (all clear) or RED (issues found).
 
 ## Post-Deploy E2E Smoke Tests
 
@@ -182,20 +164,7 @@ cold start path.
 
 ### Exploratory Testing (post-deploy, non-blocking)
 
-After deterministic smoke passes, spend 5-10 minutes testing the bot as a real
-user would. This is NOT scripted. Improvise. Try things a real user would try:
-
-- Send random text messages (not commands)
-- Send stickers, photos, voice messages
-- Rapid-fire like/dislike buttons
-- Send /start multiple times in a row
-- Try /lang mid-session
-- Send deep links (t.me/ffmemesbot?start=xxx)
-- Try the share button
-- Test in different languages if configured
-
-File any bugs found as tasks for CTO with reproduction steps and screenshots.
-This is a non-blocking bug hunt — don't gate the deploy on exploratory results.
+After deterministic smoke passes, run `/qa exhaustive` for an improvised bug hunt against the live bot. File any findings as tasks for CTO with repro steps + screenshots. Non-blocking — don't gate the deploy on exploratory results.
 
 ## Process Health Check (Watchdog)
 

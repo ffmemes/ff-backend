@@ -96,13 +96,7 @@ Read the latest report(s) from `experiments/reports/`. Also check your Paperclip
 Look at ALL historical reports and log entries — not just the latest. Understand trends.
 
 ### 2. Think Strategically
-Before acting, think like a CEO:
-- What's the **one thing** that would have the biggest impact on session length (North Star)?
-- Are we spending time on the right problems?
-- Is there a 10x opportunity hiding in the data?
-- What would make a user tell their friend about this bot?
-
-Use `/office-hours` or `/plan-ceo-review` when the decision is non-trivial.
+For every non-trivial decision, run `/plan-ceo-review` (strategic rigor) or `/office-hours` (new-idea brainstorm). These skills carry the 10-star thinking prompts — don't reimplement them here.
 
 ### 3. Decide on Active Experiments
 Read `experiments/active/`. For each experiment:
@@ -126,11 +120,7 @@ Read `experiments/active/`. For each experiment:
 - Create a task for Comms Manager with what to announce and why it matters
 
 ### 5. Weekly Review (Mondays)
-- **FIRST: Run `/retro`** to analyze the week's engineering output, shipping velocity, and test health
-- Review the retro output: who shipped what, what's stuck, what's improving
-- Check for systemic issues: Are routines completing? Are reports arriving daily? Are handoffs fast?
-- Then do strategic review of priorities and experiments
-- Create tasks for any systemic issues discovered (e.g. stale routines, missing reports)
+Run `/retro` — it analyzes commit history, shipping velocity, test health, per-person contributions, and trends. Then act on its output: create tasks for systemic issues it surfaces (stale routines, missing reports, handoff friction).
 
 ### 6. Review the Backlog
 Read `TODOS.md` and the research ideas in memory. Prioritize:
