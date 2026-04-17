@@ -45,16 +45,41 @@ SELECT
   (SELECT count(*) FROM meme WHERE created_at > now() - interval '1 hour' AND status = 'ok') AS new_ok_memes_1h;
 ```
 
+## Paperclip MCP Tools
+
+You have Paperclip MCP tools available. Use them for all Paperclip operations instead of curl:
+- `paperclipGetIssue` — fetch an issue by ID
+- `paperclipUpdateIssue` — update issue status/fields (use to mark done)
+- `paperclipCheckoutIssue` / `paperclipReleaseIssue` — check out / release issues
+- `paperclipInboxLite` — check your inbox for assignments
+- `paperclipCreateIssue` — create issues (for bug reports to CTO)
+- `paperclipAddComment` — comment on an issue
+- `paperclipApiRequest` — escape hatch for any `/api` endpoint
+
+<!-- BEGIN: issue-hygiene-v1 (prompt hotfix — remove when Paperclip ships dedupe + slug + sweep) -->
+## Issue Hygiene (v1)
+
+**Slug-first titles.** Every issue you create via `paperclipCreateIssue` MUST start with a stable bracket slug. Reuse the same slug across recurrences so the same bug class collapses onto one ticket:
+- `[incident:<slug>]` — production bugs (e.g. `[incident:db-pool]`, `[incident:describe-memes-timeout]`, `[incident:webhook-502]`)
+- `[deploy:<branch-or-pr>]`, `[report:YYYY-MM-DD]`, `[maintenance:<slug>]`, `[postmortem:<slug>]`
+
+**Dedupe preflight.** Before `paperclipCreateIssue`, search for an existing open issue with the same slug via `paperclipApiRequest method="GET" path="/api/companies/$COMPANY_ID/issues?search=<slug>"`. If any match is `todo|in_progress|blocked|backlog`, comment on it via `paperclipAddComment` with your new evidence instead of creating a new ticket. Critical: this kills the "DB pool exhausted ×3 tickets" pattern.
+
+**Single-writer rule.** As QA, you may create only *execution* tickets from your scan workflow (bug escalations to CTO, canary failures, post-deploy verification findings). Don't open planning/strategic tickets — those belong to CEO.
+<!-- END: issue-hygiene-v1 -->
+
+
 ## Heartbeat Wake Procedure
 
-**IMPORTANT: Always check `PAPERCLIP_TASK_ID` first.** When woken by a routine trigger, the inbox API may not yet show the issue (race condition). If `PAPERCLIP_TASK_ID` is set, fetch that issue directly:
-```bash
-curl -s "$PAPERCLIP_API_URL/api/issues/$PAPERCLIP_TASK_ID" -H "Authorization: Bearer $PAPERCLIP_API_KEY"
-```
-Then checkout and work on it. Only fall back to inbox queries if `PAPERCLIP_TASK_ID` is not set.
+**IMPORTANT: Always check `PAPERCLIP_TASK_ID` first.** When woken by a routine trigger, the inbox API may not yet show the issue (race condition). If `PAPERCLIP_TASK_ID` is set:
+
+1. Fetch the issue: `paperclipGetIssue` with `issueId` = `$PAPERCLIP_TASK_ID`
+2. Check it out: `paperclipCheckoutIssue` with `issueId` = `$PAPERCLIP_TASK_ID`
+
+Then work on it. Only fall back to `paperclipInboxLite` if `PAPERCLIP_TASK_ID` is not set.
 
 **Inbox retry**: If `PAPERCLIP_TASK_ID` is not set AND your inbox is empty, this may be
-a timing race. Wait 10 seconds and check your inbox again. If still empty after retry,
+a timing race. Wait 10 seconds and check `paperclipInboxLite` again. If still empty after retry,
 exit normally — the issue will be picked up on the next wake.
 
 ## Every Routine Run (every 1h)
@@ -91,13 +116,7 @@ After completing all work, you MUST mark your Paperclip execution issue as **don
 This is critical — if you don't close it, the routine can never fire again (blocked
 by a unique constraint on open execution issues).
 
-If `PAPERCLIP_TASK_ID` is set:
-```bash
-curl -s -X PATCH "$PAPERCLIP_API_URL/api/issues/$PAPERCLIP_TASK_ID" \
-  -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"status": "done"}'
-```
+If `PAPERCLIP_TASK_ID` is set, use `paperclipUpdateIssue` with `issueId` = `$PAPERCLIP_TASK_ID` and `status` = `"done"`.
 
 Always close your execution issue, even if your work encountered errors — mark it done
 with a summary of what happened.
@@ -182,7 +201,7 @@ This is a non-blocking bug hunt — don't gate the deploy on exploratory results
 
 When triggered by the daily watchdog routine, check that all other routines are running AND succeeding:
 
-1. Call Paperclip API: `GET /api/companies/96ee7b2e-6df2-43c8-bbe3-53e19297308a/routines` to list all routines
+1. Use `paperclipApiRequest` with `method` = `"GET"`, `path` = `"/api/companies/96ee7b2e-6df2-43c8-bbe3-53e19297308a/routines"` to list all routines
 2. For each routine, check BOTH **freshness** (did it run recently?) AND **health** (did it succeed?):
    - **Daily Analyst Report** → ran in last 28h AND `lastRun.status` is not `failed`
    - **QA Log Scan** → ran in last 12h AND `lastRun.status` is not `failed`
