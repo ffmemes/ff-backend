@@ -39,27 +39,26 @@ This happened in April 2026 when AI agents added paid fallbacks during unsupervi
 
 ```python
 VISION_MODELS = [
-    "google/gemma-3-27b-it:free",     # proven workhorse, 131k context
-    "google/gemma-3-12b-it:free",     # good fallback, 32k context
-    "google/gemma-3-4b-it:free",      # small but fast, 32k context
+    "google/gemma-4-31b-it:free",     # 262k context, primary
+    "google/gemma-4-26b-a4b-it:free", # 262k context, MoE variant
 ]
 ```
 
 Falls through sequentially on 403 (access denied), timeout, or bad response.
 429 (rate limit) returns immediately — the 20 rpm limit is global across all free models, so trying the next model would also 429.
 
-**Removed models** (Apr 2026): `gemma-4-31b-it:free` and `gemma-4-26b-a4b-it:free` consistently return 403, wasting daily quota on guaranteed failures (see FFM-520).
+**Removed models** (Apr 2026): All `gemma-3-*:free` models delisted from OpenRouter ~2026-04-15, causing 48h+ outage (FFM-543). `gemma-4-*:free` models restored after earlier 403 issues (FFM-520).
 
-### Available Free Vision Models (as of 2026-04-11)
+### Available Free Vision Models (as of 2026-04-17)
 
 | Model | Context | Notes |
 |-------|---------|-------|
-| `google/gemma-3-27b-it:free` | 131K | Primary, most reliable |
-| `google/gemma-3-12b-it:free` | 32K | Reliable fallback |
-| `google/gemma-3-4b-it:free` | 32K | Smallest, fastest |
-| `google/gemma-4-31b-it:free` | 262K | Returned 403 in April 2026, may be fixed |
-| `google/gemma-4-26b-a4b-it:free` | 262K | Same 403 issue |
-| `nvidia/nemotron-nano-12b-v2-vl:free` | 128K | **Removed** — returns 504s and invalid JSON/empty content, causes batch timeouts |
+| `google/gemma-4-31b-it:free` | 262K | Primary, restored after earlier 403 issues |
+| `google/gemma-4-26b-a4b-it:free` | 262K | MoE variant fallback |
+| `google/gemma-3-27b-it:free` | 131K | **Delisted** ~2026-04-15 |
+| `google/gemma-3-12b-it:free` | 32K | **Delisted** ~2026-04-15 |
+| `google/gemma-3-4b-it:free` | 32K | **Delisted** ~2026-04-15 |
+| `nvidia/nemotron-nano-12b-v2-vl:free` | 128K | **Removed** — returns 504s and invalid JSON/empty content |
 
 Check current availability: `curl https://openrouter.ai/api/v1/models | jq '.data[] | select(.id | endswith(":free")) | select(.architecture.modality | contains("image")) | .id'`
 

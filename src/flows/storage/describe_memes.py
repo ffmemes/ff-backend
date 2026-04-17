@@ -45,16 +45,13 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 # lifetime purchases for 1,000 req/day (vs 50/day without).
 # See specs/describe-memes.md for full OpenRouter constraints.
 #
-# Verified available on OpenRouter API as of 2026-04-11.
+# Verified available on OpenRouter API as of 2026-04-17.
 # Ordered by preference. Falls back to next model on 429/403/error.
 VISION_MODELS = [
-    "google/gemma-3-27b-it:free",  # proven workhorse, 131k context
-    "google/gemma-3-12b-it:free",  # good fallback, 32k context
-    "google/gemma-3-4b-it:free",  # small but fast, 32k context
-    # google/gemma-4-31b-it:free removed — consistently returns 403 (Apr 2026),
-    # wasting daily quota on guaranteed failures. Each 403 counts toward the
-    # 1,000 req/day free-tier limit. Re-add only after verifying access is restored.
-    # google/gemma-4-26b-a4b-it:free removed — same 403 issue as gemma-4-31b.
+    "google/gemma-4-31b-it:free",  # 262k context, re-added after Gemma 3 free tier removal
+    "google/gemma-4-26b-a4b-it:free",  # 262k context, MoE variant
+    # google/gemma-3-*:free removed — all Gemma 3 free models delisted from
+    # OpenRouter around 2026-04-15. This caused 48h+ pipeline outage (FFM-543).
     # nvidia/nemotron-nano-12b-v2-vl:free removed — returns 504s and invalid
     # JSON/empty content (see specs/describe-memes.md).
 ]
