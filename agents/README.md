@@ -142,8 +142,11 @@ agents/
 
 ### Update gstack skills
 
-```bash
-# Via API (secrets from env: $PAPERCLIP_URL, $PAPERCLIP_API_KEY in ~/.zshrc)
+```
+# Via MCP (preferred — if Paperclip MCP server configured):
+paperclipApiRequest method="POST" path="/api/companies/$COMPANY_ID/skills/import" jsonBody={"source": "https://github.com/garrytan/gstack"}
+
+# Via curl (fallback):
 curl -X POST "$PAPERCLIP_URL/api/companies/$COMPANY_ID/skills/import" \
   -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
   -H "Content-Type: application/json" \
