@@ -31,6 +31,15 @@ agents:
         ANALYST_DATABASE_URL:
           kind: secret
           requirement: optional
+        SENTRY_AUTH_TOKEN:
+          kind: secret
+          requirement: optional
+        COOLIFY_ACCESS_TOKEN:
+          kind: secret
+          requirement: optional
+        COOLIFY_BASE_URL:
+          kind: secret
+          requirement: optional
 
   staff-engineer:
     adapter:
@@ -57,7 +66,7 @@ agents:
           requirement: required
         SENTRY_AUTH_TOKEN:
           kind: secret
-          requirement: optional
+          requirement: required
         PAPERCLIP_API_KEY:
           kind: secret
           requirement: optional
