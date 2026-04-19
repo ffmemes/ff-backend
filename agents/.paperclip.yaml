@@ -40,6 +40,12 @@ agents:
         COOLIFY_BASE_URL:
           kind: secret
           requirement: optional
+        PREFECT_API_URL:
+          kind: secret
+          requirement: optional
+        PREFECT_AUTH_STRING:
+          kind: secret
+          requirement: optional
 
   staff-engineer:
     adapter:
@@ -65,6 +71,12 @@ agents:
           kind: secret
           requirement: required
         SENTRY_AUTH_TOKEN:
+          kind: secret
+          requirement: required
+        PREFECT_API_URL:
+          kind: secret
+          requirement: required
+        PREFECT_AUTH_STRING:
           kind: secret
           requirement: required
         PAPERCLIP_API_KEY:
