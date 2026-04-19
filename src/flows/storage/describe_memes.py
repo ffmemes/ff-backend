@@ -153,6 +153,25 @@ def _parse_vision_response(raw_content: str) -> dict:
     raise json.JSONDecodeError("Could not parse model response", content, 0)
 
 
+def _parse_retry_after(response: httpx.Response) -> float | None:
+    """Extract retry delay from Retry-After header or response body."""
+    header = response.headers.get("retry-after") or response.headers.get("x-ratelimit-reset")
+    if header:
+        try:
+            return float(header)
+        except ValueError:
+            pass
+    try:
+        body = response.json()
+        if "error" in body and "metadata" in body["error"]:
+            reset = body["error"]["metadata"].get("ratelimit_reset")
+            if reset:
+                return float(reset)
+    except Exception:
+        pass
+    return None
+
+
 async def call_openrouter_vision(image_b64: str, log, *, deadline: float | None = None) -> dict:
     """Call OpenRouter vision model with fallback chain.
 
@@ -210,11 +229,13 @@ async def call_openrouter_vision(image_b64: str, log, *, deadline: float | None 
                     return {QUOTA_EXHAUSTED: True}
 
                 if response.status_code == 429:
-                    # Rate limit is global across all free models (20 rpm),
-                    # so trying the next model will also 429. Return immediately
-                    # instead of wasting requests and time on the fallback chain.
-                    log.info("Rate-limited (429) on %s — limit is global, stopping.", model_id)
-                    return {RATE_LIMITED: True}
+                    retry_after = _parse_retry_after(response)
+                    log.info(
+                        "Rate-limited (429) on %s (retry-after: %ss)",
+                        model_id,
+                        retry_after or "unknown",
+                    )
+                    return {RATE_LIMITED: True, "__retry_after": retry_after}
 
                 if response.status_code == 403:
                     log.warning("Model %s HTTP 403 (access denied), trying next...", model_id)
@@ -303,6 +324,9 @@ async def describe_single_meme(meme_row: dict, log, *, deadline: float | None = 
         return "failed"
 
     if result.get(RATE_LIMITED):
+        retry_after = result.get("__retry_after")
+        if retry_after is not None:
+            return ("rate_limited", retry_after)
         return "rate_limited"
 
     if result.get(QUOTA_EXHAUSTED):
@@ -389,6 +413,8 @@ async def describe_memes_flow(batch_size: int = 20) -> None:
     ok = 0
     failed = 0
     consecutive_fails = 0
+    rate_limit_waits = 0
+    max_rate_limit_waits = 3
     # Hard deadline: stop 120s before the 900s flow timeout.
     # Anchored to flow_start so pre-batch query time is accounted for.
     batch_deadline = flow_start + 780
@@ -398,7 +424,9 @@ async def describe_memes_flow(batch_size: int = 20) -> None:
     # 4.0s = 15 rpm effective, well under the 20 rpm cap with margin for bursts.
     min_request_interval = 4.0
 
-    for i, meme_row in enumerate(memes):
+    i = 0
+    while i < len(memes):
+        meme_row = memes[i]
         remaining = batch_deadline - time.monotonic()
         if remaining < per_meme_timeout + 15:
             log.warning(
@@ -435,18 +463,45 @@ async def describe_memes_flow(batch_size: int = 20) -> None:
             )
             status = "failed"
 
+        retry_after = None
+        if isinstance(status, tuple):
+            status, retry_after = status
+
         if status == "ok":
             ok += 1
             consecutive_fails = 0
+            rate_limit_waits = 0
             log.info("Described meme %d (%d/%d)", meme_row["id"], i + 1, len(memes))
         elif status == "rate_limited":
-            log.warning(
-                "All models rate-limited at meme %d (%d/%d). Stopping batch.",
+            if rate_limit_waits >= max_rate_limit_waits:
+                log.warning(
+                    "Rate-limited %d times at meme %d (%d/%d). "
+                    "Likely daily quota exhausted — stopping batch.",
+                    rate_limit_waits + 1,
+                    meme_row["id"],
+                    i + 1,
+                    len(memes),
+                )
+                break
+            wait_secs = min(retry_after or 65.0, 65.0)
+            if batch_deadline - time.monotonic() < wait_secs + per_meme_timeout + 15:
+                log.warning(
+                    "Rate-limited but not enough time to wait %.0fs — stopping batch.",
+                    wait_secs,
+                )
+                break
+            rate_limit_waits += 1
+            log.info(
+                "Rate-limited at meme %d (%d/%d). Waiting %.0fs before retry (%d/%d waits).",
                 meme_row["id"],
                 i + 1,
                 len(memes),
+                wait_secs,
+                rate_limit_waits,
+                max_rate_limit_waits,
             )
-            break
+            await asyncio.sleep(wait_secs)
+            continue
         elif status == "quota_exhausted":
             log.warning(
                 "OpenRouter quota exhausted at meme %d (%d/%d). "
@@ -471,7 +526,8 @@ async def describe_memes_flow(batch_size: int = 20) -> None:
                 log.warning("3 consecutive failures — stopping batch.")
                 break
 
-        if i < len(memes) - 1:
+        i += 1
+        if i < len(memes):
             request_elapsed = time.monotonic() - request_start
             sleep_needed = max(0, min_request_interval - request_elapsed)
             if sleep_needed > 0:

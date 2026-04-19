@@ -90,7 +90,7 @@ Stored in `meme.ocr_result` JSONB:
 - **Per-meme**: 3 failures tracked in `ocr_result.describe_failures`, then skipped
 - **Per-batch**: 3 consecutive failures → batch stops early
 - **Quota exhausted**: HTTP 402 → immediate batch exit on first occurrence (no model fallback — 402 is account-wide)
-- **Rate limit**: all models return 429 → batch stops, waits for next cron run
+- **Rate limit**: all models return 429 → wait up to 65s using Retry-After header, retry same meme. After 3 waits without progress, stop batch (likely daily quota)
 - **Circuit breaker**: Prefect automation pauses deployment after 3 flow failures/hour
 
 ## Monitoring
