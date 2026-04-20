@@ -13,6 +13,7 @@ from src.tgbot.service import (
     get_experiment_variant,
     user_popup_already_sent,
 )
+from src.tgbot.utils import get_related_channel_link
 
 
 def _get_popup(popup_id: str, user_info: dict) -> Popup:
@@ -33,6 +34,30 @@ def _get_popup(popup_id: str, user_info: dict) -> Popup:
     )
 
 
+def _get_channel_popup(popup_id: str, user_info: dict) -> Popup:
+    channel_link = get_related_channel_link(user_info["interface_lang"])
+    return Popup(
+        id=popup_id,
+        text=localizer.t(popup_id, user_info["interface_lang"]),
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "📢 Subscribe",
+                        url=channel_link,
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        "✅ I subscribed",
+                        callback_data=POPUP_BUTTON_CALLBACK_DATA_PATTERN.format(popup_id=popup_id),
+                    )
+                ],
+            ]
+        ),
+    )
+
+
 async def send_popup(user_id: int, popup: Popup) -> None:
     await bot.send_message(
         chat_id=user_id,
@@ -41,6 +66,13 @@ async def send_popup(user_id: int, popup: Popup) -> None:
         reply_markup=popup.reply_markup,
     )
     await create_user_popup_log(user_id, popup.id)
+
+    if popup.id == "popup.telegram_channel":
+        safe_emit(
+            "ff.popup.telegram_channel.shown",
+            f"user.{user_id}",
+            {"user_id": user_id},
+        )
 
 
 async def get_popup_to_send(user_id: int, user_info: dict) -> Popup | None:
@@ -110,10 +142,10 @@ async def get_popup_to_send(user_id: int, user_info: dict) -> Popup | None:
         if not await user_popup_already_sent(user_id, popup_id):
             return _get_popup(popup_id, user_info)
 
-    if user_info["nmemes_sent"] % 1000 == 50:
+    if user_info["nmemes_sent"] % 1000 == 5:
         popup_id = "popup.telegram_channel"
         if not await user_popup_already_sent(user_id, popup_id):
-            return _get_popup(popup_id, user_info)
+            return _get_channel_popup(popup_id, user_info)
 
     if user_info["nmemes_sent"] % 1000 == 70:
         popup_id = "popup.github_repo"
