@@ -151,5 +151,6 @@ async def upload_meme_content_to_tg(
 
         await asyncio.sleep(3)  # flood control
 
-    logging.warning(f"Meme {meme['id']} failed to upload to Telegram.")
+    logging.warning(f"Meme {meme['id']} failed to upload to Telegram after 3 attempts.")
+    await update_meme(meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK)
     return None

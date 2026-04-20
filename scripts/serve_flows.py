@@ -137,15 +137,11 @@ if __name__ == "__main__":
             # Experiment: dropped 18:00 MSK (21:00 UTC, 10.2 fwd/1k — worst slot).
             # Added 11:00 MSK. Data: 10:00 MSK = 25.6 fwd/1k (best), 18:00 MSK = 15.6 fwd/1k.
             # Baseline (pre-2026-04-13): 8,10,12,14,16,18 MSK (6x/day)
-            schedules=[
-                CronSchedule(cron="20 8,10,11,12,14,16 * * *", timezone=MSK)
-            ],
+            schedules=[CronSchedule(cron="20 8,10,11,12,14,16 * * *", timezone=MSK)],
         ),
         post_meme_to_tgchannelen.to_deployment(
             name="Post to TG Channel EN",
-            schedules=[
-                CronSchedule(cron="40 8,10,14,18,20 * * *", timezone=MSK)
-            ],
+            schedules=[CronSchedule(cron="40 8,10,14,18,20 * * *", timezone=MSK)],
         ),
         # ── Channel Stats (every 6h) ──
         collect_channel_stats.to_deployment(
@@ -172,6 +168,11 @@ if __name__ == "__main__":
         # ── Storage ──
         describe_memes_flow.to_deployment(
             name="Describe Memes (OpenRouter)",
-            schedules=[CronSchedule(cron="*/30 * * * *", timezone=LON)],
+            # Reduced to every 3 hours with batch_size=6 (8 runs × 6 = 48/day).
+            # At 50/day free quota (no $10+ purchases), hourly×20 was burning
+            # through the daily limit within 2-3 runs. Bump back to hourly×20
+            # once $10+ lifetime credit unlocks 1,000/day. See FFM-587.
+            schedules=[CronSchedule(cron="15 */3 * * *", timezone=LON)],
+            parameters={"batch_size": 6},
         ),
     )

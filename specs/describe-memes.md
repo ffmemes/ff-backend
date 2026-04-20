@@ -4,7 +4,7 @@
 
 Background Prefect flow that uses vision LLMs to analyze meme images. Populates `meme.ocr_result` JSONB with description, OCR text, language, model used, and timestamp.
 
-Processes most-liked memes first (by `meme_stats.nlikes DESC`). Runs every 30 min, ~30 memes per batch.
+Processes most-liked memes first (by `meme_stats.nlikes DESC`). Runs every 60 min, ~20 memes per batch.
 
 ## OpenRouter Free Tier Constraints
 
@@ -39,26 +39,28 @@ This happened in April 2026 when AI agents added paid fallbacks during unsupervi
 
 ```python
 VISION_MODELS = [
-    "google/gemma-3-27b-it:free",     # proven workhorse, 131k context
-    "google/gemma-3-12b-it:free",     # good fallback, 32k context
-    "google/gemma-3-4b-it:free",      # small but fast, 32k context
-    "google/gemma-4-31b-it:free",     # 262k context (may return 403)
-    "google/gemma-4-26b-a4b-it:free", # 262k MoE (may return 403)
+    "google/gemma-4-31b-it:free",     # 262k context, primary
+    "google/gemma-4-26b-a4b-it:free", # 262k context, MoE variant
+    "google/gemma-3-27b-it:free",     # 131k context, re-listed ~2026-04-20
+    "google/gemma-3-12b-it:free",     # 32k context, re-listed ~2026-04-20
 ]
 ```
 
-Falls through sequentially on 429 (rate limit), 403 (access denied), timeout, or bad response.
+Falls through sequentially on 403 (access denied), timeout, or bad response.
+429 (rate limit) returns immediately — the 20 rpm limit is global across all free models, so trying the next model would also 429.
 
-### Available Free Vision Models (as of 2026-04-11)
+**Model history** (Apr 2026): Gemma 3 free models delisted ~2026-04-15 (FFM-543), re-listed ~2026-04-20 and re-added to chain. `gemma-4-*:free` restored after earlier 403 issues (FFM-520).
+
+### Available Free Vision Models (as of 2026-04-20)
 
 | Model | Context | Notes |
 |-------|---------|-------|
-| `google/gemma-3-27b-it:free` | 131K | Primary, most reliable |
-| `google/gemma-3-12b-it:free` | 32K | Reliable fallback |
-| `google/gemma-3-4b-it:free` | 32K | Smallest, fastest |
-| `google/gemma-4-31b-it:free` | 262K | Returned 403 in April 2026, may be fixed |
-| `google/gemma-4-26b-a4b-it:free` | 262K | Same 403 issue |
-| `nvidia/nemotron-nano-12b-v2-vl:free` | 128K | **Removed** — returns 504s and invalid JSON/empty content, causes batch timeouts |
+| `google/gemma-4-31b-it:free` | 262K | Primary |
+| `google/gemma-4-26b-a4b-it:free` | 262K | MoE variant fallback |
+| `google/gemma-3-27b-it:free` | 131K | Re-listed ~2026-04-20, restored as fallback |
+| `google/gemma-3-12b-it:free` | 32K | Re-listed ~2026-04-20, restored as fallback |
+| `google/gemma-3-4b-it:free` | 32K | Available but not used (4B too small for reliable JSON) |
+| `nvidia/nemotron-nano-12b-v2-vl:free` | 128K | **Removed** — returns 504s and invalid JSON/empty content |
 
 Check current availability: `curl https://openrouter.ai/api/v1/models | jq '.data[] | select(.id | endswith(":free")) | select(.architecture.modality | contains("image")) | .id'`
 
@@ -90,14 +92,14 @@ Stored in `meme.ocr_result` JSONB:
 - **Per-meme**: 3 failures tracked in `ocr_result.describe_failures`, then skipped
 - **Per-batch**: 3 consecutive failures → batch stops early
 - **Quota exhausted**: HTTP 402 → immediate batch exit on first occurrence (no model fallback — 402 is account-wide)
-- **Rate limit**: all models return 429 → batch stops, waits for next cron run
+- **Rate limit**: all models return 429 → wait up to 65s using Retry-After header, retry same meme. After 3 waits without progress, stop batch (likely daily quota)
 - **Circuit breaker**: Prefect automation pauses deployment after 3 flow failures/hour
 
 ## Monitoring
 
 - Flow name: `Describe Memes (OpenRouter Vision)`
 - Emits event: `ff.describe_memes.completed` with `{described: N, failed: N}`
-- Healthy batch: 20-30 memes described, < 5 failures
+- Healthy batch: 15-20 memes described, < 5 failures
 - Check: `SELECT count(*) FROM meme WHERE ocr_result->>'calculated_at' > (now() - interval '1 hour')::text`
 
 ## Key Files
@@ -113,3 +115,4 @@ Stored in `meme.ocr_result` JSONB:
 1. **Free model churn**: OpenRouter frequently removes/changes free models. Gemma 3 → Gemma 4 → back to Gemma 3 happened within days (April 2026). Models need manual verification against the API.
 2. **No balance monitoring**: No alerting when OpenRouter balance approaches $0.
 3. **No daily request counter**: Can't tell if we're hitting the 1,000/day free limit vs getting rate-limited for other reasons.
+4. **Fallback chain multiplies quota usage**: Each failed model attempt (403, timeout, bad response) counts toward the 1,000/day limit. A 5-model chain with 2 broken models wastes 40% of requests. Keep the chain short and remove models that consistently fail (FFM-520, Apr 2026).

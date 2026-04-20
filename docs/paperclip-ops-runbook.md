@@ -269,10 +269,11 @@ These are encrypted in Paperclip DB and injected as env vars during agent runs:
 | Secret | Used by | Purpose |
 |--------|---------|---------|
 | `ANALYST_DATABASE_URL` | Analyst, QA | Read-only prod DB access |
-| `COOLIFY_ACCESS_TOKEN` | QA | Coolify API for container logs |
-| `COOLIFY_BASE_URL` | QA | Coolify API URL |
-| `SENTRY_DSN` | QA | Sentry project DSN |
-| `SENTRY_AUTH_TOKEN` | QA | Sentry CLI authentication |
+| `COOLIFY_ACCESS_TOKEN` | CTO, QA, Release Engineer | Coolify API for container logs |
+| `COOLIFY_BASE_URL` | CTO, QA, Release Engineer | Coolify API URL |
+| `SENTRY_AUTH_TOKEN` | CTO, QA | Sentry CLI authentication (read-only project scope) |
+| `PREFECT_API_URL` | CTO, QA | Prefect API endpoint (`https://prefect.swanrate.com/api`) |
+| `PREFECT_AUTH_STRING` | CTO, QA | Prefect API Basic auth credentials |
 | `OPENAI_API_KEY` | All (Codex), Telegram plugin (Whisper) | OpenAI API for Codex + voice transcription |
 | `TEST_DATABASE_URL` | CTO | Test/staging DB for safe experiments |
 | `TELEGRAM_BOT_TOKEN` | Telegram plugin | @ffnerdbot token (NOT @ffmemesbot!) |

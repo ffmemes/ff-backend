@@ -1,6 +1,6 @@
 # TODOS
 
-> Last updated: 2026-03-20. Items marked ~~strikethrough~~ with "DONE" are completed.
+> Last updated: 2026-04-20. Items marked ~~strikethrough~~ with "DONE" are completed.
 
 ## P1 — High Priority
 
@@ -16,11 +16,8 @@
 ### ~~Incremental meme_stats computation~~ — DONE
 **Context:** Done 2026-03-27. Rewrote `calculate_meme_stats()` to only update memes with reactions in the last 3 hours, then upsert only those rows. Prevents full-table scan timeout cascade at peak traffic. Commit `84a5119`. See [FFM-5](/FFM/issues/FFM-5).
 
-### Add per-user recency filter to goat engine
-**What:** In the goat SQL query, add a filter to exclude memes the user saw recently (e.g., `sent_at > now() - interval '30 days'` via `user_meme_reaction`). This rotates the GOAT pool per-user.
-**Why:** Goat LR declined from 44% → 16% over 6 days post-fix due to pool exhaustion — the same top-ranked GOATs are served repeatedly to users who already saw them. Goat has 98% continuation rate (best engine) so the pool exhaustion is the only issue.
-**File:** `src/recommendations/candidates.py` (goat function)
-**Depends on:** Nothing — targeted SQL change.
+### ~~Add per-user recency filter to goat engine~~ — DONE
+**Context:** Done 2026-04-13. Added per-user recency filter using `reacted_at` in SCORES CTE to exclude memes the user reacted to in the last 30 days. PR #162 + #169, deployed Apr 13. Goat LR recovered to 41.9% (7d) vs 39.4% baseline, continuation 97.5%. Experiment running through Apr 27.
 
 ### Auto-discover new TG channels from forwarded messages
 **What:** When the TG scraper parses a forwarded post, extract the source channel URL. Store discovered channels in a new `meme_source_candidate` table with status='discovered'. Admin/moderator approval flow to promote to `meme_source`.
