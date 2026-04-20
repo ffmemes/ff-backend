@@ -409,3 +409,85 @@ WHERE created_at > now() - interval '7 days'
 GROUP BY chat_id
 ORDER BY agent_calls DESC
 LIMIT 10;
+
+
+-- =============================================
+-- SECTION: NEW USER ACTIVATION FUNNEL
+-- =============================================
+-- Tracks conversion from signup through retention.
+--
+-- IMPORTANT: The old dashboard metric (user_stats.nmemes_sent > 0) is WRONG.
+-- user_stats rows only exist for users who REACTED (clicked like/dislike).
+-- Users who received a meme but never reacted have no user_stats row and
+-- were incorrectly counted as "never received a meme."
+--
+-- Real delivery rate is ~97%. The biggest drop is delivered → first reaction (~33%).
+-- Excludes 'wrapped' and 'kitchen' deep links (different flows, not normal meme funnel).
+
+-- Query A: Weekly cohort funnel (trend tracking, last 12 weeks)
+WITH cohort AS (
+  SELECT u.id, DATE_TRUNC('week', u.created_at)::date AS week
+  FROM "user" u
+  JOIN user_tg ut ON u.id = ut.id
+  WHERE u.created_at >= now() - interval '12 weeks'
+    AND COALESCE(ut.deep_link, '') NOT IN ('wrapped', 'kitchen')
+)
+SELECT
+  week,
+  count(*) AS users,
+  round(100.0 * count(*) FILTER (
+    WHERE EXISTS (SELECT 1 FROM user_meme_reaction r WHERE r.user_id = c.id)
+  ) / NULLIF(count(*), 0), 0) AS pct_delivered,
+  round(100.0 * count(*) FILTER (
+    WHERE EXISTS (SELECT 1 FROM user_meme_reaction r WHERE r.user_id = c.id AND r.reaction_id IS NOT NULL)
+  ) / NULLIF(count(*), 0), 0) AS pct_reacted,
+  round(100.0 * count(*) FILTER (
+    WHERE EXISTS (SELECT 1 FROM user_meme_reaction r WHERE r.user_id = c.id)
+    AND NOT EXISTS (SELECT 1 FROM user_meme_reaction r WHERE r.user_id = c.id AND r.reaction_id IS NOT NULL)
+  ) / NULLIF(count(*), 0), 0) AS pct_bounced,
+  round(100.0 * count(*) FILTER (
+    WHERE EXISTS (
+      SELECT 1 FROM user_stats us WHERE us.user_id = c.id AND us.nlikes + us.ndislikes >= 5
+    )
+  ) / NULLIF(count(*), 0), 0) AS pct_5_reactions,
+  round(100.0 * count(*) FILTER (
+    WHERE EXISTS (SELECT 1 FROM user_stats us WHERE us.user_id = c.id AND us.nsessions >= 2)
+  ) / NULLIF(count(*), 0), 0) AS pct_retained,
+  round(100.0 * count(*) FILTER (
+    WHERE EXISTS (SELECT 1 FROM "user" u2 WHERE u2.id = c.id AND u2.type = 'blocked_bot')
+  ) / NULLIF(count(*), 0), 0) AS pct_blocked
+FROM cohort c
+GROUP BY week
+ORDER BY week;
+
+-- Query B: Funnel stage breakdown (last 4 weeks, current snapshot)
+-- Shows where users are stuck and how many blocked the bot at each stage
+WITH users_4w AS (
+  SELECT u.id, u.type
+  FROM "user" u
+  JOIN user_tg ut ON u.id = ut.id
+  WHERE u.created_at >= now() - interval '4 weeks'
+    AND COALESCE(ut.deep_link, '') NOT IN ('wrapped', 'kitchen')
+)
+SELECT
+  CASE
+    WHEN NOT EXISTS (SELECT 1 FROM user_language ul WHERE ul.user_id = u.id)
+      THEN '1_no_language'
+    WHEN NOT EXISTS (SELECT 1 FROM user_meme_reaction r WHERE r.user_id = u.id)
+      THEN '2_never_got_meme'
+    WHEN NOT EXISTS (SELECT 1 FROM user_meme_reaction r WHERE r.user_id = u.id AND r.reaction_id IS NOT NULL)
+      THEN '3_got_meme_never_reacted'
+    WHEN NOT EXISTS (
+      SELECT 1 FROM user_stats us WHERE us.user_id = u.id AND us.nlikes + us.ndislikes >= 5
+    )
+      THEN '4_reacted_under_5'
+    WHEN NOT EXISTS (SELECT 1 FROM user_stats us WHERE us.user_id = u.id AND us.nsessions >= 2)
+      THEN '5_single_session_5plus'
+    ELSE '6_retained'
+  END AS funnel_stage,
+  count(*) AS total,
+  count(*) FILTER (WHERE u.type = 'blocked_bot') AS blocked,
+  round(100.0 * count(*) / (SELECT count(*) FROM users_4w), 1) AS pct_of_total
+FROM users_4w u
+GROUP BY 1
+ORDER BY 1;

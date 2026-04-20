@@ -4,15 +4,42 @@
 
 Paperclip manages the autonomous AI agent team for @ffmemesbot.
 Dashboard: `https://org.ffmemes.com` (URL is public, auth required).
+**Version**: 2026.416.0 (deployed from `ohld/paperclip` fork on 2026-04-16).
 
 All secrets (API keys, DB credentials, tokens) live in **environment variables** — never in this repo.
 Required env vars for local management: `PAPERCLIP_URL`, `PAPERCLIP_API_KEY` (set in `~/.zshrc` or `.env`).
+
+### MCP Server (v2026.416.0+)
+
+Paperclip API is available as an MCP tool server via `@paperclipai/mcp-server`. Configured in two places:
+
+**Local (MacBook)**: register via `claude mcp add` CLI (writes to `~/.claude.json` under the project entry). **Do NOT put `mcpServers` in `.claude/settings.local.json` — Claude Code does not read that key there.**
+
+```bash
+source ~/.zshrc   # loads PAPERCLIP_URL + PAPERCLIP_API_KEY
+claude mcp add paperclip -s local \
+  -e PAPERCLIP_API_URL="$PAPERCLIP_URL" \
+  -e PAPERCLIP_API_KEY="$PAPERCLIP_API_KEY" \
+  -e PAPERCLIP_COMPANY_ID=96ee7b2e-6df2-43c8-bbe3-53e19297308a \
+  -- npx -y @paperclipai/mcp-server
+
+claude mcp list               # verify paperclip ✓ Connected
+claude mcp get paperclip      # note: prints API key in plaintext — do not screen-share
+```
+
+**Server (agents)**: `/paperclip/.claude/settings.json` — uses `http://localhost:3100` (internal) and inherits `$PAPERCLIP_API_KEY` from Paperclip agent runtime.
+
+34 MCP tools available (issues, agents, comments, documents, approvals, projects, goals) + `paperclipApiRequest` escape hatch for anything not covered.
+
+Agent prompts reference MCP tools instead of curl. See agent `AGENTS.md` files for the tool list.
 
 ## Architecture
 
 ```
 org.ffmemes.com (Paperclip dashboard)
   ├── Coolify app: k4w804sco4s8kc88kwcw0ow4
+  ├── Git source: ohld/paperclip fork (master branch)
+  │   └── Fork needed: upstream Dockerfile has hardcoded sha256 for GH CLI GPG key
   ├── External PostgreSQL (shared Coolify DB service)
   │   └── Database: paperclip
   ├── Named volume: paperclip-data → /paperclip
@@ -35,17 +62,61 @@ export PAPERCLIP_URL="https://org.ffmemes.com"
 export PAPERCLIP_API_KEY="<your-board-api-key>"  # Get from dashboard Settings
 ```
 
-### Common API operations
+### CLI operations (v2026.403.0+)
+
+Run on the server: `ssh root@t.ffmemes.com`, then `docker exec -it $CONT npx paperclipai <command>`.
+Or locally with `--api-base` and `--api-key` flags.
 
 ```bash
 # List agents
-curl -s "$PAPERCLIP_URL/api/companies/<company-id>/agents" \
-  -H "Authorization: Bearer $PAPERCLIP_API_KEY" | jq '.[].name'
+npx paperclipai agent list --company-id <company-id>
 
-# List routines
-curl -s "$PAPERCLIP_URL/api/companies/<company-id>/routines" \
-  -H "Authorization: Bearer $PAPERCLIP_API_KEY" | jq '.[].title'
+# List issues
+npx paperclipai issue list --company-id <company-id>
 
+# Create an issue
+npx paperclipai issue create --company-id <company-id> --title "Fix bug" --body "Details..."
+
+# Export company (backup)
+npx paperclipai company export <company-id> --include company,agents,projects,issues
+
+# Import company (restore)
+npx paperclipai company import <path-or-url>
+
+# Plugin management
+npx paperclipai plugin list
+npx paperclipai plugin install paperclip-plugin-telegram
+npx paperclipai plugin inspect paperclip-plugin-telegram
+
+# Disable all routines (maintenance)
+npx paperclipai routines disable-all --company-id <company-id>
+
+# Auth
+npx paperclipai auth whoami
+```
+
+### API operations (MCP preferred, curl fallback)
+
+With MCP server configured, use MCP tools from Claude Code for most operations:
+
+```
+# List issues (MCP)
+paperclipListIssues
+
+# Get/update issue (MCP)
+paperclipGetIssue issueId=<id>
+paperclipUpdateIssue issueId=<id> status="done"
+
+# Create issue (MCP)
+paperclipCreateIssue title="..." body="..."
+
+# Escape hatch for any endpoint (MCP)
+paperclipApiRequest method="GET" path="/api/companies/<id>/secrets"
+paperclipApiRequest method="POST" path="/api/agents/<id>/wake"
+```
+
+Curl fallback (when MCP unavailable):
+```bash
 # List secrets (names only, values encrypted)
 curl -s "$PAPERCLIP_URL/api/companies/<company-id>/secrets" \
   -H "Authorization: Bearer $PAPERCLIP_API_KEY" | jq '.[].name'
@@ -106,16 +177,18 @@ Deploy after editing: `./agents/deploy.sh`
 | Routine | Agent | Schedule (UTC) | Trigger Type | What it does |
 |---------|-------|----------------|-------------|--------------|
 | Daily Analyst Report | Analyst | `19 6 * * *` | schedule + API | Query metrics, detect anomalies, write report |
-| QA Log Scan | QA | `7 */6 * * *` | schedule + 2 webhooks + API | Sentry, Coolify logs, DB health, E2E smoke |
+| QA Log Scan | QA | `7 * * * *` | 2 schedules + 2 webhooks + API | Sentry, Coolify logs, DB health, E2E smoke |
 | Process Health Check | QA | `37 12 * * *` | schedule | Watchdog: verify all routines are running and succeeding |
 | Weekly CEO Review | CEO | `11 9 * * 1` | schedule | Retro, experiments, priorities |
 | Weekly Analyst Summary | Analyst | `23 9 * * 1` | schedule | Weekly summary for CEO review |
 | gstack Update Check | CEO | `17 3 * * *` | schedule | Update skills, review changelog |
+| Paperclip Update Check | CTO | `0 4 * * *` | schedule | Check for Paperclip updates |
+| Daily Channel Post | Comms | `0 7 * * *` | schedule | Daily @ffmemes TG channel post |
 | PR Review | Staff Engineer | on PR event | 2 webhooks + API | Review PRs via GitHub Actions trigger |
 
 ## Plugins
 
-### Telegram Bot (`paperclip-plugin-telegram` v0.2.1)
+### Telegram Bot (`paperclip-plugin-telegram` v0.2.3)
 
 Bidirectional Telegram integration for managing Paperclip via @ffnerdbot (separate from production @ffmemesbot).
 
@@ -135,11 +208,17 @@ Config and secrets are in external PostgreSQL. Both survive redeploys.
 
 **If plugin is missing after redeploy**:
 ```bash
-# Re-install via API (config auto-loads from DB)
+# Re-install via CLI (config auto-loads from DB)
+npx paperclipai plugin install paperclip-plugin-telegram
+
+# Or via API (legacy):
 curl -X POST https://org.ffmemes.com/api/plugins/install \
   -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"packageName":"paperclip-plugin-telegram"}'
+
+# Verify status:
+npx paperclipai plugin inspect paperclip-plugin-telegram
 ```
 
 **Available bot commands** (in @ffnerdbot chat):
@@ -150,6 +229,38 @@ curl -X POST https://org.ffmemes.com/api/plugins/install \
 - `/connect ffmemes` — link chat to company
 - `/acp spawn/status/cancel/close` — manage agent sessions
 - Voice messages auto-transcribed via Whisper
+
+## Webhook Triggers & Signing Modes (v2026.416.0+)
+
+Paperclip triggers now support multiple signing modes:
+- **`bearer`** (default) — `Authorization: Bearer <secret>` header
+- **`hmac_sha256`** — Paperclip-native HMAC with `X-Paperclip-Signature`
+- **`github_hmac`** (NEW) — reads `X-Hub-Signature-256` header. Compatible with GitHub webhooks.
+- **`none`** (NEW) — no auth, publicId in URL acts as shared secret.
+
+### Current webhook setup
+
+| Source | Path | Auth | Notes |
+|--------|------|------|-------|
+| Sentry | app → proxy → Paperclip trigger | HMAC-SHA256 | Proxy in `src/integrations/paperclip.py` |
+| Coolify | app → proxy → Paperclip trigger | Shared secret | Proxy also filters by ff-backend app UUID |
+| Prefect | `notify_qa_sync()` → Paperclip trigger | Bearer token | Direct call, no proxy |
+| GitHub | GH Actions → Paperclip trigger | Bearer token | Direct call |
+
+### Simplification opportunity
+
+The webhook proxy (`src/integrations/paperclip.py`) exists because Sentry/Coolify can't send Paperclip auth headers. With `none` signing mode, both can POST directly to the trigger URL.
+
+**To simplify** (TODO):
+1. Switch QA trigger signing mode to `none` in Paperclip UI (Routine → Trigger → Signing Mode)
+2. Point Sentry webhook URL directly at the Paperclip trigger fire URL
+3. Point Coolify webhook URL directly at the Paperclip trigger fire URL
+4. Remove `src/integrations/paperclip.py` proxy code and `/webhooks/qa-alert` route from `src/main.py`
+5. Remove env vars: `WEBHOOK_PROXY_SECRET`, `SENTRY_CLIENT_SECRET` from ff-backend app
+
+**Trade-off**: Losing Sentry HMAC verification and Coolify UUID filtering. Acceptable because QA trigger is low-stakes (worst case: extra QA scans). The 24-char publicId provides URL-based obscurity.
+
+**Note**: `notify_qa_sync()` in `src/flows/hooks.py` still uses Bearer token — it will continue to work with `none` mode since Paperclip accepts any request.
 
 ## Secrets (Paperclip company secrets)
 
@@ -278,24 +389,54 @@ System-wide installs via `apt-get` and `npm install -g` do NOT survive redeploys
 ### Verify after redeploy
 
 ```bash
+CONT=$(docker ps --format '{{.Names}}' | grep k4w804 | head -1)
+
 # Auth survived?
 docker exec $CONT sh -c "test -f /paperclip/.claude/.credentials.json && echo claude:OK"
 docker exec $CONT sh -c "test -f /paperclip/.codex/auth.json && echo codex:OK"
 docker exec $CONT sh -c "test -f /paperclip/.config/gh/hosts.yml && echo gh:OK"
 
-# API works?
+# API + version?
 curl -s https://org.ffmemes.com/api/health
+docker exec $CONT npx paperclipai --version
 
 # Telegram plugin loaded?
-curl -s "$PAPERCLIP_URL/api/plugins" -H "Authorization: Bearer $PAPERCLIP_API_KEY" | python3 -c "
-import sys,json
-plugins = json.load(sys.stdin)
-tg = [p for p in plugins if p['pluginKey'] == 'paperclip-plugin-telegram']
-if tg: print(f'telegram-plugin: {tg[0][\"status\"]}')
-else: print('telegram-plugin: MISSING — reinstall via API (see Plugins section)')
-"
+docker exec $CONT npx paperclipai plugin inspect paperclip-plugin-telegram
 
 # Agents listed?
-curl -s "$PAPERCLIP_URL/api/companies/<company-id>/agents" \
-  -H "Authorization: Bearer $PAPERCLIP_API_KEY" | jq '.[].name'
+docker exec $CONT npx paperclipai agent list --company-id 96ee7b2e-6df2-43c8-bbe3-53e19297308a
 ```
+
+### Updating Paperclip
+
+Paperclip is deployed from the fork `ohld/paperclip` (not upstream `paperclipai/paperclip`).
+The fork removes a sha256 checksum in the Dockerfile that breaks when GitHub rotates their CLI GPG key.
+
+```bash
+# 1. Sync fork with upstream
+gh repo sync ohld/paperclip --source paperclipai/paperclip --branch master
+
+# 2. If upstream overwrites the Dockerfile fix, re-apply it:
+#    Remove the sha256sum line from Dockerfile in the fork
+
+# 3. Check migration prerequisites (v2026.416.0 requires pg_trgm)
+ssh root@t.ffmemes.com "docker exec \$(docker ps --format '{{.Names}}' | grep tkg4c0 | head -1) psql -U paperclip -d paperclip -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm;'"
+
+# 4. Deploy via Coolify (API or UI)
+#    The Coolify MCP tool or curl can trigger:
+#    mcp__coolify__deploy tag_or_uuid=k4w804sco4s8kc88kwcw0ow4
+
+# 5. Run post-redeploy checklist above
+
+# 6. Verify MCP config survived (on named volume)
+ssh root@t.ffmemes.com "CONT=\$(docker ps --format '{{.Names}}' | grep k4w804 | head -1) && docker exec \$CONT cat /paperclip/.claude/settings.json"
+```
+
+### Notable version changes
+
+| Version | Key changes |
+|---------|-------------|
+| v2026.416.0 | MCP server, chat threads, execution policies, blocker deps, `none`/`github_hmac` webhook signing, security fix GHSA-68qg-g8mg-6pr7 |
+| v2026.403.0 | Execution workspaces, routines engine, company skills, telemetry (disabled via env var) |
+| v2026.325.0 | Company import/export, company skills library |
+| v2026.318.0 | Plugin framework + SDK |
