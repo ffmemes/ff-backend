@@ -168,10 +168,11 @@ if __name__ == "__main__":
         # ── Storage ──
         describe_memes_flow.to_deployment(
             name="Describe Memes (OpenRouter)",
-            # Changed from */30 to hourly: 48 runs/day × 20 memes was consuming
-            # ~960+ daily quota (1,000 limit), leaving no headroom for fallback
-            # retries. At 24 runs/day × 20 = 480 base requests, comfortably
-            # under quota even with fallback cascades. See FFM-520.
-            schedules=[CronSchedule(cron="15 * * * *", timezone=LON)],
+            # Reduced to every 3 hours with batch_size=6 (8 runs × 6 = 48/day).
+            # At 50/day free quota (no $10+ purchases), hourly×20 was burning
+            # through the daily limit within 2-3 runs. Bump back to hourly×20
+            # once $10+ lifetime credit unlocks 1,000/day. See FFM-587.
+            schedules=[CronSchedule(cron="15 */3 * * *", timezone=LON)],
+            parameters={"batch_size": 6},
         ),
     )

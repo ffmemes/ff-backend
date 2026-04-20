@@ -41,23 +41,25 @@ This happened in April 2026 when AI agents added paid fallbacks during unsupervi
 VISION_MODELS = [
     "google/gemma-4-31b-it:free",     # 262k context, primary
     "google/gemma-4-26b-a4b-it:free", # 262k context, MoE variant
+    "google/gemma-3-27b-it:free",     # 131k context, re-listed ~2026-04-20
+    "google/gemma-3-12b-it:free",     # 32k context, re-listed ~2026-04-20
 ]
 ```
 
 Falls through sequentially on 403 (access denied), timeout, or bad response.
 429 (rate limit) returns immediately — the 20 rpm limit is global across all free models, so trying the next model would also 429.
 
-**Removed models** (Apr 2026): All `gemma-3-*:free` models delisted from OpenRouter ~2026-04-15, causing 48h+ outage (FFM-543). `gemma-4-*:free` models restored after earlier 403 issues (FFM-520).
+**Model history** (Apr 2026): Gemma 3 free models delisted ~2026-04-15 (FFM-543), re-listed ~2026-04-20 and re-added to chain. `gemma-4-*:free` restored after earlier 403 issues (FFM-520).
 
-### Available Free Vision Models (as of 2026-04-17)
+### Available Free Vision Models (as of 2026-04-20)
 
 | Model | Context | Notes |
 |-------|---------|-------|
-| `google/gemma-4-31b-it:free` | 262K | Primary, restored after earlier 403 issues |
+| `google/gemma-4-31b-it:free` | 262K | Primary |
 | `google/gemma-4-26b-a4b-it:free` | 262K | MoE variant fallback |
-| `google/gemma-3-27b-it:free` | 131K | **Delisted** ~2026-04-15 |
-| `google/gemma-3-12b-it:free` | 32K | **Delisted** ~2026-04-15 |
-| `google/gemma-3-4b-it:free` | 32K | **Delisted** ~2026-04-15 |
+| `google/gemma-3-27b-it:free` | 131K | Re-listed ~2026-04-20, restored as fallback |
+| `google/gemma-3-12b-it:free` | 32K | Re-listed ~2026-04-20, restored as fallback |
+| `google/gemma-3-4b-it:free` | 32K | Available but not used (4B too small for reliable JSON) |
 | `nvidia/nemotron-nano-12b-v2-vl:free` | 128K | **Removed** — returns 504s and invalid JSON/empty content |
 
 Check current availability: `curl https://openrouter.ai/api/v1/models | jq '.data[] | select(.id | endswith(":free")) | select(.architecture.modality | contains("image")) | .id'`
