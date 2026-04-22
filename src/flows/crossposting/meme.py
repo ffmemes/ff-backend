@@ -11,8 +11,9 @@ from src.crossposting.service import (
     get_next_meme_for_tgchannelru,
     log_meme_sent,
 )
+from src.crossposting.vk import VkError, post_photo_to_group
 from src.flows.hooks import notify_telegram_on_failure
-from src.storage.constants import MemeStatus
+from src.storage.constants import MemeStatus, MemeType
 from src.storage.schemas import MemeData
 from src.storage.service import update_meme
 from src.tgbot.bot import bot
@@ -163,6 +164,13 @@ def _clean_caption(caption: str) -> str:
     return "\n".join(cleaned).strip()
 
 
+def _get_vk_caption_for_crossposting_meme(meme: MemeData) -> str:
+    """VK doesn't render HTML; uses plain-text caption with auto-linkified URL."""
+    cta = random.choice(CTAS)
+    ref_link = "https://t.me/ffmemesbot?start=sc_{}_{}".format(meme.id, Channel.VK_GROUP_RU.value)
+    return f"{cta}: {ref_link}"
+
+
 def _get_en_caption_for_crossposting_meme(meme: MemeData, channel: Channel) -> str:
     ref_link = "https://t.me/ffmemesbot?start=sc_{}_{}".format(meme.id, channel.value)
 
@@ -243,6 +251,22 @@ async def post_meme_to_tgchannelru():
         caption_text=caption_text,
     )
     await update_meme(next_meme.id, status=MemeStatus.PUBLISHED)
+
+    if next_meme.type == MemeType.IMAGE:
+        try:
+            tg_file = await bot.get_file(next_meme.telegram_file_id)
+            file_bytes = bytes(await tg_file.download_as_bytearray())
+            vk_caption = _get_vk_caption_for_crossposting_meme(next_meme)
+            vk_result = await post_photo_to_group(file_bytes, vk_caption)
+            await log_meme_sent(
+                next_meme.id,
+                Channel.VK_GROUP_RU,
+                telegram_message_id=vk_result.get("post_id"),
+                caption_text=vk_caption,
+            )
+            logger.info(f"VK posted meme {next_meme.id} as post_id={vk_result.get('post_id')}")
+        except (VkError, Exception) as e:
+            logger.error(f"VK crosspost failed for meme {next_meme.id}: {e}")
 
     uploader_user_id = await get_meme_uploader_user_id(next_meme.id)
     if uploader_user_id:
