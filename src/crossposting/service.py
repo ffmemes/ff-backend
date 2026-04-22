@@ -73,6 +73,10 @@ async def get_next_meme_for_tgchannelru():
 
 
 async def get_next_meme_for_tgchannelen() -> dict[str, Any]:
+    # Videos excluded: 1.8x boost (added 2026-04-13) flipped EN channel to 100% videos.
+    # Outcome over 9 days: avg views collapsed 179 → 78, reactions 1.1 → 0.5 per post,
+    # subscribers drifted 629 → 625. Higher fwd/1k for videos was an artifact of fewer
+    # views (Russian internet loads videos poorly), not better content.
     query = """
         SELECT
             M.id
@@ -89,6 +93,7 @@ async def get_next_meme_for_tgchannelen() -> dict[str, Any]:
             AND CP.meme_id IS NULL
             AND M.status = 'ok'
             AND M.language_code = 'en'
+            AND M.type = 'image'
             AND MS.nlikes >= 5
 
         ORDER BY -1
@@ -96,8 +101,6 @@ async def get_next_meme_for_tgchannelen() -> dict[str, Any]:
             * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE 0.5 END
             * CASE WHEN MS.age_days < 90 THEN 1 ELSE 0.7 END
             * CASE WHEN M.caption IS NULL THEN 1 ELSE 0.9 END
-            -- Videos get 1.8x more forwards than photos (11K post analysis)
-            * CASE WHEN M.type = 'video' THEN 1.8 ELSE 1 END
             * CASE
                 WHEN MS.nmemes_sent <= 1 THEN 1
                 ELSE (MS.nlikes + MS.ndislikes) * 1. / MS.nmemes_sent
