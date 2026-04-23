@@ -135,6 +135,53 @@ The report should tell a **story**, not just dump numbers:
 - What trends are emerging?
 - What should the CEO pay attention to?
 
+### 8b. Write Anomaly Report (for Comms Agent input)
+After the daily report, on the **morning run only** (08:00 or 09:00 MSK — whichever
+fires before the 10:00 MSK Comms cron), write a second file:
+`experiments/reports/anomalies-YYYY-MM-DD.md`.
+
+This file is **Comms Agent's primary input**. It must rank the day's most
+surprising findings so Comms can pick one and turn it into a post.
+
+Format:
+```markdown
+# Anomalies YYYY-MM-DD
+
+## Finding 1: [one-line headline in plain Russian]
+- **Category**: dau | source | like-rate | language | meme-type | session-length | cohort | other
+- **Entity_id**: [stable key — source_id, language_code, cohort week, metric name]
+- **Magnitude**: [z-score vs 7-day baseline, or % delta, or absolute move]
+- **Numbers**: [1-3 raw numbers that tell the story]
+- **Why interesting**: [1-2 sentences in plain Russian, no infra jargon — a stranger should find this exciting]
+- **Chart-worthy**: yes | no
+- **Suggested visual**: stat_slide | line_chart | bar_chart | none
+- **HARD BAN risk**: yes | no  (set yes if this is about describe_memes, infra,
+  circuit breakers, deploys, a/b tests in progress — Comms will skip these)
+
+## Finding 2: ...
+(up to 5-8 findings, ranked strongest first)
+```
+
+**What to scan for** (run these queries, compare to 7-day baseline, flag outliers > 2σ):
+- **DAU/WAU delta** — unexpected spike or drop
+- **Source climbers/fallers** — source_id whose nlikes or like_rate moved > 30%
+- **Language mix shift** — language_code whose share of reactions changed
+- **Session length outliers** — median session_length moved > 15% day-over-day
+- **Cohort anomaly** — a weekly new-user cohort's activation differs from baseline
+- **Meme-type gap** — text-heavy memes vs image memes reaction pattern
+- **Unexpected popular content** — a single meme, source, or language doing far
+  better than expected
+- **Recurring patterns** — anything that's been weird for 3+ days now
+
+**What NOT to include** (set `HARD BAN risk: yes` and deprioritize):
+- describe_memes coverage dropping (Comms will skip it)
+- circuit breaker trips, flow pauses, deploy issues (firefighting)
+- running A/B tests mid-flight (no conclusive result yet)
+
+If NO findings cross the 2σ threshold today, still write the file with a
+`# Anomalies YYYY-MM-DD` header and a note: `No strong anomalies today — Comms
+should fall back to B-Historical or D-Engagement categories.`
+
 ### 9. Log to JSONL
 Append an entry to `experiments/log.jsonl`:
 ```json
