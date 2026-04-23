@@ -99,12 +99,38 @@ For "meme of the day/week". Already watermarked with @ffmemesbot.
 - Use the meme's telegram_file_id to send directly
 
 ### 3. Charts
-For data posts. Generate with matplotlib or PIL.
-- Use brand palette above
-- Dark background (`#1A1A2E`) for dramatic effect
-- Or light background (`#F5F5F5`) for clean look
-- Always include axis labels
-- Add @ffmemesbot watermark in corner
+For data posts. **Use the `src/comms/visuals.py` primitives — do NOT write raw matplotlib.**
+
+The primitives enforce the brand constraints below automatically:
+
+```python
+from src.comms.visuals import stat_slide, line_chart, bar_chart
+
+# One number → slide-deck style
+png = stat_slide("Сессия сегодня", "24.7 мем", subtitle="медиана за 7 дней")
+
+# Time series (2-20 points)
+png = line_chart(dates, values, title="DAU 7d", accent_x=today)
+
+# Categorical (2-10 bars, highlight one)
+png = bar_chart(labels, values, title="Top sources", highlight_idx=0, horizontal=True)
+```
+
+**Design constraints (hard rules, violated = reject the image):**
+
+- **Max 3 numbers per image.** If you can't fit the story in 3 numbers, the story is too complicated for one post.
+- **One accent color per image.** Brand primary `#FF6B35` points to ONE thing (today's value, winner bar, anomaly). Rest in neutral grey `#95A5A6`.
+- **WorkSans font only.** Never Arial Black, Comic Sans, or matplotlib's default.
+- **No chart junk.** No top/right spines, no gridlines (unless strictly needed for trend reading), no legend unless series ≥ 3.
+- **Decision tree for visual type:**
+  - 1 number → `stat_slide()`
+  - 2-20 time-series points → `line_chart()` (bucket or sample if > 20)
+  - 2-10 categorical bars → `bar_chart()` (collapse to top-10 if > 10)
+  - Never: pie charts, 3D, stacked-everything, dual-axis. Banned.
+- **Text density.** Titles ≤ 6 words. Axis labels only when the unit isn't obvious.
+- **Background.** Dark (`#1A1A2E`) for stat_slide; light (`#F5F5F5`) for charts. Don't mix.
+
+If an idea needs something beyond these primitives, flag it to CTO — don't improvise raw matplotlib.
 
 ### 4. Diagrams
 For engineering/architecture posts.
