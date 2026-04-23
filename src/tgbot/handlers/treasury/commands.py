@@ -63,12 +63,20 @@ Get more 🍔: /kitchen
     )
 
 
+# Video explainer attached to /kitchen. Obtained by forwarding
+# https://t.me/c/1305866294/71096 from mod chat to the storage chat via the
+# prod bot and reading msg.video.file_id. File_ids are bot-token-specific,
+# so this only works with the prod bot.
+KITCHEN_EXPLAINER_VIDEO_FILE_ID = (
+    "BAACAgIAAx0CTdXwNgABARW4aeoMX17ZaFBOoDt9-IfuFv8nPTQAAgKcAALQHFBLjxk3pwABFxAXOwQ"
+)
+
+
 # command: /kitchen
 # shows all possible ways to earn / to mine 🍔
 async def handle_show_kitchen(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends you the meme by it's id"""
-    await update.message.reply_text(
-        f"""
+    text = f"""
 <b>🍔 Kitchen</b>
 
 How to get more 🍔.
@@ -93,9 +101,16 @@ Soon:
 ▪ more ways to spend your 🍔🍔🍔
 
 /leaderboard /balance /lang /chat /nickname
-        """,  # noqa
-        parse_mode=ParseMode.HTML,
-    )
+        """  # noqa
+
+    if KITCHEN_EXPLAINER_VIDEO_FILE_ID:
+        await update.message.reply_video(
+            video=KITCHEN_EXPLAINER_VIDEO_FILE_ID,
+            caption=text,
+            parse_mode=ParseMode.HTML,
+        )
+    else:
+        await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 
 # command: /leaderboard /l
