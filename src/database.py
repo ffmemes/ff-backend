@@ -552,9 +552,15 @@ message_tg = Table(
     Column("date", DateTime),
     Column("chat_id", BigInteger, nullable=False),
     Column("user_id", BigInteger, nullable=False),
-    Column("text", String),
+    Column("text", String),  # also stores caption when the message is media
     Column("reply_to_message_id", BigInteger),
     Column("sender_chat_id", BigInteger),  # Channel ID when posted as channel (777000 case)
+    Column("media_type", String),  # photo|video|animation|document|sticker|voice|video_note
+    Column("file_id", String),  # best-quality Telegram file_id for the attached media
+    Column("media_group_id", String),  # album grouping id
+    Column("forward_from_chat_id", BigInteger),
+    Column("forward_from_message_id", BigInteger),
+    Column("forward_from_user_id", BigInteger),
     UniqueConstraint("chat_id", "message_id", name="uq_message_tg"),
 )
 

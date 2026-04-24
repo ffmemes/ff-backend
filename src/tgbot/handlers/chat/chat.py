@@ -8,6 +8,7 @@ from telegram.ext import ContextTypes
 from src.config import settings
 from src.stats.service import get_user_stats
 from src.tgbot.constants import TELEGRAM_CHAT_RU_CHAT_ID
+from src.tgbot.handlers.chat.mod_chat_stat import handle_mod_chat_meme_forward
 from src.tgbot.handlers.chat.reaction import give_random_reaction
 from src.tgbot.handlers.chat.service import (
     get_latest_chat_messages,
@@ -55,6 +56,13 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
         await save_telegram_message(msg)
     except Exception as e:
         logger.warning("Failed to save message: %s", e)
+
+    # Moderator chat: reply with short stats when a meme is forwarded here.
+    try:
+        if await handle_mod_chat_meme_forward(msg):
+            return
+    except Exception as e:
+        logger.warning("mod-chat stat reply error: %s", e)
 
     # Skip bot messages, channel forwards (777000), and service messages
     if not msg.from_user or msg.from_user.is_bot or msg.from_user.id == 777000:

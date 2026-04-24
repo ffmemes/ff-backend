@@ -2,7 +2,12 @@ import logging
 
 from sqlalchemy import func, text
 from sqlalchemy.dialects.postgresql import insert
-from telegram import Message
+from telegram import (
+    Message,
+    MessageOriginChannel,
+    MessageOriginChat,
+    MessageOriginUser,
+)
 
 from src.database import (
     execute,
@@ -81,6 +86,40 @@ async def update_telegram_chat_bot_left(chat_id: int) -> None:
     await execute(query)
 
 
+def _extract_media(msg: Message) -> tuple[str | None, str | None]:
+    """Return (media_type, best-quality file_id) or (None, None) for text-only messages."""
+    if msg.photo:
+        return "photo", msg.photo[-1].file_id
+    if msg.video:
+        return "video", msg.video.file_id
+    if msg.animation:
+        return "animation", msg.animation.file_id
+    if msg.document:
+        return "document", msg.document.file_id
+    if msg.sticker:
+        return "sticker", msg.sticker.file_id
+    if msg.voice:
+        return "voice", msg.voice.file_id
+    if msg.video_note:
+        return "video_note", msg.video_note.file_id
+    return None, None
+
+
+def _extract_forward(msg: Message) -> tuple[int | None, int | None, int | None]:
+    """Return (forward_from_chat_id, forward_from_message_id, forward_from_user_id)."""
+    origin = getattr(msg, "forward_origin", None)
+    if origin is None:
+        return None, None, None
+    if isinstance(origin, MessageOriginUser):
+        return None, None, origin.sender_user.id
+    if isinstance(origin, MessageOriginChat):
+        return origin.sender_chat.id, None, None
+    if isinstance(origin, MessageOriginChannel):
+        return origin.chat.id, origin.message_id, None
+    # MessageOriginHiddenUser: no usable id.
+    return None, None, None
+
+
 async def save_telegram_message(msg: Message) -> None:
     # Prefer sender_chat when present (anonymous channel posts)
     sender_chat_id = None
@@ -104,6 +143,9 @@ async def save_telegram_message(msg: Message) -> None:
     except Exception as e:
         logger.warning("Failed to upsert chat: %s", e)
 
+    media_type, file_id = _extract_media(msg)
+    fwd_chat_id, fwd_msg_id, fwd_user_id = _extract_forward(msg)
+
     query = (
         insert(message_tg)
         .values(
@@ -114,6 +156,12 @@ async def save_telegram_message(msg: Message) -> None:
             sender_chat_id=sender_chat_id,
             text=msg.text or msg.caption,
             reply_to_message_id=msg.reply_to_message.message_id if msg.reply_to_message else None,
+            media_type=media_type,
+            file_id=file_id,
+            media_group_id=msg.media_group_id,
+            forward_from_chat_id=fwd_chat_id,
+            forward_from_message_id=fwd_msg_id,
+            forward_from_user_id=fwd_user_id,
         )
         .on_conflict_do_nothing()
     )
