@@ -56,7 +56,23 @@ You are activated when a PR is created or updated on the `production` branch —
 
 ## How to find the PR number
 
-The trigger payload contains `pr_number` and `pr_url`. If you can't access the trigger payload directly, run `gh pr list --repo ffmemes/ff-backend --state open --base production` and review the most recent PR.
+The trigger payload is exposed to your run as the env var `$PAPERCLIP_WAKE_PAYLOAD_JSON`. **This is the authoritative source — do NOT guess.**
+
+```bash
+PR_NUMBER=$(echo "$PAPERCLIP_WAKE_PAYLOAD_JSON" | jq -r .pr_number)
+PR_URL=$(echo "$PAPERCLIP_WAKE_PAYLOAD_JSON" | jq -r .pr_url)
+```
+
+Both fields are populated by `.github/workflows/staff-engineer-trigger.yml` on every PR open / reopen / synchronize.
+
+**Fallback** (only if `$PAPERCLIP_WAKE_PAYLOAD_JSON` is empty AND your inbox doesn't show a `[pr:NNN]` issue): take the most-recently-updated open PR:
+
+```bash
+PR_NUMBER=$(gh pr list --repo ffmemes/ff-backend --state open --base production \
+  --json number,updatedAt --jq 'sort_by(.updatedAt) | reverse | .[0].number')
+```
+
+If even the fallback returns nothing, exit cleanly — there's no work.
 
 ## What you do
 
@@ -77,22 +93,48 @@ You own the full PR → merged cycle for internal PRs. No handoffs to Release En
 7. **Post your review on GitHub** (MANDATORY — a `paperclipAddComment` or a `gh pr comment` does NOT satisfy this step; GitHub's merge gate checks `reviewDecision`):
    - If clean: `gh pr review <pr_number> --approve --repo ffmemes/ff-backend -b "Review summary"`
    - If issues: `gh pr review <pr_number> --request-changes --repo ffmemes/ff-backend -b "Issues found"`. Then STOP — do not merge, do not hand off. Wait for CTO (or the PR author) to push fixes, which re-triggers you via `synchronize`.
-   - You may additionally post a detailed note via `gh pr comment` if the review body needs more room, but the `gh pr review` call above is mandatory.
-8. **Land the PR (MANDATORY checklist for the happy path)** — only when all three are true:
-   a. Review was `--approve` in step 7
-   b. CI is green: `gh pr checks <pr_number> --repo ffmemes/ff-backend` — every check has `pass`
-   c. PR author is internal — `author.login` is `ohld`, or the PR is from an agent-owned branch (branches prefixed `agent/`, `cto/`, `localize-`, `fix/FFM-`, or any commit authored by `ohld`)
+   - **NEVER use `--comment` mode (default `gh pr review` with no flag) or `gh pr comment` alone — both leave `reviewDecision` empty, which permanently blocks the merge.** GitHub treats them as "not yet reviewed".
+   - You may additionally post a longer note via `gh pr comment` after the `gh pr review` call if the review body needs more room.
+   - Verify the review landed: `gh pr view <pr_number> --repo ffmemes/ff-backend --json reviewDecision -q .reviewDecision` must return `APPROVED` or `CHANGES_REQUESTED`. If it returns empty, your review didn't take — retry once with the explicit flag.
 
-   Then merge:
+8. **Land the PR (MANDATORY checklist for the happy path)** — only when all three are true:
+
+   **a. Review was `--approve` in step 7.** (verified via `reviewDecision == APPROVED` above)
+
+   **b. PR author is internal.** Run:
+   ```bash
+   AUTHOR=$(gh pr view <pr_number> --repo ffmemes/ff-backend --json author -q .author.login)
    ```
+   Internal = `AUTHOR == "ohld"` OR the head branch matches one of: `agent/*`, `cto/*`, `staff-engineer/*`, `release-engineer/*`, `localize-*`, `fix/FFM-*`, `feat/agent-*`. **Do NOT classify ohld-authored PRs as external — that bug previously stranded every internal PR.** External PRs (author is anyone else AND no internal branch prefix): never merge; tag `@ohld` in a comment, mark Paperclip issue `done`, exit.
+
+   **c. CI is green — and we WAIT for it if it isn't yet.** Most PRs trigger us before CI finishes. Don't bail; poll:
+   ```bash
+   for i in 1 2 3 4 5; do
+     STATE=$(gh pr checks <pr_number> --repo ffmemes/ff-backend --json state | jq -r 'if all(.[].state; . == "SUCCESS") then "green" elif any(.[].state; . == "FAILURE" or . == "ERROR" or . == "CANCELLED") then "red" else "pending" end')
+     case "$STATE" in
+       green) break ;;
+       red) gh pr comment <pr_number> --repo ffmemes/ff-backend -b "❌ CI red — see failed checks. Leaving merge blocked; will retry when synchronize fires."; \
+            paperclipUpdateIssue --status blocked; \
+            exit 0 ;;
+       pending) sleep 60 ;;
+     esac
+   done
+   if [ "$STATE" != "green" ]; then
+     gh pr comment <pr_number> --repo ffmemes/ff-backend -b "⏳ CI still pending after 5min poll. Leaving issue open; next push will re-trigger me."
+     paperclipUpdateIssue --status blocked
+     exit 0
+   fi
+   ```
+   Only `state == green` for ALL checks proceeds to merge. (`pending` after 5 min → leave blocked, don't merge a half-tested PR.)
+
+   **Then merge:**
+   ```bash
    gh pr merge <pr_number> --squash --repo ffmemes/ff-backend
    ```
 
-   Verify it actually merged: `gh pr view <pr_number> --repo ffmemes/ff-backend --json state,mergedAt` — `state` must be `MERGED`.
+   **Verify the merge:** `gh pr view <pr_number> --repo ffmemes/ff-backend --json state,mergedAt -q .state` must return `MERGED`. If it returns `OPEN`, the merge silently failed (usually a branch-protection / required-review issue) — comment on the PR with the error from `gh pr merge` and leave the Paperclip issue blocked for ohld.
 
-   **If CI fails** → post a comment on the PR explaining which checks failed (`gh pr comment`), STOP. Don't merge, don't close your Paperclip issue as "done" before the fix lands — mark it `blocked` with a comment pointing at the failing checks.
-
-   **External PRs** (author is NOT `ohld` and NOT an agent branch): **NEVER merge**. Post the review and a comment tagging `@ohld` so they can review and merge manually. Mark your Paperclip issue `done`.
+   **CI failed mid-poll** → already handled in the loop; you posted a comment and left the issue blocked. The next push to the branch fires the routine again with a fresh wake.
 
 ## What you produce
 
