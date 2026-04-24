@@ -195,11 +195,7 @@ async def handle_message_with_meme(update: Update, context: ContextTypes.DEFAULT
         uploaded_today = await count_24h_uploaded_not_approved_memes(update.effective_user.id)
         if uploaded_today >= 5:
             return await message.reply_text(
-                """
-You already uploaded lots of memes today. Try again tomorrow.
-Think about quality, not quantity: your goal is to get as many likes as possible.
-Analyse your /uploads
-                """
+                localizer.t("upload.rate_limit_exceeded", user["interface_lang"]),
             )
 
     meme_upload = await create_meme_raw_upload(message)
@@ -208,11 +204,9 @@ Analyse your /uploads
         context.bot, update.effective_user.id, user["interface_lang"]
     ):
         return await message.reply_text(
-            f"""
-You need to follow our channel to upload memes and try again:
-
-{get_related_channel_link(user["interface_lang"])}
-            """
+            localizer.t("upload.follow_channel_required", user["interface_lang"]).format(
+                link=get_related_channel_link(user["interface_lang"]),
+            ),
         )
 
     reply_markup = InlineKeyboardMarkup(

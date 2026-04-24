@@ -1,23 +1,36 @@
 upload.rules:
   en: |-
-    Do you want to share this meme with our community?
+    Do you want to share this meme with users of @ffmemesbot?
 
-    <b>~ OUR RULES ~</b>
-    1️⃣ No bullshit content, you know what I mean.
-    2️⃣ We can reject any post at our discretion.
-    3️⃣ Meme will be rejected if we already have that meme in collection.
-    4️⃣ For now, your meme should have only 1 picture.
-    5️⃣ Providing false info about the meme will lead to a rejection and penalty.
-  
+    <blockquote expandable><b>~ OUR RULES ~</b>
+    1️⃣ Shitposts, tweet screenshots, fandom-specific memes aren't welcome — a meme should primarily be a <b>picture</b>.
+    2️⃣ Advertising, even indirect, is banned.
+    3️⃣ NSFW and harsh political/ideological attacks are banned.
+    4️⃣ If the meme feels stale or just not funny — expect a rejection.
+    5️⃣ If the same meme is already in our collection — we'll reject it.
+    6️⃣ Wrong language / false info about the meme — rejection.</blockquote>
+
   ru: |-
     Хочешь показать этот мем юзерам @ffmemesbot?
 
-    <b>~ НАШИ ПРАВИЛА ~</b>
-    1️⃣ Никакого бреда. Ты понимаешь, о чем я.
-    2️⃣ Мы можем отклонить любой пост по своему усмотрению.
-    3️⃣ Мем будет отклонен, если у нас уже есть такой мем в коллекции.
-    4️⃣ Пока что, ваш мем может быть только картинкой.
-    5️⃣ Предоставление ложной информации о меме приведет к отклонению и штрафу.
+    <blockquote expandable><b>~ НАШИ ПРАВИЛА ~</b>
+    1️⃣ Щитпосты, скрины твитов, мемы из узких фандомов не приветствуются — мем прежде всего <b>картинка</b>.
+    2️⃣ Реклама, даже косвенная, запрещена.
+    3️⃣ NSFW, резкие политические/идеологические выпады запрещены.
+    4️⃣ Если мем покажется баяном или просто несмешным — ждите отказ.
+    5️⃣ Если такой мем уже есть в нашей коллекции — отклоним.
+    6️⃣ Не тот язык / ложная инфа о меме — отказ.</blockquote>
+
+  uk: |-
+    Хочеш показати цей мем юзерам @ffmemesbot?
+
+    <blockquote expandable><b>~ НАШІ ПРАВИЛА ~</b>
+    1️⃣ Щитпости, скріни твітів, меми з вузьких фандомів не вітаються — мем передусім <b>картинка</b>.
+    2️⃣ Реклама, навіть непряма, заборонена.
+    3️⃣ NSFW та різкі політичні/ідеологічні випади заборонені.
+    4️⃣ Якщо мем здасться баяном або просто несмішним — чекайте відмову.
+    5️⃣ Якщо такий мем вже є в нашій колекції — відхилимо.
+    6️⃣ Не та мова / неправдива інфа про мем — відмова.</blockquote>
 
 
 upload.rules_accept_button:
@@ -406,3 +419,184 @@ upload.submitted:
     1. हमारी टीम से मंजूरी या अस्वीकृति का इंतजार करें।
     2. अन्य जोक्स देखते रहें - अन्य अपलोड की रेटिंग करें! 🕒
 
+
+upload.rate_limit_exceeded:
+  en: |-
+    You've already uploaded a lot of memes today. Try again tomorrow.
+    Think about quality, not quantity: your goal is to get as many likes as possible.
+    Analyse your /uploads
+
+  ru: |-
+    Сегодня ты уже загрузил много мемов. Попробуй завтра.
+    Думай о качестве, а не о количестве: твоя цель — получить как можно больше лайков.
+    Анализируй свои /uploads
+
+  uk: |-
+    Сьогодні ти вже завантажив багато мемів. Спробуй завтра.
+    Думай про якість, а не про кількість: твоя мета — отримати якнайбільше лайків.
+    Аналізуй свої /uploads
+
+
+upload.follow_channel_required:
+  en: |-
+    You need to follow our channel to upload memes:
+
+    {link}
+
+  ru: |-
+    Чтобы загружать мемы, подпишись на наш канал:
+
+    {link}
+
+  uk: |-
+    Щоб завантажувати меми, підпишись на наш канал:
+
+    {link}
+
+
+upload.approved:
+  en: |-
+    🎉🎉🎉
+
+    Your <b>meme has been approved</b> and the bot will soon send it to other users!
+
+    See realtime stats of your uploaded memes: /uploads
+
+  ru: |-
+    🎉🎉🎉
+
+    Твой <b>мем одобрен</b> — скоро бот начнёт показывать его другим юзерам!
+
+    Статистика твоих загрузок в реалтайме: /uploads
+
+  uk: |-
+    🎉🎉🎉
+
+    Твій <b>мем схвалено</b> — скоро бот почне показувати його іншим юзерам!
+
+    Статистика твоїх завантажень у реалтаймі: /uploads
+
+
+upload.rejected:
+  en: |-
+    😢😢😢
+
+    Your meme was rejected by our moderators. Send us something else!
+
+  ru: |-
+    😢😢😢
+
+    Модераторы отклонили твой мем. Присылай что-нибудь другое!
+
+  uk: |-
+    😢😢😢
+
+    Модератори відхилили твій мем. Надішли щось інше!
+
+
+upload.rejected_duplicate:
+  en: |-
+    😬 This meme is already in our collection, so we can't accept it again. Send us something else!
+
+  ru: |-
+    😬 Такой мем уже есть в нашей коллекции, поэтому повторно принять не можем. Пришли что-нибудь другое!
+
+  uk: |-
+    😬 Такий мем вже є в нашій колекції, тому повторно прийняти не можемо. Надішли щось інше!
+
+
+upload.watermark_failed:
+  en: |-
+    ❌ Something went wrong while adding a watermark to your meme. Just try again.
+
+  ru: |-
+    ❌ Что-то пошло не так при наложении водяного знака. Просто попробуй ещё раз.
+
+  uk: |-
+    ❌ Щось пішло не так при накладанні водяного знаку. Просто спробуй ще раз.
+
+
+upload.tg_upload_failed:
+  en: |-
+    ❌ Something went wrong while uploading your meme to Telegram. Just try again.
+
+  ru: |-
+    ❌ Что-то пошло не так при загрузке мема в Telegram. Просто попробуй ещё раз.
+
+  uk: |-
+    ❌ Щось пішло не так при завантаженні мема в Telegram. Просто спробуй ще раз.
+
+
+upload.no_uploads_yet:
+  en: |-
+    📭 <b>You haven't uploaded any memes yet!</b>
+
+    Just forward a meme to our bot to upload it.
+
+    <i>read more:</i> /kitchen
+
+  ru: |-
+    📭 <b>Ты ещё не загрузил ни одного мема!</b>
+
+    Просто перешли мем нашему боту, чтобы загрузить его.
+
+    <i>подробнее:</i> /kitchen
+
+  uk: |-
+    📭 <b>Ти ще не завантажив жодного мема!</b>
+
+    Просто переслати мем нашому боту, щоб завантажити його.
+
+    <i>детальніше:</i> /kitchen
+
+
+upload.stats_header:
+  en: |-
+    <b>YOUR UPLOADED MEMES</b>
+
+    📥 You uploaded <b>{n_memes}</b> memes
+    👁️ Views: <b>{total_views}</b>
+    👍 Likes: <b>{total_likes}</b>
+    ♥️ Like %: <b>{total_like_prc}%</b>
+    🙋 Fans: <b>{total_fans}</b>
+
+    <b>Latest uploads</b>
+    views - likes - like %
+
+  ru: |-
+    <b>ТВОИ ЗАГРУЖЕННЫЕ МЕМЫ</b>
+
+    📥 Загружено мемов: <b>{n_memes}</b>
+    👁️ Просмотры: <b>{total_views}</b>
+    👍 Лайки: <b>{total_likes}</b>
+    ♥️ Like %: <b>{total_like_prc}%</b>
+    🙋 Фанаты: <b>{total_fans}</b>
+
+    <b>Последние загрузки</b>
+    просмотры - лайки - like %
+
+  uk: |-
+    <b>ТВОЇ ЗАВАНТАЖЕНІ МЕМИ</b>
+
+    📥 Завантажено мемів: <b>{n_memes}</b>
+    👁️ Перегляди: <b>{total_views}</b>
+    👍 Лайки: <b>{total_likes}</b>
+    ♥️ Like %: <b>{total_like_prc}%</b>
+    🙋 Фанати: <b>{total_fans}</b>
+
+    <b>Останні завантаження</b>
+    перегляди - лайки - like %
+
+
+upload.stats_footer:
+  en: |-
+    <b>Upload more memes and win lots of 🍔</b> /kitchen
+    /leaderboard /stats /balance
+
+  ru: |-
+    <b>Загружай больше мемов и зарабатывай 🍔</b> /kitchen
+    /leaderboard /stats /balance
+
+  uk: |-
+    <b>Завантажуй більше мемів і заробляй 🍔</b> /kitchen
+    /leaderboard /stats /balance
