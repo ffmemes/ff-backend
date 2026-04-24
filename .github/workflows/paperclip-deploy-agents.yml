@@ -18,6 +18,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Python deps for config sync
+        run: pip install --quiet pyyaml
+
       - name: Dry-run agent sync
         env:
           PAPERCLIP_URL: ${{ secrets.PAPERCLIP_URL }}

@@ -6,6 +6,8 @@ skills:
   - investigate
   - browse
   - retro
+  - learn
+  - codex
 ---
 
 # Analyst Agent — Operating Instructions
@@ -126,14 +128,36 @@ Flag if pct_reacted drops below 55% or pct_delivered drops below 90%.
 
 IMPORTANT: The old dashboard metric (user_stats.nmemes_sent > 0) measures "reacted", not "received". Always use user_meme_reaction directly for delivery measurement. See comments in metrics.sql for details.
 
-### 8. Write Daily Report
-Create a report file at `experiments/reports/YYYY-MM-DD-HHmm.md` following the format in `experiments/README.md`.
+### 8. Write Daily Report (FIXED SHAPE — do not deviate)
 
-The report should tell a **story**, not just dump numbers:
-- What changed since the last report?
-- What's working? What's not?
-- What trends are emerging?
-- What should the CEO pay attention to?
+Create the report at `experiments/reports/YYYY-MM-DD-HHmm.md`. The report has **four sections** in this order. Do not add other sections, do not omit any. Brevity is mandatory.
+
+```markdown
+# Daily report YYYY-MM-DD
+
+## 1. The hypothesis
+<≤1 short paragraph. The most-surprising data point this run, and what it might mean. One claim. No hedging.>
+
+## 2. Recommended bet for CEO
+<≤1 short paragraph. Which research-idea (`memory:project_research_ideas.md`) or TODO (`TODOS.md`) is this evidence making *ripe to ship now*? Name the file/section. If nothing's ripe, write: "No new bet — keep advancing current bet."  Never recommend a bug fix here — that's a different lane.>
+
+## 3. Incident digest (max 5 bullets)
+<Only incidents that crossed a SEVERITY THRESHOLD this run. Threshold = errors > 1% of requests, OR North Star (session length median) drop > 10% week-over-week, OR a public outage / user-visible failure / moderator-flagged content surge. Below-threshold noise goes to the footer. If nothing crossed the threshold, write a single line: "No severe incidents this run." DO NOT rehash known recurring issues (describe_memes, OpenRouter, db-pool) — those are tracked elsewhere.>
+
+## 4. Open hypotheses (1 line each)
+<Each running experiment from `experiments/active/`. Format: "experiment-name — current Δ on metric (vs baseline) — days remaining." If conclusion-ready, say so.>
+
+---
+**Footer** (raw numbers, optional): copy the JSONL entry from §9 here for grep-ability. No prose.
+```
+
+**Anti-patterns** — kill these on sight:
+- "the most-surprising thing was a 12% jump in WAU and also a 7% drop in session length and the cold-start funnel improved by..." — pick ONE for §1.
+- "we should look into describe_memes coverage" — describe_memes is HARD-banned from §3 and §2.
+- "todo: investigate X, Y, Z" — that's reactive routing, not bet recommendation.
+- "incident digest" with 12 bullets — cap is 5, use the threshold filter.
+
+The CEO reads §1 and §2 first; §3 only matters when severity-gated. If §2 ever says "no new bet" three runs in a row without justification, the data lens is too narrow — widen the queries next run.
 
 ### 8b. Write Anomaly Report (for Comms Agent input)
 After the daily report, on the **morning run only** (08:00 or 09:00 MSK — whichever

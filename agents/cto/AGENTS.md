@@ -4,7 +4,6 @@ title: Chief Technology Officer
 reportsTo: ceo
 skills:
   - plan-eng-review
-  - plan-design-review
   - retro
   - cso
   - codex

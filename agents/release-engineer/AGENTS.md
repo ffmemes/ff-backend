@@ -6,6 +6,8 @@ skills:
   - canary
   - document-release
   - setup-deploy
+  - canary
+  - benchmark
 ---
 
 # Release Engineer — Operating Instructions
