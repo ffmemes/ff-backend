@@ -1,0 +1,31 @@
+name: Deploy Paperclip agents
+
+on:
+  push:
+    branches: [production]
+    paths:
+      - 'agents/**'
+      - '.github/workflows/paperclip-deploy-agents.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: paperclip-deploy-agents
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dry-run agent sync
+        env:
+          PAPERCLIP_URL: ${{ secrets.PAPERCLIP_URL }}
+          PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+        run: ./agents/deploy.sh --dry-run
+
+      - name: Apply agent sync
+        env:
+          PAPERCLIP_URL: ${{ secrets.PAPERCLIP_URL }}
+          PAPERCLIP_API_KEY: ${{ secrets.PAPERCLIP_API_KEY }}
+        run: ./agents/deploy.sh
