@@ -9,7 +9,9 @@ from telegram.constants import ParseMode
 from telegram.error import BadRequest, Forbidden
 from telegram.ext import ContextTypes
 
+from src import localizer
 from src.config import settings
+from src.flows.storage.describe_memes import describe_single_meme
 from src.flows.storage.memes import (
     add_watermark_to_meme_content,
     upload_meme_content_to_tg,
@@ -18,7 +20,7 @@ from src.recommendations.service import create_user_meme_reaction
 from src.stats.meme import calculate_meme_reactions_and_engagement
 from src.stats.meme_source import calculate_meme_source_stats
 from src.storage.constants import MemeStatus, MemeType
-from src.storage.service import update_meme
+from src.storage.service import find_meme_duplicate, update_meme
 from src.storage.upload import download_meme_content_from_tg
 from src.tgbot.constants import UserType
 from src.tgbot.handlers.treasury.constants import TrxType
@@ -39,65 +41,98 @@ LEADERBOARD_URL = (
 )
 
 
+async def _notify_uploader(
+    bot: Bot,
+    meme_upload: dict[str, Any],
+    text: str,
+    parse_mode: str | None = ParseMode.HTML,
+) -> None:
+    """Send text to uploader, falling back to non-reply if original message was deleted."""
+    try:
+        await bot.send_message(
+            chat_id=meme_upload["user_id"],
+            reply_to_message_id=meme_upload["message_id"],
+            text=text,
+            parse_mode=parse_mode,
+        )
+    except Forbidden:
+        logging.warning(f"Can't notify uploader #{meme_upload['user_id']}: blocked bot")
+    except BadRequest:
+        try:
+            await bot.send_message(
+                chat_id=meme_upload["user_id"],
+                text=text,
+                parse_mode=parse_mode,
+            )
+        except Forbidden:
+            logging.warning(f"Can't notify uploader #{meme_upload['user_id']}: blocked bot")
+
+
+async def _get_uploader_lang(user_id: int) -> str | None:
+    user = await get_user_info(user_id)
+    return user["interface_lang"] if user else None
+
+
+async def _check_duplicate_via_ocr(meme: dict[str, Any]) -> tuple[dict[str, Any], int | None]:
+    """Describe the meme inline via OpenRouter vision and check for OCR-text duplicates.
+
+    Why: describe_memes cron runs hourly; for uploads we can't wait — run it synchronously
+    so the uploader gets immediate feedback and the moderator queue stays clean of dupes.
+    Non-images skip describe (OCR is image-only).
+    Failures (rate limit, model errors, short text) fall through silently — manual review kicks in.
+
+    Returns: (refreshed_meme, duplicate_of_id or None).
+    """
+    if meme["type"] != MemeType.IMAGE:
+        return meme, None
+
+    describe_log = logging.getLogger(__name__)
+    try:
+        status = await describe_single_meme(meme, describe_log)
+    except Exception as e:
+        logging.warning(f"Inline describe failed for meme {meme['id']}: {e}")
+        return meme, None
+
+    if isinstance(status, tuple):
+        status = status[0]
+    if status != "ok":
+        return meme, None
+
+    from src.tgbot.service import get_meme_by_id
+
+    refreshed = await get_meme_by_id(meme["id"])
+    if not refreshed:
+        return meme, None
+
+    ocr_text = (refreshed.get("ocr_result") or {}).get("text") or ""
+    if len(ocr_text) < 12:
+        return refreshed, None
+
+    dup_id = await find_meme_duplicate(refreshed["id"], ocr_text)
+    return refreshed, dup_id
+
+
 async def uploaded_meme_auto_review(
     meme: dict[str, Any], meme_upload: dict[str, Any], bot: Bot
 ) -> None:
+    uploader_lang = await _get_uploader_lang(meme_upload["user_id"])
+
     logging.info(f"Downloading meme {meme['id']} content")
     image_bytes = await download_meme_content_from_tg(meme["telegram_file_id"])
 
     logging.info(f"Adding watermark to meme {meme['id']} content")
     watermarked_meme_content = await add_watermark_to_meme_content(image_bytes, meme["type"])
     if watermarked_meme_content is None:
-        return await bot.send_message(
-            chat_id=meme_upload["user_id"],
-            reply_to_message_id=meme_upload["message_id"],
-            text="""
-❌ MEME REJECTED:
-Something went wrong when we tried to add watermark to your meme. Just try again.
-            """,
+        return await _notify_uploader(
+            bot, meme_upload, localizer.t("upload.watermark_failed", uploader_lang)
         )
 
     logging.info(f"Uploading watermarked meme {meme['id']} content to Telegram")
     meme = await upload_meme_content_to_tg(meme, watermarked_meme_content)
     if meme is None:
-        return await bot.send_message(
-            chat_id=meme_upload["user_id"],
-            reply_to_message_id=meme_upload["message_id"],
-            text="""
-❌ MEME REJECTED:
-Something went wrong when we tried to upload your meme to Telegram. Just try again.
-            """,
+        return await _notify_uploader(
+            bot, meme_upload, localizer.t("upload.tg_upload_failed", uploader_lang)
         )
-
-    #     logging.info(f"Finding duplicates of meme {meme['id']}")
-    #     duplicate_meme_id = await find_meme_duplicate(
-    #         meme["id"],
-    #         meme["ocr_result"]["text"],
-    #     )
-    #     if duplicate_meme_id:
-    #         await update_meme(
-    #             meme["id"],
-    #             status=MemeStatus.DUPLICATE,
-    #             duplicate_of=duplicate_meme_id,
-    #         )
-
-    #         # set like for the uploaded meme
-    #         await create_user_meme_reaction(
-    #             meme_upload["user_id"],
-    #             duplicate_meme_id,
-    #             "uploaded_meme",
-    #             reaction_id=1,
-    #             reacted_at=datetime.utcnow(),
-    #         )
-
-    #         return await bot.send_message(
-    #             chat_id=meme_upload["user_id"],
-    #             reply_to_message_id=meme_upload["message_id"],
-    #             text="""
-    # ❌ MEME REJECTED:
-    # Somebody already submitted this meme, sorry... Try another one.
-    #             """,
-    #         )
 
     logging.info(f"Updating meme {meme['id']} status to WAITING_REVIEW")
     meme = await update_meme(
@@ -105,7 +140,27 @@ Something went wrong when we tried to upload your meme to Telegram. Just try aga
         status=MemeStatus.WAITING_REVIEW,
     )
 
-    # send meme to a manual review
+    # Inline OCR + trigram dedup. Auto-reject on duplicate, else fall through to manual review.
+    meme, duplicate_of = await _check_duplicate_via_ocr(meme)
+    if duplicate_of is not None:
+        logging.info(f"Meme {meme['id']} is a duplicate of {duplicate_of}, auto-rejecting")
+        await update_meme(
+            meme["id"],
+            status=MemeStatus.DUPLICATE,
+            duplicate_of=duplicate_of,
+        )
+        # Credit the uploader with a like on the original, so it counts as engagement
+        await create_user_meme_reaction(
+            meme_upload["user_id"],
+            duplicate_of,
+            "uploaded_meme",
+            reaction_id=1,
+            reacted_at=datetime.utcnow(),
+        )
+        return await _notify_uploader(
+            bot, meme_upload, localizer.t("upload.rejected_duplicate", uploader_lang)
+        )
+
     return await send_uploaded_meme_to_manual_review(meme, meme_upload, bot)
 
 
@@ -258,34 +313,10 @@ async def handle_uploaded_meme_review_button(
             external_id=str(meme["id"]),
         )
 
-        text = """
-🎉🎉🎉
-
-Your <b>meme has been approved</b> and soon bot will send it to other users!
-
-See realtime stats of your uploaded memes: /uploads
-        """
-
-        try:
-            await context.bot.send_message(
-                chat_id=meme_upload["user_id"],
-                reply_to_message_id=meme_upload["message_id"],
-                text=text,
-                parse_mode=ParseMode.HTML,
-            )
-        except Forbidden:
-            logging.warning(f"Can't notify uploader #{meme_upload['user_id']}: blocked bot")
-        except BadRequest:
-            # messsage was deleted ??
-            # trying again withount reply_message_id
-            try:
-                await context.bot.send_message(
-                    chat_id=meme_upload["user_id"],
-                    text=text,
-                    parse_mode=ParseMode.HTML,
-                )
-            except Forbidden:
-                logging.warning(f"Can't notify uploader #{meme_upload['user_id']}: blocked bot")
+        uploader_lang = await _get_uploader_lang(meme_upload["user_id"])
+        await _notify_uploader(
+            context.bot, meme_upload, localizer.t("upload.approved", uploader_lang)
+        )
 
     else:
         await update_meme_by_upload_id(upload_id, status=MemeStatus.REJECTED)
@@ -302,29 +333,8 @@ See realtime stats of your uploaded memes: /uploads
             except BadRequest as exc:
                 if "Message is not modified" not in str(exc):
                     raise
-        try:
-            await context.bot.send_message(
-                chat_id=meme_upload["user_id"],
-                reply_to_message_id=meme_upload["message_id"],
-                text="""
-😢😢😢
 
-Your meme was rejected by our moderators. Send us something else!
-            """,
-            )
-        except Forbidden:
-            logging.warning(f"Can't notify uploader #{meme_upload['user_id']}: blocked bot")
-        except BadRequest:
-            # messsage was deleted ??
-            # trying again withount reply_message_id
-            try:
-                await context.bot.send_message(
-                    chat_id=meme_upload["user_id"],
-                    text="""
-😢😢😢
-
-Your meme was rejected by our moderators. Send us something else!
-            """,
-                )
-            except Forbidden:
-                logging.warning(f"Can't notify uploader #{meme_upload['user_id']}: blocked bot")
+        uploader_lang = await _get_uploader_lang(meme_upload["user_id"])
+        await _notify_uploader(
+            context.bot, meme_upload, localizer.t("upload.rejected", uploader_lang)
+        )

@@ -13,27 +13,24 @@ from telegram import (
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
+from src import localizer
 from src.storage.constants import MemeType
 from src.tgbot.handlers.upload.service import (
     get_fans_of_user_id,
     get_uploaded_memes_of_user_id,
 )
+from src.tgbot.user_info import get_user_info
 
 
 async def handle_uploaded_memes_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Shows stats for uploaded memes"""
-    # user_info = await get_user_info(update.effective_user.id)
+    user_info = await get_user_info(update.effective_user.id)
+    lang = user_info["interface_lang"] if user_info else None
 
     uploaded_memes = await get_uploaded_memes_of_user_id(update.effective_user.id)
     if len(uploaded_memes) == 0:
         await update.message.reply_text(
-            """
-📭 <b>You haven't uploaded any memes yet!</b>
-
-Just forward a meme to our bot to upload it. Only pics are supported yet.
-
-<i>read more:</i> /kitchen
-            """,
+            localizer.t("upload.no_uploads_yet", lang),
             parse_mode=ParseMode.HTML,
         )
         return
@@ -48,17 +45,13 @@ Just forward a meme to our bot to upload it. Only pics are supported yet.
     else:
         total_like_prc = round(total_likes * 100.0 / (total_likes + total_dislikes))
 
-    STATS_TEXT = f"""
-<b>YOUR UPLOADED MEMES</b>
-
-📥 You uploaded <b>{len(uploaded_memes)}</b> memes
-👁️ Views: <b>{total_views}</b>
-👍 Likes: <b>{total_likes}</b>
-♥️ Like %: <b>{total_like_prc}%</b>
-🙋 Fans: <b>{total_fans}</b>
-
-<b>Latest uploads</b>
-views - likes - like %"""
+    stats_text = localizer.t("upload.stats_header", lang).format(
+        n_memes=len(uploaded_memes),
+        total_views=total_views,
+        total_likes=total_likes,
+        total_like_prc=total_like_prc,
+        total_fans=total_fans,
+    )
 
     # show stats for last 5 uploads:
     media = []
@@ -73,13 +66,12 @@ views - likes - like %"""
         else:
             media.append(InputMediaVideo(media=uploaded_meme["telegram_file_id"]))
 
-        STATS_TEXT += f"\n▪ {views} - {likes} - {like_prc}%"
+        stats_text += f"\n▪ {views} - {likes} - {like_prc}%"
 
-    STATS_TEXT += "\n\n<b>Upload more memes and win lots of 🍔</b> /kitchen"
-    STATS_TEXT += "\n/leaderboard /stats /balance"
+    stats_text += "\n\n" + localizer.t("upload.stats_footer", lang)
 
     await update.message.reply_media_group(
         media=media,
-        caption=STATS_TEXT,
+        caption=stats_text,
         parse_mode=ParseMode.HTML,
     )
