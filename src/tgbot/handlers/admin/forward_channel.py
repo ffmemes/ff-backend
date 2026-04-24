@@ -17,8 +17,8 @@ from src.broadcasts.service import (
 from src.storage.schemas import MemeData
 from src.tgbot.constants import TELEGRAM_CHANNEL_RU_CHAT_ID, UserType
 from src.tgbot.logs import log
-from src.tgbot.service import get_meme_by_id, update_user
-from src.tgbot.user_info import get_user_info, update_user_info_cache
+from src.tgbot.service import get_meme_by_id, mark_user_blocked
+from src.tgbot.user_info import get_user_info
 from src.tgbot.utils import check_if_user_chat_member
 
 
@@ -33,8 +33,7 @@ async def forward_message_to_user(
         logging.info(
             f"❌ Failed to forward: {user_id} blocked the bot",
         )
-        await update_user(user_id, type=UserType.BLOCKED_BOT)
-        await update_user_info_cache(user_id)
+        await mark_user_blocked(user_id, source="forbidden_forward_channel")
         return False
     except RetryAfter as e:
         logging.info(

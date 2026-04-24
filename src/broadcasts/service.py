@@ -4,9 +4,10 @@ import logging
 from sqlalchemy import text
 from telegram.error import BadRequest, Forbidden, RetryAfter
 
-from src.database import execute, fetch_all
+from src.database import fetch_all
 from src.redis import redis_client
 from src.tgbot.bot import bot
+from src.tgbot.service import mark_user_blocked
 
 logger = logging.getLogger(__name__)
 
@@ -197,10 +198,15 @@ async def send_broadcast(
             if isinstance(e, Forbidden) or "not found" in err_msg:
                 blocked += 1
                 await redis_client.sadd(redis_key, str(user_id))
-                await execute(
-                    text("UPDATE \"user\" SET type = 'blocked_bot' WHERE id = :uid"),
-                    {"uid": user_id},
-                )
+                try:
+                    await mark_user_blocked(user_id, source="forbidden_broadcast")
+                except Exception as mark_exc:  # noqa: BLE001
+                    logger.warning(
+                        "mark_user_blocked failed for %d in broadcast %s: %s",
+                        user_id,
+                        broadcast_id,
+                        mark_exc,
+                    )
             else:
                 failed += 1
                 if failed <= 10:

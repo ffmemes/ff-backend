@@ -297,6 +297,98 @@ async def update_user(user_id: int, **kwargs) -> dict[str, Any] | None:
     return await fetch_one(update_query)
 
 
+async def mark_user_blocked(
+    user_id: int,
+    source: str,
+    when: datetime | None = None,
+) -> dict[str, Any] | None:
+    """Mark a user as having blocked the bot.
+
+    Idempotent. Preserves privileged roles (moderator/admin/super_user) —
+    still records blocked_bot_at for retention analysis, but does not
+    demote their type. Invalidates user_info cache on success.
+
+    `source` is a free-form label for observability
+    ("my_chat_member", "forbidden_send_meme", ...).
+    `when` should be the Telegram event date when available
+    (update.my_chat_member.date); otherwise defaults to utcnow().
+    """
+    from src.tgbot.user_info import update_user_info_cache  # avoid cycle
+
+    current = await get_user_by_id(user_id)
+    if current is None:
+        return None
+
+    ts = when or datetime.utcnow()
+    current_type = UserType(current["type"]) if current["type"] else None
+
+    if current_type and current_type.is_moderator:
+        logging.warning(
+            "User #%s blocked via %s but is privileged (type=%s); "
+            "recording blocked_bot_at, NOT demoting type",
+            user_id,
+            source,
+            current_type.value,
+        )
+        updated = await update_user(user_id, blocked_bot_at=ts)
+    else:
+        updated = await update_user(
+            user_id,
+            type=UserType.BLOCKED_BOT,
+            blocked_bot_at=ts,
+        )
+
+    if updated is not None:
+        try:
+            await update_user_info_cache(user_id)
+        except Exception as exc:
+            logging.warning(
+                "Cache refresh failed for user #%s after block: %s",
+                user_id,
+                exc,
+            )
+        logging.info("User #%s blocked (source=%s)", user_id, source)
+
+    return updated
+
+
+async def mark_user_unblocked(
+    user_id: int,
+    source: str,
+    when: datetime | None = None,
+) -> dict[str, Any] | None:
+    """Mark a user as having unblocked the bot.
+
+    Always clears blocked_bot_at. Restores type to 'user' only if the
+    user was currently 'blocked_bot' — privileged roles left alone.
+    Invalidates user_info cache on success.
+    """
+    from src.tgbot.user_info import update_user_info_cache  # avoid cycle
+
+    current = await get_user_by_id(user_id)
+    if current is None:
+        return None
+
+    update_kwargs: dict[str, Any] = {"blocked_bot_at": None}
+    if current["type"] == UserType.BLOCKED_BOT.value:
+        update_kwargs["type"] = UserType.USER.value
+
+    updated = await update_user(user_id, **update_kwargs)
+
+    if updated is not None:
+        try:
+            await update_user_info_cache(user_id)
+        except Exception as exc:
+            logging.warning(
+                "Cache refresh failed for user #%s after unblock: %s",
+                user_id,
+                exc,
+            )
+        logging.info("User #%s unblocked (source=%s)", user_id, source)
+
+    return updated
+
+
 async def user_popup_already_sent(
     user_id: int,
     popup_id: str,

@@ -10,7 +10,7 @@ from src.tgbot.constants import UserType
 from src.tgbot.handlers.admin.service import (
     get_user_by_tg_username,
 )
-from src.tgbot.service import update_user
+from src.tgbot.service import mark_user_blocked, update_user
 from src.tgbot.user_info import get_user_info, update_user_info_cache
 
 
@@ -47,5 +47,4 @@ async def invite_user(user_id: int) -> None:
             localizer.t("onboarding.invited_by_admin", user_info["interface_lang"]),
         )
     except Forbidden:
-        await update_user(user_id, type=UserType.BLOCKED_BOT)
-        await update_user_info_cache(user_id)
+        await mark_user_blocked(user_id, source="forbidden_waitlist_invite")
