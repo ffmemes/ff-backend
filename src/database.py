@@ -480,6 +480,49 @@ channel_daily_stats = Table(
     UniqueConstraint("channel", "date"),
 )
 
+editorial_posts = Table(
+    "editorial_posts",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("channel", String, nullable=False),
+    Column("telegram_message_id", BigInteger, nullable=False),
+    Column("draft_hash", String, nullable=False),
+    Column("category", String),
+    Column("entity_id", String),
+    Column("topic_slug", String),
+    Column("text", String, nullable=False),
+    Column("has_media", Boolean, nullable=False, server_default="false"),
+    Column("validation_version", Integer, nullable=False, server_default="1"),
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+    Column("views", Integer),
+    Column("forwards", Integer),
+    Column("reactions", Integer),
+    Column("comments", Integer),
+    Column("reactions_detail", JSONB),  # {"😁": 6, "❤": 4, ...}
+    Column("stats_updated_at", DateTime),
+    UniqueConstraint("draft_hash", name="uq_editorial_posts_draft_hash"),
+    UniqueConstraint("channel", "telegram_message_id", name="uq_editorial_posts_channel_msg"),
+)
+
+editorial_post_snapshots = Table(
+    "editorial_post_snapshots",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("channel", String, nullable=False),
+    Column(
+        "editorial_post_id",
+        ForeignKey("editorial_posts.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("telegram_message_id", BigInteger, nullable=False),
+    Column("views", Integer),
+    Column("forwards", Integer),
+    Column("reactions", Integer),
+    Column("comments", Integer),
+    Column("reactions_detail", JSONB),
+    Column("snapshot_at", DateTime, server_default=func.now(), nullable=False),
+)
+
 user_popup_logs = Table(
     "user_popup_logs",
     metadata,
