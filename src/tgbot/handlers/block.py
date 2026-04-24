@@ -1,58 +1,54 @@
 """
-Handles user blocking the bot
+Handles user blocking / unblocking the bot.
 """
 
-from datetime import datetime
-
 from telegram import Update
-from telegram.ext import (
-    ContextTypes,
-)
+from telegram.ext import ContextTypes
 
-from src.stats.service import get_user_stats
-from src.stats.user import calculate_user_stats
-from src.tgbot.constants import UserType
 from src.tgbot.logs import log
-from src.tgbot.service import get_user_languages, update_user
+from src.tgbot.service import mark_user_blocked, mark_user_unblocked
 
 
 async def handle_user_blocked_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle an event when user blocks us"""
+    """Handle my_chat_member MEMBER → KICKED in a private chat."""
     user_tg = update.my_chat_member.from_user
     user_id = user_tg.id
+
     if update.effective_chat.id != user_id:
-        # this is not a private chat
         await log(
             f"user #{user_id} blocked us in chat_id: {update.effective_chat.id}",
             context.bot,
         )
         return
 
-    user = await update_user(user_id, blocked_bot_at=datetime.utcnow(), type=UserType.BLOCKED_BOT)
-
-    if user is None:
-        # user wasn't in our db
+    updated = await mark_user_blocked(
+        user_id=user_id,
+        source="my_chat_member",
+        when=update.my_chat_member.date,
+    )
+    if updated is None:
         return
 
-    # send user info to admin log chat
-    # it's useful to analyze churned users
-    await calculate_user_stats()  # regenerate user stats
-    user_stats = await get_user_stats(user_id)
-
-    report = ""
-    if user_stats:
-        for k, v in user_stats.items():
-            report += f"<b>{k}</b>: {v}\n"
-
-    languages = await get_user_languages(user_id)
-
-    # TODO:
-    # 1. create a function to generate this repr
-    # 2. show all availabel languages
-    message = f"""
-⛔️ <b>BLOCKED</b> by {user_tg.name} / #{user_id}
-<b>registered</b>: {user["created_at"]}
-<b>langs</b>: {user_tg.language_code} / {languages}
-{report}
-    """
+    # Lightweight admin log: fields we already have, no stats recompute.
+    message = (
+        f"⛔️ <b>BLOCKED</b> by {user_tg.name} / #{user_id}\n"
+        f"<b>registered</b>: {updated['created_at']}\n"
+        f"<b>tg lang</b>: {user_tg.language_code}\n"
+        f"<b>nickname</b>: {updated.get('nickname') or '—'}"
+    )
     await log(message, context.bot)
+
+
+async def handle_user_unblocked_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle my_chat_member KICKED → MEMBER in a private chat."""
+    user_tg = update.my_chat_member.from_user
+    user_id = user_tg.id
+
+    if update.effective_chat.id != user_id:
+        return
+
+    await mark_user_unblocked(
+        user_id=user_id,
+        source="my_chat_member",
+        when=update.my_chat_member.date,
+    )

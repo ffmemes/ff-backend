@@ -16,14 +16,13 @@ from src.recommendations.service import create_user_meme_reaction
 from src.storage.constants import MemeType
 from src.storage.schemas import MemeData
 from src.tgbot.bot import bot
-from src.tgbot.constants import UserType
 from src.tgbot.senders.keyboards import (
     meme_reaction_keyboard,
     select_referral_button_text,
 )
 from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
 from src.tgbot.senders.utils import collect_user_languages, has_russian_language
-from src.tgbot.service import update_user
+from src.tgbot.service import mark_user_blocked
 from src.tgbot.user_info import get_user_info
 
 logger = logging.getLogger(__name__)
@@ -151,7 +150,7 @@ async def send_new_message_with_meme(
             return await _do_send(None)
         raise
     except Forbidden:
-        await update_user(user_id, type=UserType.BLOCKED_BOT)
+        await mark_user_blocked(user_id, source="forbidden_send_meme")
 
 
 async def edit_last_message_with_meme(
