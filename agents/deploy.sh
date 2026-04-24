@@ -26,10 +26,21 @@ DRY_RUN=0
 api() {
   local method=$1 path=$2
   shift 2
-  curl -sf -X "$method" \
+  local body
+  local code
+  body=$(mktemp)
+  code=$(curl -s -X "$method" \
     -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
     -H "Content-Type: application/json" \
-    "$PAPERCLIP_URL$path" "$@"
+    -o "$body" -w "%{http_code}" \
+    "$PAPERCLIP_URL$path" "$@")
+  if [[ "$code" -ge 400 ]]; then
+    echo "  HTTP $code: $(cat "$body")" >&2
+    rm -f "$body"
+    return 1
+  fi
+  cat "$body"
+  rm -f "$body"
 }
 
 echo "Syncing agent instructions to $PAPERCLIP_URL (company=$COMPANY_ID)"
