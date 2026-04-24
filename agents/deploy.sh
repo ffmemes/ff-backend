@@ -87,10 +87,21 @@ for agent_dir in "$SCRIPT_DIR"/*/; do
 done
 
 echo
+echo "Syncing adapter config + skills (diff-first PATCH)..."
+
+# Pass 2: model, maxTurnsPerRun, desiredSkills, runtime.heartbeat, permissions.
+# Diff first; PATCH only on change so we don't spam Paperclip's config-revision history.
+COMPANY_ID="$COMPANY_ID" SCRIPT_DIR="$SCRIPT_DIR" DRY_RUN="$DRY_RUN" \
+  python3 "$SCRIPT_DIR/_sync_config.py" || {
+  echo "Config sync failed." >&2
+  errors=$((errors + 1))
+}
+
+echo
 if [[ $DRY_RUN -eq 1 ]]; then
   echo "Dry-run complete. Re-run without --dry-run to apply."
 elif [[ $errors -gt 0 ]]; then
-  echo "Synced $synced_files files, $errors errors."
+  echo "Synced $synced_files files; $errors errors during apply."
   exit 1
 else
   echo "Synced $synced_files files. Changes take effect on next agent wake."

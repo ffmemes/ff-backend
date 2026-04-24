@@ -34,7 +34,7 @@ agents:
       config:
         dangerouslySkipPermissions: true
         maxTurnsPerRun: 300
-        model: "claude-opus-4-6"
+        model: "claude-opus-4-7"
     runtime:
       heartbeat:
         enabled: true
@@ -85,7 +85,7 @@ agents:
       config:
         dangerouslySkipPermissions: true
         maxTurnsPerRun: 300
-        model: "claude-opus-4-6"
+        model: "claude-opus-4-7"
     runtime:
       heartbeat:
         maxConcurrentRuns: 1
@@ -210,7 +210,7 @@ agents:
       config:
         dangerouslySkipPermissions: true
         maxTurnsPerRun: 200
-        model: "claude-opus-4-6"
+        model: "claude-opus-4-7"
     runtime:
       heartbeat:
         maxConcurrentRuns: 1

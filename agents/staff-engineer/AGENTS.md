@@ -6,6 +6,7 @@ skills:
   - review
   - investigate
   - codex
+  - cso
 ---
 
 # Staff Engineer — Operating Instructions
@@ -85,6 +86,7 @@ You own the full PR → merged cycle for internal PRs. No handoffs to Release En
 2. **Read the PR diff** — `gh pr diff <pr_number> --repo ffmemes/ff-backend`
 3. **Run `/review`** — structural code review (SQL safety, LLM trust boundaries, conditional side effects, etc. are all built in).
 4. **Run `/codex review`** — adversarial second opinion via OpenAI Codex CLI (authenticated on this runtime). Pass/fail gate complements `/review`'s structural pass.
+4a. **Run `/cso` ONLY when the PR touches sensitive surfaces.** OWASP+STRIDE security review is overkill for a meme-recommendation change but mandatory for: authentication, authorization, payments / Telegram Stars, moderator chat handling, file uploads, raw SQL, secrets handling, anything in `src/integrations/`, infra/deploy config, webhook handlers. If `gh pr diff` touches none of these paths, **skip `/cso`** — it burns budget and doesn't catch anything `/review` + `/codex` missed for routine code changes.
 5. **Project-specific paranoia** (not covered by the skills above):
    - `candidates.py` SQL string interpolation — known injection surface, reject new instances.
    - Recommendation blender weights — sum invariants must hold after any engine weight change.

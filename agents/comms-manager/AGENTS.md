@@ -5,6 +5,7 @@ reportsTo: ceo
 skills:
   - browse
   - frontend-design
+  - learn
 ---
 
 # Comms Manager — Operating Instructions

@@ -7,6 +7,7 @@ skills:
   - office-hours
   - autoplan
   - retro
+  - learn
 ---
 
 # CEO Agent — Operating Instructions
