@@ -1,0 +1,118 @@
+# Paperclip-native migration
+
+Branch: `feat/paperclip-native-migration`. Prod is on **Paperclip v2026.416.0** (verified by deployed commit `4bdae1f42` → tag `v2026.416.0`). CLI is `paperclipai@2026.416.0`.
+
+Goal: stop maintaining custom scaffolding for things Paperclip ships natively, so upstream fixes apply to us for free.
+
+## Pre-flight backups (taken 2026-04-24 09:27 UTC)
+
+On `t.ffmemes.com:/root/paperclip-backups/pre-export-2026-04-24/`:
+- `preexport-20260424-092754.sql.gz` — 16 MB DB dump via `paperclipai db:backup`
+- `paperclip-config-2026-04-24.tgz` — 2.4 GB tar of `.paperclip` + `.claude` + `.claude.json` from the named volume
+
+Restore (only if needed):
+```bash
+gunzip -c preexport-20260424-092754.sql.gz | docker exec -i <paperclip-container> psql "$DATABASE_URL"
+```
+
+## What Paperclip-native looks like (v2026.416)
+
+CLI commands we now rely on:
+- `paperclipai db:backup` — native DB dump.
+- `paperclipai company export <id> --include company,agents,skills` — git-syncable export of the entire company definition.
+- `paperclipai dashboard get --json` — replaces custom health-summary scripts.
+- `paperclipai heartbeat run --agent-id <id>` — wake an agent on demand.
+
+API endpoints we now use directly (no SSH, no `docker cp`):
+- `GET  /api/companies/<id>/agents` — slug → agent ID resolution.
+- `GET  /api/agents/<id>/instructions-bundle?companyId=<id>` — list current instruction files.
+- `PUT  /api/agents/<id>/instructions-bundle/file?companyId=<id>` — body `{path, content}`. Records audit + config revision (rollbackable).
+- `PATCH /api/agents/<id>` — adapter config, `desiredSkills`, runtime, permissions (not yet wired in deploy script — see "Future work").
+
+## Why `company import` is **not** the deploy path
+
+`paperclipai company import --target existing --collision replace` is **rejected by the server** with `403: Safe import route does not allow replace collision strategy`. The CLI accepts the flag but the v416 API hardens the existing-company import endpoint against destructive overwrites. `--collision skip` works but does not update existing agents.
+
+So `company import` is for:
+- bootstrapping a new company (`--target new`)
+- additive sync of new agents into an existing company (`--target existing --collision skip`)
+
+For **updating existing agent prompts**, use the instructions-bundle PUT endpoint (per-file, audited, rollbackable). That is what `agents/deploy.sh` now does.
+
+## Phase 1 — Repo as source of truth (this PR)
+
+What changed in `agents/`:
+- **Slug renames**: `comms/` → `comms-manager/`, `qa/` → `qa-engineer/` to match prod `urlKey`s. Done via `git mv` to preserve history.
+- **CEO additions**: `agents/ceo/{SOUL,TOOLS,HEARTBEAT}.md` pulled from prod (Paperclip pattern; CEO-only for now).
+- **Top-level files**: `agents/COMPANY.md`, `agents/README.md`, `agents/images/{org-chart.png,company-logo.jpg}` pulled from prod.
+- **Manifest** `agents/.paperclip.yaml` rewritten in `paperclip/v1` schema with full prod structure (heartbeat, model, maxTurnsPerRun, env-default declarations, sidebar order, brand color) and the union of repo + prod env var declarations. The inlined `capabilities` text from prod's `comms-manager` was dropped — `AGENTS.md` is the single source.
+- **Removed** `agents/backup/` (legacy local snapshots; server-side backups now exist).
+- **Replaced** `agents/deploy.sh`: now 70 LOC of curl + jq against the native API. No SSH. No docker cp.
+
+What did **not** change in this PR:
+- `agents/<slug>/AGENTS.md` text content. Repo content is preserved as-is per CEO direction ("repo is final").
+
+### Drift status when this PR merges
+
+Per `paperclipai company export` taken 2026-04-24, repo vs prod AGENTS.md diff:
+
+| Agent | Δ lines (repo − prod) | First deploy effect |
+|---|---:|---|
+| analyst | +9 | Repo overwrites prod (minor) |
+| ceo | −13 | **Prod text replaced** by older repo text |
+| comms-manager | +62 | Repo overwrites prod (intended — anomaly-driven content rules etc.) |
+| cto | −14 | **Prod text replaced** by older repo text |
+| qa-engineer | +6 | Repo overwrites prod (minor) |
+| release-engineer | −12 | **Prod text replaced** by older repo text |
+| staff-engineer | −11 | **Prod text replaced** by older repo text |
+
+**Reviewer's call before merging**: for each "Prod text replaced" row, decide whether to (a) ship as-is and accept the lost prod edits, or (b) `curl -H ... GET .../instructions-bundle/file?path=AGENTS.md` to pull prod's current text into repo first. Pre-merge backups exist in case of regret.
+
+## Phase 2 — Auto-deploy on push to `production` (this PR)
+
+`.github/workflows/paperclip-deploy-agents.yml` triggers on:
+- `push` to `production` touching `agents/**` (or the workflow itself), or
+- manual `workflow_dispatch`.
+
+Steps:
+1. `./agents/deploy.sh --dry-run` — fails build on slug-resolution miss.
+2. `./agents/deploy.sh` — applies via API.
+
+Required GitHub repo secrets (set before merging this PR):
+- `PAPERCLIP_URL` = `https://org.ffmemes.com`
+- `PAPERCLIP_API_KEY` = a board-operator scoped token (use a dedicated CI key, not your personal one)
+
+Concurrency group `paperclip-deploy-agents` prevents overlapping runs; `cancel-in-progress: false` ensures in-flight syncs complete.
+
+## Phase 3 — Pending (separate PRs)
+
+**3a. Adapter config sync from `.paperclip.yaml`** (next iteration of `agents/deploy.sh`).
+Read agent block from manifest, PATCH `/api/agents/<id>` with `adapterConfig`, `runtimeConfig`, `permissions`, `desiredSkills` (parsed from AGENTS.md frontmatter). Currently we only sync the prompt text.
+
+**3b. Retire the webhook proxy.** Paperclip v416 ships `none` and `github_hmac` signing modes (per `infra_paperclip_webhook_fix_shipped.md`). Switch QA trigger signing to `none`, point Sentry/Coolify/Prefect directly at the trigger URL, delete:
+- `src/integrations/paperclip.py` `/webhooks/qa-alert` route + HMAC helpers (~150 LOC)
+- `src/flows/hooks.py::notify_qa_sync` (~30 LOC) → replace with Prefect's native "Send a webhook" automation
+- env vars `WEBHOOK_PROXY_SECRET`, `SENTRY_CLIENT_SECRET`
+
+**3c. CLI-native agent skills.** In each AGENTS.md, replace raw `curl https://org.ffmemes.com/api/...` with `paperclipai issue list --json`, `paperclipai approval create`, `paperclipai dashboard get`, `paperclipai heartbeat run --agent-id`. Reduces per-wake context.
+
+**3d. gstack skill update routine.** Codex flagged: Paperclip already shipped "pinned GitHub skills with update checks" in v2026.325.0. Build a daily Paperclip routine that:
+- compares pinned `skills.source` ref against `garrytan/gstack` HEAD,
+- summarizes the changelog/commit delta in plain English,
+- creates **one** Paperclip issue ("review gstack updates: <slug list>") for human/CEO triage,
+- bumps the pin only after explicit approval (never auto-bump — supply-chain roulette).
+
+Prefer Paperclip's native skill-update mechanism over a custom-rolled routine if it exists in the UI; this routine should hook into it, not replace it.
+
+## What stays custom
+
+- `.github/workflows/staff-engineer-trigger.yml` — no native Paperclip↔GitHub PR integration yet; HTTP POST to a routine trigger is the right shape.
+- `agents/<slug>/AGENTS.md` content — our IP, not Paperclip's job.
+- Telegram plugin — already native (Paperclip plugin system).
+
+## Risks acknowledged
+
+- **First deploy overwrites 4 prod-ahead agents** (CEO/CTO/release-eng/staff-eng) with older repo text. Reviewer must decide pre-merge.
+- **`--collision replace` was rejected** by the v416 safe-import server — we work around with per-file PUT, but if Paperclip changes the instructions-bundle endpoint behavior in a future version, we re-evaluate.
+- **No drift monitoring yet.** Auto-deploy reduces drift; UI edits between deploys still possible. Codex recommended a nightly `company export` artifact job; deferred per CEO call. Revisit if drift bites.
+- **CI auth uses a single API key.** No first-class service-account exists in Paperclip. The key must be scoped to this company and rotated if leaked.
