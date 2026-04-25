@@ -11,7 +11,6 @@ from src.tgbot.constants import TELEGRAM_CHAT_RU_CHAT_ID
 from src.tgbot.handlers.chat.mod_chat_stat import handle_mod_chat_meme_forward
 from src.tgbot.handlers.chat.reaction import give_random_reaction
 from src.tgbot.handlers.chat.service import (
-    get_latest_chat_messages,
     save_telegram_message,
 )
 from src.tgbot.handlers.chat.utils import _reply_and_delete

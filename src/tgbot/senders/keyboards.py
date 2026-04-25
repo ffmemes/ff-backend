@@ -11,7 +11,6 @@ from src.tgbot.constants import (
     MEME_SOURCE_SET_LANG_PATTERN,
     Reaction,
 )
-from src.tgbot.senders.utils import get_referral_link
 
 # IDEA: use sometimes another emoji pair like 🤣/🤮
 
@@ -58,7 +57,6 @@ def meme_reaction_keyboard(
     like, dislike = heart, "⏬"
     # like, dislike = "👍", "👎"
 
-    referral_link = get_referral_link(user_id, meme_id)
     return InlineKeyboardMarkup(
         [
             [

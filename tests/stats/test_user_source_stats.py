@@ -6,7 +6,6 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import select
 from tests.factories import (
-    FIXED_DT,
     cleanup_test_data,
     create_meme,
     create_meme_source,

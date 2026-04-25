@@ -185,7 +185,6 @@ def line_chart(
             "per brand-guide (too many points = chart junk)"
         )
 
-    fg = CANVAS_LIGHT if dark else CANVAS_DARK
     fig, ax = plt.subplots(figsize=DEFAULT_SIZE_IN)
     ax.plot(
         list(x),

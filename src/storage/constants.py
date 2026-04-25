@@ -17,17 +17,13 @@ class MemeType(str, Enum):
 class MemeSourceType(str, Enum):
     TELEGRAM = "telegram"
     VK = "vk"
-    REDDIT = "reddit"
     INSTAGRAM = "instagram"
-    TWITTER = "twitter"
-    TIKTOK = "tiktok"
     USER_UPLOAD = "user upload"
 
 
 class MemeSourceStatus(str, Enum):
     IN_MODERATION = "in_moderation"
     PARSING_ENABLED = "parsing_enabled"
-    PARSING_DISABLED = "parsing_disabled"
     SNOOZED = "snoozed"
 
 

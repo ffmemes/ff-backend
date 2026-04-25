@@ -29,10 +29,8 @@ from telethon.tl.functions.channels import GetFullChannelRequest
 from src.config import settings
 from src.database import (
     channel_daily_stats,
-    crossposting,
     crossposting_snapshots,
     editorial_post_snapshots,
-    editorial_posts,
     execute,
     fetch_all,
 )

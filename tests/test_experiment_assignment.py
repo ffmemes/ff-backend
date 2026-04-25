@@ -1,7 +1,7 @@
 """Tests for experiment_assignment table and helper functions."""
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import engine, experiment_assignment, user
