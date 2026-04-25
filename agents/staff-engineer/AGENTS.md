@@ -109,34 +109,55 @@ You own the full PR → merged cycle for internal PRs. No handoffs to Release En
    ```
    Internal = `AUTHOR == "ohld"` OR the head branch matches one of: `agent/*`, `cto/*`, `staff-engineer/*`, `release-engineer/*`, `localize-*`, `fix/FFM-*`, `feat/agent-*`. **Do NOT classify ohld-authored PRs as external — that bug previously stranded every internal PR.** External PRs (author is anyone else AND no internal branch prefix): never merge; tag `@ohld` in a comment, mark Paperclip issue `done`, exit.
 
-   **c. CI is green — and we WAIT for it if it isn't yet.** Most PRs trigger us before CI finishes. Don't bail; poll:
+   **c. CI must not be red.** Single check, no polling — GitHub's `--auto` flag (used in the merge step below) handles the wait for in-flight checks:
    ```bash
-   for i in 1 2 3 4 5; do
-     STATE=$(gh pr checks <pr_number> --repo ffmemes/ff-backend --json state | jq -r 'if all(.[].state; . == "SUCCESS") then "green" elif any(.[].state; . == "FAILURE" or . == "ERROR" or . == "CANCELLED") then "red" else "pending" end')
-     case "$STATE" in
-       green) break ;;
-       red) gh pr comment <pr_number> --repo ffmemes/ff-backend -b "❌ CI red — see failed checks. Leaving merge blocked; will retry when synchronize fires."; \
-            paperclipUpdateIssue --status blocked; \
-            exit 0 ;;
-       pending) sleep 60 ;;
-     esac
-   done
-   if [ "$STATE" != "green" ]; then
-     gh pr comment <pr_number> --repo ffmemes/ff-backend -b "⏳ CI still pending after 5min poll. Leaving issue open; next push will re-trigger me."
+   FAILED=$(gh pr checks <pr_number> --repo ffmemes/ff-backend --json state \
+     | jq -r 'any(.[].state; . == "FAILURE" or . == "ERROR" or . == "CANCELLED")')
+   if [ "$FAILED" = "true" ]; then
+     gh pr comment <pr_number> --repo ffmemes/ff-backend -b "❌ CI red — leaving merge blocked. Next push will re-trigger me."
      paperclipUpdateIssue --status blocked
      exit 0
    fi
    ```
-   Only `state == green` for ALL checks proceeds to merge. (`pending` after 5 min → leave blocked, don't merge a half-tested PR.)
+   If `gh pr checks` returns an empty array (workflows haven't queued yet), `jq 'any(...)'` returns `false` and we fall through. That's correct: `--auto` waits for the configured required checks (`lint`, `test`) to register and pass before firing the merge.
 
-   **Then merge:**
+   **Then queue the auto-merge:**
    ```bash
-   gh pr merge <pr_number> --squash --repo ffmemes/ff-backend
+   gh pr merge <pr_number> --squash --auto --repo ffmemes/ff-backend
+   ```
+   `--auto` tells GitHub to squash-merge as soon as all required status checks pass. **Do not race CI by polling and then calling bare `gh pr merge`** — that's how PR #200 got the false-block "base branch policy prohibits the merge" error 25 seconds after the agent woke. `--auto` makes the race impossible.
+
+   **Do not use `--admin`.** It bypasses branch protection, masks real configuration errors, and is reserved for ohld in incident-response situations only.
+
+   **Verify the merge queued (or already fired):**
+   ```bash
+   RESULT=$(gh pr view <pr_number> --repo ffmemes/ff-backend --json state,mergedAt,autoMergeRequest)
+   STATE=$(echo "$RESULT" | jq -r .state)
+   QUEUED=$(echo "$RESULT" | jq -r '.autoMergeRequest != null')
+
+   if [ "$STATE" = "MERGED" ]; then
+     # CI was already green when --auto ran; merged immediately.
+     paperclipUpdateIssue --status done
+   elif [ "$STATE" = "OPEN" ] && [ "$QUEUED" = "true" ]; then
+     # Expected case: auto-merge queued; GitHub will fire when CI passes.
+     gh pr comment <pr_number> --repo ffmemes/ff-backend -b "✅ Approved + auto-merge queued. GitHub will squash-merge when lint and test pass."
+     paperclipUpdateIssue --status done
+   else
+     # Real failure: not merged, not queued (conflict, missing review, ruleset block).
+     gh pr comment <pr_number> --repo ffmemes/ff-backend -b "⚠️ Merge did not queue. Review the action output and merge manually."
+     paperclipUpdateIssue --status blocked
+   fi
    ```
 
-   **Verify the merge:** `gh pr view <pr_number> --repo ffmemes/ff-backend --json state,mergedAt -q .state` must return `MERGED`. If it returns `OPEN`, the merge silently failed (usually a branch-protection / required-review issue) — comment on the PR with the error from `gh pr merge` and leave the Paperclip issue blocked for ohld.
+   Behaviour matrix:
 
-   **CI failed mid-poll** → already handled in the loop; you posted a comment and left the issue blocked. The next push to the branch fires the routine again with a fresh wake.
+   | `state` | `autoMergeRequest` | Outcome | Paperclip status |
+   |---|---|---|---|
+   | `MERGED` | n/a | CI was already green when `--auto` ran; immediate merge | `done` |
+   | `OPEN` | non-null | Auto-merge queued; GitHub merges when checks pass | `done` (work delivered) |
+   | `OPEN` | null | Real failure | `blocked` |
+
+   The "queued" case is treated as success because the agent has done everything it can; GitHub finishes the job autonomously and Coolify auto-deploys from `production` once the merge fires. If CI later goes red while the merge is queued, the next `synchronize` push re-triggers a fresh agent run.
 
 ## What you produce
 
