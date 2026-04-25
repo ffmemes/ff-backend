@@ -68,6 +68,7 @@ async def get_recent_editorial_performance(
         )
         .where(editorial_posts.c.channel == channel)
         .where(editorial_posts.c.created_at >= cutoff)
+        .where(editorial_posts.c.telegram_message_id.isnot(None))
         .order_by(desc(editorial_posts.c.created_at))
     )
     return [

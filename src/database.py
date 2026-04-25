@@ -485,7 +485,7 @@ editorial_posts = Table(
     metadata,
     Column("id", Integer, Identity(), primary_key=True),
     Column("channel", String, nullable=False),
-    Column("telegram_message_id", BigInteger, nullable=False),
+    Column("telegram_message_id", BigInteger, nullable=True),
     Column("draft_hash", String, nullable=False),
     Column("category", String),
     Column("entity_id", String),

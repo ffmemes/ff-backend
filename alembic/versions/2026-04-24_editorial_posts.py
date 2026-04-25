@@ -1,7 +1,7 @@
 """Add editorial_posts + editorial_post_snapshots tables
 
 Revision ID: a1b4c7d0e3f6
-Revises: 5a9d22dbecb6
+Revises: a7b8c9d0e1f2
 Create Date: 2026-04-24 00:00:00.000000
 
 """
@@ -21,7 +21,11 @@ def upgrade() -> None:
         "editorial_posts",
         sa.Column("id", sa.Integer(), sa.Identity(), primary_key=True),
         sa.Column("channel", sa.String(), nullable=False),
-        sa.Column("telegram_message_id", sa.BigInteger(), nullable=False),
+        # NULL means "claim taken, Telegram send not confirmed yet". Set to
+        # the real message_id immediately after the Bot API call returns.
+        # Allows publish_editorial_post to insert before posting (and so
+        # idempotently survive a crash between the TG send and the DB write).
+        sa.Column("telegram_message_id", sa.BigInteger(), nullable=True),
         sa.Column("draft_hash", sa.String(), nullable=False),
         sa.Column("category", sa.String()),
         sa.Column("entity_id", sa.String()),

@@ -14,7 +14,11 @@ Invariants enforced here (not in prompt):
 - `<blockquote>` is always rewritten to `<blockquote expandable>`.
 - Substring/pattern ban (describe_memes, circuit breakers, A/B iteration updates).
 - Category+entity rotation check against the last 14 editorial posts.
-- Idempotency via SHA256 `draft_hash` (same draft, same channel → no double-post).
+- Idempotency via SHA256 `draft_hash`. The hash row is INSERTED before the
+  Telegram send (telegram_message_id NULL), then UPDATED with the real id
+  after send returns. A retry that races with a previous in-flight call
+  loses the ON CONFLICT and refuses to double-post; a retry after the
+  previous call succeeded short-circuits via the existing-row fast path.
 """
 
 from __future__ import annotations
@@ -24,7 +28,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Iterable
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import editorial_posts, execute, fetch_all, fetch_one
@@ -41,6 +45,10 @@ ALLOWED_HTML_TAGS = {"b", "strong", "i", "em", "code", "a", "blockquote"}
 
 _TAG_RE = re.compile(r"<(/?)([a-zA-Z][a-zA-Z0-9\-]*)([^>]*)>")
 _BLOCKQUOTE_OPEN_RE = re.compile(r"<blockquote(\s[^>]*)?>", re.IGNORECASE)
+# Match a real `href=` attribute, not a substring of e.g. `xhref=`. Requires a
+# non-letter (or start-of-attrs) before `href` so `xhref=` is rejected.
+_HREF_ATTR_RE = re.compile(r"(?:^|[^a-z])href\s*=", re.IGNORECASE)
+_HREF_VALUE_RE = re.compile(r"href\s*=\s*['\"]([^'\"]*)['\"]", re.IGNORECASE)
 
 BANNED_SUBSTRINGS: tuple[str, ...] = (
     "describe_memes",
@@ -176,8 +184,15 @@ def _validate_html(text: str) -> list[str]:
             else:
                 stack.pop()
             continue
-        if tag == "a" and "href=" not in attrs.lower():
-            errors.append("<a> tag missing href attribute")
+        if tag == "a":
+            if not _HREF_ATTR_RE.search(attrs):
+                errors.append("<a> tag missing href attribute")
+            else:
+                href_match = _HREF_VALUE_RE.search(attrs)
+                if href_match:
+                    scheme = href_match.group(1).strip().lower()
+                    if scheme.startswith(("javascript:", "data:", "vbscript:", "file:")):
+                        errors.append(f"<a> href uses unsafe scheme: {scheme.split(':', 1)[0]}:")
         if tag == "blockquote" and stack and "blockquote" in stack:
             errors.append("Nested <blockquote> is not supported by Telegram")
         stack.append(tag)
@@ -263,8 +278,20 @@ def compute_draft_hash(
     photo_key: str | None,
     category: str,
     entity_id: str,
+    button_text: str | None = None,
+    button_url: str | None = None,
 ) -> str:
-    blob = f"{channel}|{category}|{entity_id}|{photo_key or ''}|{text}"
+    blob = "|".join(
+        [
+            channel,
+            category,
+            entity_id,
+            photo_key or "",
+            button_text or "",
+            button_url or "",
+            text,
+        ]
+    )
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:32]
 
 
@@ -309,15 +336,18 @@ async def publish_editorial_post(
         photo_key=photo_key,
         category=category,
         entity_id=entity_id,
+        button_text=button_text,
+        button_url=button_url,
     )
 
+    # Fast-path: identical draft already posted (telegram_message_id set).
     existing = await fetch_one(
         select(
             editorial_posts.c.id,
             editorial_posts.c.telegram_message_id,
         ).where(editorial_posts.c.draft_hash == draft_hash)
     )
-    if existing:
+    if existing and existing["telegram_message_id"] is not None:
         return EditorialPostResult(
             message_id=existing["telegram_message_id"],
             editorial_post_id=existing["id"],
@@ -336,6 +366,38 @@ async def publish_editorial_post(
     if not result.ok:
         raise EditorialValidationError(result.errors)
 
+    # Claim the draft_hash slot BEFORE posting so a crash between TG send and
+    # DB write cannot result in a re-post on retry. INSERT ON CONFLICT DO
+    # NOTHING; if a row already exists with telegram_message_id IS NULL,
+    # another worker is mid-send — refuse to double-post.
+    claim_stmt = (
+        insert(editorial_posts)
+        .values(
+            channel=channel,
+            telegram_message_id=None,
+            draft_hash=draft_hash,
+            category=category,
+            entity_id=entity_id,
+            topic_slug=topic_slug,
+            text=normalized_text,
+            has_media=has_media,
+            validation_version=VALIDATION_VERSION,
+        )
+        .on_conflict_do_nothing(index_elements=["draft_hash"])
+        .returning(editorial_posts.c.id)
+    )
+    claim_row = await fetch_one(claim_stmt)
+    if claim_row is None:
+        # Lost the race — another caller already claimed this draft_hash.
+        raise EditorialValidationError(
+            [
+                "Draft is already being published by another worker "
+                "(draft_hash claim row exists with no telegram_message_id). "
+                "Retry after the other call completes or fails."
+            ]
+        )
+    editorial_post_id = claim_row["id"]
+
     # Import lazily — avoids pulling python-telegram-bot into the Comms agent
     # runtime for dry-run / validation-only calls in tests.
     from src.flows.crossposting.editorial import post_editorial_to_channel
@@ -349,39 +411,34 @@ async def publish_editorial_post(
         button_url=button_url,
     )
 
-    row = await fetch_one(
-        insert(editorial_posts)
-        .values(
-            channel=channel,
-            telegram_message_id=message_id,
-            draft_hash=draft_hash,
-            category=category,
-            entity_id=entity_id,
-            topic_slug=topic_slug,
-            text=normalized_text,
-            has_media=has_media,
-            validation_version=VALIDATION_VERSION,
-        )
-        .returning(editorial_posts.c.id)
+    await execute(
+        update(editorial_posts)
+        .where(editorial_posts.c.id == editorial_post_id)
+        .values(telegram_message_id=message_id)
     )
-    if row is None:
-        raise RuntimeError(f"editorial_posts insert returned no row for message_id={message_id}")
 
     return EditorialPostResult(
         message_id=message_id,
-        editorial_post_id=row["id"],
+        editorial_post_id=editorial_post_id,
         already_posted=False,
         normalized_text=normalized_text,
     )
 
 
 async def mark_tracked_message_ids(channel: str) -> dict[int, int]:
-    """Return {telegram_message_id: editorial_posts.id} for stats collector."""
+    """Return {telegram_message_id: editorial_posts.id} for stats collector.
+
+    Skips claim rows with telegram_message_id IS NULL (drafts mid-publish or
+    orphaned by a crash between claim and Telegram send).
+    """
     rows = await fetch_all(
         select(
             editorial_posts.c.id,
             editorial_posts.c.telegram_message_id,
-        ).where(editorial_posts.c.channel == channel)
+        ).where(
+            editorial_posts.c.channel == channel,
+            editorial_posts.c.telegram_message_id.isnot(None),
+        )
     )
     return {r["telegram_message_id"]: r["id"] for r in (rows or [])}
 

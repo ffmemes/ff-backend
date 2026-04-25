@@ -77,6 +77,34 @@ def test_validate_rejects_anchor_without_href():
     assert any("href" in e.lower() for e in result.errors)
 
 
+def test_validate_rejects_xhref_bypass():
+    # 'href=' as a substring inside another attribute name (xhref) must NOT
+    # satisfy the href-required check. Substring match was a real bug.
+    result = validate_post_draft(
+        text='<a xhref="https://evil">click</a>',
+        has_media=True,
+        category="C",
+        entity_id="e",
+    )
+    assert not result.ok
+    assert any("href" in e.lower() for e in result.errors)
+
+
+@pytest.mark.parametrize(
+    "bad_href",
+    [
+        '<a href="javascript:alert(1)">x</a>',
+        '<a href="data:text/plain,hi">x</a>',
+        '<a href="vbscript:msgbox(1)">x</a>',
+        '<a href="file:///etc/passwd">x</a>',
+    ],
+)
+def test_validate_rejects_unsafe_href_schemes(bad_href):
+    result = validate_post_draft(text=bad_href, has_media=True, category="C", entity_id="e")
+    assert not result.ok
+    assert any("unsafe scheme" in e.lower() for e in result.errors)
+
+
 def test_validate_rejects_unclosed_tag():
     result = validate_post_draft(
         text="<b>unclosed",
@@ -241,3 +269,19 @@ def test_compute_draft_hash_differs_on_any_field():
     assert base != compute_draft_hash("ru", "hello", "f2", "C", "e1")
     assert base != compute_draft_hash("ru", "hello", "f1", "A", "e1")
     assert base != compute_draft_hash("ru", "hello", "f1", "C", "e2")
+
+
+def test_compute_draft_hash_includes_button():
+    base = compute_draft_hash("ru", "hello", "f1", "C", "e1")
+    with_button = compute_draft_hash(
+        "ru", "hello", "f1", "C", "e1", button_text="Открыть", button_url="https://t.me/x"
+    )
+    assert base != with_button
+    # Different URL → different hash even if text identical.
+    assert with_button != compute_draft_hash(
+        "ru", "hello", "f1", "C", "e1", button_text="Открыть", button_url="https://t.me/y"
+    )
+    # Different text → different hash even if URL identical.
+    assert with_button != compute_draft_hash(
+        "ru", "hello", "f1", "C", "e1", button_text="Поехали", button_url="https://t.me/x"
+    )

@@ -121,7 +121,10 @@ async def _collect_post_stats(client: TelegramClient, channel_key: str, channel_
     )
 
     editorial_rows = await fetch_all(
-        text("SELECT id, telegram_message_id FROM editorial_posts " "WHERE channel = :channel"),
+        text(
+            "SELECT id, telegram_message_id FROM editorial_posts "
+            "WHERE channel = :channel AND telegram_message_id IS NOT NULL"
+        ),
         {"channel": channel_key},
     )
     known_editorial = (
