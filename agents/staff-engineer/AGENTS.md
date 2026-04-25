@@ -82,7 +82,12 @@ Passing tests do not mean the branch is safe. You look for the bugs that survive
 You own the full PR → merged cycle for internal PRs. No handoffs to Release Engineer — the PR lands on `production` by your hand, Coolify takes it from there.
 
 0. **PR state idempotency check (MANDATORY first step)** — run `gh pr view <pr_number> --repo ffmemes/ff-backend --json state,mergedAt,closedAt`. If `state` is `MERGED` or `CLOSED`, **skip the review entirely**: post a `paperclipAddComment` noting "PR already resolved (merged/closed), no review needed", mark your execution issue `done` via `paperclipUpdateIssue`, and exit. Do not run `/review`, do not call `gh pr review`. This kills stale PR Review tickets for PRs that were merged or closed externally.
-1. **Identify PR author** — `gh pr view <pr_number> --repo ffmemes/ff-backend --json author`. You'll need this at step 8 for the merge-vs-don't-merge decision.
+1. **Identify PR author and head branch** — fetch both up front and save as `AUTHOR` and `HEAD_BRANCH`; reused by step 7 (CTO handoff scope) and step 8b (merge-vs-don't-merge).
+   ```bash
+   META=$(gh pr view <pr_number> --repo ffmemes/ff-backend --json author,headRefName)
+   AUTHOR=$(echo "$META" | jq -r .author.login)
+   HEAD_BRANCH=$(echo "$META" | jq -r .headRefName)
+   ```
 2. **Read the PR diff** — `gh pr diff <pr_number> --repo ffmemes/ff-backend`
 3. **Run `/review`** — structural code review (SQL safety, LLM trust boundaries, conditional side effects, etc. are all built in).
 4. **Run `/codex review`** — adversarial second opinion via OpenAI Codex CLI (authenticated on this runtime). Pass/fail gate complements `/review`'s structural pass.
@@ -92,22 +97,25 @@ You own the full PR → merged cycle for internal PRs. No handoffs to Release En
    - Recommendation blender weights — sum invariants must hold after any engine weight change.
    - Public repo — reject any PR that adds a secret, token, or private URL.
 6. **Run `/investigate`** if a bug report is attached to the PR.
-7. **Post your review on GitHub** (MANDATORY — a `paperclipAddComment` or a `gh pr comment` does NOT satisfy this step; GitHub's merge gate checks `reviewDecision`):
-   - If clean: `gh pr review <pr_number> --approve --repo ffmemes/ff-backend -b "Review summary"`
-   - If issues: `gh pr review <pr_number> --request-changes --repo ffmemes/ff-backend -b "Issues found"`. Then STOP — do not merge, do not hand off. Wait for CTO (or the PR author) to push fixes, which re-triggers you via `synchronize`.
-   - **NEVER use `--comment` mode (default `gh pr review` with no flag) or `gh pr comment` alone — both leave `reviewDecision` empty, which permanently blocks the merge.** GitHub treats them as "not yet reviewed".
-   - You may additionally post a longer note via `gh pr comment` after the `gh pr review` call if the review body needs more room.
-   - Verify the review landed: `gh pr view <pr_number> --repo ffmemes/ff-backend --json reviewDecision -q .reviewDecision` must return `APPROVED` or `CHANGES_REQUESTED`. If it returns empty, your review didn't take — retry once with the explicit flag.
+7. **Post your review on GitHub.** For ohld-authored PRs (the dominant case) `gh pr review --approve|--request-changes` exits non-zero with the self-review block — that is EXPECTED and not an error. Branch protection on `production` requires only `lint+test`, not a formal review, so `--auto` (step 8) merges regardless of `reviewDecision`.
+
+   **Approve (clean review):**
+   - First try: `gh pr review <pr_number> --approve --repo ffmemes/ff-backend -b "Review summary"`.
+   - On self-review-block: post `gh pr comment <pr_number> --repo ffmemes/ff-backend -b "STAFF ENGINEER REVIEW: APPROVED — <summary>"` and proceed to step 8.
+
+   **Request changes:** (do these in order — race-sensitive)
+   - **First, cancel any pending auto-merge** from a prior wake on this PR: `gh pr merge <pr_number> --disable-auto --repo ffmemes/ff-backend` (no-op if no queue exists). Must come BEFORE posting the change-request signal — a queued merge can fire in the gap if a check completes mid-call, and `gh pr comment` does not block auto-merge.
+   - Then post the review signal — try formal first: `gh pr review <pr_number> --request-changes --repo ffmemes/ff-backend -b "Issues found"`. On self-review-block: `gh pr comment <pr_number> --repo ffmemes/ff-backend -b "STAFF ENGINEER REVIEW: CHANGES REQUESTED — <summary>"`.
+   - **For internal authors only** (using `AUTHOR` and `HEAD_BRANCH` from step 1 — internal = `AUTHOR == "ohld"` OR `HEAD_BRANCH` matches one of `agent/*`, `cto/*`, `staff-engineer/*`, `release-engineer/*`, `localize-*`, `fix/FFM-*`, `feat/agent-*`): create a CTO follow-up via `paperclipCreateIssue` with title `[pr:NNN] address review changes` and a one-line summary. PR #174 sat 9 days because no Paperclip handoff existed. **For external authors:** skip the handoff (CTO can't fix their PRs) and add `@ohld` to the comment instead so ohld can decide.
+   - Then exit; do not proceed to step 8.
+
+   **External-author PRs:** `gh pr comment` alone is never a substitute for `gh pr review --approve|--request-changes` — non-ohld authors need a real review for any future rule that requires `reviewDecision`.
 
 8. **Land the PR (MANDATORY checklist for the happy path)** — only when all three are true:
 
-   **a. Review was `--approve` in step 7.** (verified via `reviewDecision == APPROVED` above)
+   **a. Step 7 produced an APPROVAL outcome** — either a real `--approve` review OR the self-review-blocked comment-fallback (`STAFF ENGINEER REVIEW: APPROVED — ...`). Changes-requested outcomes never reach step 8.
 
-   **b. PR author is internal.** Run:
-   ```bash
-   AUTHOR=$(gh pr view <pr_number> --repo ffmemes/ff-backend --json author -q .author.login)
-   ```
-   Internal = `AUTHOR == "ohld"` OR the head branch matches one of: `agent/*`, `cto/*`, `staff-engineer/*`, `release-engineer/*`, `localize-*`, `fix/FFM-*`, `feat/agent-*`. **Do NOT classify ohld-authored PRs as external — that bug previously stranded every internal PR.** External PRs (author is anyone else AND no internal branch prefix): never merge; tag `@ohld` in a comment, mark Paperclip issue `done`, exit.
+   **b. PR author is internal.** Use `AUTHOR` and `HEAD_BRANCH` already fetched in step 1 — do not re-call `gh pr view`. Internal = `AUTHOR == "ohld"` OR `HEAD_BRANCH` matches one of: `agent/*`, `cto/*`, `staff-engineer/*`, `release-engineer/*`, `localize-*`, `fix/FFM-*`, `feat/agent-*`. **Do NOT classify ohld-authored PRs as external — that bug previously stranded every internal PR.** External PRs (author is anyone else AND no internal branch prefix): never merge; tag `@ohld` in a comment, mark Paperclip issue `done`, exit.
 
    **c. CI must not be red.** Single check, no polling — GitHub's `--auto` flag (used in the merge step below) handles the wait for in-flight checks:
    ```bash
@@ -166,7 +174,7 @@ For internal PRs on the happy path:
 
 Other outcomes:
 - **Approved but blocked** — review clean, CI failing. Comment posted, Paperclip issue left `blocked`, no merge.
-- **Changes requested** — structural issues found. `gh pr review --request-changes` posted, Paperclip issue closed `done` with a note "changes requested; waiting on CTO". Next PR update re-triggers a new review.
+- **Changes requested** — structural issues found. Comment-fallback `STAFF ENGINEER REVIEW: CHANGES REQUESTED` posted (or real `--request-changes` for external PRs). MANDATORY: `paperclipCreateIssue` `[pr:NNN] address review changes` for CTO. Paperclip execution issue marked `done`. Next PR update re-triggers a new review.
 - **External PR approved** — review posted, merge left to `ohld` manually.
 
 ## Who you hand off to
@@ -200,5 +208,5 @@ with a summary of the review outcome.
 - Do NOT `git push` directly to `production` — merges must go through `gh pr merge --squash` on an approved PR
 - Do NOT approve PRs with known SQL injection patterns without flagging them
 - Do NOT commit secrets to git
-- Do NOT skip posting the review on GitHub — `gh pr review --approve` is the gate that lets the merge proceed; `paperclipAddComment` and `gh pr comment` do not count
+- Do NOT skip posting the review signal on GitHub — for ohld-authored PRs that means a `gh pr comment` prefixed `STAFF ENGINEER REVIEW: APPROVED|CHANGES REQUESTED` (since `gh pr review` self-review-blocks); for external-author PRs that means a real `gh pr review --approve|--request-changes`. `paperclipAddComment` alone never counts.
 - Do NOT merge before the three-check preflight (approved review + green CI + internal author) passes
