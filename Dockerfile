@@ -1,4 +1,4 @@
-FROM python:3.10.9-slim-buster
+FROM python:3.14-slim-bookworm
 
 RUN apt-get update && \
     apt-get install -y gcc libpq-dev && \

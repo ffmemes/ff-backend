@@ -5,23 +5,23 @@ python-jose==3.3.*
 SQLAlchemy==2.0.43
 httpx==0.28.*
 
-pydantic[email]==2.11.*
+pydantic[email]==2.13.*
 pydantic-settings==2.10.*
-asyncpg==0.30.*
+asyncpg==0.31.*
 fastapi==0.115.*
 uvicorn[standard]==0.32.*
 
 sentry-sdk==2.39.*
 
 # prefect + worker
-prefect==3.4.17
+prefect==3.6.*
 beautifulsoup4==4.13.*
 lxml==6.0.*
 
 python-telegram-bot[rate-limiter]==22.3.*
 
 Pillow==11.3.*
-matplotlib==3.9.*
+matplotlib==3.10.*
 
 openai==2.8.*
 openai-agents==0.4.*
