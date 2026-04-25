@@ -317,7 +317,7 @@ async def generate_recommendations(
             candidates = await fetch_all(text(fallback_query), params)
             if candidates:
                 logging.info(
-                    "Moderator user %s: low_sent + blender empty, " "last_resort found %d memes",
+                    "Moderator user %s: low_sent + blender empty, last_resort found %d memes",
                     user_id,
                     len(candidates),
                 )

@@ -152,8 +152,7 @@ async def _replace_previous_message(
     except BadRequest as error:
         if _is_missing_message_error(error):
             logger.info(
-                "Previous message for meme %s is missing (error: %s). "
-                "Sending new message instead.",
+                "Previous message for meme %s is missing (error: %s). Sending new message instead.",
                 meme.id,
                 error,
             )

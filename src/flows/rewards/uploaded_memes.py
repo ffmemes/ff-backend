@@ -91,9 +91,9 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
 
     top_memes = sorted(
         uploaded_memes,
-        key=lambda m: m["nlikes"] / (m["nlikes"] + m["ndislikes"])
-        if m["nlikes"] + m["ndislikes"] > 0
-        else 0,
+        key=lambda m: (
+            m["nlikes"] / (m["nlikes"] + m["ndislikes"]) if m["nlikes"] + m["ndislikes"] > 0 else 0
+        ),
         reverse=True,
     )[:5]
 
@@ -210,9 +210,9 @@ async def reward_en_users_for_weekly_top_uploaded_memes():
 
     top_memes = sorted(
         uploaded_memes,
-        key=lambda m: m["nlikes"] / (m["nlikes"] + m["ndislikes"])
-        if m["nlikes"] + m["ndislikes"] > 0
-        else 0,
+        key=lambda m: (
+            m["nlikes"] / (m["nlikes"] + m["ndislikes"]) if m["nlikes"] + m["ndislikes"] > 0 else 0
+        ),
         reverse=True,
     )[:5]
 

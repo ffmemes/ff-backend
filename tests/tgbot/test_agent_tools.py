@@ -58,8 +58,8 @@ async def test_send_meme_coerces_string_meme_id():
             # LLM sends meme_id as string in JSON — must be coerced to int
             result = await send_meme.on_invoke_tool(tool_ctx, json.dumps({"meme_id": "6091977"}))
 
-    assert isinstance(
-        captured_params["meme_id"], int
-    ), "meme_id must be cast to int before SQL — asyncpg rejects str for integer columns"
+    assert isinstance(captured_params["meme_id"], int), (
+        "meme_id must be cast to int before SQL — asyncpg rejects str for integer columns"
+    )
     assert captured_params["meme_id"] == 6091977
     assert "Sent" in result

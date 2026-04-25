@@ -186,9 +186,9 @@ async def test_best_uploaded_memes_only_from_user_upload_source(base_data):
     results = await retriever.get_candidates("best_uploaded_memes", USER_ID, limit=50)
     assert len(results) > 0
     for r in results:
-        assert r["id"] in range(
-            10006, 10009
-        ), f"best_uploaded_memes returned meme {r['id']} not from user upload source"
+        assert r["id"] in range(10006, 10009), (
+            f"best_uploaded_memes returned meme {r['id']} not from user upload source"
+        )
 
 
 @pytest.mark.asyncio
