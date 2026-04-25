@@ -67,7 +67,7 @@ _STATS_QUERY = text(
         COALESCE(mrt.url, msrc.url)  AS source_url,
         (
             SELECT count(*) FROM user_deep_link_log
-            WHERE deep_link LIKE 's\_%\_' || :mid
+            WHERE deep_link LIKE :mid_pattern
         ) AS clicks
     FROM meme m
     LEFT JOIN meme_stats ms       ON ms.meme_id = m.id
@@ -81,7 +81,10 @@ _STATS_QUERY = text(
 
 
 async def _build_stat_reply(meme_id: int) -> str | None:
-    row = await fetch_one(_STATS_QUERY, {"mid": meme_id})
+    row = await fetch_one(
+        _STATS_QUERY,
+        {"mid": meme_id, "mid_pattern": rf"s\_%\_{meme_id}"},
+    )
     if not row:
         return None
 
