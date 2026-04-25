@@ -18,10 +18,8 @@ from prefect.events.actions import PauseDeployment, RunDeployment
 DEPLOYMENT_NAMES = {
     "parse_tg": "Parse Telegram Channels/Parse Telegram Sources",
     "parse_vk": "Parse VK Groups/Parse VK Sources",
-    "parse_ig": "Parse Instagram Groups/Parse Instagram Sources",
     "tg_pipeline": "Memes from Telegram Pipeline/TG Meme Pipeline",
     "vk_pipeline": "Memes from VK Pipeline/VK Meme Pipeline",
-    "ig_pipeline": "Memes from Instagram Pipeline/IG Meme Pipeline",
     "final_pipeline": "Final Memes Pipeline/Final Meme Pipeline",
     "stats_meme": "Calculate meme_stats/Calculate meme_stats",
     "stats_user": "Calculate user_stats/Calculate user_stats",
@@ -89,7 +87,6 @@ async def create_automations(ids: dict):
     chains = [
         ("parse_tg", "tg_pipeline", "TG parser -> TG pipeline"),
         ("parse_vk", "vk_pipeline", "VK parser -> VK pipeline"),
-        ("parse_ig", "ig_pipeline", "IG parser -> IG pipeline"),
     ]
     for source, target, desc in chains:
         if source in ids and target in ids:
@@ -103,7 +100,7 @@ async def create_automations(ids: dict):
             created.append(auto.name)
 
     # ── Flow chaining: pipeline -> final_pipeline ──
-    for pipeline_key in ("tg_pipeline", "vk_pipeline", "ig_pipeline"):
+    for pipeline_key in ("tg_pipeline", "vk_pipeline"):
         if pipeline_key in ids and "final_pipeline" in ids:
             auto = Automation(
                 name=f"{PREFIX}chain:{pipeline_key}->final",
