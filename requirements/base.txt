@@ -8,8 +8,8 @@ httpx==0.28.*
 pydantic[email]==2.13.*
 pydantic-settings==2.14.*
 asyncpg==0.31.*
-fastapi==0.115.*
-uvicorn[standard]==0.32.*
+fastapi==0.136.*
+uvicorn[standard]==0.46.*
 
 sentry-sdk==2.58.*
 
