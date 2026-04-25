@@ -31,6 +31,8 @@ from src.database import (
     channel_daily_stats,
     crossposting,
     crossposting_snapshots,
+    editorial_post_snapshots,
+    editorial_posts,
     execute,
     fetch_all,
 )
@@ -61,8 +63,30 @@ def _get_telethon_client() -> TelegramClient | None:
     )
 
 
+def _extract_metrics(msg) -> tuple[int, int, int, dict[str, int], int]:
+    """Return (views, forwards, reactions_total, reactions_detail, comments)."""
+    views = getattr(msg, "views", None) or 0
+    forwards = getattr(msg, "forwards", None) or 0
+    reaction_count = 0
+    reactions_detail: dict[str, int] = {}
+    if msg.reactions and hasattr(msg.reactions, "results"):
+        for r in msg.reactions.results:
+            reaction_count += r.count
+            emoji = getattr(r.reaction, "emoticon", str(r.reaction))
+            reactions_detail[emoji] = r.count
+    comments = 0
+    if msg.replies:
+        comments = getattr(msg.replies, "replies", 0) or 0
+    return views, forwards, reaction_count, reactions_detail, comments
+
+
 async def _collect_post_stats(client: TelegramClient, channel_key: str, channel_username: str):
-    """Collect views/forwards/reactions for recent posts in a channel."""
+    """Collect views/forwards/reactions for recent posts in a channel.
+
+    Posts may be tracked in two places: `crossposting` (meme cross-posts, high
+    volume) or `editorial_posts` (agent-written updates, ~1/day). A single
+    Telegram message cannot be both, so we dispatch by source.
+    """
     log = get_run_logger()
 
     try:
@@ -71,89 +95,119 @@ async def _collect_post_stats(client: TelegramClient, channel_key: str, channel_
         log.error(f"Cannot access @{channel_username} — private or no access")
         return
 
-    # Get recent posts (last 48h worth, limit 50)
-    messages = await client.get_messages(entity, limit=50)
+    # Fetch a wider window: editorial posts are low-volume (~1/day) so we want
+    # to keep refreshing them for ~30 days. Meme crossposts get most of their
+    # views in the first 48h, but re-updating is cheap.
+    messages = await client.get_messages(entity, limit=200)
 
-    cutoff = datetime.utcnow() - timedelta(hours=48)
+    cutoff = datetime.utcnow() - timedelta(days=30)
     recent_messages = [m for m in messages if m.date and m.date.replace(tzinfo=None) > cutoff]
 
-    log.info(f"@{channel_username}: {len(recent_messages)} posts in last 48h")
+    log.info(f"@{channel_username}: {len(recent_messages)} posts in last 30d")
 
-    # Get crossposting rows that have telegram_message_id for matching
     if not recent_messages:
         return
 
-    # Fetch all crossposting rows for this channel that have telegram_message_id set.
-    # We filter in Python rather than using ANY() which isn't used elsewhere in the codebase.
-    rows = await fetch_all(
+    # Build two lookup maps so a single message update is routed correctly.
+    crosspost_rows = await fetch_all(
         text(
             "SELECT meme_id, telegram_message_id FROM crossposting "
             "WHERE channel = :channel AND telegram_message_id IS NOT NULL"
         ),
         {"channel": channel_key},
     )
-    known_msg_ids = {r["telegram_message_id"]: r["meme_id"] for r in rows} if rows else {}
+    known_crosspost = (
+        {r["telegram_message_id"]: r["meme_id"] for r in crosspost_rows} if crosspost_rows else {}
+    )
 
-    snapshots_inserted = 0
+    editorial_rows = await fetch_all(
+        text(
+            "SELECT id, telegram_message_id FROM editorial_posts "
+            "WHERE channel = :channel AND telegram_message_id IS NOT NULL"
+        ),
+        {"channel": channel_key},
+    )
+    known_editorial = (
+        {r["telegram_message_id"]: r["id"] for r in editorial_rows} if editorial_rows else {}
+    )
+
+    crosspost_snapshots = 0
+    editorial_snapshots = 0
     for msg in recent_messages:
-        views = getattr(msg, "views", None) or 0
-        forwards = getattr(msg, "forwards", None) or 0
+        views, forwards, reaction_count, reactions_detail, comments = _extract_metrics(msg)
 
-        # Reactions: total count + per-emoji breakdown
-        reaction_count = 0
-        reactions_detail = {}
-        if msg.reactions and hasattr(msg.reactions, "results"):
-            for r in msg.reactions.results:
-                reaction_count += r.count
-                emoji = getattr(r.reaction, "emoticon", str(r.reaction))
-                reactions_detail[emoji] = r.count
+        meme_id = known_crosspost.get(msg.id)
+        editorial_id = known_editorial.get(msg.id)
 
-        # Comments count
-        comments = 0
-        if msg.replies:
-            comments = getattr(msg.replies, "replies", 0) or 0
-
-        meme_id = known_msg_ids.get(msg.id)
-        if meme_id is None:
-            # Post not tracked in crossposting table (pre-T2 or manual)
-            continue
-
-        # Insert time-series snapshot
-        await execute(
-            insert(crossposting_snapshots).values(
-                channel=channel_key,
-                meme_id=meme_id,
-                telegram_message_id=msg.id,
-                views=views,
-                forwards=forwards,
-                reactions=reaction_count,
-                comments=comments,
-                reactions_detail=reactions_detail or None,
-                message_text=(msg.text or "")[:500],
+        if meme_id is not None:
+            await execute(
+                insert(crossposting_snapshots).values(
+                    channel=channel_key,
+                    meme_id=meme_id,
+                    telegram_message_id=msg.id,
+                    views=views,
+                    forwards=forwards,
+                    reactions=reaction_count,
+                    comments=comments,
+                    reactions_detail=reactions_detail or None,
+                    message_text=(msg.text or "")[:500],
+                )
             )
-        )
-        snapshots_inserted += 1
+            crosspost_snapshots += 1
+            await execute(
+                text(
+                    "UPDATE crossposting SET views = :views, forwards = :fwd, "
+                    "reactions = :react, comments = :comments, "
+                    "reactions_detail = :rdetail, stats_updated_at = NOW() "
+                    "WHERE channel = :ch AND telegram_message_id = :msg_id"
+                ),
+                {
+                    "views": views,
+                    "fwd": forwards,
+                    "react": reaction_count,
+                    "comments": comments,
+                    "rdetail": json.dumps(reactions_detail) if reactions_detail else None,
+                    "ch": channel_key,
+                    "msg_id": msg.id,
+                },
+            )
 
-        # Update latest values on crossposting table
-        await execute(
-            text(
-                "UPDATE crossposting SET views = :views, forwards = :fwd, "
-                "reactions = :react, comments = :comments, "
-                "reactions_detail = :rdetail, stats_updated_at = NOW() "
-                "WHERE channel = :ch AND telegram_message_id = :msg_id"
-            ),
-            {
-                "views": views,
-                "fwd": forwards,
-                "react": reaction_count,
-                "comments": comments,
-                "rdetail": json.dumps(reactions_detail) if reactions_detail else None,
-                "ch": channel_key,
-                "msg_id": msg.id,
-            },
-        )
+        if editorial_id is not None:
+            await execute(
+                insert(editorial_post_snapshots).values(
+                    channel=channel_key,
+                    editorial_post_id=editorial_id,
+                    telegram_message_id=msg.id,
+                    views=views,
+                    forwards=forwards,
+                    reactions=reaction_count,
+                    comments=comments,
+                    reactions_detail=reactions_detail or None,
+                )
+            )
+            editorial_snapshots += 1
+            await execute(
+                text(
+                    "UPDATE editorial_posts SET views = :views, forwards = :fwd, "
+                    "reactions = :react, comments = :comments, "
+                    "reactions_detail = :rdetail, stats_updated_at = NOW() "
+                    "WHERE channel = :ch AND telegram_message_id = :msg_id"
+                ),
+                {
+                    "views": views,
+                    "fwd": forwards,
+                    "react": reaction_count,
+                    "comments": comments,
+                    "rdetail": json.dumps(reactions_detail) if reactions_detail else None,
+                    "ch": channel_key,
+                    "msg_id": msg.id,
+                },
+            )
 
-    log.info(f"@{channel_username}: {snapshots_inserted} snapshots inserted")
+    log.info(
+        f"@{channel_username}: {crosspost_snapshots} crosspost snapshots, "
+        f"{editorial_snapshots} editorial snapshots"
+    )
 
 
 async def _collect_subscriber_count(
