@@ -3,9 +3,9 @@ from datetime import timedelta
 from typing import Optional
 
 import orjson
+from redis.exceptions import ResponseError
 
 from redis import asyncio as aioredis
-from redis.exceptions import ResponseError
 from src.config import settings
 from src.constants import Environment
 from src.models import CustomModel

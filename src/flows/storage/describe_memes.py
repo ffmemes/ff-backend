@@ -144,7 +144,7 @@ def _parse_vision_response(raw_content: str) -> dict:
     try:
         fixed = re.sub(r'\\(?!["\\/bfnrtu])', r"\\\\", content)
         return json.loads(fixed)
-    except (json.JSONDecodeError, Exception):
+    except json.JSONDecodeError, Exception:
         pass
 
     # 3. Regex extraction — last resort for severely malformed output

@@ -389,8 +389,7 @@ async def handle_wrapped(
             )
         else:
             msg = (
-                f"Stats are available for channel subscribers only 😉\n\n"
-                f"Subscribe:\n{channel_link}"
+                f"Stats are available for channel subscribers only 😉\n\nSubscribe:\n{channel_link}"
             )
         return await update.message.reply_text(msg)
 
@@ -1209,7 +1208,7 @@ def _build_zodiac_slide(p: dict, is_ru: bool = True) -> str:
     if not sign:
         return ""
     header = "🔮 <b>Твой мем-зодиак:</b>" if is_ru else "🔮 <b>Your Meme Zodiac:</b>"
-    return f"{header}\n\n" f"<b>{html_escape(sign)}</b>\n\n" f"<i>{html_escape(why)}</i>"
+    return f"{header}\n\n<b>{html_escape(sign)}</b>\n\n<i>{html_escape(why)}</i>"
 
 
 def _attach_memes_to_absurd(p: dict, liked: list, used_ids: set | None = None) -> list:
@@ -1295,11 +1294,10 @@ def _build_extra_slide(
         md = speed.get("median_dislike", 0)
         if is_ru:
             parts.append(
-                f"⚡ <b>Скорость реакции:</b> {med} сек\n"
-                f"(до лайка: {ml} сек, до скипа: {md} сек)"
+                f"⚡ <b>Скорость реакции:</b> {med} сек\n(до лайка: {ml} сек, до скипа: {md} сек)"
             )
         else:
-            parts.append(f"⚡ <b>Reaction speed:</b> {med}s\n" f"(to like: {ml}s, to skip: {md}s)")
+            parts.append(f"⚡ <b>Reaction speed:</b> {med}s\n(to like: {ml}s, to skip: {md}s)")
 
     if peak:
         h = peak.get("hour", 0)

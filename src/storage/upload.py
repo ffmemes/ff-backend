@@ -29,7 +29,7 @@ async def download_meme_content_file(
                 headers={"User-Agent": USER_AGENT},
                 follow_redirects=True,
             )
-        except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.ConnectError):
+        except httpx.ConnectTimeout, httpx.ReadTimeout, httpx.ConnectError:
             return None
 
         if response.status_code in (400, 403, 404, 500):

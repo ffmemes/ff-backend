@@ -62,7 +62,7 @@ async def send_meme(ctx: RunContextWrapper, meme_id: int) -> str:
     context = ctx.context
     try:
         meme_id = int(meme_id)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return f"Invalid meme_id {meme_id!r}: must be an integer."
     meme = await fetch_one(
         text(
