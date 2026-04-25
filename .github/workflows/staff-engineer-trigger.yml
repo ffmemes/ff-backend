@@ -7,7 +7,7 @@ name: Staff Engineer Review Trigger
 on:
   pull_request_target:
     branches: [production]
-    types: [opened, reopened, synchronize]
+    types: [opened, reopened, synchronize, edited]
 
 jobs:
   notify-staff-engineer:
