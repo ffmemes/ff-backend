@@ -145,7 +145,7 @@ async def handle_agent_trigger(update: Update, context: ContextTypes.DEFAULT_TYP
     # Show typing indicator
     try:
         await context.bot.send_chat_action(chat_id=chat_id, action="typing")
-    except BadRequest, Forbidden:
+    except (BadRequest, Forbidden):
         return
 
     # Run the agent

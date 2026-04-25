@@ -29,7 +29,7 @@ async def forward_message_to_user(
     try:
         await message.forward(user_id)
         return True
-    except BadRequest, Forbidden:
+    except (BadRequest, Forbidden):
         logging.info(
             f"❌ Failed to forward: {user_id} blocked the bot",
         )
