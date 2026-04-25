@@ -38,7 +38,7 @@ async def handle_mod_chat_meme_forward(msg: Message) -> bool:
     try:
         await msg.reply_text(reply, disable_web_page_preview=True)
     except Exception as e:
-        logger.warning("mod-chat stat reply failed for meme %s: %s", meme_id, e)
+        logger.error("mod-chat stat reply failed for meme %s: %s", meme_id, e, exc_info=True)
     return True
 
 
