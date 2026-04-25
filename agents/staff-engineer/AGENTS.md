@@ -82,12 +82,14 @@ Passing tests do not mean the branch is safe. You look for the bugs that survive
 You own the full PR → merged cycle for internal PRs. No handoffs to Release Engineer — the PR lands on `production` by your hand, Coolify takes it from there.
 
 0. **PR state idempotency check (MANDATORY first step)** — run `gh pr view <pr_number> --repo ffmemes/ff-backend --json state,mergedAt,closedAt`. If `state` is `MERGED` or `CLOSED`, **skip the review entirely**: post a `paperclipAddComment` noting "PR already resolved (merged/closed), no review needed", mark your execution issue `done` via `paperclipUpdateIssue`, and exit. Do not run `/review`, do not call `gh pr review`. This kills stale PR Review tickets for PRs that were merged or closed externally.
-1. **Identify PR author and head branch** — fetch both up front and save as `AUTHOR` and `HEAD_BRANCH`; reused by step 7 (CTO handoff scope) and step 8b (merge-vs-don't-merge).
+1. **Identify PR author, head branch, and fork status** — fetch all three up front and save as `AUTHOR`, `HEAD_BRANCH`, and `IS_FORK`; reused by step 7 (CTO handoff scope) and step 8b (merge-vs-don't-merge).
    ```bash
-   META=$(gh pr view <pr_number> --repo ffmemes/ff-backend --json author,headRefName)
+   META=$(gh pr view <pr_number> --repo ffmemes/ff-backend --json author,headRefName,isCrossRepository)
    AUTHOR=$(echo "$META" | jq -r .author.login)
    HEAD_BRANCH=$(echo "$META" | jq -r .headRefName)
+   IS_FORK=$(echo "$META" | jq -r .isCrossRepository)
    ```
+   `IS_FORK=true` means the PR's head ref lives in a fork, not in `ffmemes/ff-backend`. Fork PRs are ALWAYS external regardless of author or branch name — a fork can name its branch anything (`fix/FFM-foo`, `agent/whatever`) and would otherwise spoof the in-repo branch-prefix allowlist.
 2. **Read the PR diff** — `gh pr diff <pr_number> --repo ffmemes/ff-backend`
 3. **Run `/review`** — structural code review (SQL safety, LLM trust boundaries, conditional side effects, etc. are all built in).
 4. **Run `/codex review`** — adversarial second opinion via OpenAI Codex CLI (authenticated on this runtime). Pass/fail gate complements `/review`'s structural pass.
@@ -106,7 +108,7 @@ You own the full PR → merged cycle for internal PRs. No handoffs to Release En
    **Request changes:** (do these in order — race-sensitive)
    - **First, cancel any pending auto-merge** from a prior wake on this PR: `gh pr merge <pr_number> --disable-auto --repo ffmemes/ff-backend` (no-op if no queue exists). Must come BEFORE posting the change-request signal — a queued merge can fire in the gap if a check completes mid-call, and `gh pr comment` does not block auto-merge.
    - Then post the review signal — try formal first: `gh pr review <pr_number> --request-changes --repo ffmemes/ff-backend -b "Issues found"`. On self-review-block: `gh pr comment <pr_number> --repo ffmemes/ff-backend -b "STAFF ENGINEER REVIEW: CHANGES REQUESTED — <summary>"`.
-   - **For internal authors only** (using `AUTHOR` and `HEAD_BRANCH` from step 1 — internal = `AUTHOR == "ohld"` OR `HEAD_BRANCH` matches one of `agent/*`, `cto/*`, `staff-engineer/*`, `release-engineer/*`, `localize-*`, `fix/FFM-*`, `feat/agent-*`): create a CTO follow-up via `paperclipCreateIssue` with title `[pr:NNN] address review changes` and a one-line summary. PR #174 sat 9 days because no Paperclip handoff existed. **For external authors:** skip the handoff (CTO can't fix their PRs) and add `@ohld` to the comment instead so ohld can decide.
+   - **For internal authors only** (using `AUTHOR`, `HEAD_BRANCH`, and `IS_FORK` from step 1 — internal = `IS_FORK == false` AND (`AUTHOR == "ohld"` OR `HEAD_BRANCH` matches one of `agent/*`, `cto/*`, `staff-engineer/*`, `release-engineer/*`, `localize-*`, `fix/FFM-*`, `feat/agent-*`)): create a CTO follow-up via `paperclipCreateIssue` with title `[pr:NNN] address review changes` and a one-line summary. PR #174 sat 9 days because no Paperclip handoff existed. **For external authors (or any fork PR):** skip the handoff (CTO can't fix their PRs) and add `@ohld` to the comment instead so ohld can decide.
    - Then exit; do not proceed to step 8.
 
    **External-author PRs:** `gh pr comment` alone is never a substitute for `gh pr review --approve|--request-changes` — non-ohld authors need a real review for any future rule that requires `reviewDecision`.
@@ -115,7 +117,7 @@ You own the full PR → merged cycle for internal PRs. No handoffs to Release En
 
    **a. Step 7 produced an APPROVAL outcome** — either a real `--approve` review OR the self-review-blocked comment-fallback (`STAFF ENGINEER REVIEW: APPROVED — ...`). Changes-requested outcomes never reach step 8.
 
-   **b. PR author is internal.** Use `AUTHOR` and `HEAD_BRANCH` already fetched in step 1 — do not re-call `gh pr view`. Internal = `AUTHOR == "ohld"` OR `HEAD_BRANCH` matches one of: `agent/*`, `cto/*`, `staff-engineer/*`, `release-engineer/*`, `localize-*`, `fix/FFM-*`, `feat/agent-*`. **Do NOT classify ohld-authored PRs as external — that bug previously stranded every internal PR.** External PRs (author is anyone else AND no internal branch prefix): never merge; tag `@ohld` in a comment, mark Paperclip issue `done`, exit.
+   **b. PR author is internal.** Use `AUTHOR`, `HEAD_BRANCH`, and `IS_FORK` already fetched in step 1 — do not re-call `gh pr view`. Internal = `IS_FORK == false` AND (`AUTHOR == "ohld"` OR `HEAD_BRANCH` matches one of: `agent/*`, `cto/*`, `staff-engineer/*`, `release-engineer/*`, `localize-*`, `fix/FFM-*`, `feat/agent-*`). **Do NOT classify ohld-authored PRs as external — that bug previously stranded every internal PR.** **Always treat fork PRs (`IS_FORK == true`) as external — a fork can spoof an internal branch name like `fix/FFM-foo`.** External PRs (fork OR (non-ohld author AND no internal branch prefix)): never merge; tag `@ohld` in a comment, mark Paperclip issue `done`, exit.
 
    **c. CI must not be red.** Single check, no polling — GitHub's `--auto` flag (used in the merge step below) handles the wait for in-flight checks:
    ```bash
@@ -134,6 +136,8 @@ You own the full PR → merged cycle for internal PRs. No handoffs to Release En
    gh pr merge <pr_number> --squash --auto --repo ffmemes/ff-backend
    ```
    `--auto` tells GitHub to squash-merge as soon as all required status checks pass. **Do not race CI by polling and then calling bare `gh pr merge`** — that's how PR #200 got the false-block "base branch policy prohibits the merge" error 25 seconds after the agent woke. `--auto` makes the race impossible.
+
+   **Repo prerequisite — `allow_auto_merge: true`.** `--auto` only works when the repo has auto-merge enabled at the settings level. Verify with `gh api repos/ffmemes/ff-backend --jq .allow_auto_merge`; if it returns `false`, a config drift has occurred — comment `⚠️ Repo auto-merge disabled — ohld must run \`gh api -X PATCH repos/ffmemes/ff-backend -f allow_auto_merge=true\`` on the PR, mark the Paperclip issue `blocked`, and exit. Do not fall back to a bare `gh pr merge --squash`: that re-opens the CI race this whole step exists to close.
 
    **Do not use `--admin`.** It bypasses branch protection, masks real configuration errors, and is reserved for ohld in incident-response situations only.
 
