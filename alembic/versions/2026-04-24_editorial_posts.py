@@ -87,9 +87,15 @@ def upgrade() -> None:
         "editorial_post_snapshots",
         ["channel", "telegram_message_id"],
     )
+    op.create_index(
+        "ix_editorial_post_snapshots_editorial_post_id",
+        "editorial_post_snapshots",
+        ["editorial_post_id"],
+    )
 
 
 def downgrade() -> None:
+    op.drop_index("ix_editorial_post_snapshots_editorial_post_id")
     op.drop_index("ix_editorial_post_snapshots_channel_msg")
     op.drop_table("editorial_post_snapshots")
     op.drop_index("ix_editorial_posts_created_at")

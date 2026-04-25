@@ -56,6 +56,10 @@ BANNED_SUBSTRINGS: tuple[str, ...] = (
     "fixed bug",
     "ab test",
     "a/b test",
+    # Russian forms — agent writes in Russian for @ffmemes.
+    "а/б тест",
+    "аб-тест",
+    "сплит-тест",
 )
 
 # Regex patterns for banned content structures.
@@ -65,7 +69,52 @@ BANNED_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\bday\s+\d+\s*/\s*\d+", re.IGNORECASE),
     # "итерация эксперимента" — experiments-in-progress framing.
     re.compile(r"итерация\s+эксперимента", re.IGNORECASE),
+    # "A/B тест", "А/B test", "а/b тест" — every mixed-script combination of
+    # Cyrillic/Latin a-b around a slash followed by test/тест. This is the
+    # bypass that the prompt-level HARD BAN couldn't catch.
+    re.compile(r"[аa]\s*/\s*[бbв]\s*[-–\s]?\s*(?:test|тест)", re.IGNORECASE),
 )
+
+# Cyrillic → Latin lookalike map. Used by _normalize_lookalikes() before the
+# substring/pattern ban check so that mixed-script evasion (e.g. Cyrillic А
+# in "А/B тест") cannot route around the ban list.
+_CYRILLIC_TO_LATIN = str.maketrans(
+    {
+        "а": "a",
+        "А": "a",
+        "е": "e",
+        "Е": "e",
+        "о": "o",
+        "О": "o",
+        "р": "p",
+        "Р": "p",
+        "с": "c",
+        "С": "c",
+        "у": "y",
+        "У": "y",
+        "х": "x",
+        "Х": "x",
+        "к": "k",
+        "К": "k",
+        "в": "b",
+        "В": "b",
+        "м": "m",
+        "М": "m",
+        "т": "t",
+        "Т": "t",
+        "н": "h",
+        "Н": "h",
+    }
+)
+
+
+def _normalize_lookalikes(text: str) -> str:
+    """Fold Cyrillic homoglyphs to Latin for ban-list matching only.
+
+    Applied before substring/pattern checks; never to the posted text.
+    """
+    return text.translate(_CYRILLIC_TO_LATIN)
+
 
 ALLOWED_CHANNELS = frozenset({"ru", "en"})
 
@@ -139,12 +188,17 @@ def _validate_html(text: str) -> list[str]:
 
 def _check_banned(text: str) -> list[str]:
     errors: list[str] = []
+    # Fold Cyrillic homoglyphs to Latin so mixed-script bypass (e.g. Cyrillic А
+    # in "А/B тест") still trips the ban list. Patterns are checked against
+    # both forms because the Cyrillic-only patterns (день, итерация) need the
+    # original characters.
     lower = text.lower()
+    folded = _normalize_lookalikes(lower)
     for needle in BANNED_SUBSTRINGS:
-        if needle in lower:
+        if needle in lower or needle in folded:
             errors.append(f"Banned substring: '{needle}' — topic violates HARD BAN")
     for pattern in BANNED_PATTERNS:
-        m = pattern.search(text)
+        m = pattern.search(text) or pattern.search(folded)
         if m:
             errors.append(
                 f"Banned pattern: '{m.group(0)}' — A/B iteration updates are banned, "
