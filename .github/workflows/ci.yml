@@ -18,6 +18,32 @@ jobs:
       - run: ruff check src/ tests/
       - run: ruff format --check src/ tests/
 
+      # Catch multi-head migrations BEFORE the slow test job. After a rebase,
+      # two migrations can both point at the same down_revision and produce
+      # a confusing UndefinedTableError downstream. This 1-second pure-text
+      # scan fails fast with a clear message instead.
+      - name: Verify single alembic head
+        run: |
+          python3 - <<'PY'
+          import re, sys, pathlib
+          rev_re = re.compile(r"^revision\s*=\s*['\"]([^'\"]+)['\"]", re.M)
+          down_re = re.compile(r"^down_revision\s*=\s*['\"]([^'\"]+)['\"]", re.M)
+          revs, parents = set(), set()
+          for f in pathlib.Path("alembic/versions").glob("*.py"):
+              text = f.read_text()
+              m = rev_re.search(text)
+              if m:
+                  revs.add(m.group(1))
+              for p in down_re.findall(text):
+                  parents.add(p)
+          heads = sorted(revs - parents)
+          if len(heads) != 1:
+              print(f"::error::Expected 1 alembic head, found {len(heads)}: {heads}")
+              print("Re-parent your migration's down_revision to the current tip.")
+              sys.exit(1)
+          print(f"Single alembic head: {heads[0]}")
+          PY
+
   test:
     runs-on: ubuntu-latest
     services:
