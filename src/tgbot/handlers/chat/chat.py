@@ -55,14 +55,14 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     try:
         await save_telegram_message(msg)
     except Exception as e:
-        logger.warning("Failed to save message: %s", e)
+        logger.error("Failed to save message: %s", e, exc_info=True)
 
     # Moderator chat: reply with short stats when a meme is forwarded here.
     try:
         if await handle_mod_chat_meme_forward(msg):
             return
     except Exception as e:
-        logger.warning("mod-chat stat reply error: %s", e)
+        logger.error("mod-chat stat reply error: %s", e, exc_info=True)
 
     # Skip bot messages, channel forwards (777000), and service messages
     if not msg.from_user or msg.from_user.is_bot or msg.from_user.id == 777000:

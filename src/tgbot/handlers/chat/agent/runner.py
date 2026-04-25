@@ -175,6 +175,6 @@ def _log_usage(
                 },
             )
         except Exception as e:
-            logger.warning("Failed to log agent usage: %s", e)
+            logger.error("Failed to log agent usage: %s", e, exc_info=True)
 
     asyncio.create_task(_insert())
