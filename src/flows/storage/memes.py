@@ -7,7 +7,6 @@ from src.flows.hooks import notify_telegram_on_failure
 from src.storage import ads
 from src.storage.constants import MemeStatus, MemeType
 from src.storage.etl import (
-    etl_memes_from_raw_ig_posts,
     etl_memes_from_raw_telegram_posts,
     etl_memes_from_raw_vk_posts,
 )
@@ -15,7 +14,6 @@ from src.storage.service import (
     find_meme_duplicate,
     find_meme_duplicate_by_file_id,
     get_pending_memes,
-    get_unloaded_ig_memes,
     get_unloaded_tg_memes,
     get_unloaded_vk_memes,
     resolve_meme_duplicate,
@@ -170,26 +168,6 @@ async def vk_meme_pipeline() -> None:
     await _process_unloaded_memes(unloaded_memes, "VK")
 
     safe_emit("ff.pipeline.vk.completed", "ff.pipeline.vk")
-
-
-@flow(
-    name="Memes from Instagram Pipeline",
-    description="Process raw memes parsed from IG",
-    version="0.3.0",
-    retries=1,
-    retry_delay_seconds=60,
-    timeout_seconds=1800,
-    on_failure=[notify_telegram_on_failure],
-)
-async def ig_meme_pipeline() -> None:
-    logger = get_run_logger()
-    logger.info("ETLing memes from 'meme_raw_ig' table.")
-    await etl_memes_from_raw_ig_posts()
-
-    unloaded_memes = await get_unloaded_ig_memes(limit=100)
-    await _process_unloaded_memes(unloaded_memes, "Instagram")
-
-    safe_emit("ff.pipeline.ig.completed", "ff.pipeline.ig")
 
 
 @flow(

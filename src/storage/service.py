@@ -50,17 +50,6 @@ async def get_vk_sources_to_parse(limit=10) -> list[dict[str, Any]]:
     return await fetch_all(select_query)
 
 
-async def get_ig_sources_to_parse(limit=10) -> list[dict[str, Any]]:
-    select_query = (
-        select(meme_source)
-        .where(meme_source.c.type == MemeSourceType.INSTAGRAM)
-        .where(meme_source.c.status == MemeSourceStatus.PARSING_ENABLED)
-        .order_by(nulls_first(meme_source.c.parsed_at))
-        .limit(limit)
-    )
-    return await fetch_all(select_query)
-
-
 async def update_meme_source(meme_source_id: int, **kwargs) -> dict[str, Any] | None:
     update_query = (
         meme_source.update()
@@ -195,30 +184,6 @@ async def get_unloaded_vk_memes(limit: int) -> list[dict[str, Any]]:
         ORDER BY meme.published_at DESC
         LIMIT {limit}
     """
-    return await fetch_all(text(select_query))
-
-
-async def get_unloaded_ig_memes(limit: int) -> list[dict[str, Any]]:
-    select_query = f"""
-        SELECT
-            meme.id,
-            meme.type,
-            MRI.media->0->>'url' content_url
-        FROM meme
-        INNER JOIN meme_source
-            ON meme_source.id = meme.meme_source_id
-            AND meme_source.type = '{MemeSourceType.INSTAGRAM.value}'
-        INNER JOIN meme_raw_ig MRI
-            ON MRI.id = meme.raw_meme_id
-            AND MRI.meme_source_id = meme.meme_source_id
-        WHERE 1=1
-            AND meme.telegram_file_id IS NULL
-            AND MRI.media->0->>'url' IS NOT NULL
-            AND COALESCE(MRI.updated_at, MRI.created_at) >= NOW() - INTERVAL '24 hours'
-        ORDER BY meme.published_at DESC
-        LIMIT {limit}
-    """
-
     return await fetch_all(text(select_query))
 
 

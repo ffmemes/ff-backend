@@ -10,8 +10,6 @@ from src.database import fetch_all
 from src.recommendations.blender import blend
 from src.recommendations.candidates import (
     CandidatesRetriever,
-    best_uploaded_memes,
-    get_lr_smoothed,
 )
 from src.recommendations.utils import exclude_meme_ids_sql_filter
 from src.storage.schemas import MemeData
@@ -72,29 +70,6 @@ async def check_queue(user_id: int) -> bool:
             await redis.redis_client.delete(lock_key)
 
     return True
-
-
-async def generate_cold_start_recommendations(user_id, limit=10):
-    queue_key = redis.get_meme_queue_key(user_id)
-    memes_in_queue = await redis.get_all_memes_in_queue_by_key(queue_key)
-    meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
-
-    candidates = await get_lr_smoothed(
-        user_id,
-        limit=limit,
-        exclude_meme_ids=meme_ids_in_queue,
-        min_sends=10,
-    )
-
-    if len(candidates) == 0:
-        candidates = await best_uploaded_memes(
-            user_id, limit=limit, exclude_meme_ids=meme_ids_in_queue
-        )
-
-    if len(candidates) == 0:
-        return
-
-    await redis.add_memes_to_queue_by_key(queue_key, candidates)
 
 
 async def generate_recommendations(

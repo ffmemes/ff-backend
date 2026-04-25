@@ -7,12 +7,10 @@ from src.database import (
     execute,
     fetch_all,
     meme,
-    meme_raw_ig,
     meme_raw_telegram,
     meme_raw_vk,
 )
 from src.storage.parsers.schemas import (
-    IgPostParsingResult,
     TgChannelPostParsingResult,
     VkGroupPostParsingResult,
 )
@@ -99,47 +97,6 @@ async def insert_parsed_posts_from_vk(
             meme_raw_vk.update()
             .where(meme_raw_vk.c.meme_source_id == meme_source_id)
             .where(meme_raw_vk.c.post_id == post["post_id"])
-            .values(post)
-        )
-        await execute(update_query)
-
-
-async def insert_parsed_posts_from_ig(
-    meme_source_id: int,
-    ig_posts: list[IgPostParsingResult,],
-) -> None:
-    result = await fetch_all(
-        select(meme_raw_ig.c.post_id)
-        .where(meme_raw_ig.c.meme_source_id == meme_source_id)
-        .where(meme_raw_ig.c.post_id.in_([post.post_id for post in ig_posts]))
-    )
-    post_ids_in_db = {row["post_id"] for row in result}
-
-    posts_to_create = [
-        post.model_dump() | {"meme_source_id": meme_source_id}
-        for post in ig_posts
-        if post.post_id not in post_ids_in_db
-    ]
-
-    if len(posts_to_create) > 0:
-        print(f"Going to insert {len(posts_to_create)} new posts.")
-        await execute(insert(meme_raw_ig).values(posts_to_create))
-
-    posts_to_update = [
-        post.model_dump()
-        | {
-            "meme_source_id": meme_source_id,
-            "updated_at": datetime.now(timezone.utc).replace(tzinfo=None),
-        }
-        for post in ig_posts
-        if post.post_id in post_ids_in_db
-    ]
-
-    for post in posts_to_update:
-        update_query = (
-            meme_raw_ig.update()
-            .where(meme_raw_ig.c.meme_source_id == meme_source_id)
-            .where(meme_raw_ig.c.post_id == post["post_id"])
             .values(post)
         )
         await execute(update_query)
@@ -276,50 +233,6 @@ async def etl_memes_from_raw_vk_posts() -> None:
     await update_or_create_memes(transformed_memes, memes_not_in_memes_table)
 
 
-async def etl_memes_from_raw_ig_posts() -> None:
-    transformed_memes = await fetch_all(
-        text(
-            """
-                SELECT
-                    MRI.meme_source_id,
-                    MRI.id AS raw_meme_id,
-                    CASE
-                        WHEN media->0->>'url' LIKE '%.mp4%' THEN 'video'
-                        ELSE 'image'
-                    END AS type,
-                    'created' AS status,
-                    MS.language_code,
-                    MRI.published_at
-                FROM meme_raw_ig AS MRI
-                LEFT JOIN meme_source AS MS
-                    ON MS.id = MRI.meme_source_id
-                WHERE 1=1
-                    AND COALESCE(MRI.updated_at, MRI.created_at) >= NOW() - INTERVAL '24 hours'
-            """  # noqa: E501
-        )
-    )
-
-    memes_not_in_memes_table = await fetch_all(
-        text(
-            """
-                SELECT
-                    MRI.meme_source_id,
-                    MRI.id AS raw_meme_id
-                FROM meme_raw_ig MRI
-                LEFT JOIN meme
-                    ON meme.meme_source_id = MRI.meme_source_id
-                    AND meme.raw_meme_id = MRI.id
-                WHERE 1=1
-                    AND meme.meme_source_id IS NULL
-                    AND meme.raw_meme_id IS NULL
-                    AND JSONB_ARRAY_LENGTH(MRI.media) = 1
-            """
-        )
-    )
-
-    await update_or_create_memes(transformed_memes, memes_not_in_memes_table)
-
-
 async def update_or_create_memes(transformed_memes, memes_not_in_memes_table):
     create_these_memes = [
         m
@@ -358,9 +271,9 @@ async def update_or_create_memes(transformed_memes, memes_not_in_memes_table):
             ),
         )
 
-    # Retry broken uploads: reset broken_content_link → created
-    # so the upload pipeline picks them up again.
-    # For IG memes, only retry if the raw post is still fresh (CDN URLs expire).
+    # Retry broken uploads: reset broken_content_link → created so the upload
+    # pipeline picks them up again. Excludes Instagram — the IG parser was
+    # removed and existing IG memes have stale CDN URLs that will never load.
     await execute(
         text(
             """
@@ -370,40 +283,6 @@ async def update_or_create_memes(transformed_memes, memes_not_in_memes_table):
             WHERE meme.status = 'broken_content_link'
               AND meme_source.id = meme.meme_source_id
               AND meme_source.type != 'instagram'
-            """
-        )
-    )
-    # IG memes: retry only if raw post is fresh enough for CDN URLs to still work.
-    await execute(
-        text(
-            """
-            UPDATE meme
-            SET status = 'created'
-            FROM meme_source
-            JOIN meme_raw_ig MRI
-              ON MRI.meme_source_id = meme_source.id
-            WHERE meme.status = 'broken_content_link'
-              AND meme_source.id = meme.meme_source_id
-              AND meme_source.type = 'instagram'
-              AND MRI.id = meme.raw_meme_id
-              AND COALESCE(MRI.updated_at, MRI.created_at) >= NOW() - INTERVAL '24 hours'
-            """
-        )
-    )
-    # IG memes with expired CDN URLs: mark as permanently failed.
-    await execute(
-        text(
-            """
-            UPDATE meme
-            SET status = 'expired_content_link'
-            FROM meme_source
-            JOIN meme_raw_ig MRI
-              ON MRI.meme_source_id = meme_source.id
-            WHERE meme.status = 'broken_content_link'
-              AND meme_source.id = meme.meme_source_id
-              AND meme_source.type = 'instagram'
-              AND MRI.id = meme.raw_meme_id
-              AND COALESCE(MRI.updated_at, MRI.created_at) < NOW() - INTERVAL '24 hours'
             """
         )
     )

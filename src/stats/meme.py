@@ -255,31 +255,9 @@ async def calculate_channel_invited_count():
     - Bot shares: s_{user_id}_{meme_id} -> invited_count
     - Channel posts: sc_{meme_id}_{channel} -> channel_invited_count
     """
-    query = """
-        WITH CHANNEL_DEEP_LINKS AS (
-            SELECT
-                CAST(SPLIT_PART(deep_link, '_', 2) AS INTEGER) AS meme_id,
-                SPLIT_PART(deep_link, '_', 3) AS channel,
-                user_id
-            FROM user_deep_link_log
-            WHERE deep_link IS NOT NULL
-              AND deep_link LIKE 'sc\\_%\\_%'
-        )
-
-        UPDATE crossposting CP
-        SET views = COALESCE(CP.views, 0)  -- no-op, just to trigger the UPDATE
-        FROM (
-            SELECT meme_id, channel, COUNT(DISTINCT user_id) AS bot_starts
-            FROM CHANNEL_DEEP_LINKS
-            INNER JOIN meme M ON M.id = CHANNEL_DEEP_LINKS.meme_id
-            GROUP BY meme_id, channel
-        ) AS stats
-        WHERE CP.meme_id = stats.meme_id
-          AND CP.channel = stats.channel
-    """
-    # For now, log the results. The actual bot_starts metric is computed
-    # on-demand via SQL queries in analysis (T6).
-    # This function validates the deep link parsing works correctly.
+    # The actual bot_starts metric is computed on-demand via SQL queries in
+    # analysis (T6). This function validates the deep link parsing works
+    # correctly by logging per-channel counts.
     count_query = """
         SELECT
             SPLIT_PART(deep_link, '_', 3) AS channel,

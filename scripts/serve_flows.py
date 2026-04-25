@@ -31,7 +31,6 @@ from src.flows.crossposting.meme import (
 )
 from src.flows.crossposting.stats_collector import collect_channel_stats
 from src.flows.crossposting.weekly_report import post_weekly_burger_report
-from src.flows.parsers.ig import parse_ig_sources
 
 # Parsers
 from src.flows.parsers.tg import parse_telegram_sources
@@ -54,7 +53,6 @@ from src.flows.stats.user_meme_source import calculate_user_meme_source_stats
 from src.flows.storage.describe_memes import describe_memes_flow
 from src.flows.storage.memes import (
     final_meme_pipeline,
-    ig_meme_pipeline,
     tg_meme_pipeline,
     vk_meme_pipeline,
 )
@@ -99,14 +97,9 @@ if __name__ == "__main__":
             name="Parse VK Sources",
             schedules=[CronSchedule(cron="20 * * * *", timezone=LON)],
         ),
-        parse_ig_sources.to_deployment(
-            name="Parse Instagram Sources",
-            schedules=[CronSchedule(cron="30 0 * * *", timezone=LON)],
-        ),
         # ── Pipelines (no cron — triggered by automations) ──
         tg_meme_pipeline.to_deployment(name="TG Meme Pipeline"),
         vk_meme_pipeline.to_deployment(name="VK Meme Pipeline"),
-        ig_meme_pipeline.to_deployment(name="IG Meme Pipeline"),
         final_meme_pipeline.to_deployment(name="Final Meme Pipeline"),
         # ── Broadcasts ──
         broadcast_next_meme_to_active_15m_ago.to_deployment(

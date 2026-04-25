@@ -39,7 +39,6 @@ class Config(BaseSettings):
     VK_TOKEN: str | None = None
     VK_USER_TOKEN: str | None = None
     VK_GROUP_ID: int | None = None
-    HIKERAPI_TOKEN: str | None = None
 
     REDIS_MAX_CONNECTIONS: int = 128
 

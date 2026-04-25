@@ -17,17 +17,17 @@ class MemeType(str, Enum):
 class MemeSourceType(str, Enum):
     TELEGRAM = "telegram"
     VK = "vk"
-    REDDIT = "reddit"
+    REDDIT = "reddit"  # not parsed, kept for legacy/forward-compat with DB strings
     INSTAGRAM = "instagram"
-    TWITTER = "twitter"
-    TIKTOK = "tiktok"
+    TWITTER = "twitter"  # not parsed, kept for legacy/forward-compat with DB strings
+    TIKTOK = "tiktok"  # not parsed, kept for legacy/forward-compat with DB strings
     USER_UPLOAD = "user upload"
 
 
 class MemeSourceStatus(str, Enum):
     IN_MODERATION = "in_moderation"
     PARSING_ENABLED = "parsing_enabled"
-    PARSING_DISABLED = "parsing_disabled"
+    PARSING_DISABLED = "parsing_disabled"  # kept for legacy/forward-compat with DB strings
     SNOOZED = "snoozed"
 
 

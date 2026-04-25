@@ -17,7 +17,6 @@ from datetime import datetime, timedelta
 import pytest
 import pytest_asyncio
 from sqlalchemy import delete, insert, select
-from sqlalchemy.ext.asyncio import AsyncConnection
 
 from src.database import (
     engine,
