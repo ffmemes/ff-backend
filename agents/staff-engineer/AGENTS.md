@@ -210,20 +210,28 @@ Use `jq ... /tmp/sc.json` for every field read below. Do **not** use `SC=$(gh ..
 
 ### Path A — Approved + Merged (`state == MERGED`)
 - **A1**: `jq -r .state /tmp/sc.json` returns `MERGED`.
-- **A2**: A review signal artifact exists on GitHub for THIS run — either a real `--approve` review OR a comment whose body starts with `STAFF ENGINEER REVIEW: APPROVED`. Verify via:
+- **A2**: A review-approval artifact exists on GitHub for THIS run. Two acceptable forms (step 7 produces ONE of them depending on author):
+  - Formal review: `jq -r '.reviews[] | select(.state == "APPROVED") | .author.login' /tmp/sc.json` returns at least one match (used for non-self-review-blocked internal authors and external authors).
+  - Comment-fallback: `jq -r '.comments[].body' /tmp/sc.json | grep -E '^STAFF ENGINEER REVIEW: APPROVED' | head -1` returns a line (used when ohld-authored PRs trip the self-review block).
+  
+  Pass if EITHER form is present. **If neither is found, you exited silently — do not close.**
+- **A3**: Coolify deploy probe (next-link), gated by a 5-minute grace window. Coolify's `/api/v1/applications/<uuid>` exposes `last_online_at` — when the container last became healthy. After merge, this should advance past `mergedAt` once a deploy + healthcheck cycle completes (~3-5 min). Coolify's `git_commit_sha` field is unreliable for `dockercompose` build-pack apps (literal `"HEAD"` instead of a real SHA), so the timestamp is the correct signal:
   ```bash
-  jq -r '.comments[].body, .reviews[].body' /tmp/sc.json \
-    | grep -E '^STAFF ENGINEER REVIEW: APPROVED' | head -1
-  ```
-  **If empty, you exited silently — do not close.**
-- **A3**: Coolify deploy probe (next-link). Coolify's `/api/v1/applications/<uuid>` exposes `last_online_at` — when the container last became healthy. After merge, this should advance past `mergedAt` within ~5 minutes (a deploy + healthcheck cycle). Note: Coolify's `git_commit_sha` field is unreliable — for `dockercompose` build-pack apps it returns the literal string `"HEAD"`, not a real SHA — so the timestamp probe is the correct signal:
-  ```bash
-  curl -s -H "Authorization: Bearer $COOLIFY_ACCESS_TOKEN" \
-    "$COOLIFY_BASE_URL/api/v1/applications/v0kkssccwoswgwwscws4kscc" > /tmp/app.json
   MERGED_EPOCH=$(date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$(jq -r .mergedAt /tmp/sc.json)" "+%s")
-  ONLINE_EPOCH=$(date -u -j -f "%Y-%m-%d %H:%M:%S" "$(jq -r .last_online_at /tmp/app.json)" "+%s")
+  NOW_EPOCH=$(date -u +%s)
+  AGE=$(( NOW_EPOCH - MERGED_EPOCH ))
+  if [ "$AGE" -lt 300 ]; then
+    : "deploy probe deferred — merge is < 5 min old, healthcheck cycle in flight; QA's hourly Process Health Check will catch stuck deploys"
+  else
+    curl -s -H "Authorization: Bearer $COOLIFY_ACCESS_TOKEN" \
+      "$COOLIFY_BASE_URL/api/v1/applications/v0kkssccwoswgwwscws4kscc" > /tmp/app.json
+    ONLINE_EPOCH=$(date -u -j -f "%Y-%m-%d %H:%M:%S" "$(jq -r .last_online_at /tmp/app.json)" "+%s")
+    if [ "$ONLINE_EPOCH" -le "$MERGED_EPOCH" ]; then
+      : "file [chain-broken:coolify-not-triggered] PR #<n> HIGH for CTO with both timestamps in the body"
+    fi
+  fi
   ```
-  Note Coolify stores `last_online_at` as `YYYY-MM-DD HH:MM:SS` (no `Z`), not ISO 8601 — date format string differs from `mergedAt`. If `$ONLINE_EPOCH > $MERGED_EPOCH` → deploy fired and container came healthy after merge. If after 5 minutes from merge the container is still online with a pre-merge timestamp, the GH→Coolify webhook dropped — file `[chain-broken:coolify-not-triggered] PR #<n>` HIGH for CTO via `paperclipCreateIssue` with `assigneeAgentId` = CTO and a one-line summary including both timestamps. Then mark this issue `done` (you delivered review + merge; the broken link is a separate ticket).
+  Note Coolify stores `last_online_at` as `YYYY-MM-DD HH:MM:SS` (UTC, no `Z`), not ISO 8601 — the `date -j -f` format string differs from `mergedAt`. The 5-minute deferral is critical: probing immediately after merge will always see a pre-merge `last_online_at` and fire false `chain-broken` alarms. After filing the chain-broken issue (or skipping the probe), still mark this execution issue `done` — you delivered review + merge; the broken link is a separate ticket.
 
 ### Path B — Approved + Auto-merge Queued (`state == OPEN`, `autoMergeRequest != null`)
 - **B1**: `jq -r '.state, (.autoMergeRequest != null)' /tmp/sc.json` returns `OPEN` then `true`.
@@ -236,7 +244,9 @@ Use `jq ... /tmp/sc.json` for every field read below. Do **not** use `SC=$(gh ..
 - **C3**: You are about to set issue `blocked` (not `done`). The "next push re-triggers me" loop is the recovery path; do NOT close `done`.
 
 ### Path D — Changes Requested
-- **D1**: Review signal artifact: `STAFF ENGINEER REVIEW: CHANGES REQUESTED` comment OR formal `--request-changes` review for external PR.
+- **D1**: A changes-requested artifact exists on GitHub for THIS run. Pass if EITHER form is present:
+  - Formal review: `jq -r '.reviews[] | select(.state == "CHANGES_REQUESTED") | .author.login' /tmp/sc.json` returns at least one match (formal `--request-changes`, used for external authors and non-self-review-blocked internals).
+  - Comment-fallback: `jq -r '.comments[].body' /tmp/sc.json | grep -E '^STAFF ENGINEER REVIEW: CHANGES REQUESTED' | head -1` returns a line (used when the formal review self-blocks for ohld-authored PRs).
 - **D2**: Auto-merge cancelled — `jq -r '.autoMergeRequest == null' /tmp/sc.json` returns `true`. (You ran `gh pr merge --disable-auto` in step 7; verify it actually took.)
 - **D3** (internal authors only): The `[pr:NNN] address review changes` Paperclip issue exists. Verify by re-searching:
   ```
