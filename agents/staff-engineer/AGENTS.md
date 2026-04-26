@@ -195,16 +195,80 @@ Other outcomes:
 - **North Star**: session length, not like rate
 - **Dislike != bad**: dislike button means "next meme"
 
+## 9. Self-Check Gate (MANDATORY before closing your execution issue)
+
+Before `paperclipUpdateIssue status=done`, your outcome from steps 7-8 maps to ONE of six paths below. Run the matching verification block. **If any check fails, mark the execution issue `blocked` (not `done`) with a one-line reason and exit.** Silently closing an unverified outcome is the single biggest cause of post-merge chain breakage — see `agents/staff-engineer/ANTI-PATTERNS.md` for the case log.
+
+Re-fetch via tempfile (NOT a bash var — `gh pr view --json` emits literal newlines inside long comment bodies, which `echo "$SC" | jq` cannot re-parse):
+
+```bash
+gh pr view <pr_number> --repo ffmemes/ff-backend \
+  --json state,mergedAt,autoMergeRequest,comments,reviews,mergeCommit > /tmp/sc.json
+```
+
+Use `jq ... /tmp/sc.json` for every field read below. Do **not** use `SC=$(gh ...)` — it has been verified to corrupt JSON containing multiline comment bodies (case study #6 in `ANTI-PATTERNS.md`).
+
+### Path A — Approved + Merged (`state == MERGED`)
+- **A1**: `jq -r .state /tmp/sc.json` returns `MERGED`.
+- **A2**: A review signal artifact exists on GitHub for THIS run — either a real `--approve` review OR a comment whose body starts with `STAFF ENGINEER REVIEW: APPROVED`. Verify via:
+  ```bash
+  jq -r '.comments[].body, .reviews[].body' /tmp/sc.json \
+    | grep -E '^STAFF ENGINEER REVIEW: APPROVED' | head -1
+  ```
+  **If empty, you exited silently — do not close.**
+- **A3**: Coolify deploy probe (next-link). Coolify's `/api/v1/applications/<uuid>` exposes `last_online_at` — when the container last became healthy. After merge, this should advance past `mergedAt` within ~5 minutes (a deploy + healthcheck cycle). Note: Coolify's `git_commit_sha` field is unreliable — for `dockercompose` build-pack apps it returns the literal string `"HEAD"`, not a real SHA — so the timestamp probe is the correct signal:
+  ```bash
+  curl -s -H "Authorization: Bearer $COOLIFY_ACCESS_TOKEN" \
+    "$COOLIFY_BASE_URL/api/v1/applications/v0kkssccwoswgwwscws4kscc" > /tmp/app.json
+  MERGED_EPOCH=$(date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$(jq -r .mergedAt /tmp/sc.json)" "+%s")
+  ONLINE_EPOCH=$(date -u -j -f "%Y-%m-%d %H:%M:%S" "$(jq -r .last_online_at /tmp/app.json)" "+%s")
+  ```
+  Note Coolify stores `last_online_at` as `YYYY-MM-DD HH:MM:SS` (no `Z`), not ISO 8601 — date format string differs from `mergedAt`. If `$ONLINE_EPOCH > $MERGED_EPOCH` → deploy fired and container came healthy after merge. If after 5 minutes from merge the container is still online with a pre-merge timestamp, the GH→Coolify webhook dropped — file `[chain-broken:coolify-not-triggered] PR #<n>` HIGH for CTO via `paperclipCreateIssue` with `assigneeAgentId` = CTO and a one-line summary including both timestamps. Then mark this issue `done` (you delivered review + merge; the broken link is a separate ticket).
+
+### Path B — Approved + Auto-merge Queued (`state == OPEN`, `autoMergeRequest != null`)
+- **B1**: `jq -r '.state, (.autoMergeRequest != null)' /tmp/sc.json` returns `OPEN` then `true`.
+- **B2**: Same as A2 — review signal artifact exists.
+- **B3**: No Coolify probe yet — defer to next wake (or skip; QA's hourly Process Health Check covers stuck-queued PRs).
+
+### Path C — Approved but Blocked (CI red)
+- **C1**: A comment matching `❌ CI red — leaving merge blocked` was posted in this run.
+- **C2**: Same as A2 — review signal artifact exists.
+- **C3**: You are about to set issue `blocked` (not `done`). The "next push re-triggers me" loop is the recovery path; do NOT close `done`.
+
+### Path D — Changes Requested
+- **D1**: Review signal artifact: `STAFF ENGINEER REVIEW: CHANGES REQUESTED` comment OR formal `--request-changes` review for external PR.
+- **D2**: Auto-merge cancelled — `jq -r '.autoMergeRequest == null' /tmp/sc.json` returns `true`. (You ran `gh pr merge --disable-auto` in step 7; verify it actually took.)
+- **D3** (internal authors only): The `[pr:NNN] address review changes` Paperclip issue exists. Verify by re-searching:
+  ```
+  paperclipApiRequest method=GET path=/api/companies/$COMPANY_ID/issues?search=[pr:<n>]
+  ```
+  Expect at least one open issue with `assigneeAgentId` = CTO. If absent, the create call silently failed — retry it now or escalate to CEO with the failure body.
+
+### Path E — External PR Approved
+- **E1**: A formal `gh pr review --approve` review exists — `jq -r '.reviews[] | select(.state == "APPROVED") | .author.login' /tmp/sc.json` returns at least one match. (NOT a comment-fallback — externals need a real review for any future ruleset.)
+- **E2**: A comment mentioning `@ohld` was posted asking for manual merge.
+
+### Path F — PR Already Resolved (step 0 short-circuit)
+- **F1**: `paperclipAddComment` posted explaining "PR already merged/closed externally — no review needed".
+
+### When a check fails
+
+Do not close `done`. Instead:
+1. Comment on the Paperclip execution issue with the failing check ID and what was missing.
+2. Set status to `blocked` via `paperclipUpdateIssue`.
+3. If A3 (chain-broken) fired, also create the `[chain-broken:*]` issue for CTO.
+
+### Growing the gate
+
+When a real production failure mode escapes this gate, append a numbered entry to `agents/staff-engineer/ANTI-PATTERNS.md` and add the corresponding check to the path above. Every row in the log MUST map to a specific check letter.
+
 ## Closing Your Execution Issue
 
-After completing your PR review, you MUST mark your Paperclip execution issue as **done**.
-This is critical — if you don't close it, the routine can never fire again (blocked
-by a unique constraint on open execution issues).
+You may only reach this step **after** the Self-Check Gate above passed for your outcome path.
 
-If `PAPERCLIP_TASK_ID` is set, use `paperclipUpdateIssue` with `issueId` = `$PAPERCLIP_TASK_ID` and `status` = `"done"`.
+Use `paperclipUpdateIssue` with `issueId` = `$PAPERCLIP_TASK_ID` and `status` = `"done"`. The done-comment must name your outcome path (A/B/C/D/E/F) and the verification artifacts (e.g., "Path A: merged at 14:22 UTC, comment-fallback approval, Coolify deploy started 14:23 UTC"). One line is fine.
 
-Always close your execution issue, even if the PR review found issues — mark it done
-with a summary of the review outcome.
+Critical: if you don't close it, the routine can never fire again (blocked by a unique constraint on open execution issues). But closing without a passed Self-Check Gate is worse — it stalls the whole post-merge chain silently.
 
 ## What NOT To Do
 
