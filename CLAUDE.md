@@ -107,6 +107,32 @@ alembic/versions/        # 32 migration files
 - **Async throughout**: asyncpg driver, all DB operations are async
 - **Migrations auto-generated** from `Table` definitions in `database.py`
 
+## Migrations
+
+After rebasing a feature branch with a new migration onto `production`, **always**
+verify a single head before pushing:
+
+```bash
+docker compose exec app alembic heads   # MUST return exactly one revision
+```
+
+If two heads appear, your migration's `down_revision` is stale (another migration
+landed on production with the same parent). Re-parent it to the new tip and amend
+the commit. The CI lint job also enforces this (`alembic heads | grep -c '(head)'`),
+so a multi-head push fails fast at lint time instead of cascading into a confusing
+`UndefinedTableError` in the test job.
+
+When `Table()` columns change in `database.py`, the migration must match
+exactly — including `nullable` and `unique` constraints. Mismatches drift schema
+between local autogenerate and prod.
+
+## Worktrees
+
+In-progress PR branches live in `.worktrees/<slug>/`. Check there before
+`git checkout <branch>` — git refuses with `already checked out at <path>`.
+Either `cd .worktrees/<slug>` to work on the branch, or `git worktree remove
+.worktrees/<slug>` if you want to free the branch for the main checkout.
+
 ## Data Flow
 
 ```
@@ -153,6 +179,23 @@ Queue refills when length <= 2, generating 5 memes per refill.
 - Tests run alembic upgrade/downgrade automatically via fixtures in `tests/conftest.py`
 - Use `pytest-asyncio` for async test support
 - Test manually with `docker compose exec app ipython` (supports async without `asyncio.run()`)
+
+### Host-mode pytest (no Docker)
+
+For fast iteration on a single test file, run pytest directly on the host. Set
+up `.env.test` (gitignored — keeps real test-DB credentials off the public
+repo) by mirroring the env block in `.github/workflows/ci.yml`. Then:
+
+```bash
+set -a; source .env.test; set +a
+python3 -m pytest tests/comms/test_publishing.py -x
+```
+
+Required vars beyond `DATABASE_URL` / `REDIS_URL`: `CORS_ORIGINS`,
+`CORS_HEADERS`, plus the TG bot vars (any non-empty string works for tests).
+If `src.config` raises a pydantic `ValidationError` on import, your `.env.test`
+is missing a required field — `.github/workflows/ci.yml` is the source of
+truth for the full set.
 
 ## Environment Variables
 
