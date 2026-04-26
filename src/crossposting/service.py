@@ -30,18 +30,16 @@ async def log_meme_sent(
 
 
 async def get_next_meme_for_tgchannelru():
+    # Videos excluded: 1.8x boost flipped RU channel to ~89% videos in last 14 days
+    # (84 video / 10 image as of 2026-04-26). Users complained about video-only feed.
+    # Same root cause as EN fix on 2026-04-22 — fwd/1k boost was an artifact of fewer
+    # views, not better content. RU was left untouched then; reality showed the 50/50
+    # mix collapsed within days. Hard-filter to images, mirroring EN.
     query = """
         SELECT
             M.id
             , M.type, M.telegram_file_id, M.caption
 
-        ----------- DEBUG
-        --	, MS.nlikes
-        --	, MS.ndislikes
-        --	, MS.nmemes_sent
-        --	, MS.raw_impr_rank
-        --	, MS.age_days
-        --	, M.meme_source_id
         FROM meme M
         INNER JOIN meme_stats MS
             ON MS.meme_id = M.id
@@ -53,6 +51,7 @@ async def get_next_meme_for_tgchannelru():
             AND CP.meme_id IS NULL
             AND M.status = 'ok'
             AND M.language_code = 'ru'
+            AND M.type = 'image'
             AND MS.nlikes >= 5
 
         ORDER BY -1
@@ -60,8 +59,6 @@ async def get_next_meme_for_tgchannelru():
             * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE 0.8 END
             * CASE WHEN MS.age_days < 7 THEN 1 ELSE 0.8 END
             * CASE WHEN M.caption IS NULL THEN 1 ELSE 0.8 END
-            -- Videos get 1.8x more forwards than photos (11K post analysis)
-            * CASE WHEN M.type = 'video' THEN 1.8 ELSE 1 END
             * CASE
                 WHEN MS.nmemes_sent <= 1 THEN 1
                 ELSE (MS.nlikes + MS.ndislikes) * 1. / MS.nmemes_sent
