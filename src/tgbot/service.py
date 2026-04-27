@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Sequence
 
 from sqlalchemy import bindparam, exists, select, text
@@ -319,7 +319,15 @@ async def mark_user_blocked(
     if current is None:
         return None
 
-    ts = when or datetime.utcnow()
+    # blocked_bot_at is TIMESTAMP WITHOUT TIME ZONE; asyncpg on Py 3.14 rejects
+    # tz-aware values. Telegram's update.my_chat_member.date is tz-aware UTC,
+    # so strip tzinfo (preserving the wall-clock UTC moment).
+    if when is None:
+        ts = datetime.now(timezone.utc).replace(tzinfo=None)
+    elif when.tzinfo is not None:
+        ts = when.astimezone(timezone.utc).replace(tzinfo=None)
+    else:
+        ts = when
     current_type = UserType(current["type"]) if current["type"] else None
 
     if current_type and current_type.is_moderator:
