@@ -125,49 +125,64 @@ You own the full PR → merged cycle for internal PRs. No handoffs to Release En
 
    **b. PR author is internal.** Use `AUTHOR`, `HEAD_BRANCH`, and `IS_FORK` already fetched in step 1 — do not re-call `gh pr view`. Internal = `IS_FORK == false` AND (`AUTHOR == "ohld"` OR `HEAD_BRANCH` matches one of: `agent/*`, `cto/*`, `staff-engineer/*`, `release-engineer/*`, `localize-*`, `fix/FFM-*`, `feat/agent-*`). **Do NOT classify ohld-authored PRs as external — that bug previously stranded every internal PR.** **Always treat fork PRs (`IS_FORK == true`) as external — a fork can spoof an internal branch name like `fix/FFM-foo`.** External PRs (fork OR (non-ohld author AND no internal branch prefix)): never merge; tag `@ohld` in a comment, set `OUTCOME_PATH=E`, and **jump to step 9**. Do NOT call `paperclipUpdateIssue` here.
 
-   **c. CI must not be red.** Single check, no polling — GitHub's `--auto` flag (used in the merge step below) handles the wait for in-flight checks:
+   **c. CI must not be red AND repo auto-merge must be enabled.** Both prechecks run BEFORE the `gh pr merge --squash --auto` call — calling merge first and recovering from the failure later is how config drift leaks past the gate (round-2 review caught this ordering bug). Either precheck failure sets `OUTCOME_PATH=C` and a `SKIP_MERGE=1` flag that fences off the merge command.
+
    ```bash
+   SKIP_MERGE=
+
+   # Precheck 1: CI not red.
    FAILED=$(gh pr checks <pr_number> --repo ffmemes/ff-backend --json state \
      | jq -r 'any(.[].state; . == "FAILURE" or . == "ERROR" or . == "CANCELLED")')
    if [ "$FAILED" = "true" ]; then
      gh pr comment <pr_number> --repo ffmemes/ff-backend -b "❌ CI red — leaving merge blocked. Next push will re-trigger me."
-     # Set OUTCOME_PATH=C and jump to step 9 — the gate is the only exit. Do NOT call paperclipUpdateIssue here.
-     OUTCOME_PATH=C
-     # ... goto step 9
+     OUTCOME_PATH=C   # sub-reason: ci-red
+     SKIP_MERGE=1
+   fi
+
+   # Precheck 2: repo-level auto-merge enabled. `gh pr merge --auto` errors out if it's disabled.
+   if [ -z "$SKIP_MERGE" ]; then
+     ALLOW=$(gh api repos/ffmemes/ff-backend --jq .allow_auto_merge)
+     if [ "$ALLOW" != "true" ]; then
+       gh pr comment <pr_number> --repo ffmemes/ff-backend -b "⚠️ Repo auto-merge disabled — ohld must run \`gh api -X PATCH repos/ffmemes/ff-backend -f allow_auto_merge=true\`"
+       OUTCOME_PATH=C   # sub-reason: auto-merge-disabled
+       SKIP_MERGE=1
+     fi
    fi
    ```
-   If `gh pr checks` returns an empty array (workflows haven't queued yet), `jq 'any(...)'` returns `false` and we fall through. That's correct: `--auto` waits for the configured required checks (`lint`, `test`) to register and pass before firing the merge.
 
-   **Then queue the auto-merge:**
+   `gh pr checks` returning an empty array (workflows haven't queued yet) → `jq 'any(...)'` returns `false` and we fall through to the merge call. That's correct: `--auto` waits for the configured required checks (`lint`, `test`) to register and pass before firing.
+
+   **Then queue the auto-merge AND verify the result — gated on `SKIP_MERGE` empty. Do NOT call `paperclipUpdateIssue` in any branch:**
+
    ```bash
-   gh pr merge <pr_number> --squash --auto --repo ffmemes/ff-backend
-   ```
-   `--auto` tells GitHub to squash-merge as soon as all required status checks pass. **Do not race CI by polling and then calling bare `gh pr merge`** — that's how PR #200 got the false-block "base branch policy prohibits the merge" error 25 seconds after the agent woke. `--auto` makes the race impossible.
+   if [ -z "$SKIP_MERGE" ]; then
+     gh pr merge <pr_number> --squash --auto --repo ffmemes/ff-backend
 
-   **Repo prerequisite — `allow_auto_merge: true`.** `--auto` only works when the repo has auto-merge enabled at the settings level. Verify with `gh api repos/ffmemes/ff-backend --jq .allow_auto_merge`; if it returns `false`, a config drift has occurred — comment `⚠️ Repo auto-merge disabled — ohld must run \`gh api -X PATCH repos/ffmemes/ff-backend -f allow_auto_merge=true\`` on the PR, set `OUTCOME_PATH=C` (Approved-but-Blocked, sub-reason `auto-merge-disabled`), and **jump to step 9**. Do NOT call `paperclipUpdateIssue` here. Do not fall back to a bare `gh pr merge --squash`: that re-opens the CI race this whole step exists to close.
+     RESULT=$(gh pr view <pr_number> --repo ffmemes/ff-backend --json state,mergedAt,autoMergeRequest)
+     STATE=$(echo "$RESULT" | jq -r .state)
+     QUEUED=$(echo "$RESULT" | jq -r '.autoMergeRequest != null')
 
-   **Do not use `--admin`.** It bypasses branch protection, masks real configuration errors, and is reserved for ohld in incident-response situations only.
-
-   **Verify the merge queued (or already fired) — set `OUTCOME_PATH` and route to step 9. Do NOT call `paperclipUpdateIssue` in any branch:**
-   ```bash
-   RESULT=$(gh pr view <pr_number> --repo ffmemes/ff-backend --json state,mergedAt,autoMergeRequest)
-   STATE=$(echo "$RESULT" | jq -r .state)
-   QUEUED=$(echo "$RESULT" | jq -r '.autoMergeRequest != null')
-
-   if [ "$STATE" = "MERGED" ]; then
-     # CI was already green when --auto ran; merged immediately.
-     OUTCOME_PATH=A
-   elif [ "$STATE" = "OPEN" ] && [ "$QUEUED" = "true" ]; then
-     # Expected case: auto-merge queued; GitHub will fire when CI passes.
-     gh pr comment <pr_number> --repo ffmemes/ff-backend -b "✅ Approved + auto-merge queued. GitHub will squash-merge when lint and test pass."
-     OUTCOME_PATH=B
-   else
-     # Real failure: not merged, not queued (conflict, missing review, ruleset block).
-     gh pr comment <pr_number> --repo ffmemes/ff-backend -b "⚠️ Merge did not queue. Review the action output and merge manually."
-     OUTCOME_PATH=C  # sub-reason: merge-did-not-queue
+     if [ "$STATE" = "MERGED" ]; then
+       # CI was already green when --auto ran; merged immediately.
+       OUTCOME_PATH=A
+     elif [ "$STATE" = "OPEN" ] && [ "$QUEUED" = "true" ]; then
+       # Expected case: auto-merge queued; GitHub will fire when CI passes.
+       gh pr comment <pr_number> --repo ffmemes/ff-backend -b "✅ Approved + auto-merge queued. GitHub will squash-merge when lint and test pass."
+       OUTCOME_PATH=B
+     else
+       # Real failure: not merged, not queued (conflict, missing review, ruleset block).
+       gh pr comment <pr_number> --repo ffmemes/ff-backend -b "⚠️ Merge did not queue. Review the action output and merge manually."
+       OUTCOME_PATH=C   # sub-reason: merge-did-not-queue
+     fi
    fi
    # Proceed to step 9. Step 9 is the ONLY place that calls paperclipUpdateIssue.
    ```
+
+   `--auto` tells GitHub to squash-merge as soon as all required status checks pass. **Do not race CI by polling and then calling bare `gh pr merge`** — that's how PR #200 got the false-block "base branch policy prohibits the merge" error 25 seconds after the agent woke. `--auto` makes the race impossible.
+
+   **Do not use `--admin`.** It bypasses branch protection, masks real configuration errors, and is reserved for ohld in incident-response situations only.
+
+   **Do not fall back to a bare `gh pr merge --squash`** if precheck 2 failed: that re-opens the CI race this whole step exists to close.
 
    Behaviour matrix (terminal status is set by step 9 after gate verification, not here):
 
@@ -231,12 +246,17 @@ Use `jq ... "$SC_FILE"` for every field read below. Do **not** use `SC=$(gh ...)
 
   **A3 is an explicit non-blocking exception** to the general "any failed check → blocked" rule. SE delivered review + merge regardless of the next-link's health; the broken handoff is a separate `[chain-broken:*]` ticket for CTO. A3 failures still close the execution issue `done` — they only file the chain-broken issue alongside.
 
+  The bash block below is **diagnostic only** — it computes `A3_RESULT` and `A3_DETAIL`. Filing the chain-broken issue is an MCP tool call, not a shell command, so it lives in the prose step that follows. (Earlier drafts used `: "file [chain-broken:*] ..."` here; `:` is the bash null command, so the issue was never filed and the wake closed `done` silently. Fixed in round 2.)
+
   ```bash
   MERGED_EPOCH=$(date -u -d "$(jq -r .mergedAt "$SC_FILE")" "+%s")
   NOW_EPOCH=$(date -u +%s)
   AGE=$(( NOW_EPOCH - MERGED_EPOCH ))
+  A3_RESULT=ok
+  A3_DETAIL=
   if [ "$AGE" -lt 300 ]; then
-    : "deploy probe deferred — merge is < 5 min old, healthcheck cycle in flight; QA's hourly Process Health Check will catch stuck deploys"
+    # Merge < 5 min old; healthcheck cycle in flight. QA's hourly Process Health Check covers stuck deploys.
+    A3_RESULT=deferred
   else
     # Validate the curl response. Empty body on 401/404/500/network failure must NOT silently no-op the probe.
     HTTP=$(curl -s -o "$APP_FILE" -w "%{http_code}" \
@@ -245,16 +265,27 @@ Use `jq ... "$SC_FILE"` for every field read below. Do **not** use `SC=$(gh ...)
     CURL_RC=$?
     LAST_ONLINE=$(jq -r '.last_online_at // empty' "$APP_FILE" 2>/dev/null)
     if [ "$CURL_RC" -ne 0 ] || [ "$HTTP" != "200" ] || [ -z "$LAST_ONLINE" ]; then
-      : "file [chain-broken:coolify-probe-unhealthy] PR #<n> HIGH for CTO — curl rc=$CURL_RC http=$HTTP last_online=<empty-or-missing>; close execution issue done (A3 non-blocking exception)"
+      A3_RESULT=probe-unhealthy
+      A3_DETAIL="curl rc=$CURL_RC http=$HTTP last_online=<empty-or-missing>"
     else
       ONLINE_EPOCH=$(date -u -d "$LAST_ONLINE" "+%s")
       if [ "$ONLINE_EPOCH" -le "$MERGED_EPOCH" ]; then
-        : "file [chain-broken:coolify-not-triggered] PR #<n> HIGH for CTO with both timestamps in the body; close execution issue done (A3 non-blocking exception)"
+        A3_RESULT=not-triggered
+        A3_DETAIL="mergedAt=$(jq -r .mergedAt "$SC_FILE") last_online_at=$LAST_ONLINE (last_online predates merge)"
       fi
     fi
   fi
   ```
+
   GNU `date -u -d` (the agent runtime is Linux) auto-parses both ISO 8601 (`mergedAt`) and `YYYY-MM-DD HH:MM:SS` (`last_online_at`) with no format string. The 5-minute deferral is critical: probing immediately after merge will always see a pre-merge `last_online_at` and fire false `chain-broken` alarms.
+
+  **A3 follow-up action (MANDATORY when `A3_RESULT` is `probe-unhealthy` or `not-triggered`):** invoke the `paperclipCreateIssue` MCP tool — the bash block does NOT file the issue, you do. Pass:
+  - `title`: `[chain-broken:coolify-${A3_RESULT}] PR #${PR_NUMBER}`
+  - `priority`: `high`
+  - `assigneeAgentId`: CTO's agent id (resolve via `paperclipApiRequest` with `{ "method": "GET", "path": "/api/companies/$COMPANY_ID/agents" }` if you don't have it cached; CTO's `nameKey` is `cto`)
+  - `description`: include `${A3_DETAIL}`, the PR URL, `mergedAt`, `last_online_at`, and a one-line summary of which sub-failure tripped (probe-unhealthy = Coolify API not responding sanely; not-triggered = GH→Coolify webhook dropped)
+
+  After filing the chain-broken issue (or skipping it because `A3_RESULT` is `ok` / `deferred`), proceed to step 9 with `OUTCOME_PATH=A`. A3 is non-blocking: SE delivered review + merge, the broken next-link is a separate ticket. Step 9 still closes the execution issue `done`.
 
 ### Path B — Approved + Auto-merge Queued (`state == OPEN`, `autoMergeRequest != null`)
 - **B1**: `jq -r '.state, (.autoMergeRequest != null)' "$SC_FILE"` returns `OPEN` then `true`.
