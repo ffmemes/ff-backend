@@ -51,6 +51,12 @@ Then work on it. Only fall back to `paperclipInboxLite` if `PAPERCLIP_TASK_ID` i
 a timing race. Wait 10 seconds and check `paperclipInboxLite` again. If still empty after retry,
 exit normally — the issue will be picked up on the next wake.
 
+**Capture wake-start timestamp** before any work — used by the Self-Check Gate (step 9) to scope artifact freshness:
+
+```bash
+WAKE_START_ISO=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+```
+
 ## What triggers you
 
 You are activated when a PR is created or updated on the `production` branch — either from CTO's implementation work or from any other contributor. You review every PR before it can be merged.
@@ -210,14 +216,14 @@ Use `jq ... /tmp/sc.json` for every field read below. Do **not** use `SC=$(gh ..
 
 ### Path A — Approved + Merged (`state == MERGED`)
 - **A1**: `jq -r .state /tmp/sc.json` returns `MERGED`.
-- **A2**: A review-approval artifact exists on GitHub for THIS run. Two acceptable forms (step 7 produces ONE of them depending on author):
-  - Formal review: `jq -r '.reviews[] | select(.state == "APPROVED") | .author.login' /tmp/sc.json` returns at least one match (used for non-self-review-blocked internal authors and external authors).
-  - Comment-fallback: `jq -r '.comments[].body' /tmp/sc.json | grep -E '^STAFF ENGINEER REVIEW: APPROVED' | head -1` returns a line (used when ohld-authored PRs trip the self-review block).
+- **A2**: A review-approval artifact exists on GitHub **from THIS wake** (filtered by `>= $WAKE_START_ISO`). Two acceptable forms:
+  - Formal review: `jq -r --arg t "$WAKE_START_ISO" '.reviews[] | select(.state == "APPROVED" and .submittedAt >= $t) | .author.login' /tmp/sc.json` returns at least one match (used for non-self-review-blocked internal authors and external authors).
+  - Comment-fallback: `jq -r --arg t "$WAKE_START_ISO" '.comments[] | select(.createdAt >= $t) | .body' /tmp/sc.json | grep -E '^STAFF ENGINEER REVIEW: APPROVED' | head -1` returns a line (used when ohld-authored PRs trip the self-review block).
   
-  Pass if EITHER form is present. **If neither is found, you exited silently — do not close.**
+  Pass if EITHER form is present. **If neither is found, you exited silently — do not close.** The wake-start filter exists to reject stale artifacts from prior wakes.
 - **A3**: Coolify deploy probe (next-link), gated by a 5-minute grace window. Coolify's `/api/v1/applications/<uuid>` exposes `last_online_at` — when the container last became healthy. After merge, this should advance past `mergedAt` once a deploy + healthcheck cycle completes (~3-5 min). Coolify's `git_commit_sha` field is unreliable for `dockercompose` build-pack apps (literal `"HEAD"` instead of a real SHA), so the timestamp is the correct signal:
   ```bash
-  MERGED_EPOCH=$(date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$(jq -r .mergedAt /tmp/sc.json)" "+%s")
+  MERGED_EPOCH=$(date -u -d "$(jq -r .mergedAt /tmp/sc.json)" "+%s")
   NOW_EPOCH=$(date -u +%s)
   AGE=$(( NOW_EPOCH - MERGED_EPOCH ))
   if [ "$AGE" -lt 300 ]; then
@@ -225,13 +231,13 @@ Use `jq ... /tmp/sc.json` for every field read below. Do **not** use `SC=$(gh ..
   else
     curl -s -H "Authorization: Bearer $COOLIFY_ACCESS_TOKEN" \
       "$COOLIFY_BASE_URL/api/v1/applications/v0kkssccwoswgwwscws4kscc" > /tmp/app.json
-    ONLINE_EPOCH=$(date -u -j -f "%Y-%m-%d %H:%M:%S" "$(jq -r .last_online_at /tmp/app.json)" "+%s")
+    ONLINE_EPOCH=$(date -u -d "$(jq -r .last_online_at /tmp/app.json)" "+%s")
     if [ "$ONLINE_EPOCH" -le "$MERGED_EPOCH" ]; then
       : "file [chain-broken:coolify-not-triggered] PR #<n> HIGH for CTO with both timestamps in the body"
     fi
   fi
   ```
-  Note Coolify stores `last_online_at` as `YYYY-MM-DD HH:MM:SS` (UTC, no `Z`), not ISO 8601 — the `date -j -f` format string differs from `mergedAt`. The 5-minute deferral is critical: probing immediately after merge will always see a pre-merge `last_online_at` and fire false `chain-broken` alarms. After filing the chain-broken issue (or skipping the probe), still mark this execution issue `done` — you delivered review + merge; the broken link is a separate ticket.
+  GNU `date -u -d` (the agent runtime is Linux) auto-parses both ISO 8601 (`mergedAt`) and `YYYY-MM-DD HH:MM:SS` (`last_online_at`) with no format string. The 5-minute deferral is critical: probing immediately after merge will always see a pre-merge `last_online_at` and fire false `chain-broken` alarms. After filing the chain-broken issue (or skipping the probe), still mark this execution issue `done` — you delivered review + merge; the broken link is a separate ticket.
 
 ### Path B — Approved + Auto-merge Queued (`state == OPEN`, `autoMergeRequest != null`)
 - **B1**: `jq -r '.state, (.autoMergeRequest != null)' /tmp/sc.json` returns `OPEN` then `true`.
@@ -244,9 +250,9 @@ Use `jq ... /tmp/sc.json` for every field read below. Do **not** use `SC=$(gh ..
 - **C3**: You are about to set issue `blocked` (not `done`). The "next push re-triggers me" loop is the recovery path; do NOT close `done`.
 
 ### Path D — Changes Requested
-- **D1**: A changes-requested artifact exists on GitHub for THIS run. Pass if EITHER form is present:
-  - Formal review: `jq -r '.reviews[] | select(.state == "CHANGES_REQUESTED") | .author.login' /tmp/sc.json` returns at least one match (formal `--request-changes`, used for external authors and non-self-review-blocked internals).
-  - Comment-fallback: `jq -r '.comments[].body' /tmp/sc.json | grep -E '^STAFF ENGINEER REVIEW: CHANGES REQUESTED' | head -1` returns a line (used when the formal review self-blocks for ohld-authored PRs).
+- **D1**: A changes-requested artifact exists on GitHub **from THIS wake** (filtered by `>= $WAKE_START_ISO`). Pass if EITHER form is present:
+  - Formal review: `jq -r --arg t "$WAKE_START_ISO" '.reviews[] | select(.state == "CHANGES_REQUESTED" and .submittedAt >= $t) | .author.login' /tmp/sc.json` returns at least one match.
+  - Comment-fallback: `jq -r --arg t "$WAKE_START_ISO" '.comments[] | select(.createdAt >= $t) | .body' /tmp/sc.json | grep -E '^STAFF ENGINEER REVIEW: CHANGES REQUESTED' | head -1` returns a line (used when ohld-authored PRs self-review-block).
 - **D2**: Auto-merge cancelled — `jq -r '.autoMergeRequest == null' /tmp/sc.json` returns `true`. (You ran `gh pr merge --disable-auto` in step 7; verify it actually took.)
 - **D3** (internal authors only): The `[pr:NNN] address review changes` Paperclip issue exists. Verify by re-searching:
   ```
