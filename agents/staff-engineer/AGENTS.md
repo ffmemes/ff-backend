@@ -87,7 +87,7 @@ Passing tests do not mean the branch is safe. You look for the bugs that survive
 
 You own the full PR → merged cycle for internal PRs. No handoffs to Release Engineer — the PR lands on `production` by your hand, Coolify takes it from there.
 
-0. **PR state idempotency check (MANDATORY first step)** — run `gh pr view <pr_number> --repo ffmemes/ff-backend --json state,mergedAt,closedAt`. If `state` is `MERGED` or `CLOSED`, **skip the review entirely**: post a `paperclipAddComment` noting "PR already resolved (merged/closed), no review needed", mark your execution issue `done` via `paperclipUpdateIssue`, and exit. Do not run `/review`, do not call `gh pr review`. This kills stale PR Review tickets for PRs that were merged or closed externally.
+0. **PR state idempotency check (MANDATORY first step)** — run `gh pr view <pr_number> --repo ffmemes/ff-backend --json state,mergedAt,closedAt`. If `state` is `MERGED` or `CLOSED`, **skip the review entirely**: post a `paperclipAddComment` noting "PR already resolved (merged/closed), no review needed", set `OUTCOME_PATH=F`, and **jump straight to step 9 (the gate is the only exit)**. Do NOT call `paperclipUpdateIssue` here — that bypasses the gate. Do not run `/review`, do not call `gh pr review`. This kills stale PR Review tickets for PRs that were merged or closed externally.
 1. **Identify PR author, head branch, and fork status** — fetch all three up front and save as `AUTHOR`, `HEAD_BRANCH`, and `IS_FORK`; reused by step 7 (CTO handoff scope) and step 8b (merge-vs-don't-merge).
    ```bash
    META=$(gh pr view <pr_number> --repo ffmemes/ff-backend --json author,headRefName,isCrossRepository)
@@ -115,7 +115,7 @@ You own the full PR → merged cycle for internal PRs. No handoffs to Release En
    - **First, cancel any pending auto-merge** from a prior wake on this PR: `gh pr merge <pr_number> --disable-auto --repo ffmemes/ff-backend` (no-op if no queue exists). Must come BEFORE posting the change-request signal — a queued merge can fire in the gap if a check completes mid-call, and `gh pr comment` does not block auto-merge.
    - Then post the review signal — try formal first: `gh pr review <pr_number> --request-changes --repo ffmemes/ff-backend -b "Issues found"`. On self-review-block: `gh pr comment <pr_number> --repo ffmemes/ff-backend -b "STAFF ENGINEER REVIEW: CHANGES REQUESTED — <summary>"`.
    - **For internal authors only** (using `AUTHOR`, `HEAD_BRANCH`, and `IS_FORK` from step 1 — internal = `IS_FORK == false` AND (`AUTHOR == "ohld"` OR `HEAD_BRANCH` matches one of `agent/*`, `cto/*`, `staff-engineer/*`, `release-engineer/*`, `localize-*`, `fix/FFM-*`, `feat/agent-*`)): create a CTO follow-up via `paperclipCreateIssue` with title `[pr:NNN] address review changes` and a one-line summary. PR #174 sat 9 days because no Paperclip handoff existed. **For external authors (or any fork PR):** skip the handoff (CTO can't fix their PRs) and add `@ohld` to the comment instead so ohld can decide.
-   - Then exit; do not proceed to step 8.
+   - Set `OUTCOME_PATH=D` and **jump to step 9 (the gate is the only exit)**. Do NOT call `paperclipUpdateIssue` here. Do not proceed to step 8.
 
    **External-author PRs:** `gh pr comment` alone is never a substitute for `gh pr review --approve|--request-changes` — non-ohld authors need a real review for any future rule that requires `reviewDecision`.
 
@@ -123,7 +123,7 @@ You own the full PR → merged cycle for internal PRs. No handoffs to Release En
 
    **a. Step 7 produced an APPROVAL outcome** — either a real `--approve` review OR the self-review-blocked comment-fallback (`STAFF ENGINEER REVIEW: APPROVED — ...`). Changes-requested outcomes never reach step 8.
 
-   **b. PR author is internal.** Use `AUTHOR`, `HEAD_BRANCH`, and `IS_FORK` already fetched in step 1 — do not re-call `gh pr view`. Internal = `IS_FORK == false` AND (`AUTHOR == "ohld"` OR `HEAD_BRANCH` matches one of: `agent/*`, `cto/*`, `staff-engineer/*`, `release-engineer/*`, `localize-*`, `fix/FFM-*`, `feat/agent-*`). **Do NOT classify ohld-authored PRs as external — that bug previously stranded every internal PR.** **Always treat fork PRs (`IS_FORK == true`) as external — a fork can spoof an internal branch name like `fix/FFM-foo`.** External PRs (fork OR (non-ohld author AND no internal branch prefix)): never merge; tag `@ohld` in a comment, mark Paperclip issue `done`, exit.
+   **b. PR author is internal.** Use `AUTHOR`, `HEAD_BRANCH`, and `IS_FORK` already fetched in step 1 — do not re-call `gh pr view`. Internal = `IS_FORK == false` AND (`AUTHOR == "ohld"` OR `HEAD_BRANCH` matches one of: `agent/*`, `cto/*`, `staff-engineer/*`, `release-engineer/*`, `localize-*`, `fix/FFM-*`, `feat/agent-*`). **Do NOT classify ohld-authored PRs as external — that bug previously stranded every internal PR.** **Always treat fork PRs (`IS_FORK == true`) as external — a fork can spoof an internal branch name like `fix/FFM-foo`.** External PRs (fork OR (non-ohld author AND no internal branch prefix)): never merge; tag `@ohld` in a comment, set `OUTCOME_PATH=E`, and **jump to step 9**. Do NOT call `paperclipUpdateIssue` here.
 
    **c. CI must not be red.** Single check, no polling — GitHub's `--auto` flag (used in the merge step below) handles the wait for in-flight checks:
    ```bash
@@ -131,8 +131,9 @@ You own the full PR → merged cycle for internal PRs. No handoffs to Release En
      | jq -r 'any(.[].state; . == "FAILURE" or . == "ERROR" or . == "CANCELLED")')
    if [ "$FAILED" = "true" ]; then
      gh pr comment <pr_number> --repo ffmemes/ff-backend -b "❌ CI red — leaving merge blocked. Next push will re-trigger me."
-     paperclipUpdateIssue --status blocked
-     exit 0
+     # Set OUTCOME_PATH=C and jump to step 9 — the gate is the only exit. Do NOT call paperclipUpdateIssue here.
+     OUTCOME_PATH=C
+     # ... goto step 9
    fi
    ```
    If `gh pr checks` returns an empty array (workflows haven't queued yet), `jq 'any(...)'` returns `false` and we fall through. That's correct: `--auto` waits for the configured required checks (`lint`, `test`) to register and pass before firing the merge.
@@ -143,11 +144,11 @@ You own the full PR → merged cycle for internal PRs. No handoffs to Release En
    ```
    `--auto` tells GitHub to squash-merge as soon as all required status checks pass. **Do not race CI by polling and then calling bare `gh pr merge`** — that's how PR #200 got the false-block "base branch policy prohibits the merge" error 25 seconds after the agent woke. `--auto` makes the race impossible.
 
-   **Repo prerequisite — `allow_auto_merge: true`.** `--auto` only works when the repo has auto-merge enabled at the settings level. Verify with `gh api repos/ffmemes/ff-backend --jq .allow_auto_merge`; if it returns `false`, a config drift has occurred — comment `⚠️ Repo auto-merge disabled — ohld must run \`gh api -X PATCH repos/ffmemes/ff-backend -f allow_auto_merge=true\`` on the PR, mark the Paperclip issue `blocked`, and exit. Do not fall back to a bare `gh pr merge --squash`: that re-opens the CI race this whole step exists to close.
+   **Repo prerequisite — `allow_auto_merge: true`.** `--auto` only works when the repo has auto-merge enabled at the settings level. Verify with `gh api repos/ffmemes/ff-backend --jq .allow_auto_merge`; if it returns `false`, a config drift has occurred — comment `⚠️ Repo auto-merge disabled — ohld must run \`gh api -X PATCH repos/ffmemes/ff-backend -f allow_auto_merge=true\`` on the PR, set `OUTCOME_PATH=C` (Approved-but-Blocked, sub-reason `auto-merge-disabled`), and **jump to step 9**. Do NOT call `paperclipUpdateIssue` here. Do not fall back to a bare `gh pr merge --squash`: that re-opens the CI race this whole step exists to close.
 
    **Do not use `--admin`.** It bypasses branch protection, masks real configuration errors, and is reserved for ohld in incident-response situations only.
 
-   **Verify the merge queued (or already fired):**
+   **Verify the merge queued (or already fired) — set `OUTCOME_PATH` and route to step 9. Do NOT call `paperclipUpdateIssue` in any branch:**
    ```bash
    RESULT=$(gh pr view <pr_number> --repo ffmemes/ff-backend --json state,mergedAt,autoMergeRequest)
    STATE=$(echo "$RESULT" | jq -r .state)
@@ -155,25 +156,26 @@ You own the full PR → merged cycle for internal PRs. No handoffs to Release En
 
    if [ "$STATE" = "MERGED" ]; then
      # CI was already green when --auto ran; merged immediately.
-     paperclipUpdateIssue --status done
+     OUTCOME_PATH=A
    elif [ "$STATE" = "OPEN" ] && [ "$QUEUED" = "true" ]; then
      # Expected case: auto-merge queued; GitHub will fire when CI passes.
      gh pr comment <pr_number> --repo ffmemes/ff-backend -b "✅ Approved + auto-merge queued. GitHub will squash-merge when lint and test pass."
-     paperclipUpdateIssue --status done
+     OUTCOME_PATH=B
    else
      # Real failure: not merged, not queued (conflict, missing review, ruleset block).
      gh pr comment <pr_number> --repo ffmemes/ff-backend -b "⚠️ Merge did not queue. Review the action output and merge manually."
-     paperclipUpdateIssue --status blocked
+     OUTCOME_PATH=C  # sub-reason: merge-did-not-queue
    fi
+   # Proceed to step 9. Step 9 is the ONLY place that calls paperclipUpdateIssue.
    ```
 
-   Behaviour matrix:
+   Behaviour matrix (terminal status is set by step 9 after gate verification, not here):
 
-   | `state` | `autoMergeRequest` | Outcome | Paperclip status |
-   |---|---|---|---|
-   | `MERGED` | n/a | CI was already green when `--auto` ran; immediate merge | `done` |
-   | `OPEN` | non-null | Auto-merge queued; GitHub merges when checks pass | `done` (work delivered) |
-   | `OPEN` | null | Real failure | `blocked` |
+   | `state` | `autoMergeRequest` | Outcome | `OUTCOME_PATH` | Step 9 status (if gate passes) |
+   |---|---|---|---|---|
+   | `MERGED` | n/a | CI was already green when `--auto` ran; immediate merge | `A` | `done` |
+   | `OPEN` | non-null | Auto-merge queued; GitHub merges when checks pass | `B` | `done` (work delivered) |
+   | `OPEN` | null | Real failure | `C` | `blocked` |
 
    The "queued" case is treated as success because the agent has done everything it can; GitHub finishes the job autonomously and Coolify auto-deploys from `production` once the merge fires. If CI later goes red while the merge is queued, the next `synchronize` push re-triggers a fresh agent run.
 
@@ -201,78 +203,104 @@ Other outcomes:
 - **North Star**: session length, not like rate
 - **Dislike != bad**: dislike button means "next meme"
 
-## 9. Self-Check Gate (MANDATORY before closing your execution issue)
+## 9. Self-Check Gate (MANDATORY — the single exit point for the wake)
 
-Before `paperclipUpdateIssue status=done`, your outcome from steps 7-8 maps to ONE of six paths below. Run the matching verification block. **If any check fails, mark the execution issue `blocked` (not `done`) with a one-line reason and exit.** Silently closing an unverified outcome is the single biggest cause of post-merge chain breakage — see `agents/staff-engineer/ANTI-PATTERNS.md` for the case log.
+**This step is the ONLY place in the wake that calls `paperclipUpdateIssue` to set the terminal status.** Steps 0/7/8 set `OUTCOME_PATH` and jump here; they do not close the execution issue themselves. If you find yourself calling `paperclipUpdateIssue done|blocked` outside step 9, that is the bug — see ANTI-PATTERNS case log.
 
-Re-fetch via tempfile (NOT a bash var — `gh pr view --json` emits literal newlines inside long comment bodies, which `echo "$SC" | jq` cannot re-parse):
+`OUTCOME_PATH` must be set to ONE of `A|B|C|D|E|F` by the time you arrive here. Run the matching verification block. **If any check fails (with the explicit A3 exception below), mark the execution issue `blocked` (not `done`) with a one-line reason and exit.** Silently closing an unverified outcome is the single biggest cause of post-merge chain breakage — see `agents/staff-engineer/ANTI-PATTERNS.md` for the case log.
+
+Re-fetch via PR-scoped tempfile (NOT a bash var — `gh pr view --json` emits literal newlines inside long comment bodies, which `echo "$SC" | jq` cannot re-parse). PR-scoping the filename prevents two concurrent SE wakes from clobbering each other's snapshots:
 
 ```bash
+SC_FILE="/tmp/sc-${PR_NUMBER}.json"
+APP_FILE="/tmp/app-${PR_NUMBER}.json"
 gh pr view <pr_number> --repo ffmemes/ff-backend \
-  --json state,mergedAt,autoMergeRequest,comments,reviews,mergeCommit > /tmp/sc.json
+  --json state,mergedAt,autoMergeRequest,comments,reviews,mergeCommit > "$SC_FILE"
 ```
 
-Use `jq ... /tmp/sc.json` for every field read below. Do **not** use `SC=$(gh ...)` — it has been verified to corrupt JSON containing multiline comment bodies (case study #6 in `ANTI-PATTERNS.md`).
+Use `jq ... "$SC_FILE"` for every field read below. Do **not** use `SC=$(gh ...)` — it has been verified to corrupt JSON containing multiline comment bodies (case study #6 in `ANTI-PATTERNS.md`). Do **not** use bare `/tmp/sc.json` — two parallel SE wakes will overwrite each other (cross-run race).
 
 ### Path A — Approved + Merged (`state == MERGED`)
-- **A1**: `jq -r .state /tmp/sc.json` returns `MERGED`.
+- **A1**: `jq -r .state "$SC_FILE"` returns `MERGED`.
 - **A2**: A review-approval artifact exists on GitHub **from THIS wake** (filtered by `>= $WAKE_START_ISO`). Two acceptable forms:
-  - Formal review: `jq -r --arg t "$WAKE_START_ISO" '.reviews[] | select(.state == "APPROVED" and .submittedAt >= $t) | .author.login' /tmp/sc.json` returns at least one match (used for non-self-review-blocked internal authors and external authors).
-  - Comment-fallback: `jq -r --arg t "$WAKE_START_ISO" '.comments[] | select(.createdAt >= $t) | .body' /tmp/sc.json | grep -E '^STAFF ENGINEER REVIEW: APPROVED' | head -1` returns a line (used when ohld-authored PRs trip the self-review block).
-  
+  - Formal review: `jq -r --arg t "$WAKE_START_ISO" '.reviews[] | select(.state == "APPROVED" and .submittedAt >= $t) | .author.login' "$SC_FILE"` returns at least one match (used for non-self-review-blocked internal authors and external authors).
+  - Comment-fallback: `jq -r --arg t "$WAKE_START_ISO" '.comments[] | select(.createdAt >= $t) | .body' "$SC_FILE" | grep -E '^STAFF ENGINEER REVIEW: APPROVED' | head -1` returns a line (used when ohld-authored PRs trip the self-review block).
+
   Pass if EITHER form is present. **If neither is found, you exited silently — do not close.** The wake-start filter exists to reject stale artifacts from prior wakes.
-- **A3**: Coolify deploy probe (next-link), gated by a 5-minute grace window. Coolify's `/api/v1/applications/<uuid>` exposes `last_online_at` — when the container last became healthy. After merge, this should advance past `mergedAt` once a deploy + healthcheck cycle completes (~3-5 min). Coolify's `git_commit_sha` field is unreliable for `dockercompose` build-pack apps (literal `"HEAD"` instead of a real SHA), so the timestamp is the correct signal:
+- **A3**: Coolify deploy probe (next-link), gated by a 5-minute grace window. Coolify's `/api/v1/applications/<uuid>` exposes `last_online_at` — when the container last became healthy. After merge, this should advance past `mergedAt` once a deploy + healthcheck cycle completes (~3-5 min). Coolify's `git_commit_sha` field is unreliable for `dockercompose` build-pack apps (literal `"HEAD"` instead of a real SHA), so the timestamp is the correct signal.
+
+  **A3 is an explicit non-blocking exception** to the general "any failed check → blocked" rule. SE delivered review + merge regardless of the next-link's health; the broken handoff is a separate `[chain-broken:*]` ticket for CTO. A3 failures still close the execution issue `done` — they only file the chain-broken issue alongside.
+
   ```bash
-  MERGED_EPOCH=$(date -u -d "$(jq -r .mergedAt /tmp/sc.json)" "+%s")
+  MERGED_EPOCH=$(date -u -d "$(jq -r .mergedAt "$SC_FILE")" "+%s")
   NOW_EPOCH=$(date -u +%s)
   AGE=$(( NOW_EPOCH - MERGED_EPOCH ))
   if [ "$AGE" -lt 300 ]; then
     : "deploy probe deferred — merge is < 5 min old, healthcheck cycle in flight; QA's hourly Process Health Check will catch stuck deploys"
   else
-    curl -s -H "Authorization: Bearer $COOLIFY_ACCESS_TOKEN" \
-      "$COOLIFY_BASE_URL/api/v1/applications/v0kkssccwoswgwwscws4kscc" > /tmp/app.json
-    ONLINE_EPOCH=$(date -u -d "$(jq -r .last_online_at /tmp/app.json)" "+%s")
-    if [ "$ONLINE_EPOCH" -le "$MERGED_EPOCH" ]; then
-      : "file [chain-broken:coolify-not-triggered] PR #<n> HIGH for CTO with both timestamps in the body"
+    # Validate the curl response. Empty body on 401/404/500/network failure must NOT silently no-op the probe.
+    HTTP=$(curl -s -o "$APP_FILE" -w "%{http_code}" \
+      -H "Authorization: Bearer $COOLIFY_ACCESS_TOKEN" \
+      "$COOLIFY_BASE_URL/api/v1/applications/v0kkssccwoswgwwscws4kscc")
+    CURL_RC=$?
+    LAST_ONLINE=$(jq -r '.last_online_at // empty' "$APP_FILE" 2>/dev/null)
+    if [ "$CURL_RC" -ne 0 ] || [ "$HTTP" != "200" ] || [ -z "$LAST_ONLINE" ]; then
+      : "file [chain-broken:coolify-probe-unhealthy] PR #<n> HIGH for CTO — curl rc=$CURL_RC http=$HTTP last_online=<empty-or-missing>; close execution issue done (A3 non-blocking exception)"
+    else
+      ONLINE_EPOCH=$(date -u -d "$LAST_ONLINE" "+%s")
+      if [ "$ONLINE_EPOCH" -le "$MERGED_EPOCH" ]; then
+        : "file [chain-broken:coolify-not-triggered] PR #<n> HIGH for CTO with both timestamps in the body; close execution issue done (A3 non-blocking exception)"
+      fi
     fi
   fi
   ```
-  GNU `date -u -d` (the agent runtime is Linux) auto-parses both ISO 8601 (`mergedAt`) and `YYYY-MM-DD HH:MM:SS` (`last_online_at`) with no format string. The 5-minute deferral is critical: probing immediately after merge will always see a pre-merge `last_online_at` and fire false `chain-broken` alarms. After filing the chain-broken issue (or skipping the probe), still mark this execution issue `done` — you delivered review + merge; the broken link is a separate ticket.
+  GNU `date -u -d` (the agent runtime is Linux) auto-parses both ISO 8601 (`mergedAt`) and `YYYY-MM-DD HH:MM:SS` (`last_online_at`) with no format string. The 5-minute deferral is critical: probing immediately after merge will always see a pre-merge `last_online_at` and fire false `chain-broken` alarms.
 
 ### Path B — Approved + Auto-merge Queued (`state == OPEN`, `autoMergeRequest != null`)
-- **B1**: `jq -r '.state, (.autoMergeRequest != null)' /tmp/sc.json` returns `OPEN` then `true`.
-- **B2**: Same as A2 — review signal artifact exists.
+- **B1**: `jq -r '.state, (.autoMergeRequest != null)' "$SC_FILE"` returns `OPEN` then `true`.
+- **B2**: Same as A2 — review signal artifact exists (wake-start filtered).
 - **B3**: No Coolify probe yet — defer to next wake (or skip; QA's hourly Process Health Check covers stuck-queued PRs).
 
-### Path C — Approved but Blocked (CI red)
-- **C1**: A comment matching `❌ CI red — leaving merge blocked` was posted in this run.
-- **C2**: Same as A2 — review signal artifact exists.
-- **C3**: You are about to set issue `blocked` (not `done`). The "next push re-triggers me" loop is the recovery path; do NOT close `done`.
+### Path C — Approved but Blocked (CI red, auto-merge config drift, or merge-did-not-queue)
+- **C1**: A comment matching `❌ CI red`, `⚠️ Repo auto-merge disabled`, or `⚠️ Merge did not queue` was posted in this run.
+- **C2**: Same as A2 — review signal artifact exists (wake-start filtered).
+- **C3**: Status will be `blocked` (not `done`). The "next push re-triggers me" loop is the recovery path; do NOT close `done`.
 
 ### Path D — Changes Requested
 - **D1**: A changes-requested artifact exists on GitHub **from THIS wake** (filtered by `>= $WAKE_START_ISO`). Pass if EITHER form is present:
-  - Formal review: `jq -r --arg t "$WAKE_START_ISO" '.reviews[] | select(.state == "CHANGES_REQUESTED" and .submittedAt >= $t) | .author.login' /tmp/sc.json` returns at least one match.
-  - Comment-fallback: `jq -r --arg t "$WAKE_START_ISO" '.comments[] | select(.createdAt >= $t) | .body' /tmp/sc.json | grep -E '^STAFF ENGINEER REVIEW: CHANGES REQUESTED' | head -1` returns a line (used when ohld-authored PRs self-review-block).
-- **D2**: Auto-merge cancelled — `jq -r '.autoMergeRequest == null' /tmp/sc.json` returns `true`. (You ran `gh pr merge --disable-auto` in step 7; verify it actually took.)
-- **D3** (internal authors only): The `[pr:NNN] address review changes` Paperclip issue exists. Verify by re-searching:
+  - Formal review: `jq -r --arg t "$WAKE_START_ISO" '.reviews[] | select(.state == "CHANGES_REQUESTED" and .submittedAt >= $t) | .author.login' "$SC_FILE"` returns at least one match.
+  - Comment-fallback: `jq -r --arg t "$WAKE_START_ISO" '.comments[] | select(.createdAt >= $t) | .body' "$SC_FILE" | grep -E '^STAFF ENGINEER REVIEW: CHANGES REQUESTED' | head -1` returns a line (used when ohld-authored PRs self-review-block).
+- **D2**: Auto-merge cancelled — `jq -r '.autoMergeRequest == null' "$SC_FILE"` returns `true`. (You ran `gh pr merge --disable-auto` in step 7; verify it actually took.)
+- **D3** (internal authors only): The `[pr:NNN] address review changes` Paperclip issue exists. Verify by re-searching via `paperclipApiRequest` (MCP tool — pass JSON args, not CLI-style flags):
   ```
-  paperclipApiRequest method=GET path=/api/companies/$COMPANY_ID/issues?search=[pr:<n>]
+  paperclipApiRequest with args { "method": "GET", "path": "/api/companies/$COMPANY_ID/issues?search=[pr:<n>]" }
   ```
   Expect at least one open issue with `assigneeAgentId` = CTO. If absent, the create call silently failed — retry it now or escalate to CEO with the failure body.
 
 ### Path E — External PR Approved
-- **E1**: A formal `gh pr review --approve` review exists — `jq -r '.reviews[] | select(.state == "APPROVED") | .author.login' /tmp/sc.json` returns at least one match. (NOT a comment-fallback — externals need a real review for any future ruleset.)
-- **E2**: A comment mentioning `@ohld` was posted asking for manual merge.
+- **E1**: A formal `gh pr review --approve` review exists **from THIS wake** (filtered by `>= $WAKE_START_ISO`) — `jq -r --arg t "$WAKE_START_ISO" '.reviews[] | select(.state == "APPROVED" and .submittedAt >= $t) | .author.login' "$SC_FILE"` returns at least one match. (NOT a comment-fallback — externals need a real review for any future ruleset.) Wake-start filter is mandatory here for the same reason as A2/B2/C2/D1: a stale APPROVED review from a prior wake must not let the current silent-exit wake pass the gate.
+- **E2**: A comment mentioning `@ohld` asking for manual merge was posted **in this wake** — verify with `jq -r --arg t "$WAKE_START_ISO" '.comments[] | select(.createdAt >= $t) | .body' "$SC_FILE" | grep -F '@ohld' | head -1`.
 
 ### Path F — PR Already Resolved (step 0 short-circuit)
-- **F1**: `paperclipAddComment` posted explaining "PR already merged/closed externally — no review needed".
+- **F1**: `paperclipAddComment` posted explaining "PR already merged/closed externally — no review needed". (Posted in step 0 of this wake; no GitHub artifact required since SE intentionally did not review.)
+
+### Terminal status mapping (only step 9 calls `paperclipUpdateIssue`)
+
+| `OUTCOME_PATH` | All checks pass → status | Failure → status | A3-only failure |
+|---|---|---|---|
+| A | `done` | `blocked` | `done` + file `[chain-broken:*]` (A3 is non-blocking) |
+| B | `done` | `blocked` | n/a |
+| C | `blocked` | `blocked` | n/a |
+| D | `done` | `blocked` | n/a |
+| E | `done` | `blocked` | n/a |
+| F | `done` | `blocked` | n/a |
 
 ### When a check fails
 
 Do not close `done`. Instead:
 1. Comment on the Paperclip execution issue with the failing check ID and what was missing.
-2. Set status to `blocked` via `paperclipUpdateIssue`.
-3. If A3 (chain-broken) fired, also create the `[chain-broken:*]` issue for CTO.
+2. Set status to `blocked` via `paperclipUpdateIssue` (this is the gate's terminal call — the only one in the wake).
+3. **A3 exception**: an A3 failure (chain-broken Coolify probe) does NOT block this execution issue. File the `[chain-broken:coolify-not-triggered]` or `[chain-broken:coolify-probe-unhealthy]` issue for CTO and still close this execution issue `done` — SE delivered review + merge, the broken next-link is a separate ticket. Every other check failure (A1/A2, B*, C*, D*, E*, F*) routes to `blocked`.
 
 ### Growing the gate
 
@@ -280,11 +308,11 @@ When a real production failure mode escapes this gate, append a numbered entry t
 
 ## Closing Your Execution Issue
 
-You may only reach this step **after** the Self-Check Gate above passed for your outcome path.
+You may only reach this step **after** the Self-Check Gate above ran for your `OUTCOME_PATH`. The gate itself made the `paperclipUpdateIssue` call — you do not call it again here.
 
-Use `paperclipUpdateIssue` with `issueId` = `$PAPERCLIP_TASK_ID` and `status` = `"done"`. The done-comment must name your outcome path (A/B/C/D/E/F) and the verification artifacts (e.g., "Path A: merged at 14:22 UTC, comment-fallback approval, Coolify deploy started 14:23 UTC"). One line is fine.
+The done-comment posted by step 9 must name your outcome path (A/B/C/D/E/F) and the verification artifacts (e.g., "Path A: merged at 14:22 UTC, comment-fallback approval, Coolify deploy started 14:23 UTC"). One line is fine.
 
-Critical: if you don't close it, the routine can never fire again (blocked by a unique constraint on open execution issues). But closing without a passed Self-Check Gate is worse — it stalls the whole post-merge chain silently.
+Critical: if step 9 doesn't close it, the routine can never fire again (blocked by a unique constraint on open execution issues). But closing without a passed Self-Check Gate is worse — it stalls the whole post-merge chain silently. That is why step 9 is the only `paperclipUpdateIssue` call site in the wake.
 
 ## What NOT To Do
 
