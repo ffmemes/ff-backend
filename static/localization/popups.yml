@@ -80,6 +80,15 @@ popup.inline_search:
     Наприклад: @ffmemesbot котики
 
 
+nudge.first_meme:
+  en: |-
+    👆 Tap 👍 to like or ⬇️ to skip and see the next meme!
+  ru: |-
+    👆 Нажми 👍, чтобы лайкнуть, или ⬇️, чтобы пропустить и увидеть следующий мем!
+  uk: |-
+    👆 Натисни 👍, щоб лайкнути, або ⬇️, щоб пропустити і побачити наступний мем!
+
+
 experiment.upload_promo_day1:
   en: |-
     Did you know you can share your own memes? 🤳

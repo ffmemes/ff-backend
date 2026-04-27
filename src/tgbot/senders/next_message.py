@@ -24,7 +24,11 @@ from src.tgbot.senders.meme import (
     send_new_message_with_meme,
 )
 from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
-from src.tgbot.senders.popups import get_popup_to_send, send_popup
+from src.tgbot.senders.popups import (
+    get_popup_to_send,
+    maybe_send_first_meme_nudge,
+    send_popup,
+)
 from src.tgbot.senders.utils import collect_user_languages, has_russian_language
 from src.tgbot.user_info import get_user_info
 
@@ -66,6 +70,7 @@ async def next_message(
     user_info = await get_user_info(user_id)
     languages = await collect_user_languages(user_id, user_info["interface_lang"])
     has_russian = has_russian_language(languages)
+    is_first_meme = (user_info["nmemes_sent"] or 0) == 0
     # TODO: if watched > 30 memes / day show paywall / tasks / donate
 
     popup = await get_popup_to_send(user_id, user_info)
@@ -126,6 +131,8 @@ async def next_message(
 
         await create_user_meme_reaction(user_id, meme.id, meme.recommended_by)
         asyncio.create_task(meme_queue.check_queue(user_id))
+        if is_first_meme:
+            asyncio.create_task(maybe_send_first_meme_nudge(user_id, user_info))
         return msg
 
     asyncio.create_task(meme_queue.check_queue(user_id))

@@ -1,5 +1,8 @@
+import logging
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
+from telegram.error import Forbidden, TelegramError
 
 from src import localizer
 from src.flows.events import safe_emit
@@ -14,6 +17,11 @@ from src.tgbot.service import (
     user_popup_already_sent,
 )
 from src.tgbot.utils import get_related_channel_link
+
+logger = logging.getLogger(__name__)
+
+FIRST_MEME_NUDGE_EXPERIMENT_ID = "first_meme_nudge"
+FIRST_MEME_NUDGE_POPUP_ID = "nudge.first_meme"
 
 
 def _get_popup(popup_id: str, user_info: dict) -> Popup:
@@ -172,3 +180,44 @@ async def get_popup_to_send(user_id: int, user_info: dict) -> Popup | None:
             return _get_popup(popup_id, user_info)
 
     return None
+
+
+async def maybe_send_first_meme_nudge(user_id: int, user_info: dict) -> None:
+    # Idempotent: already nudged this user — never send again.
+    if await user_popup_already_sent(user_id, FIRST_MEME_NUDGE_POPUP_ID):
+        return
+
+    variant = await get_experiment_variant(user_id, FIRST_MEME_NUDGE_EXPERIMENT_ID)
+    if variant is None:
+        variant = "treatment" if user_id % 2 == 0 else "control"
+        await assign_experiment(user_id, FIRST_MEME_NUDGE_EXPERIMENT_ID, variant)
+
+    safe_emit(
+        f"ff.experiment.{FIRST_MEME_NUDGE_EXPERIMENT_ID}.evaluated",
+        f"user.{user_id}",
+        {"user_id": user_id, "group": variant},
+    )
+
+    if variant != "treatment":
+        return
+
+    text = localizer.t(FIRST_MEME_NUDGE_POPUP_ID, user_info["interface_lang"])
+    try:
+        await bot.send_message(
+            chat_id=user_id,
+            text=text,
+            parse_mode=ParseMode.HTML,
+        )
+    except Forbidden:
+        # User blocked the bot between meme send and nudge — nothing to do.
+        return
+    except TelegramError as exc:
+        logger.warning("Failed to send first-meme nudge to user %s: %s", user_id, exc)
+        return
+
+    await create_user_popup_log(user_id, FIRST_MEME_NUDGE_POPUP_ID)
+    safe_emit(
+        f"ff.experiment.{FIRST_MEME_NUDGE_EXPERIMENT_ID}.sent",
+        f"user.{user_id}",
+        {"user_id": user_id, "group": variant},
+    )
