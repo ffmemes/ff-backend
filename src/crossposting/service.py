@@ -30,30 +30,46 @@ async def log_meme_sent(
 
 
 async def get_next_meme_for_tgchannelru():
-    # Videos excluded: 1.8x boost flipped RU channel to ~89% videos in last 14 days
-    # (84 video / 10 image as of 2026-04-26). Users complained about video-only feed.
-    # Same root cause as EN fix on 2026-04-22 — fwd/1k boost was an artifact of fewer
-    # views, not better content. RU was left untouched then; reality showed the 50/50
-    # mix collapsed within days. Hard-filter to images, mirroring EN.
     query = """
-        SELECT
-            M.id
-            , M.type, M.telegram_file_id, M.caption
-
+        WITH src_quality AS (
+            SELECT
+                m.meme_source_id,
+                AVG(cp.forwards * SQRT(GREATEST(cp.views, 1) / 100.0)) AS signal,
+                COUNT(*) AS n_posts
+            FROM crossposting cp
+            JOIN meme m ON m.id = cp.meme_id
+            WHERE cp.channel = 'tgchannelru'
+              AND cp.created_at > NOW() - INTERVAL '30 days'
+              AND cp.created_at < NOW() - INTERVAL '48 hours'
+              AND cp.views IS NOT NULL
+              AND cp.views > 0
+              AND m.type = 'image'
+            GROUP BY m.meme_source_id
+            HAVING COUNT(*) >= 5
+        ),
+        src_median AS (
+            SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY signal) AS m_signal
+            FROM src_quality
+        ),
+        recent_src AS (
+            SELECT DISTINCT m2.meme_source_id
+            FROM crossposting cp2
+            JOIN meme m2 ON m2.id = cp2.meme_id
+            WHERE cp2.channel = 'tgchannelru'
+              AND cp2.created_at > NOW() - INTERVAL '24 hours'
+        )
+        SELECT M.id, M.type, M.telegram_file_id, M.caption
         FROM meme M
-        INNER JOIN meme_stats MS
-            ON MS.meme_id = M.id
-        LEFT JOIN crossposting CP
-            ON CP.meme_id = M.id
-            AND CP.channel = 'tgchannelru'
-
+        INNER JOIN meme_stats MS ON MS.meme_id = M.id
+        LEFT JOIN crossposting CP ON CP.meme_id = M.id AND CP.channel = 'tgchannelru'
+        LEFT JOIN src_quality SQ ON SQ.meme_source_id = M.meme_source_id
         WHERE 1=1
-            AND CP.meme_id IS NULL
-            AND M.status = 'ok'
-            AND M.language_code = 'ru'
-            AND M.type = 'image'
-            AND MS.nlikes >= 5
-
+          AND CP.meme_id IS NULL
+          AND M.status = 'ok'
+          AND M.language_code = 'ru'
+          AND M.type = 'image'
+          AND MS.nlikes >= 5
+          AND M.meme_source_id NOT IN (SELECT meme_source_id FROM recent_src)
         ORDER BY -1
             * COALESCE((MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1), 0.5)
             * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE 0.8 END
@@ -62,47 +78,76 @@ async def get_next_meme_for_tgchannelru():
             * CASE
                 WHEN MS.nmemes_sent <= 1 THEN 1
                 ELSE (MS.nlikes + MS.ndislikes) * 1. / MS.nmemes_sent
-            END
-
+              END
+            * COALESCE(
+                LEAST(2.0, GREATEST(0.5,
+                    SQ.signal / NULLIF((SELECT m_signal FROM src_median), 0)
+                )),
+                1.0
+              )
+            * (1.0 + LEAST(MS.invited_count, 10) * 0.1)
         LIMIT 1
     """
     return await fetch_one(text(query))
 
 
 async def get_next_meme_for_tgchannelen() -> dict[str, Any]:
-    # Videos excluded: 1.8x boost (added 2026-04-13) flipped EN channel to 100% videos.
-    # Outcome over 9 days: avg views collapsed 179 → 78, reactions 1.1 → 0.5 per post,
-    # subscribers drifted 629 → 625. Higher fwd/1k for videos was an artifact of fewer
-    # views (Russian internet loads videos poorly), not better content.
     query = """
-        SELECT
-            M.id
-            , M.type, M.telegram_file_id, M.caption
-
+        WITH src_quality AS (
+            SELECT
+                m.meme_source_id,
+                AVG(cp.forwards * SQRT(GREATEST(cp.views, 1) / 100.0)) AS signal,
+                COUNT(*) AS n_posts
+            FROM crossposting cp
+            JOIN meme m ON m.id = cp.meme_id
+            WHERE cp.channel = 'tgchannelen'
+              AND cp.created_at > NOW() - INTERVAL '30 days'
+              AND cp.created_at < NOW() - INTERVAL '48 hours'
+              AND cp.views IS NOT NULL
+              AND cp.views > 0
+              AND m.type = 'image'
+            GROUP BY m.meme_source_id
+            HAVING COUNT(*) >= 5
+        ),
+        src_median AS (
+            SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY signal) AS m_signal
+            FROM src_quality
+        ),
+        recent_src AS (
+            SELECT DISTINCT m2.meme_source_id
+            FROM crossposting cp2
+            JOIN meme m2 ON m2.id = cp2.meme_id
+            WHERE cp2.channel = 'tgchannelen'
+              AND cp2.created_at > NOW() - INTERVAL '24 hours'
+        )
+        SELECT M.id, M.type, M.telegram_file_id, M.caption
         FROM meme M
-        LEFT JOIN meme_stats MS
-            ON MS.meme_id = M.id
-        LEFT JOIN crossposting CP
-            ON CP.meme_id = M.id
-            AND CP.channel = 'tgchannelen'
-
+        INNER JOIN meme_stats MS ON MS.meme_id = M.id
+        LEFT JOIN crossposting CP ON CP.meme_id = M.id AND CP.channel = 'tgchannelen'
+        LEFT JOIN src_quality SQ ON SQ.meme_source_id = M.meme_source_id
         WHERE 1=1
-            AND CP.meme_id IS NULL
-            AND M.status = 'ok'
-            AND M.language_code = 'en'
-            AND M.type = 'image'
-            AND MS.nlikes >= 5
-
+          AND CP.meme_id IS NULL
+          AND M.status = 'ok'
+          AND M.language_code = 'en'
+          AND M.type = 'image'
+          AND MS.nlikes >= 5
+          AND M.meme_source_id NOT IN (SELECT meme_source_id FROM recent_src)
         ORDER BY -1
             * COALESCE((MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1), 0.5)
             * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE 0.5 END
-            * CASE WHEN MS.age_days < 90 THEN 1 ELSE 0.7 END
-            * CASE WHEN M.caption IS NULL THEN 1 ELSE 0.9 END
+            * CASE WHEN MS.age_days < 90 THEN 1 ELSE 0.8 END
+            * CASE WHEN M.caption IS NULL THEN 1 ELSE 0.8 END
             * CASE
                 WHEN MS.nmemes_sent <= 1 THEN 1
                 ELSE (MS.nlikes + MS.ndislikes) * 1. / MS.nmemes_sent
-            END
-
+              END
+            * COALESCE(
+                LEAST(2.0, GREATEST(0.5,
+                    SQ.signal / NULLIF((SELECT m_signal FROM src_median), 0)
+                )),
+                1.0
+              )
+            * (1.0 + LEAST(MS.invited_count, 10) * 0.1)
         LIMIT 1
     """
     return await fetch_one(text(query))

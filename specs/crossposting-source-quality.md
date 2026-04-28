@@ -384,10 +384,10 @@ The two functions stay separate — no helper extraction (DRY violation accepted
 - `LIMIT 1`
 
 **Verification:**
-- `python -c "from src.crossposting.service import get_next_meme_for_tgchannelru, get_next_meme_for_tgchannelen; print('imports ok')"` succeeds.
-- `ruff check src/crossposting/service.py` — no errors.
-- `ruff format --check src/crossposting/service.py` — formatted.
-- Both functions still return `dict[str, Any] | None` shape (do not change signature).
+- [x] `python -c "from src.crossposting.service import get_next_meme_for_tgchannelru, get_next_meme_for_tgchannelen; print('imports ok')"` succeeds.
+- [x] `ruff check src/crossposting/service.py` — no errors.
+- [x] `ruff format --check src/crossposting/service.py` — formatted.
+- [x] Both functions still return `dict[str, Any] | None` shape (do not change signature).
 
 ### Task 2: Bump `score_version=2` and add graceful skip in flow handlers
 
@@ -422,9 +422,9 @@ The `log_meme_sent()` signature in `src/crossposting/service.py` already accepts
 **Do NOT change:** `src/flows/rewards/uploaded_memes.py` (or any other caller of `log_meme_sent`) — those callers stay at default `score_version=1`. Only the channel post handlers bump to 2.
 
 **Verification:**
-- `ruff check src/flows/crossposting/meme.py` — no errors.
-- `grep -n "score_version=2" src/flows/crossposting/meme.py` — returns at least 3 lines (EN, RU TG, RU VK).
-- `grep -n "if meme_data is None" src/flows/crossposting/meme.py` — returns exactly 2 lines (one per channel handler).
+- [ ] `ruff check src/flows/crossposting/meme.py` — no errors.
+- [ ] `grep -n "score_version=2" src/flows/crossposting/meme.py` — returns at least 3 lines (EN, RU TG, RU VK).
+- [ ] `grep -n "if meme_data is None" src/flows/crossposting/meme.py` — returns exactly 2 lines (one per channel handler).
 
 ### Task 3: Add 4 integration tests for the new ranker logic
 
@@ -459,9 +459,9 @@ All tests must use `@pytest.mark.asyncio` and the running DB fixture per `CLAUDE
 - Assert: result is not None, result['id'] matches the candidate (source-quality coefficient falls through to neutral 1.0, ranker returns the only valid candidate).
 
 **Verification:**
-- `docker compose exec app pytest tests/test_crossposting_meme.py -x -v` — all 4 new tests pass plus 9 existing `_clean_caption` tests.
-- `ruff check tests/test_crossposting_meme.py` — no errors.
-- `ruff format --check tests/test_crossposting_meme.py` — formatted.
+- [ ] `docker compose exec app pytest tests/test_crossposting_meme.py -x -v` — all 4 new tests pass plus 9 existing `_clean_caption` tests.
+- [ ] `ruff check tests/test_crossposting_meme.py` — no errors.
+- [ ] `ruff format --check tests/test_crossposting_meme.py` — formatted.
 
 ### Task 4: Lint, format, and full verification
 
@@ -474,7 +474,7 @@ docker compose exec app pytest tests/test_crossposting_meme.py -x -v
 ```
 
 **Verification:**
-- `ruff check src/ tests/` — exits 0.
-- `ruff format --check src/ tests/` — exits 0.
-- `docker compose exec app pytest tests/test_crossposting_meme.py` — exits 0, all tests pass.
-- `git status` — only `src/crossposting/service.py`, `src/flows/crossposting/meme.py`, `tests/test_crossposting_meme.py` modified. No other files touched.
+- [ ] `ruff check src/ tests/` — exits 0.
+- [ ] `ruff format --check src/ tests/` — exits 0.
+- [ ] `docker compose exec app pytest tests/test_crossposting_meme.py` — exits 0, all tests pass.
+- [ ] `git status` — only `src/crossposting/service.py`, `src/flows/crossposting/meme.py`, `tests/test_crossposting_meme.py` modified. No other files touched.
