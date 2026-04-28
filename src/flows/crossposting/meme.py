@@ -10,6 +10,7 @@ from src.crossposting.service import (
     get_next_meme_for_tgchannelen,
     get_next_meme_for_tgchannelru,
     log_meme_sent,
+    log_ranker_decision,
 )
 from src.crossposting.vk import post_photo_to_group
 from src.flows.hooks import notify_telegram_on_failure
@@ -191,12 +192,20 @@ def _get_en_caption_for_crossposting_meme(meme: MemeData, channel: Channel) -> s
 async def post_meme_to_tgchannelen():
     logger = get_run_logger()
 
-    meme_data = await get_next_meme_for_tgchannelen()
+    meme_data, decision = await get_next_meme_for_tgchannelen()
     if meme_data is None:
         logger.warning("No qualifying meme for TG Channel EN, skipping slot")
         return
     next_meme = MemeData(**meme_data)
     logger.info(f"Next meme for TG Channel EN: {next_meme.id}")
+
+    # Persist the ranker decision for retro analysis. Failure must NOT propagate
+    # — Prefect retry would republish the meme.
+    if decision:
+        try:
+            await log_ranker_decision(**decision)
+        except Exception as e:
+            logger.error(f"log_ranker_decision failed for {next_meme.id}: {e}")
 
     caption_text = _get_en_caption_for_crossposting_meme(next_meme, Channel.TG_CHANNEL_EN)
     next_meme.caption = caption_text
@@ -237,12 +246,20 @@ async def post_meme_to_tgchannelen():
 async def post_meme_to_tgchannelru():
     logger = get_run_logger()
 
-    meme_data = await get_next_meme_for_tgchannelru()
+    meme_data, decision = await get_next_meme_for_tgchannelru()
     if meme_data is None:
         logger.warning("No qualifying meme for TG Channel RU, skipping slot")
         return
     next_meme = MemeData(**meme_data)
     logger.info(f"Next meme for TG Channel RU: {next_meme.id}")
+
+    # Persist the ranker decision for retro analysis. Failure must NOT propagate
+    # — Prefect retry would republish the meme.
+    if decision:
+        try:
+            await log_ranker_decision(**decision)
+        except Exception as e:
+            logger.error(f"log_ranker_decision failed for {next_meme.id}: {e}")
 
     caption_text = _get_ru_caption_for_crossposting_meme(next_meme, Channel.TG_CHANNEL_RU)
     next_meme.caption = caption_text

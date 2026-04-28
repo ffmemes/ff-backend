@@ -2,8 +2,11 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import delete, text
 
-from src.crossposting.service import get_next_meme_for_tgchannelru
-from src.database import crossposting, engine
+from src.crossposting.service import (
+    get_next_meme_for_tgchannelru,
+    log_ranker_decision,
+)
+from src.database import crossposting, crossposting_decision_log, engine
 from src.flows.crossposting.meme import _clean_caption
 from tests.factories import (
     TEST_ID_START,
@@ -58,6 +61,11 @@ def test_whitespace_only():
 
 async def _wipe(conn):
     await conn.execute(delete(crossposting).where(crossposting.c.meme_id >= TEST_ID_START))
+    await conn.execute(
+        delete(crossposting_decision_log).where(
+            crossposting_decision_log.c.picked_meme_id >= TEST_ID_START
+        )
+    )
     await cleanup_test_data(conn)
     await conn.commit()
 
@@ -129,11 +137,14 @@ async def test_select_excludes_source_posted_within_24h(clean_xpost):
         await create_meme_stats(conn, meme_id=10004, nlikes=10, ndislikes=2)
         await conn.commit()
 
-    result = await get_next_meme_for_tgchannelru()
-    assert result is not None, "Source B candidate should remain selectable"
-    assert result["id"] == 10004, (
+    picked, decision = await get_next_meme_for_tgchannelru()
+    assert picked is not None, "Source B candidate should remain selectable"
+    assert picked["id"] == 10004, (
         "diversity cap must exclude source 10001 and prefer source 10003 candidate"
     )
+    assert decision is not None
+    assert decision["picked_meme_id"] == 10004
+    assert decision["candidates"][0]["meme_id"] == 10004
 
 
 @pytest.mark.asyncio
@@ -158,8 +169,9 @@ async def test_select_returns_none_when_all_filtered(clean_xpost):
         await _insert_crossposting(conn, "tgchannelru", 10013, hours_ago=72, views=100, forwards=5)
         await conn.commit()
 
-    result = await get_next_meme_for_tgchannelru()
-    assert result is None
+    picked, decision = await get_next_meme_for_tgchannelru()
+    assert picked is None
+    assert decision is None
 
 
 @pytest.mark.asyncio
@@ -209,10 +221,19 @@ async def test_source_quality_applied_when_n_above_threshold(clean_xpost):
         await create_meme_stats(conn, meme_id=10250, nlikes=10, ndislikes=2)
         await conn.commit()
 
-    result = await get_next_meme_for_tgchannelru()
-    assert result is not None
-    assert result["id"] == 10150, (
+    picked, decision = await get_next_meme_for_tgchannelru()
+    assert picked is not None
+    assert picked["id"] == 10150, (
         "good_source candidate should outrank bad_source via SQ multiplier"
+    )
+    # Decision log captures both candidates with their src_quality_mult
+    assert decision is not None
+    candidate_meme_ids = [c["meme_id"] for c in decision["candidates"]]
+    assert 10150 in candidate_meme_ids and 10250 in candidate_meme_ids
+    picked_breakdown = decision["candidates"][0]
+    other_breakdown = next(c for c in decision["candidates"] if c["meme_id"] == 10250)
+    assert picked_breakdown["src_quality_mult"] > other_breakdown["src_quality_mult"], (
+        "good_source mult must exceed bad_source mult"
     )
 
 
@@ -226,6 +247,105 @@ async def test_source_quality_neutral_when_no_snapshots(clean_xpost):
         await create_meme_stats(conn, meme_id=10301, nlikes=10, ndislikes=2)
         await conn.commit()
 
-    result = await get_next_meme_for_tgchannelru()
-    assert result is not None
-    assert result["id"] == 10301
+    picked, decision = await get_next_meme_for_tgchannelru()
+    assert picked is not None
+    assert picked["id"] == 10301
+    assert decision is not None
+    # Cold-start: src_signal None and src_quality_mult falls through to neutral 1.0
+    only_candidate = decision["candidates"][0]
+    assert only_candidate["src_signal"] is None
+    assert only_candidate["src_quality_mult"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_ranker_decision_log_records_top5(clean_xpost):
+    """Decision log persists top-N candidates with full score breakdown for retro analysis."""
+    async with engine.connect() as conn:
+        await create_meme_source(conn, id=10400, language_code="ru")
+        # Create 7 eligible candidates from the same source (so all pass filters
+        # and rank by score). LIMIT in get_next_meme_for_tgchannelru is 5 → top-5 logged.
+        for i in range(7):
+            mid = 10401 + i
+            await create_meme(
+                conn,
+                id=mid,
+                meme_source_id=10400,
+                language_code="ru",
+                type="image",
+                status="ok",
+            )
+            # Different nlikes so the ranker has a deterministic ordering
+            await create_meme_stats(conn, meme_id=mid, nlikes=20 - i, ndislikes=2)
+        await conn.commit()
+
+    picked, decision = await get_next_meme_for_tgchannelru()
+    assert picked is not None
+    assert decision is not None
+    # Persist via the actual logger (exercising the SQL path)
+    await log_ranker_decision(**decision)
+
+    async with engine.connect() as conn:
+        rows = (
+            (
+                await conn.execute(
+                    text(
+                        "SELECT channel, picked_meme_id, score_version, candidate_pool_size, "
+                        "candidates FROM crossposting_decision_log WHERE picked_meme_id >= :s "
+                        "ORDER BY decided_at DESC LIMIT 1"
+                    ),
+                    {"s": TEST_ID_START},
+                )
+            )
+            .mappings()
+            .all()
+        )
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["channel"] == "tgchannelru"
+    assert row["picked_meme_id"] == picked["id"]
+    assert row["score_version"] == 2
+    assert row["candidate_pool_size"] == 7  # 7 eligible memes
+    assert len(row["candidates"]) == 5  # top-5 logged (LIMIT 5)
+    # Each entry has the documented score breakdown keys
+    required_keys = {
+        "rank",
+        "meme_id",
+        "source_id",
+        "nlikes",
+        "ndislikes",
+        "raw_impr_rank",
+        "age_days",
+        "nmemes_sent",
+        "invited_count",
+        "caption_present",
+        "src_signal",
+        "src_quality_mult",
+        "lr_factor",
+        "impr_factor",
+        "age_factor",
+        "caption_factor",
+        "sent_factor",
+        "invited_boost",
+        "final_score",
+    }
+    assert required_keys.issubset(row["candidates"][0].keys())
+    # Rank order matches list order
+    ranks = [c["rank"] for c in row["candidates"]]
+    assert ranks == [1, 2, 3, 4, 5]
+
+
+@pytest.mark.asyncio
+async def test_ranker_decision_log_does_not_propagate_db_errors(clean_xpost):
+    """Caller wraps log_ranker_decision in try/except. Smoke-test that obviously
+    invalid args (missing required key) raise — caller is responsible for catching.
+    Ensures the logger doesn't silently swallow programmer errors."""
+    with pytest.raises(Exception):
+        # Missing channel — DB-level NOT NULL violation
+        await log_ranker_decision(
+            channel=None,  # type: ignore[arg-type]
+            picked_meme_id=99999,
+            score_version=2,
+            median_signal=1.0,
+            pool_size=1,
+            candidates=[{"rank": 1, "meme_id": 99999}],
+        )
