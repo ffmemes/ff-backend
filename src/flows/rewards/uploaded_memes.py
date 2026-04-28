@@ -148,11 +148,14 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
     )
 
     for i, top_meme in enumerate(top_memes):
-        await log_meme_sent(
-            top_meme["meme_id"],
-            channel=Channel.TG_CHANNEL_RU,
-            telegram_message_id=ms[i].id,
-        )
+        try:
+            await log_meme_sent(
+                top_meme["meme_id"],
+                channel=Channel.TG_CHANNEL_RU,
+                telegram_message_id=ms[i].id,
+            )
+        except Exception as e:
+            logger.error(f"Failed to log meme_sent for {top_meme['meme_id']}: {e}")
 
     message_link = f"{TELEGRAM_CHANNEL_RU_LINK}/{ms[0].id}"
 
@@ -273,11 +276,14 @@ Forward top meme to our bot → <a href="https://t.me/ffmemesbot?start=kitchen">
     )
 
     for i, top_meme in enumerate(top_memes):
-        await log_meme_sent(
-            top_meme["meme_id"],
-            channel=Channel.TG_CHANNEL_EN,
-            telegram_message_id=ms[i].id,
-        )
+        try:
+            await log_meme_sent(
+                top_meme["meme_id"],
+                channel=Channel.TG_CHANNEL_EN,
+                telegram_message_id=ms[i].id,
+            )
+        except Exception as e:
+            logger.error(f"Failed to log meme_sent for {top_meme['meme_id']}: {e}")
 
     message_link = f"{TELEGRAM_CHANNEL_EN_LINK}/{ms[0].id}"
 
