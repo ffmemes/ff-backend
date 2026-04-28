@@ -92,6 +92,7 @@ async def clean_xpost():
 @pytest.mark.asyncio
 async def test_select_excludes_source_posted_within_24h(clean_xpost):
     async with engine.connect() as conn:
+        # Source A: posted within 24h → must be excluded by diversity cap
         await create_meme_source(conn, id=10001, language_code="ru")
         await create_meme(
             conn, id=10001, meme_source_id=10001, language_code="ru", type="image", status="ok"
@@ -101,15 +102,21 @@ async def test_select_excludes_source_posted_within_24h(clean_xpost):
         )
         await create_meme_stats(conn, meme_id=10001, nlikes=10, ndislikes=2)
         await create_meme_stats(conn, meme_id=10002, nlikes=10, ndislikes=2)
-        # Post meme 10001 to channel within last 24h → source enters recent_src
         await _insert_crossposting(conn, "tgchannelru", 10001, hours_ago=1, views=200, forwards=20)
+
+        # Source B: not posted recently → must be selected over Source A
+        await create_meme_source(conn, id=10003, language_code="ru")
+        await create_meme(
+            conn, id=10004, meme_source_id=10003, language_code="ru", type="image", status="ok"
+        )
+        await create_meme_stats(conn, meme_id=10004, nlikes=10, ndislikes=2)
         await conn.commit()
 
     result = await get_next_meme_for_tgchannelru()
-    if result is not None:
-        assert result["id"] not in (10001, 10002), (
-            "source posted within 24h should be excluded by diversity cap"
-        )
+    assert result is not None, "Source B candidate should remain selectable"
+    assert result["id"] == 10004, (
+        "diversity cap must exclude source 10001 and prefer source 10003 candidate"
+    )
 
 
 @pytest.mark.asyncio

@@ -11,7 +11,7 @@ from src.crossposting.service import (
     get_next_meme_for_tgchannelru,
     log_meme_sent,
 )
-from src.crossposting.vk import VkError, post_photo_to_group
+from src.crossposting.vk import post_photo_to_group
 from src.flows.hooks import notify_telegram_on_failure
 from src.storage.constants import MemeStatus, MemeType
 from src.storage.schemas import MemeData
@@ -274,7 +274,7 @@ async def post_meme_to_tgchannelru():
                 score_version=2,
             )
             logger.info(f"VK posted meme {next_meme.id} as post_id={vk_result.get('post_id')}")
-        except (VkError, Exception) as e:
+        except Exception as e:
             logger.error(f"VK crosspost failed for meme {next_meme.id}: {e}")
 
     uploader_user_id = await get_meme_uploader_user_id(next_meme.id)
