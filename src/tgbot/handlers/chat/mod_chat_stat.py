@@ -60,21 +60,38 @@ _STATS_QUERY = text(
     r"""
     SELECT
         m.id,
-        COALESCE(ms.nmemes_sent, 0)  AS views,
-        COALESCE(ms.nlikes, 0)       AS nlikes,
-        COALESCE(ms.ndislikes, 0)    AS ndislikes,
+        COALESCE(rc.views, 0)        AS views,
+        COALESCE(rc.nlikes, 0)       AS nlikes,
+        COALESCE(rc.ndislikes, 0)    AS ndislikes,
         COALESCE(ms.sec_to_react, 0) AS sec_to_react,
-        COALESCE(mrt.url, msrc.url)  AS source_url,
+        CASE
+            WHEN msrc.type = 'telegram' AND mrt.post_id IS NOT NULL
+                THEN msrc.url || '/' || mrt.post_id
+            WHEN msrc.type = 'vk' AND mrv.url IS NOT NULL
+                THEN mrv.url
+            ELSE msrc.url
+        END AS source_url,
         (
             SELECT count(*) FROM user_deep_link_log
             WHERE deep_link LIKE :mid_pattern
         ) AS clicks
     FROM meme m
+    LEFT JOIN (
+        SELECT
+            meme_id,
+            COUNT(*)                              AS views,
+            COUNT(*) FILTER (WHERE reaction_id=1) AS nlikes,
+            COUNT(*) FILTER (WHERE reaction_id=2) AS ndislikes
+        FROM user_meme_reaction
+        WHERE meme_id = :mid
+        GROUP BY meme_id
+    ) rc ON rc.meme_id = m.id
     LEFT JOIN meme_stats ms       ON ms.meme_id = m.id
     LEFT JOIN meme_source msrc    ON msrc.id = m.meme_source_id
     LEFT JOIN meme_raw_telegram mrt
-        ON mrt.meme_source_id = m.meme_source_id
-       AND mrt.post_id = m.raw_meme_id
+        ON msrc.type = 'telegram' AND mrt.id = m.raw_meme_id
+    LEFT JOIN meme_raw_vk mrv
+        ON msrc.type = 'vk' AND mrv.id = m.raw_meme_id
     WHERE m.id = :mid
     """
 )
