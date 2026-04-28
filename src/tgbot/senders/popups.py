@@ -13,6 +13,7 @@ from src.tgbot.senders.utils import get_random_emoji
 from src.tgbot.service import (
     assign_experiment,
     create_user_popup_log,
+    delete_user_popup_log,
     get_experiment_variant,
     user_popup_already_sent,
 )
@@ -183,7 +184,9 @@ async def get_popup_to_send(user_id: int, user_info: dict) -> Popup | None:
 
 
 async def maybe_send_first_meme_nudge(user_id: int, user_info: dict) -> None:
-    # Idempotent: already nudged this user — never send again.
+    # Cheap pre-check: avoids extra writes (assignment row + insert attempt) for
+    # the common already-nudged path. The atomic lease below is what actually
+    # guarantees single-fire under concurrent meme #1 deliveries.
     if await user_popup_already_sent(user_id, FIRST_MEME_NUDGE_POPUP_ID):
         return
 
@@ -201,6 +204,13 @@ async def maybe_send_first_meme_nudge(user_id: int, user_info: dict) -> None:
     if variant != "treatment":
         return
 
+    # Atomic lease: insert the popup-log row first. Only the caller whose insert
+    # actually created the row (rowcount==1) is allowed to send. This collapses
+    # the previous (check, send, log) sequence into a single race-safe op so two
+    # concurrent first-meme flows can't both fire the nudge.
+    if not await create_user_popup_log(user_id, FIRST_MEME_NUDGE_POPUP_ID):
+        return
+
     text = localizer.t(FIRST_MEME_NUDGE_POPUP_ID, user_info["interface_lang"])
     try:
         await bot.send_message(
@@ -209,13 +219,17 @@ async def maybe_send_first_meme_nudge(user_id: int, user_info: dict) -> None:
             parse_mode=ParseMode.HTML,
         )
     except Forbidden:
-        # User blocked the bot between meme send and nudge — nothing to do.
+        # User blocked the bot between meme send and nudge. Keep the lease — the
+        # user can't receive messages anyway, and nmemes_sent will advance past 0
+        # so this code path won't re-enter for this user.
         return
     except TelegramError as exc:
+        # Transient delivery failure (timeout, rate-limit, etc.). Release the
+        # lease so a future meme #1 attempt can re-fire the nudge.
         logger.warning("Failed to send first-meme nudge to user %s: %s", user_id, exc)
+        await delete_user_popup_log(user_id, FIRST_MEME_NUDGE_POPUP_ID)
         return
 
-    await create_user_popup_log(user_id, FIRST_MEME_NUDGE_POPUP_ID)
     safe_emit(
         f"ff.experiment.{FIRST_MEME_NUDGE_EXPERIMENT_ID}.sent",
         f"user.{user_id}",
