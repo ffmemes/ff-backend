@@ -474,7 +474,7 @@ docker compose exec app pytest tests/test_crossposting_meme.py -x -v
 ```
 
 **Verification:**
-- [ ] `ruff check src/ tests/` — exits 0.
-- [ ] `ruff format --check src/ tests/` — exits 0.
-- [ ] `docker compose exec app pytest tests/test_crossposting_meme.py` — exits 0, all tests pass.
-- [ ] `git status` — only `src/crossposting/service.py`, `src/flows/crossposting/meme.py`, `tests/test_crossposting_meme.py` modified. No other files touched.
+- [x] `ruff check src/ tests/` — exits 0.
+- [x] `ruff format --check src/ tests/` — exits 0.
+- [x] `docker compose exec app pytest tests/test_crossposting_meme.py` — exits 0, all tests pass. (Ran via host-mode pytest per CLAUDE.md — 13/13 passed in 105s.)
+- [x] `git status` — only `src/crossposting/service.py`, `src/flows/crossposting/meme.py`, `tests/test_crossposting_meme.py` modified. No other files touched. (Verified via prior commits: 1d7831c, 42ed9e8, 06721d9; working tree clean.)
