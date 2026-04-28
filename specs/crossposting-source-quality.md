@@ -459,9 +459,9 @@ All tests must use `@pytest.mark.asyncio` and the running DB fixture per `CLAUDE
 - Assert: result is not None, result['id'] matches the candidate (source-quality coefficient falls through to neutral 1.0, ranker returns the only valid candidate).
 
 **Verification:**
-- [ ] `docker compose exec app pytest tests/test_crossposting_meme.py -x -v` — all 4 new tests pass plus 9 existing `_clean_caption` tests.
-- [ ] `ruff check tests/test_crossposting_meme.py` — no errors.
-- [ ] `ruff format --check tests/test_crossposting_meme.py` — formatted.
+- [x] `docker compose exec app pytest tests/test_crossposting_meme.py -x -v` — all 4 new tests pass plus 9 existing `_clean_caption` tests. (Ran via host-mode pytest per CLAUDE.md "Host-mode pytest" — 13/13 passed in 93s.)
+- [x] `ruff check tests/test_crossposting_meme.py` — no errors.
+- [x] `ruff format --check tests/test_crossposting_meme.py` — formatted.
 
 ### Task 4: Lint, format, and full verification
 
