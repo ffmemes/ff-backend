@@ -11,7 +11,7 @@ from src.crossposting.service import (
     get_next_meme_for_tgchannelru,
     log_meme_sent,
 )
-from src.crossposting.vk import VkError, post_photo_to_group
+from src.crossposting.vk import post_photo_to_group
 from src.flows.hooks import notify_telegram_on_failure
 from src.storage.constants import MemeStatus, MemeType
 from src.storage.schemas import MemeData
@@ -192,6 +192,9 @@ async def post_meme_to_tgchannelen():
     logger = get_run_logger()
 
     meme_data = await get_next_meme_for_tgchannelen()
+    if meme_data is None:
+        logger.warning("No qualifying meme for TG Channel EN, skipping slot")
+        return
     next_meme = MemeData(**meme_data)
     logger.info(f"Next meme for TG Channel EN: {next_meme.id}")
 
@@ -206,6 +209,7 @@ async def post_meme_to_tgchannelen():
         Channel.TG_CHANNEL_EN,
         telegram_message_id=msg.message_id,
         caption_text=caption_text,
+        score_version=2,
     )
     await update_meme(next_meme.id, status=MemeStatus.PUBLISHED)
 
@@ -234,6 +238,9 @@ async def post_meme_to_tgchannelru():
     logger = get_run_logger()
 
     meme_data = await get_next_meme_for_tgchannelru()
+    if meme_data is None:
+        logger.warning("No qualifying meme for TG Channel RU, skipping slot")
+        return
     next_meme = MemeData(**meme_data)
     logger.info(f"Next meme for TG Channel RU: {next_meme.id}")
 
@@ -249,6 +256,7 @@ async def post_meme_to_tgchannelru():
         Channel.TG_CHANNEL_RU,
         telegram_message_id=msg.message_id,
         caption_text=caption_text,
+        score_version=2,
     )
     await update_meme(next_meme.id, status=MemeStatus.PUBLISHED)
 
@@ -263,9 +271,10 @@ async def post_meme_to_tgchannelru():
                 Channel.VK_GROUP_RU,
                 telegram_message_id=vk_result.get("post_id"),
                 caption_text=vk_caption,
+                score_version=2,
             )
             logger.info(f"VK posted meme {next_meme.id} as post_id={vk_result.get('post_id')}")
-        except (VkError, Exception) as e:
+        except Exception as e:
             logger.error(f"VK crosspost failed for meme {next_meme.id}: {e}")
 
     uploader_user_id = await get_meme_uploader_user_id(next_meme.id)

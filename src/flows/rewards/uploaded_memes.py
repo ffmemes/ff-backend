@@ -120,7 +120,6 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
 
         if top_meme["status"] != MemeStatus.PUBLISHED:
             await update_meme(top_meme["meme_id"], status=MemeStatus.PUBLISHED)
-            await log_meme_sent(top_meme["meme_id"], channel=Channel.TG_CHANNEL_RU)
 
     # send message to tgchannelru
 
@@ -147,6 +146,19 @@ async def reward_ru_users_for_weekly_top_uploaded_memes():
         caption=channel_text,
         parse_mode="HTML",
     )
+
+    # log_meme_sent failures must NOT propagate — Prefect would retry the flow
+    # and re-publish the album publicly. Missing one diversity-cap row is the
+    # smaller harm; the safe block below mirrors the author-notify pattern.
+    for i, top_meme in enumerate(top_memes):
+        try:
+            await log_meme_sent(
+                top_meme["meme_id"],
+                channel=Channel.TG_CHANNEL_RU,
+                telegram_message_id=ms[i].id,
+            )
+        except Exception as e:
+            logger.error(f"Failed to log meme_sent for {top_meme['meme_id']}: {e}")
 
     message_link = f"{TELEGRAM_CHANNEL_RU_LINK}/{ms[0].id}"
 
@@ -239,7 +251,6 @@ async def reward_en_users_for_weekly_top_uploaded_memes():
 
         if top_meme["status"] != MemeStatus.PUBLISHED:
             await update_meme(top_meme["meme_id"], status=MemeStatus.PUBLISHED)
-            await log_meme_sent(top_meme["meme_id"], channel=Channel.TG_CHANNEL_EN)
 
     # send message to tgchannelen
 
@@ -266,6 +277,17 @@ Forward top meme to our bot → <a href="https://t.me/ffmemesbot?start=kitchen">
         caption=channel_text,
         parse_mode="HTML",
     )
+
+    # log_meme_sent failures must NOT propagate (see RU flow above for context).
+    for i, top_meme in enumerate(top_memes):
+        try:
+            await log_meme_sent(
+                top_meme["meme_id"],
+                channel=Channel.TG_CHANNEL_EN,
+                telegram_message_id=ms[i].id,
+            )
+        except Exception as e:
+            logger.error(f"Failed to log meme_sent for {top_meme['meme_id']}: {e}")
 
     message_link = f"{TELEGRAM_CHANNEL_EN_LINK}/{ms[0].id}"
 
