@@ -69,14 +69,23 @@ async def _insert_crossposting(
     hours_ago: int,
     views: int = 0,
     forwards: int = 0,
+    telegram_message_id: int | None = None,
 ) -> None:
     await conn.execute(
         text(
-            "INSERT INTO crossposting (channel, meme_id, created_at, views, forwards) "
-            f"VALUES (:channel, :meme_id, NOW() - INTERVAL '{hours_ago} hours', :views, :forwards) "
+            "INSERT INTO crossposting "
+            "(channel, meme_id, created_at, views, forwards, telegram_message_id) "
+            f"VALUES (:channel, :meme_id, NOW() - INTERVAL '{hours_ago} hours', "
+            ":views, :forwards, :tmid) "
             "ON CONFLICT DO NOTHING"
         ),
-        {"channel": channel, "meme_id": meme_id, "views": views, "forwards": forwards},
+        {
+            "channel": channel,
+            "meme_id": meme_id,
+            "views": views,
+            "forwards": forwards,
+            "tmid": telegram_message_id,
+        },
     )
 
 
@@ -102,7 +111,15 @@ async def test_select_excludes_source_posted_within_24h(clean_xpost):
         )
         await create_meme_stats(conn, meme_id=10001, nlikes=10, ndislikes=2)
         await create_meme_stats(conn, meme_id=10002, nlikes=10, ndislikes=2)
-        await _insert_crossposting(conn, "tgchannelru", 10001, hours_ago=1, views=200, forwards=20)
+        await _insert_crossposting(
+            conn,
+            "tgchannelru",
+            10001,
+            hours_ago=1,
+            views=200,
+            forwards=20,
+            telegram_message_id=999001,
+        )
 
         # Source B: not posted recently → must be selected over Source A
         await create_meme_source(conn, id=10003, language_code="ru")

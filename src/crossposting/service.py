@@ -14,6 +14,11 @@ async def log_meme_sent(
     caption_text: str | None = None,
     score_version: int = 1,
 ) -> None:
+    # ON CONFLICT DO NOTHING: rewrite-on-repost would corrupt source-quality
+    # measurements (drop the original mature sample out of the [30d, 48h]
+    # window and overwrite its views/forwards with the reward post's stats).
+    # Reward reposts of already-crossposted memes therefore don't refresh
+    # the diversity cap — acceptable since rewards run weekly.
     insert_statement = (
         insert(crossposting)
         .values(
@@ -57,6 +62,7 @@ async def get_next_meme_for_tgchannelru():
             JOIN meme m2 ON m2.id = cp2.meme_id
             WHERE cp2.channel = 'tgchannelru'
               AND cp2.created_at > NOW() - INTERVAL '24 hours'
+              AND cp2.telegram_message_id IS NOT NULL
         )
         SELECT M.id, M.type, M.telegram_file_id, M.caption
         FROM meme M
@@ -119,6 +125,7 @@ async def get_next_meme_for_tgchannelen() -> dict[str, Any]:
             JOIN meme m2 ON m2.id = cp2.meme_id
             WHERE cp2.channel = 'tgchannelen'
               AND cp2.created_at > NOW() - INTERVAL '24 hours'
+              AND cp2.telegram_message_id IS NOT NULL
         )
         SELECT M.id, M.type, M.telegram_file_id, M.caption
         FROM meme M
