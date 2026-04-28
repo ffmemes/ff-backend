@@ -415,6 +415,9 @@ async def create_user_popup_log(
     user_id: int,
     popup_id: str,
 ) -> bool:
+    # Returns True if a new row was inserted (caller "won the lease"), False if a
+    # row already existed. Callers that need atomic single-fire semantics can use
+    # the return value as a lease — see maybe_send_first_meme_nudge.
     insert_query = (
         insert(user_popup_logs)
         .values(
@@ -425,7 +428,19 @@ async def create_user_popup_log(
             index_elements=(user_popup_logs.c.user_id, user_popup_logs.c.popup_id)
         )
     )
-    await execute(insert_query)
+    result = await execute(insert_query)
+    return result.rowcount > 0
+
+
+async def delete_user_popup_log(
+    user_id: int,
+    popup_id: str,
+) -> None:
+    await execute(
+        user_popup_logs.delete()
+        .where(user_popup_logs.c.user_id == user_id)
+        .where(user_popup_logs.c.popup_id == popup_id)
+    )
 
 
 async def update_user_popup_log(
@@ -515,8 +530,13 @@ async def get_experiment_variant(user_id: int, experiment_id: str) -> str | None
     return row["variant"] if row else None
 
 
-async def assign_experiment(user_id: int, experiment_id: str, variant: str) -> None:
-    """Assign a user to an experiment variant. Idempotent (ON CONFLICT DO NOTHING)."""
+async def assign_experiment(user_id: int, experiment_id: str, variant: str) -> bool:
+    """Assign a user to an experiment variant. Idempotent (ON CONFLICT DO NOTHING).
+
+    Returns True when this call inserted a new assignment row, False when a
+    row already existed. Callers can use the return value as a once-per-user
+    gate (e.g. emitting `evaluated` exactly once when the cohort is decided).
+    """
     insert_query = (
         insert(experiment_assignment)
         .values(
@@ -528,4 +548,5 @@ async def assign_experiment(user_id: int, experiment_id: str, variant: str) -> N
             index_elements=["experiment_id", "user_id"],
         )
     )
-    await execute(insert_query)
+    result = await execute(insert_query)
+    return result.rowcount > 0

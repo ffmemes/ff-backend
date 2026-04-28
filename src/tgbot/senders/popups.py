@@ -1,5 +1,8 @@
+import logging
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
+from telegram.error import Forbidden, TelegramError
 
 from src import localizer
 from src.flows.events import safe_emit
@@ -10,10 +13,16 @@ from src.tgbot.senders.utils import get_random_emoji
 from src.tgbot.service import (
     assign_experiment,
     create_user_popup_log,
+    delete_user_popup_log,
     get_experiment_variant,
     user_popup_already_sent,
 )
 from src.tgbot.utils import get_related_channel_link
+
+logger = logging.getLogger(__name__)
+
+FIRST_MEME_NUDGE_EXPERIMENT_ID = "first_meme_nudge"
+FIRST_MEME_NUDGE_POPUP_ID = "nudge.first_meme"
 
 
 def _get_popup(popup_id: str, user_info: dict) -> Popup:
@@ -172,3 +181,78 @@ async def get_popup_to_send(user_id: int, user_info: dict) -> Popup | None:
             return _get_popup(popup_id, user_info)
 
     return None
+
+
+async def get_or_assign_first_meme_nudge_variant(user_id: int) -> str | None:
+    # Synchronous cohort assignment for the first-meme-nudge experiment.
+    # MUST run before the user's first user_meme_reaction insert so that
+    # ea.assigned_at <= r.reacted_at — otherwise v_experiment_results
+    # (LEFT JOIN ... AND r.reacted_at >= ea.assigned_at) silently drops the
+    # very reaction this experiment is designed to measure.
+    #
+    # `evaluated` fires here exactly once per user, gated by the rowcount
+    # of assign_experiment's INSERT ... ON CONFLICT DO NOTHING. Without that
+    # gate, control users (no popup-log lease) re-emit on every retry.
+    if await user_popup_already_sent(user_id, FIRST_MEME_NUDGE_POPUP_ID):
+        return None
+
+    variant = await get_experiment_variant(user_id, FIRST_MEME_NUDGE_EXPERIMENT_ID)
+    if variant is not None:
+        return variant
+
+    proposed = "treatment" if user_id % 2 == 0 else "control"
+    inserted = await assign_experiment(user_id, FIRST_MEME_NUDGE_EXPERIMENT_ID, proposed)
+    if not inserted:
+        # Concurrent peer won the assignment race — re-read what they wrote
+        # rather than emit a duplicate `evaluated`.
+        return await get_experiment_variant(user_id, FIRST_MEME_NUDGE_EXPERIMENT_ID)
+
+    safe_emit(
+        f"ff.experiment.{FIRST_MEME_NUDGE_EXPERIMENT_ID}.evaluated",
+        f"user.{user_id}",
+        {"user_id": user_id, "group": proposed},
+    )
+    return proposed
+
+
+async def maybe_send_first_meme_nudge(user_id: int, user_info: dict) -> None:
+    # Treatment-only sender. Caller is expected to have already invoked
+    # get_or_assign_first_meme_nudge_variant synchronously (in the meme
+    # delivery path, before create_user_meme_reaction) so the cohort row
+    # is locked in. Safe to dispatch as a background asyncio task — only
+    # the slow Telegram I/O lives here.
+    variant = await get_experiment_variant(user_id, FIRST_MEME_NUDGE_EXPERIMENT_ID)
+    if variant != "treatment":
+        return
+
+    # Atomic lease: insert the popup-log row first. Only the caller whose insert
+    # actually created the row (rowcount==1) is allowed to send. This collapses
+    # the previous (check, send, log) sequence into a single race-safe op so two
+    # concurrent first-meme flows can't both fire the nudge.
+    if not await create_user_popup_log(user_id, FIRST_MEME_NUDGE_POPUP_ID):
+        return
+
+    text = localizer.t(FIRST_MEME_NUDGE_POPUP_ID, user_info["interface_lang"])
+    try:
+        await bot.send_message(
+            chat_id=user_id,
+            text=text,
+            parse_mode=ParseMode.HTML,
+        )
+    except Forbidden:
+        # User blocked the bot between meme send and nudge. Keep the lease — the
+        # user can't receive messages anyway, and nmemes_sent will advance past 0
+        # so this code path won't re-enter for this user.
+        return
+    except TelegramError as exc:
+        # Transient delivery failure (timeout, rate-limit, etc.). Release the
+        # lease so a future meme #1 attempt can re-fire the nudge.
+        logger.warning("Failed to send first-meme nudge to user %s: %s", user_id, exc)
+        await delete_user_popup_log(user_id, FIRST_MEME_NUDGE_POPUP_ID)
+        return
+
+    safe_emit(
+        f"ff.experiment.{FIRST_MEME_NUDGE_EXPERIMENT_ID}.sent",
+        f"user.{user_id}",
+        {"user_id": user_id, "group": variant},
+    )
