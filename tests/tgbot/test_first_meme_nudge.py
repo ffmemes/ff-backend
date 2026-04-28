@@ -17,6 +17,7 @@ from src.database import (
 from src.tgbot.senders.popups import (
     FIRST_MEME_NUDGE_EXPERIMENT_ID,
     FIRST_MEME_NUDGE_POPUP_ID,
+    get_or_assign_first_meme_nudge_variant,
     maybe_send_first_meme_nudge,
 )
 from src.tgbot.service import (
@@ -59,6 +60,9 @@ def _mock_bot(send_message: AsyncMock | None = None) -> MagicMock:
 
 @pytest.mark.asyncio
 async def test_treatment_user_receives_nudge(setup):
+    variant = await get_or_assign_first_meme_nudge_variant(TREATMENT_USER_ID)
+    assert variant == "treatment"
+
     bot_mock = _mock_bot()
     with patch("src.tgbot.senders.popups.bot", bot_mock):
         await maybe_send_first_meme_nudge(TREATMENT_USER_ID, _user_info("en"))
@@ -78,8 +82,13 @@ async def test_treatment_user_receives_nudge(setup):
 
 @pytest.mark.asyncio
 async def test_control_user_assigned_but_not_messaged(setup):
+    variant = await get_or_assign_first_meme_nudge_variant(CONTROL_USER_ID)
+    assert variant == "control"
+
     bot_mock = _mock_bot()
     with patch("src.tgbot.senders.popups.bot", bot_mock):
+        # Even if dispatched (it shouldn't be — caller gates on variant), the
+        # sender must no-op for control to keep accidental traffic off Telegram.
         await maybe_send_first_meme_nudge(CONTROL_USER_ID, _user_info("en"))
 
     bot_mock.send_message.assert_not_called()
@@ -93,6 +102,8 @@ async def test_control_user_assigned_but_not_messaged(setup):
 
 @pytest.mark.asyncio
 async def test_idempotent_treatment(setup):
+    await get_or_assign_first_meme_nudge_variant(TREATMENT_USER_ID)
+
     bot_mock = _mock_bot()
     with patch("src.tgbot.senders.popups.bot", bot_mock):
         await maybe_send_first_meme_nudge(TREATMENT_USER_ID, _user_info("en"))
@@ -105,6 +116,8 @@ async def test_idempotent_treatment(setup):
 async def test_concurrent_calls_send_only_once(setup):
     # Insert-first lease: even if both flows pass the pre-check, only the one
     # whose insert won the ON CONFLICT race is allowed to send.
+    await get_or_assign_first_meme_nudge_variant(TREATMENT_USER_ID)
+
     bot_mock = _mock_bot()
     with patch("src.tgbot.senders.popups.bot", bot_mock):
         await asyncio.gather(
@@ -119,6 +132,8 @@ async def test_concurrent_calls_send_only_once(setup):
 async def test_send_failure_releases_lease(setup):
     # Transient TelegramError must roll back the popup-log row so the nudge
     # remains eligible to fire on a future attempt.
+    await get_or_assign_first_meme_nudge_variant(TREATMENT_USER_ID)
+
     failing_bot = _mock_bot(AsyncMock(side_effect=TelegramError("boom")))
     with patch("src.tgbot.senders.popups.bot", failing_bot):
         await maybe_send_first_meme_nudge(TREATMENT_USER_ID, _user_info("en"))
@@ -139,6 +154,9 @@ async def test_existing_popup_log_short_circuits(setup):
     # Simulate a backfill / prior run that already logged the nudge.
     await create_user_popup_log(TREATMENT_USER_ID, FIRST_MEME_NUDGE_POPUP_ID)
 
+    variant = await get_or_assign_first_meme_nudge_variant(TREATMENT_USER_ID)
+    assert variant is None  # short-circuit: no further action
+
     bot_mock = _mock_bot()
     with patch("src.tgbot.senders.popups.bot", bot_mock):
         await maybe_send_first_meme_nudge(TREATMENT_USER_ID, _user_info("en"))
@@ -157,6 +175,8 @@ async def test_existing_popup_log_short_circuits(setup):
 
 @pytest.mark.asyncio
 async def test_russian_user_gets_localized_nudge(setup):
+    await get_or_assign_first_meme_nudge_variant(TREATMENT_USER_ID)
+
     bot_mock = _mock_bot()
     with patch("src.tgbot.senders.popups.bot", bot_mock):
         await maybe_send_first_meme_nudge(TREATMENT_USER_ID, _user_info("ru"))
@@ -165,3 +185,36 @@ async def test_russian_user_gets_localized_nudge(setup):
     assert "Нажми" in text
     assert "❤️" in text
     assert "⏬" in text
+
+
+@pytest.mark.asyncio
+async def test_assignment_helper_is_idempotent(setup):
+    # Re-entrant calls (e.g. /start retries before the first reaction lands)
+    # must NOT re-emit `evaluated` or duplicate the assignment row.
+    first = await get_or_assign_first_meme_nudge_variant(CONTROL_USER_ID)
+    second = await get_or_assign_first_meme_nudge_variant(CONTROL_USER_ID)
+
+    assert first == "control"
+    assert second == "control"
+
+    async with engine.connect() as conn:
+        result = await conn.execute(
+            select(experiment_assignment).where(
+                experiment_assignment.c.user_id == CONTROL_USER_ID,
+                experiment_assignment.c.experiment_id == FIRST_MEME_NUDGE_EXPERIMENT_ID,
+            )
+        )
+        rows = result.fetchall()
+    assert len(rows) == 1
+
+
+@pytest.mark.asyncio
+async def test_sender_no_ops_without_assignment(setup):
+    # Defensive: if the sender ever fires without the sync helper having run
+    # (e.g. a future caller forgets to gate on variant), it must not send.
+    bot_mock = _mock_bot()
+    with patch("src.tgbot.senders.popups.bot", bot_mock):
+        await maybe_send_first_meme_nudge(TREATMENT_USER_ID, _user_info("en"))
+
+    bot_mock.send_message.assert_not_called()
+    assert not await user_popup_already_sent(TREATMENT_USER_ID, FIRST_MEME_NUDGE_POPUP_ID)

@@ -25,6 +25,7 @@ from src.tgbot.senders.meme import (
 )
 from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
 from src.tgbot.senders.popups import (
+    get_or_assign_first_meme_nudge_variant,
     get_popup_to_send,
     maybe_send_first_meme_nudge,
     send_popup,
@@ -129,9 +130,18 @@ async def next_message(
             attempt += 1
             continue
 
+        # Lock the experiment cohort BEFORE the first reaction lands. The
+        # v_experiment_results view filters reactions on r.reacted_at >=
+        # ea.assigned_at — if assignment ran in the background task it could
+        # land after the first reaction, dropping it from the cohort and
+        # biasing the session-length comparison.
+        nudge_variant: str | None = None
+        if is_first_meme:
+            nudge_variant = await get_or_assign_first_meme_nudge_variant(user_id)
+
         await create_user_meme_reaction(user_id, meme.id, meme.recommended_by)
         asyncio.create_task(meme_queue.check_queue(user_id))
-        if is_first_meme:
+        if nudge_variant == "treatment":
             asyncio.create_task(maybe_send_first_meme_nudge(user_id, user_info))
         return msg
 

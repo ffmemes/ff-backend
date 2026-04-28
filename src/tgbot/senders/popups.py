@@ -183,24 +183,45 @@ async def get_popup_to_send(user_id: int, user_info: dict) -> Popup | None:
     return None
 
 
-async def maybe_send_first_meme_nudge(user_id: int, user_info: dict) -> None:
-    # Cheap pre-check: avoids extra writes (assignment row + insert attempt) for
-    # the common already-nudged path. The atomic lease below is what actually
-    # guarantees single-fire under concurrent meme #1 deliveries.
+async def get_or_assign_first_meme_nudge_variant(user_id: int) -> str | None:
+    # Synchronous cohort assignment for the first-meme-nudge experiment.
+    # MUST run before the user's first user_meme_reaction insert so that
+    # ea.assigned_at <= r.reacted_at — otherwise v_experiment_results
+    # (LEFT JOIN ... AND r.reacted_at >= ea.assigned_at) silently drops the
+    # very reaction this experiment is designed to measure.
+    #
+    # `evaluated` fires here exactly once per user, gated by the rowcount
+    # of assign_experiment's INSERT ... ON CONFLICT DO NOTHING. Without that
+    # gate, control users (no popup-log lease) re-emit on every retry.
     if await user_popup_already_sent(user_id, FIRST_MEME_NUDGE_POPUP_ID):
-        return
+        return None
 
     variant = await get_experiment_variant(user_id, FIRST_MEME_NUDGE_EXPERIMENT_ID)
-    if variant is None:
-        variant = "treatment" if user_id % 2 == 0 else "control"
-        await assign_experiment(user_id, FIRST_MEME_NUDGE_EXPERIMENT_ID, variant)
+    if variant is not None:
+        return variant
+
+    proposed = "treatment" if user_id % 2 == 0 else "control"
+    inserted = await assign_experiment(user_id, FIRST_MEME_NUDGE_EXPERIMENT_ID, proposed)
+    if not inserted:
+        # Concurrent peer won the assignment race — re-read what they wrote
+        # rather than emit a duplicate `evaluated`.
+        return await get_experiment_variant(user_id, FIRST_MEME_NUDGE_EXPERIMENT_ID)
 
     safe_emit(
         f"ff.experiment.{FIRST_MEME_NUDGE_EXPERIMENT_ID}.evaluated",
         f"user.{user_id}",
-        {"user_id": user_id, "group": variant},
+        {"user_id": user_id, "group": proposed},
     )
+    return proposed
 
+
+async def maybe_send_first_meme_nudge(user_id: int, user_info: dict) -> None:
+    # Treatment-only sender. Caller is expected to have already invoked
+    # get_or_assign_first_meme_nudge_variant synchronously (in the meme
+    # delivery path, before create_user_meme_reaction) so the cohort row
+    # is locked in. Safe to dispatch as a background asyncio task — only
+    # the slow Telegram I/O lives here.
+    variant = await get_experiment_variant(user_id, FIRST_MEME_NUDGE_EXPERIMENT_ID)
     if variant != "treatment":
         return
 

@@ -522,8 +522,13 @@ async def get_experiment_variant(user_id: int, experiment_id: str) -> str | None
     return row["variant"] if row else None
 
 
-async def assign_experiment(user_id: int, experiment_id: str, variant: str) -> None:
-    """Assign a user to an experiment variant. Idempotent (ON CONFLICT DO NOTHING)."""
+async def assign_experiment(user_id: int, experiment_id: str, variant: str) -> bool:
+    """Assign a user to an experiment variant. Idempotent (ON CONFLICT DO NOTHING).
+
+    Returns True when this call inserted a new assignment row, False when a
+    row already existed. Callers can use the return value as a once-per-user
+    gate (e.g. emitting `evaluated` exactly once when the cohort is decided).
+    """
     insert_query = (
         insert(experiment_assignment)
         .values(
@@ -535,4 +540,5 @@ async def assign_experiment(user_id: int, experiment_id: str, variant: str) -> N
             index_elements=["experiment_id", "user_id"],
         )
     )
-    await execute(insert_query)
+    result = await execute(insert_query)
+    return result.rowcount > 0
