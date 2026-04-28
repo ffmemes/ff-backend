@@ -466,6 +466,29 @@ crossposting_snapshots = Table(
     Column("snapshot_at", DateTime, server_default=func.now(), nullable=False),
 )
 
+crossposting_decision_log = Table(
+    "crossposting_decision_log",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("decided_at", DateTime, server_default=func.now(), nullable=False),
+    Column("channel", String, nullable=False),
+    Column("picked_meme_id", ForeignKey("meme.id", ondelete="SET NULL")),
+    Column("score_version", Integer, nullable=False),
+    Column("median_signal", Float),
+    Column("candidate_pool_size", Integer),
+    # candidates JSONB: list of {meme_id, source_id, rank, nlikes, ndislikes,
+    # raw_impr_rank, age_days, nmemes_sent, invited_count, caption_present,
+    # src_signal, src_quality_mult, lr_factor, impr_factor, age_factor,
+    # caption_factor, sent_factor, invited_boost, final_score}
+    Column("candidates", JSONB, nullable=False),
+    Index(
+        "ix_crossposting_decision_log_channel_time",
+        "channel",
+        "decided_at",
+    ),
+)
+
+
 channel_daily_stats = Table(
     "channel_daily_stats",
     metadata,
