@@ -422,9 +422,9 @@ The `log_meme_sent()` signature in `src/crossposting/service.py` already accepts
 **Do NOT change:** `src/flows/rewards/uploaded_memes.py` (or any other caller of `log_meme_sent`) — those callers stay at default `score_version=1`. Only the channel post handlers bump to 2.
 
 **Verification:**
-- [ ] `ruff check src/flows/crossposting/meme.py` — no errors.
-- [ ] `grep -n "score_version=2" src/flows/crossposting/meme.py` — returns at least 3 lines (EN, RU TG, RU VK).
-- [ ] `grep -n "if meme_data is None" src/flows/crossposting/meme.py` — returns exactly 2 lines (one per channel handler).
+- [x] `ruff check src/flows/crossposting/meme.py` — no errors.
+- [x] `grep -n "score_version=2" src/flows/crossposting/meme.py` — returns at least 3 lines (EN, RU TG, RU VK).
+- [x] `grep -n "if meme_data is None" src/flows/crossposting/meme.py` — returns exactly 2 lines (one per channel handler).
 
 ### Task 3: Add 4 integration tests for the new ranker logic
 
