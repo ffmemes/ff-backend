@@ -148,6 +148,9 @@ backup.dump.gz
 test.py
 .gstack/
 
+# Per-developer git worktrees (in-progress feature branches)
+.worktrees/
+
 # AI agent experiment log (machine-generated, append-only)
 experiments/log.jsonl
 # Agent daily reports (generated per heartbeat, can be large)
