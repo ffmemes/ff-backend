@@ -146,7 +146,3 @@ async def prefect_deployments():
 
 
 app.include_router(tgbot_router, prefix="/tgbot", tags=["Telegram Bot"])
-
-from src.integrations.paperclip import router as paperclip_router  # noqa: E402
-
-app.include_router(paperclip_router, tags=["Integrations"])

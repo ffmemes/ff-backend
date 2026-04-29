@@ -89,10 +89,7 @@ Concurrency group `paperclip-deploy-agents` prevents overlapping runs; `cancel-i
 **3a. Adapter config sync from `.paperclip.yaml`** (next iteration of `agents/deploy.sh`).
 Read agent block from manifest, PATCH `/api/agents/<id>` with `adapterConfig`, `runtimeConfig`, `permissions`, `desiredSkills` (parsed from AGENTS.md frontmatter). Currently we only sync the prompt text.
 
-**3b. Retire the webhook proxy.** Paperclip v416 ships `none` and `github_hmac` signing modes (per `infra_paperclip_webhook_fix_shipped.md`). Switch QA trigger signing to `none`, point Sentry/Coolify/Prefect directly at the trigger URL, delete:
-- `src/integrations/paperclip.py` `/webhooks/qa-alert` route + HMAC helpers (~150 LOC)
-- `src/flows/hooks.py::notify_qa_sync` (~30 LOC) → replace with Prefect's native "Send a webhook" automation
-- env vars `WEBHOOK_PROXY_SECRET`, `SENTRY_CLIENT_SECRET`
+**3b. Retire the webhook proxy.** ✅ Done 2026-04-29. QA trigger `30901464-...` flipped to `signingMode: none`, Sentry Internal Integration `paperclip-qa-alert-b86aa3` now POSTs directly to `https://org.ffmemes.com/api/routine-triggers/public/18a2f9e439c396e9b21a02fa/fire`. Deleted: `src/integrations/paperclip.py`, `notify_qa_sync` callsite in `src/flows/hooks.py`, env vars `WEBHOOK_PROXY_SECRET` / `SENTRY_CLIENT_SECRET` / `PAPERCLIP_QA_TRIGGER_URL` / `PAPERCLIP_QA_TRIGGER_SECRET`. Coolify webhook path was unused (no hits in 24h prior to removal). Prefect failures now surface via the QA Log Scan 3h cron instead of an instant push — accepted tradeoff for less code. Trigger publicId leakage = at most noisy QA scans (no user input or commands accepted).
 
 **3c. CLI-native agent skills.** In each AGENTS.md, replace raw `curl https://org.ffmemes.com/api/...` with `paperclipai issue list --json`, `paperclipai approval create`, `paperclipai dashboard get`, `paperclipai heartbeat run --agent-id`. Reduces per-wake context.
 

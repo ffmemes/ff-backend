@@ -28,18 +28,9 @@ def _extract_error_msg(state) -> str:
 
 
 def notify_telegram_on_failure(flow, flow_run, state):
-    """Send failure alerts to Telegram and Paperclip QA when a flow fails."""
+    """Send failure alert to Telegram admin chat when a flow fails."""
     error_msg = _extract_error_msg(state)
 
-    # Notify Paperclip QA (independent of Telegram config)
-    try:
-        from src.integrations.paperclip import notify_qa_sync
-
-        notify_qa_sync(flow.name, flow_run.name, error_msg)
-    except Exception as e:
-        logger.error("Failed to notify Paperclip QA: %s", e)
-
-    # Notify Telegram admin chat
     bot_token = settings.TELEGRAM_BOT_TOKEN
     chat_id = settings.ADMIN_LOGS_CHAT_ID
 
