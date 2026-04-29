@@ -177,7 +177,7 @@ Deploy after editing: `./agents/deploy.sh`
 | Routine | Agent | Schedule (UTC) | Trigger Type | What it does |
 |---------|-------|----------------|-------------|--------------|
 | Daily Analyst Report | Analyst | `19 6 * * *` | schedule + API | Query metrics, detect anomalies, write report |
-| QA Log Scan | QA | `7 * * * *` | 2 schedules + 2 webhooks + API | Sentry, Coolify logs, DB health, E2E smoke |
+| QA Log Scan | QA | `7 */3 * * *` | schedule + Sentry webhook + API | Sentry, Coolify logs, DB health, E2E smoke |
 | Process Health Check | QA | `37 12 * * *` | schedule | Watchdog: verify all routines are running and succeeding |
 | Weekly CEO Review | CEO | `11 9 * * 1` | schedule | Retro, experiments, priorities |
 | Weekly Analyst Summary | Analyst | `23 9 * * 1` | schedule | Weekly summary for CEO review |
@@ -238,29 +238,56 @@ Paperclip triggers now support multiple signing modes:
 - **`github_hmac`** (NEW) — reads `X-Hub-Signature-256` header. Compatible with GitHub webhooks.
 - **`none`** (NEW) — no auth, publicId in URL acts as shared secret.
 
-### Current webhook setup
+### Current webhook setup (post PR #212, 2026-04-29)
 
 | Source | Path | Auth | Notes |
 |--------|------|------|-------|
-| Sentry | app → proxy → Paperclip trigger | HMAC-SHA256 | Proxy in `src/integrations/paperclip.py` |
-| Coolify | app → proxy → Paperclip trigger | Shared secret | Proxy also filters by ff-backend app UUID |
-| Prefect | `notify_qa_sync()` → Paperclip trigger | Bearer token | Direct call, no proxy |
-| GitHub | GH Actions → Paperclip trigger | Bearer token | Direct call |
+| Sentry | Sentry Internal Integration → Paperclip trigger | none (publicId is the secret) | Internal Integration `paperclip-qa-alert-b86aa3` |
+| GitHub | GH Actions (`notify-staff-engineer`) → Paperclip trigger | Bearer token | Direct call |
+| Prefect | (none) | — | Failures surface via QA Log Scan 3h cron |
+| Coolify | (none) | — | Was never actively used in practice |
 
-### Simplification opportunity
+**Sentry → Paperclip QA trigger** is fully direct since PR #212. Set up:
+- QA routine `477f452d-06f3-421e-a274-7f09155bb5bb`, webhook trigger `30901464-a100-4cff-9515-9fdbcfc1a797`
+- `signingMode: none` — `server/dist/services/routines.js` short-circuits all auth checks
+- Public URL: `https://org.ffmemes.com/api/routine-triggers/public/18a2f9e439c396e9b21a02fa/fire`
+- Sentry posts the raw payload (`{"action":"created","data":{"issue":{...}}}`); Paperclip stores it in `routine_run.triggerPayload` verbatim
+- Trigger fires only on **issue creation**, not subsequent occurrences. To re-test, send an event with a unique exception class so Sentry creates a new issue group.
 
-The webhook proxy (`src/integrations/paperclip.py`) exists because Sentry/Coolify can't send Paperclip auth headers. With `none` signing mode, both can POST directly to the trigger URL.
+### How to test the Sentry path end-to-end
 
-**To simplify** (TODO):
-1. Switch QA trigger signing mode to `none` in Paperclip UI (Routine → Trigger → Signing Mode)
-2. Point Sentry webhook URL directly at the Paperclip trigger fire URL
-3. Point Coolify webhook URL directly at the Paperclip trigger fire URL
-4. Remove `src/integrations/paperclip.py` proxy code and `/webhooks/qa-alert` route from `src/main.py`
-5. Remove env vars: `WEBHOOK_PROXY_SECRET`, `SENTRY_CLIENT_SECRET` from ff-backend app
+```bash
+set -a; source .env; set +a
+python3 -c "
+import sentry_sdk, time
+sentry_sdk.init(dsn='$SENTRY_DSN', environment='production')
+class _SentryE2EProbe(Exception): pass
+try:
+    raise _SentryE2EProbe(f'sentry-paperclip e2e probe {int(time.time())}')
+except Exception as e:
+    sentry_sdk.capture_exception(e)
+sentry_sdk.flush(timeout=10)
+"
 
-**Trade-off**: Losing Sentry HMAC verification and Coolify UUID filtering. Acceptable because QA trigger is low-stakes (worst case: extra QA scans). The 24-char publicId provides URL-based obscurity.
+# Within ~15-30s, a new routine_execution issue (title 'QA Log Scan') should appear
+# at https://org.ffmemes.com/issues, source='webhook', triggerId=30901464-...
+```
 
-**Note**: `notify_qa_sync()` in `src/flows/hooks.py` still uses Bearer token — it will continue to work with `none` mode since Paperclip accepts any request.
+### Reverting if Sentry → Paperclip breaks
+
+```bash
+# Flip trigger back to bearer mode
+curl -X PATCH "https://org.ffmemes.com/api/routine-triggers/30901464-a100-4cff-9515-9fdbcfc1a797" \
+  -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"signingMode":"bearer"}'
+
+# Restore proxy: revert PR #212 in this repo. Until that's redeployed,
+# Sentry deliveries will 401 because Paperclip is back in bearer mode without
+# auth headers. Acceptable for short windows; QA cron runs every 3h regardless.
+```
+
+**Tradeoff accepted**: no Sentry HMAC verification, no Coolify UUID filter, no instant Prefect alert. Worst case is noisy QA scans (the routine has no user-input parsing — its agent always re-scans logs from scratch). The 24-char publicId provides URL-based obscurity; if it leaks, rotate via `POST /routine-triggers/:id/rotate-secret`.
 
 ## Secrets (Paperclip company secrets)
 
