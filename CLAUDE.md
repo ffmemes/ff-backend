@@ -84,6 +84,8 @@ src/
 │   ├── blender.py       # Weighted random sampling across engines
 │   ├── meme_queue.py    # Redis queue: check_queue, generate_recommendations
 │   └── service.py       # Reaction persistence, stats triggers
+├── feed_turn/
+│   └── planner.py       # Pure maturity-stage decision table (engine plan + mod quota); no DB/Redis/TG. Contract for upcoming Feed Turn refactor; not yet wired into hot path.
 ├── storage/
 │   ├── parsers/         # TG (BeautifulSoup HTML), VK (API), IG (HikerAPI)
 │   ├── etl.py           # Raw posts -> processed memes pipeline
