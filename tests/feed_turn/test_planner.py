@@ -124,6 +124,20 @@ def test_planner_mappings_are_read_only():
         plan.fixed_pos[0] = "x"
 
 
+def test_fallback_engines_coerced_to_tuple():
+    from src.feed_turn.planner import CandidateSelectionPlan, EngineFallback
+
+    plan = CandidateSelectionPlan(
+        maturity_stage="x",
+        primary_engine=None,
+        fallback_engines=[EngineFallback("a")],
+    )
+
+    assert isinstance(plan.fallback_engines, tuple)
+    with pytest.raises(AttributeError):
+        plan.fallback_engines.append(EngineFallback("b"))
+
+
 def test_engine_fallback_kwargs_are_read_only():
     cold_plan = plan_candidate_selection(0)
     lr_fallback = cold_plan.fallback_engines[0]

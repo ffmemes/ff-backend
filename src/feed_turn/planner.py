@@ -37,6 +37,7 @@ class CandidateSelectionPlan:
     def __post_init__(self) -> None:
         object.__setattr__(self, "blend_weights", MappingProxyType(dict(self.blend_weights)))
         object.__setattr__(self, "fixed_pos", MappingProxyType(dict(self.fixed_pos)))
+        object.__setattr__(self, "fallback_engines", tuple(self.fallback_engines))
 
 
 LR_SMOOTHED_COLD_FALLBACK = EngineFallback("lr_smoothed", {"min_sends": 10})
