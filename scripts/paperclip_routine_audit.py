@@ -73,7 +73,7 @@ class Paperclip:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 return json.loads(resp.read())
         except urllib.error.HTTPError as exc:
-            body = exc.read().decode("utf-8", errors="replace")[:500]
+            body = compact_body(exc.read().decode("utf-8", errors="replace"), limit=500)
             raise RuntimeError(f"HTTP {exc.code} for {path}: {body}") from exc
 
 
