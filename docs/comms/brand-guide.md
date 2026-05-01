@@ -7,7 +7,8 @@ Minimal visual identity. Iterate after 10+ posts.
 - Full: **Fast Food Memes**
 - Short: **FFmemes**
 - Bot: **@ffmemesbot**
-- Channel (RU): **@ffmemes** (t.me/fastfoodmemes)
+- Channel (RU build-in-public): **@ffmemes** (t.me/ffmemes)
+- Channel (RU main meme channel): **@fastfoodmemes** (t.me/fastfoodmemes)
 - Channel (EN): **@fast_food_memes** (t.me/fast_food_memes)
 
 ## Logo
@@ -15,6 +16,7 @@ Minimal visual identity. Iterate after 10+ posts.
 Hamburger avatar. Used on:
 - @ffmemesbot Telegram bot
 - @ffmemes Telegram channel
+- @fastfoodmemes Telegram channel
 - Paperclip company profile
 
 No SVG/PNG file exists yet. Source: Telegram avatar.

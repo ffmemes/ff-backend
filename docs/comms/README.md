@@ -1,6 +1,9 @@
 # FFmemes Content Strategy
 
-Content workspace for @ffmemes Telegram channel (https://t.me/ffmemes).
+Content workspace for FFmemes Telegram channels:
+
+- @ffmemes (https://t.me/ffmemes): build-in-public / product / process updates.
+- @fastfoodmemes (https://t.me/fastfoodmemes): main RU meme channel; fun meme findings and meme-of-the-month posts can go here when they fit the wider audience.
 
 **Target cadence**: ~1 post per day
 **Language**: Russian only
@@ -24,7 +27,7 @@ docs/comms/
 2. Picks next post from schedule or creates data-driven post
 3. Drafts post as Paperclip issue with text + visual description
 4. CEO reviews and approves
-5. Agent posts to @ffmemes channel
+5. Agent posts to the selected public channel and records the exact Telegram URL
 6. Post moved to `published/` with date prefix
 
 ## Links

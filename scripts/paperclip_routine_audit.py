@@ -33,7 +33,11 @@ DEGRADED_PATTERNS = (
     "0 updated",
     "skills no longer in upstream",
 )
-PUBLISHED_PATTERNS = ("outcome=published", "editorial_post_id", "telegram_message_id")
+PUBLISHED_MARKER_PATTERNS = (
+    re.compile(r"\boutcome\s*=\s*published\b", re.IGNORECASE),
+    re.compile(r"\b(?:editorial_post_id|editorial post id)\b", re.IGNORECASE),
+    re.compile(r"\b(?:telegram_message_id|telegram message id)\b", re.IGNORECASE),
+)
 SENSITIVE_PATTERNS = (
     (
         re.compile(r"(?i)\b(bearer\s+)[a-z0-9._~+/=-]{20,}"),
@@ -149,7 +153,9 @@ def classify_issue(issue: dict[str, Any], comments: list[dict[str, Any]]) -> tup
         flags.append("unknown_gstack_update_path")
     if "draft issue exists" in lower or "awaiting ceo approval" in lower:
         flags.append("draft_handoff")
-    if "approved" in lower and not all(pattern in lower for pattern in PUBLISHED_PATTERNS):
+    if "approved" in lower and not all(
+        pattern.search(text) for pattern in PUBLISHED_MARKER_PATTERNS
+    ):
         flags.append("approved_without_publish_marker")
     if not comments and issue.get("status") == "done":
         flags.append("no_comments")

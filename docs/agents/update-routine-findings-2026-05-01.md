@@ -22,7 +22,9 @@ release note from scratch.
   ad-hoc comments when prod support is verified.
 - First-class blockers and ordered sub-issues. Use `blockedByIssueIds` and
   checklist/subtask structure instead of free-text "blocked" states.
-- Liveness/recovery improvements and active-run watchdog. After prod upgrade
+- Liveness/recovery improvements and active-run watchdog. `v2026.427.0`
+  explicitly fixed stale execution-run locks, which maps directly to the
+  `activeRun=null` zombie PR-review pattern observed here. After prod upgrade
   verification, remove prompt-side race/recovery prose that duplicates runtime
   behavior.
 - Productivity review service. This is the right surface for "agents are busy
@@ -38,6 +40,9 @@ release note from scratch.
   read-only changelog/dashboard extraction. Do not allow unattended `/skillify`
   in prod agents yet because it creates persistent browser skills after approval
   gates.
+- `1.16.0.0`: paired-agent browser tunnel fixes plus browser operations such as
+  `newtab`, `tabs`, `snapshot`, `fill`, and `closetab`. Relevant for remote or
+  paired browser agents before blaming prompts for browser-control failures.
 - `1.21.1.0`: stronger `/plan-ceo-review` smoke tests around Step 0. Good for
   planning quality; do not bypass plan-review gates with blanket "always accept"
   behavior except where the prompt explicitly says autonomous approval is safe.
@@ -50,6 +55,11 @@ release note from scratch.
 - `Daily Channel Post` Apr 30 created `FFM-842`, got CEO approval, then closed
   green without publishing. The actual public outcome requires
   `telegram_message_id` and `editorial_post_id`; approval alone is intermediate.
+- `Daily Channel Post` May 1 published the meme highlight to the main RU meme
+  channel (`https://t.me/fastfoodmemes/12590`). This is a valid target for fun
+  findings like "most liked meme", but the outcome comment must name the actual
+  channel. `@ffmemes` remains the target for build-in-public/product/process
+  updates.
 - `gstack Update Check` closed green while it had no canonical update path for
   runtime-delivered skills. Future runs must report `upstream_ref`,
   `checked_count`, `updated_count`, `failed_count`, `removed_count`, and
