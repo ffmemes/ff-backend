@@ -66,9 +66,10 @@ async def maybe_auto_snooze_source(
 ) -> str | None:
     """
     Check auto-snooze criteria after a parse attempt.
-    Snoozes the source if either criterion is met:
+    Snoozes the source if any criterion is met:
       1. 3 consecutive parse attempts returned 0 posts.
       2. like_rate < 10% with at least 100 total reactions.
+      3. ad_rate > 30% over rolling 7d window with >= 30 processed memes.
     Returns the snooze reason string if snoozed, None otherwise.
     """
     source = await fetch_one(select(meme_source).where(meme_source.c.id == meme_source_id))
@@ -112,6 +113,34 @@ async def maybe_auto_snooze_source(
                 },
             )
             return "low_like_rate"
+
+    # Criterion 3: rolling 7d ad_rate > 30% (min 30 processed memes for sample)
+    ad_stats = await fetch_one(
+        text(
+            """
+            SELECT
+                COUNT(*) FILTER (WHERE status = 'ad')::float AS n_ads,
+                COUNT(*) FILTER (WHERE status IN ('ok', 'ad', 'duplicate')) AS n_processed
+            FROM meme
+            WHERE meme_source_id = :sid
+              AND created_at > NOW() - INTERVAL '7 days'
+            """
+        ),
+        {"sid": meme_source_id},
+    )
+    if ad_stats and ad_stats["n_processed"] >= 30:
+        ad_rate = ad_stats["n_ads"] / ad_stats["n_processed"]
+        if ad_rate > 0.30:
+            await update_meme_source(
+                meme_source_id,
+                status=MemeSourceStatus.SNOOZED.value,
+                data={
+                    **updated_data,
+                    "snoozed_reason": "high_ad_rate",
+                    "snoozed_at": now_iso,
+                },
+            )
+            return "high_ad_rate"
 
     # No snooze: persist updated counter if it changed
     if updated_data != current_data:
