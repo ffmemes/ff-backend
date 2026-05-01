@@ -124,7 +124,7 @@ def _normalize_lookalikes(text: str) -> str:
     return text.translate(_CYRILLIC_TO_LATIN)
 
 
-ALLOWED_CHANNELS = frozenset({"ru", "en"})
+ALLOWED_CHANNELS = frozenset({"ru", "en", "ffmemes"})
 
 
 class EditorialValidationError(Exception):
@@ -324,7 +324,9 @@ async def publish_editorial_post(
     read the error list, fix the draft, and call again.
     """
     if channel not in ALLOWED_CHANNELS:
-        raise EditorialValidationError([f"Invalid channel {channel!r}; use 'ru' or 'en'"])
+        raise EditorialValidationError(
+            [f"Invalid channel {channel!r}; use 'ru', 'en', or 'ffmemes'"]
+        )
 
     normalized_text = normalize_blockquote(text)
     photo_key = photo_file_id or photo_url

@@ -73,6 +73,10 @@ TELEGRAM_CHANNEL_EN_LINK = "https://t.me/fast_food_memes"
 
 TELEGRAM_CHANNEL_RU_CHAT_ID = -1001152876229
 TELEGRAM_CHANNEL_RU_LINK = "https://t.me/fastfoodmemes"
+
+# @ffmemes — RU build-in-public / product / process channel.
+TELEGRAM_CHANNEL_FFMEMES_CHAT_ID = -1001472939243
+TELEGRAM_CHANNEL_FFMEMES_LINK = "https://t.me/ffmemes"
 TELEGRAM_CHAT_RU_CHAT_ID = -1001202214427
 TELEGRAM_CHAT_EN_CHAT_ID = -1001586135039
 
