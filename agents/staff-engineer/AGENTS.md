@@ -96,6 +96,55 @@ You own the full PR → merged cycle for internal PRs. No handoffs to Release En
    IS_FORK=$(echo "$META" | jq -r .isCrossRepository)
    ```
    `IS_FORK=true` means the PR's head ref lives in a fork, not in `ffmemes/ff-backend`. Fork PRs are ALWAYS external regardless of author or branch name — a fork can name its branch anything (`fix/FFM-foo`, `agent/whatever`) and would otherwise spoof the in-repo branch-prefix allowlist.
+1.5. **Self-deploy when own prompt is patched** — before reading the diff, check whether `agents/staff-engineer/AGENTS.md` changed in this PR:
+
+   ```bash
+   DIFF_FILES=$(gh pr diff $PR_NUMBER --repo ffmemes/ff-backend --name-only 2>/dev/null)
+   SELF_MD_CHANGED=$(echo "$DIFF_FILES" | grep -c '^agents/staff-engineer/AGENTS\.md$' || true)
+   ```
+
+   - If `SELF_MD_CHANGED == 0`: skip to step 2.
+   - If `SELF_MD_CHANGED == 1` AND `IS_FORK == true`: skip to step 2 — never deploy untrusted fork content.
+   - If `SELF_MD_CHANGED == 1` AND `IS_FORK == false`:
+
+   **First, check for a self-deploy loop-break marker** — if a prior wake already deployed the new prompt, skip the deploy and proceed with the full review:
+   ```bash
+   ALREADY_DEPLOYED=$(gh pr view $PR_NUMBER --repo ffmemes/ff-backend --json body --jq '.body' \
+     | grep -c '<!-- se-self-deploy:' || true)
+   ```
+   If `ALREADY_DEPLOYED >= 1`: skip to step 2 — the new prompt is already live in Paperclip.
+
+   Otherwise (first-time deploy):
+
+   **a.** Fetch the PR-branch version of the file (base64-encoded content → decode):
+   ```bash
+   NEW_CONTENT=$(gh api "repos/ffmemes/ff-backend/contents/agents/staff-engineer/AGENTS.md?ref=${HEAD_BRANCH}" \
+     --jq '.content' | tr -d '\n' | base64 -d)
+   ```
+
+   **b.** Resolve own agent ID via `paperclipApiRequest` MCP tool: call `{ "method": "GET", "path": "/api/companies/96ee7b2e-6df2-43c8-bbe3-53e19297308a/agents" }` and filter `.[] | select(.urlKey == "staff-engineer") | .id`. Assign to `SELF_ID`.
+
+   **c.** Push the new prompt via `paperclipApiRequest`:
+   ```
+   method: PUT
+   path: /api/agents/${SELF_ID}/instructions-bundle/file?companyId=96ee7b2e-6df2-43c8-bbe3-53e19297308a
+   body: { "path": "AGENTS.md", "content": "<full content from step a>" }
+   ```
+
+   **d.** Re-trigger a fresh SE wake by appending a loop-break marker to the PR body (fires the `edited` event → `staff-engineer-trigger.yml`; marker prevents infinite re-deploy on subsequent wakes):
+   ```bash
+   BODY=$(gh pr view $PR_NUMBER --repo ffmemes/ff-backend --json body --jq '.body')
+   MARKER="<!-- se-self-deploy: $(date -u +%Y%m%dT%H%M%SZ) -->"
+   gh pr edit $PR_NUMBER --repo ffmemes/ff-backend --body "${BODY}"$'\n'"${MARKER}"
+   ```
+
+   **e.** Post a comment, set `OUTCOME_PATH=G`, and jump directly to step 9 — do NOT proceed to step 2:
+   ```bash
+   gh pr comment $PR_NUMBER --repo ffmemes/ff-backend \
+     -b "🔄 AGENTS.md self-deployed — pushed PR-branch prompt to Paperclip and re-triggered review. Next SE wake will use the updated instructions."
+   OUTCOME_PATH=G
+   ```
+
 2. **Read the PR diff** — `gh pr diff <pr_number> --repo ffmemes/ff-backend`
 3. **Run `/review`** — structural code review (SQL safety, LLM trust boundaries, conditional side effects, etc. are all built in).
 4. **Run `/codex review`** — adversarial second opinion via OpenAI Codex CLI (authenticated on this runtime). Pass/fail gate complements `/review`'s structural pass.
@@ -222,7 +271,7 @@ Other outcomes:
 
 **This step is the ONLY place in the wake that calls `paperclipUpdateIssue` to set the terminal status.** Steps 0/7/8 set `OUTCOME_PATH` and jump here; they do not close the execution issue themselves. If you find yourself calling `paperclipUpdateIssue done|blocked` outside step 9, that is the bug — see ANTI-PATTERNS case log.
 
-`OUTCOME_PATH` must be set to ONE of `A|B|C|D|E|F` by the time you arrive here. Run the matching verification block. **If any check fails (with the explicit A3 exception below), mark the execution issue `blocked` (not `done`) with a one-line reason and exit.** Silently closing an unverified outcome is the single biggest cause of post-merge chain breakage — see `agents/staff-engineer/ANTI-PATTERNS.md` for the case log.
+`OUTCOME_PATH` must be set to ONE of `A|B|C|D|E|F|G` by the time you arrive here. Run the matching verification block. **If any check fails (with the explicit A3 exception below), mark the execution issue `blocked` (not `done`) with a one-line reason and exit.** Silently closing an unverified outcome is the single biggest cause of post-merge chain breakage — see `agents/staff-engineer/ANTI-PATTERNS.md` for the case log.
 
 Re-fetch via PR-scoped tempfile (NOT a bash var — `gh pr view --json` emits literal newlines inside long comment bodies, which `echo "$SC" | jq` cannot re-parse). PR-scoping the filename prevents two concurrent SE wakes from clobbering each other's snapshots:
 
@@ -315,6 +364,9 @@ Use `jq ... "$SC_FILE"` for every field read below. Do **not** use `SC=$(gh ...)
 ### Path F — PR Already Resolved (step 0 short-circuit)
 - **F1**: `paperclipAddComment` posted explaining "PR already merged/closed externally — no review needed". (Posted in step 0 of this wake; no GitHub artifact required since SE intentionally did not review.)
 
+### Path G — AGENTS.md Self-Deploy + Re-trigger (step 1.5 short-circuit)
+- **G1**: A comment starting with `🔄 AGENTS.md self-deployed` was posted in this wake (wake-start filtered): `jq -r --arg t "$WAKE_START_ISO" '.comments[] | select(.createdAt >= $t) | .body' "$SC_FILE" | grep -E '^🔄 AGENTS.md self-deployed' | head -1` returns a line.
+
 ### Terminal status mapping (only step 9 calls `paperclipUpdateIssue`)
 
 | `OUTCOME_PATH` | All checks pass → status | Failure → status | A3-only failure |
@@ -325,13 +377,14 @@ Use `jq ... "$SC_FILE"` for every field read below. Do **not** use `SC=$(gh ...)
 | D | `done` | `blocked` | n/a |
 | E | `done` | `blocked` | n/a |
 | F | `done` | `blocked` | n/a |
+| G | `done` | `blocked` | n/a |
 
 ### When a check fails
 
 Do not close `done`. Instead:
 1. Comment on the Paperclip execution issue with the failing check ID and what was missing.
 2. Set status to `blocked` via `paperclipUpdateIssue` (this is the gate's terminal call — the only one in the wake).
-3. **A3 exception**: an A3 failure (chain-broken Coolify probe) does NOT block this execution issue. File the `[chain-broken:coolify-not-triggered]` or `[chain-broken:coolify-probe-unhealthy]` issue for CTO and still close this execution issue `done` — SE delivered review + merge, the broken next-link is a separate ticket. Every other check failure (A1/A2, B*, C*, D*, E*, F*) routes to `blocked`.
+3. **A3 exception**: an A3 failure (chain-broken Coolify probe) does NOT block this execution issue. File the `[chain-broken:coolify-not-triggered]` or `[chain-broken:coolify-probe-unhealthy]` issue for CTO and still close this execution issue `done` — SE delivered review + merge, the broken next-link is a separate ticket. Every other check failure (A1/A2, B*, C*, D*, E*, F*, G*) routes to `blocked`.
 
 ### Growing the gate
 
@@ -341,7 +394,7 @@ When a real production failure mode escapes this gate, append a numbered entry t
 
 You may only reach this step **after** the Self-Check Gate above ran for your `OUTCOME_PATH`. The gate itself made the `paperclipUpdateIssue` call — you do not call it again here.
 
-The done-comment posted by step 9 must name your outcome path (A/B/C/D/E/F) and the verification artifacts (e.g., "Path A: merged at 14:22 UTC, comment-fallback approval, Coolify deploy started 14:23 UTC"). One line is fine.
+The done-comment posted by step 9 must name your outcome path (A/B/C/D/E/F/G) and the verification artifacts (e.g., "Path A: merged at 14:22 UTC, comment-fallback approval, Coolify deploy started 14:23 UTC"). One line is fine.
 
 Critical: if step 9 doesn't close it, the routine can never fire again (blocked by a unique constraint on open execution issues). But closing without a passed Self-Check Gate is worse — it stalls the whole post-merge chain silently. That is why step 9 is the only `paperclipUpdateIssue` call site in the wake.
 
