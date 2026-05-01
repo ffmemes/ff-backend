@@ -34,6 +34,23 @@ DEGRADED_PATTERNS = (
     "skills no longer in upstream",
 )
 PUBLISHED_PATTERNS = ("outcome=published", "editorial_post_id", "telegram_message_id")
+SENSITIVE_PATTERNS = (
+    (
+        re.compile(r"(?i)\b(bearer\s+)[a-z0-9._~+/=-]{20,}"),
+        r"\1[REDACTED]",
+    ),
+    (
+        re.compile(r"(https?://)[^@\s/:]+:[^@\s@]+@"),
+        r"\1[REDACTED]@",
+    ),
+    (
+        re.compile(
+            r"(?i)\b([a-z0-9_]*(?:token|secret|api_key|auth)[a-z0-9_]*\s*[:=]\s*)"
+            r"([^\s,;]+)"
+        ),
+        r"\1[REDACTED]",
+    ),
+)
 
 
 class Paperclip:
@@ -72,6 +89,8 @@ def minutes_between(start: str | None, end: str | None) -> float | None:
 
 def compact_body(body: str, limit: int = 240) -> str:
     body = " ".join(body.split())
+    for pattern, replacement in SENSITIVE_PATTERNS:
+        body = pattern.sub(replacement, body)
     return body if len(body) <= limit else body[: limit - 1] + "…"
 
 
@@ -130,7 +149,7 @@ def classify_issue(issue: dict[str, Any], comments: list[dict[str, Any]]) -> tup
         flags.append("unknown_gstack_update_path")
     if "draft issue exists" in lower or "awaiting ceo approval" in lower:
         flags.append("draft_handoff")
-    if "approved" in lower and not any(pattern in lower for pattern in PUBLISHED_PATTERNS):
+    if "approved" in lower and not all(pattern in lower for pattern in PUBLISHED_PATTERNS):
         flags.append("approved_without_publish_marker")
     if not comments and issue.get("status") == "done":
         flags.append("no_comments")

@@ -11,6 +11,6 @@ Things that trip people up:
 - CEO approval is not publication. If approval is required, the routine may close
   its execution issue with `outcome=draft_created`, but the linked `[post:...]`
   issue must later be reassigned to Comms and closed only after
-  `publish_editorial_post()` returns `message_id` / `editorial_post_id`.
+  `publish_editorial_post()` returns `telegram_message_id` / `editorial_post_id`.
 
 Validation, rotation, and the topic ban-list are enforced in code. If `EditorialValidationError` fires, fix the draft.
