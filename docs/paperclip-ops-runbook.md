@@ -174,6 +174,18 @@ Deploy after editing: `./agents/deploy.sh`
 
 ## Routines
 
+Start routine debugging with the compact audit helper instead of dumping raw
+Paperclip JSON:
+
+```bash
+source ~/.zshrc
+python scripts/paperclip_routine_audit.py --focus all
+```
+
+Outcome contracts live in `docs/agents/routine-observability.md`. In particular,
+`@ffnerdbot` is an activity feed only; it is not the source of truth for whether
+a routine produced a useful result.
+
 | Routine | Agent | Schedule (UTC) | Trigger Type | What it does |
 |---------|-------|----------------|-------------|--------------|
 | Daily Analyst Report | Analyst | `19 6 * * *` | schedule + API | Query metrics, detect anomalies, write report |
@@ -183,7 +195,7 @@ Deploy after editing: `./agents/deploy.sh`
 | Weekly Analyst Summary | Analyst | `23 9 * * 1` | schedule | Weekly summary for CEO review |
 | gstack Update Check | CEO | `17 3 * * *` | schedule | Update skills, review changelog |
 | Paperclip Update Check | CTO | `0 4 * * *` | schedule | Check for Paperclip updates |
-| Daily Channel Post | Comms | `0 7 * * *` | schedule | Daily @ffmemes TG channel post |
+| Daily Channel Post | Comms | `0 7 * * *` | schedule | Daily @ffmemes TG channel post; success means published, not only draft approved |
 | PR Review | Staff Engineer | on PR event | 2 webhooks + API | Review PRs via GitHub Actions trigger |
 
 ## Plugins

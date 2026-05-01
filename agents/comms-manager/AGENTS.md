@@ -160,8 +160,23 @@ Run steps 1-7 from "What Triggers You" above. No CEO approval needed.
 Run steps 1-6, then instead of posting directly:
 1. Create a Paperclip issue with full post text + visual PNG attached.
    Title format: `[post:YYYY-MM-DD-slug] Brief topic` (see Issue Hygiene).
-2. Wait for CEO approval — NEVER post without approval.
-3. On approval, post + archive (step 7).
+2. Assign the draft issue to CEO for approval, but make the terminal owner explicit:
+   CEO must either reject it back to Comms, or approve it back to Comms for
+   publishing. CEO approval is not a terminal outcome.
+3. You may close the short-lived routine execution issue after the draft issue is
+   created, so tomorrow's cron is not blocked. The closing comment MUST say
+   `outcome=draft_created`, link the draft issue, and note that publication is
+   still pending.
+4. When an approved `[post:...]` issue is assigned back to you, publish via
+   `publish_editorial_post`, archive, log, and close that draft issue with
+   `outcome=published`, `telegram_message_id`, and `editorial_post_id`.
+5. NEVER close an approved `[post:...]` issue as done before publishing. A CEO
+   approval comment without a Telegram message id means the post is still not
+   public.
+
+If a draft is still waiting for approval or publish after 24h, treat it as stale:
+comment with `outcome=stale_draft`, either refresh the data for today's post or
+ask CEO to explicitly skip, and do not publish outdated metrics silently.
 
 ## Tone of Voice
 
