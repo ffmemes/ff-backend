@@ -114,13 +114,25 @@ async def maybe_auto_snooze_source(
             )
             return "low_like_rate"
 
-    # Criterion 3: rolling 7d ad_rate > 30% (min 30 processed memes for sample)
+    # Criterion 3: rolling 7d ad_rate > 30% (min 30 processed memes for sample).
+    # n_processed = "memes the source actually delivered" — excludes pipeline failures
+    # and pre-pipeline states. Includes 'published' so cross-posted ok memes still count
+    # (otherwise high-quality sources would shrink the denominator and false-positive snooze).
     ad_stats = await fetch_one(
         text(
             """
             SELECT
                 COUNT(*) FILTER (WHERE status = 'ad')::float AS n_ads,
-                COUNT(*) FILTER (WHERE status IN ('ok', 'ad', 'duplicate')) AS n_processed
+                COUNT(*) FILTER (
+                    WHERE status NOT IN (
+                        'created',
+                        'broken_content_link',
+                        'expired_content_link',
+                        'rejected',
+                        'waiting_review',
+                        'snoozed'
+                    )
+                ) AS n_processed
             FROM meme
             WHERE meme_source_id = :sid
               AND created_at > NOW() - INTERVAL '7 days'
