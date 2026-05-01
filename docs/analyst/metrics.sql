@@ -257,6 +257,40 @@ WHERE meme_number <= 10;
 
 
 -- =============================================
+-- SECTION: LR SEGMENT BREAKDOWN (regular users vs mod/admin)
+-- =============================================
+-- Added 2026-05-01 per FFM-874: include regular-user-only LR alongside aggregate.
+-- Context: ~46-49% of reactions come from moderators (type='moderator'/'admin'),
+-- whose LR (~28-32%) significantly drags down aggregate LR (~36-43%).
+-- Regular-user LR is materially higher (43-52%) and more meaningful for product decisions.
+--
+-- Report BOTH lines in daily roll-up:
+--   - aggregate_lr (all users, current)
+--   - regular_lr   (user.type NOT IN ('moderator','admin'))
+--
+-- User types: 'user', 'blocked_bot', 'moderator', 'admin', 'bot'
+-- NOTE: avoid reserved word 'window' as column alias — use 'bucket' or 'period' instead.
+
+SELECT
+  reacted_at::date AS day,
+  count(*) AS total_reactions,
+  round(100.0 * count(*) FILTER (WHERE reaction_id = 1)
+    / NULLIF(count(*) FILTER (WHERE reaction_id IS NOT NULL), 0), 1) AS aggregate_lr,
+  count(*) FILTER (WHERE u.type NOT IN ('moderator', 'admin')) AS regular_reactions,
+  round(100.0 * count(*) FILTER (WHERE reaction_id = 1 AND u.type NOT IN ('moderator', 'admin'))
+    / NULLIF(count(*) FILTER (WHERE u.type NOT IN ('moderator', 'admin') AND reaction_id IS NOT NULL), 0), 1) AS regular_lr,
+  count(*) FILTER (WHERE u.type IN ('moderator', 'admin')) AS mod_admin_reactions,
+  round(100.0 * count(*) FILTER (WHERE reaction_id = 1 AND u.type IN ('moderator', 'admin'))
+    / NULLIF(count(*) FILTER (WHERE u.type IN ('moderator', 'admin') AND reaction_id IS NOT NULL), 0), 1) AS mod_admin_lr
+FROM user_meme_reaction umr
+JOIN "user" u ON u.id = umr.user_id
+WHERE reacted_at > now() - interval '7 days'
+  AND reaction_id IS NOT NULL
+GROUP BY reacted_at::date
+ORDER BY day;
+
+
+-- =============================================
 -- SECTION: ANOMALY DETECTION (for Analyst)
 -- =============================================
 -- Compare today vs yesterday vs 7-day average
