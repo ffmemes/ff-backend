@@ -1,4 +1,6 @@
-Daily build-in-public post for @ffmemes (RU).
+Daily RU channel post. Product/process/build-in-public updates target @ffmemes;
+fun meme findings may target @fastfoodmemes when they stand alone for the wider
+main-channel audience.
 
 Run the workflow in `agents/comms-manager/AGENTS.md` ("What Triggers You", steps 0–7). That file is the source of truth — don't re-derive a parallel workflow here.
 
@@ -8,6 +10,9 @@ Things that trip people up:
 - Step 0 — read `experiments/reports/channel-stats-YYYY-MM-DD.md` for yesterday's performance.
 - Step 1 — pick the strongest `Chart-worthy: yes` finding from `experiments/reports/anomalies-YYYY-MM-DD.md`.
 - Step 7 — archive to `docs/comms/published/YYYY-MM-DD-slug.md` and close this issue with a one-liner pointing at the archive.
+- Outcome comments must include the actual public channel and Telegram URL.
+  `telegram_message_id` alone is ambiguous because @ffmemes and @fastfoodmemes
+  are different chats with different message id sequences.
 - CEO approval is not publication. If approval is required, the routine may close
   its execution issue with `outcome=draft_created`, but the linked `[post:...]`
   issue must later be reassigned to Comms and closed only after

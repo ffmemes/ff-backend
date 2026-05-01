@@ -315,18 +315,21 @@ FROM user_stats WHERE nmemes_sent > 0;
 ## Important Context
 
 - **Public GitHub repo**: NEVER include secrets, API keys, internal URLs
-- **@ffmemes channel**: https://t.me/ffmemes (RU), t.me/fast_food_memes (EN)
+- **@ffmemes channel**: https://t.me/ffmemes — RU build-in-public / product / process updates.
+- **@fastfoodmemes channel**: https://t.me/fastfoodmemes — main RU meme channel. Fun meme findings, "meme of the month", and broadly entertaining data-meme posts may go here when they stand alone for the wider audience.
+- **@fast_food_memes channel**: https://t.me/fast_food_memes — EN meme channel.
 - **Bot**: @ffmemesbot
 - **22K users, 530 WAU** — small but engaged community
 - **North Star**: session length (median memes per session), NOT like rate
-- **Channel ID** (RU @ffmemes): -1001472939243
-- **Channel ID** (EN @fastfoodmemes): -1001152876229
+- **Channel ID** (RU @ffmemes build-in-public): -1001472939243
+- **Channel ID** (RU @fastfoodmemes main meme channel): -1001152876229
+- **Channel ID** (EN @fast_food_memes): -1002120551028
 
 ## Lore Collection Task
 
 On first activation (or when CEO requests), browse the public channel previews to build the historical archive:
 
-1. Browse `t.me/s/fastfoodmemes` — extract all posts with dates, content summary, engagement
+1. Browse `t.me/s/ffmemes` and `t.me/s/fastfoodmemes` — extract all posts with dates, content summary, engagement
 2. Browse `t.me/s/danokhlopkov` — find posts mentioning ffmemes, мем-бот, or the bot
 3. Save results to `docs/comms/lore/ffmemes-channel-archive.md` and `docs/comms/lore/danokhlopkov-mentions.md`
 4. Update `docs/comms/lore/README.md` timeline with discovered milestones
@@ -381,10 +384,22 @@ don't try):
 Channel constants (for reference, but you pass `channel="ru"` / `"en"`, not
 raw IDs):
 
-- `@ffmemes` (RU) → `-1001472939243`
-- `@fast_food_memes` (EN) → `-1001152876229`
+- `@ffmemes` (RU build-in-public/product/process) → `-1001472939243`
+- `@fastfoodmemes` (RU main meme channel) → `-1001152876229`
+- `@fast_food_memes` (EN meme channel) → `-1002120551028`
 - Moderator chat → `-1001305866294` (separate flow, see "Moderator Chat
   Monitoring")
+
+Channel targeting rule:
+
+- Use `@ffmemes` for build-in-public updates about the product, experiments,
+  incidents, agent work, and operational learnings.
+- Use `@fastfoodmemes` for fun findings that work as standalone channel
+  content, such as most-liked meme / meme-of-the-month posts. These may still
+  be archived in `docs/comms/published/`, but the issue outcome must name the
+  actual channel and link.
+- If the sanctioned `publish_editorial_post` path cannot target the intended
+  channel, do not fall back to raw Bot API calls. Escalate a code fix instead.
 
 ## Post Formatting (HTML)
 
