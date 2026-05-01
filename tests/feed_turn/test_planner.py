@@ -120,3 +120,14 @@ def test_planner_mappings_are_read_only():
 
     with pytest.raises(TypeError):
         plan.blend_weights["lr_smoothed"] = 0.9
+    with pytest.raises(TypeError):
+        plan.fixed_pos[0] = "x"
+
+
+def test_engine_fallback_kwargs_are_read_only():
+    cold_plan = plan_candidate_selection(0)
+    lr_fallback = cold_plan.fallback_engines[0]
+
+    assert lr_fallback.engine == "lr_smoothed"
+    with pytest.raises(TypeError):
+        lr_fallback.kwargs["min_sends"] = 1

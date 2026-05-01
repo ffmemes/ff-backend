@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from math import ceil
 from types import MappingProxyType
 from typing import Any, Mapping
@@ -14,22 +14,13 @@ MATURE = "mature"
 MODERATOR_USER_TYPES = frozenset({"moderator", "admin"})
 
 
-def _empty_str_any_mapping() -> Mapping[str, Any]:
-    return MappingProxyType({})
-
-
-def _empty_str_float_mapping() -> Mapping[str, float]:
-    return MappingProxyType({})
-
-
-def _empty_int_str_mapping() -> Mapping[int, str]:
-    return MappingProxyType({})
+_EMPTY_MAPPING: Mapping[Any, Any] = MappingProxyType({})
 
 
 @dataclass(frozen=True)
 class EngineFallback:
     engine: str
-    kwargs: Mapping[str, Any] = field(default_factory=_empty_str_any_mapping)
+    kwargs: Mapping[str, Any] = _EMPTY_MAPPING
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "kwargs", MappingProxyType(dict(self.kwargs)))
@@ -39,14 +30,13 @@ class EngineFallback:
 class CandidateSelectionPlan:
     maturity_stage: str
     primary_engine: str | None
-    blend_weights: Mapping[str, float] = field(default_factory=_empty_str_float_mapping)
-    fixed_pos: Mapping[int, str] = field(default_factory=_empty_int_str_mapping)
+    blend_weights: Mapping[str, float] = _EMPTY_MAPPING
+    fixed_pos: Mapping[int, str] = _EMPTY_MAPPING
     fallback_engines: tuple[EngineFallback, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "blend_weights", MappingProxyType(dict(self.blend_weights)))
         object.__setattr__(self, "fixed_pos", MappingProxyType(dict(self.fixed_pos)))
-        object.__setattr__(self, "fallback_engines", tuple(self.fallback_engines))
 
 
 LR_SMOOTHED_COLD_FALLBACK = EngineFallback("lr_smoothed", {"min_sends": 10})

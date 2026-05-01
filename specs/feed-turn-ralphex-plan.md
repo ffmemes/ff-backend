@@ -185,9 +185,9 @@ tail -f .ralphex/progress/progress-feed-turn-ralphex-plan.txt
 
 ## Babysitting Checklist
 
-- [ ] Stop or redirect if Ralphex edits `meme_queue.py`, `next_message.py`,
+- [x] Stop or redirect if Ralphex edits `meme_queue.py`, `next_message.py`,
   `reaction.py`, Redis helpers, migrations, schemas, or observability writes.
-- [ ] Watch for changed engine names, weights, boundaries, fallback order, or
+- [x] Watch for changed engine names, weights, boundaries, fallback order, or
   `min_sends=10`.
-- [ ] Watch for weakened assertions in existing tests.
-- [ ] Before PR creation, inspect `git diff --stat` and `git diff`.
+- [x] Watch for weakened assertions in existing tests.
+- [x] Before PR creation, inspect `git diff --stat` and `git diff`.
