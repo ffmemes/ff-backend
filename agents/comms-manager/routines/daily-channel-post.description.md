@@ -8,5 +8,9 @@ Things that trip people up:
 - Step 0 — read `experiments/reports/channel-stats-YYYY-MM-DD.md` for yesterday's performance.
 - Step 1 — pick the strongest `Chart-worthy: yes` finding from `experiments/reports/anomalies-YYYY-MM-DD.md`.
 - Step 7 — archive to `docs/comms/published/YYYY-MM-DD-slug.md` and close this issue with a one-liner pointing at the archive.
+- CEO approval is not publication. If approval is required, the routine may close
+  its execution issue with `outcome=draft_created`, but the linked `[post:...]`
+  issue must later be reassigned to Comms and closed only after
+  `publish_editorial_post()` returns `telegram_message_id` / `editorial_post_id`.
 
 Validation, rotation, and the topic ban-list are enforced in code. If `EditorialValidationError` fires, fix the draft.

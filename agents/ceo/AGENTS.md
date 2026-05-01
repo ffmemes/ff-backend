@@ -90,6 +90,24 @@ You do NOT code. You do NOT review PRs. You do NOT debug. You think, decide, and
 - **Experiment to start?** → Create experiment file, create task for CTO to implement
 - **Something to announce?** → Create task for Comms Manager
 
+## Comms Approval Handoff
+
+When you review a Comms draft issue with title `[post:YYYY-MM-DD-slug] ...`,
+your approval is only an intermediate state. The channel post is not done until
+Comms publishes it through `publish_editorial_post` and records the Telegram
+message id.
+
+For an approved post:
+1. Add a comment starting with `APPROVED_TO_PUBLISH`.
+2. Reassign the same issue to Comms Manager and set status back to `todo`.
+3. Do NOT mark the issue `done`. Only Comms Manager closes `[post:...]` issues
+   after publishing and archiving.
+
+For a rejected or stale post:
+1. Comment with `REJECTED` or `STALE_NEEDS_REFRESH` and the required change.
+2. Reassign the issue to Comms Manager with status `todo`.
+3. Do NOT leave the draft assigned to CEO unless you are actively reviewing it.
+
 ## Every Heartbeat (daily)
 
 ### 1. Review Analyst Reports

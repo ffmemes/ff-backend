@@ -184,17 +184,26 @@ After deterministic smoke passes, run `/qa exhaustive` for an improvised bug hun
 
 When triggered by the daily watchdog routine, check that all other routines are running AND succeeding:
 
-1. Use `paperclipApiRequest` with `method` = `"GET"`, `path` = `"/api/companies/96ee7b2e-6df2-43c8-bbe3-53e19297308a/routines"` to list all routines
-2. For each routine, check BOTH **freshness** (did it run recently?) AND **health** (did it succeed?):
+1. Run the compact outcome audit first:
+```bash
+source ~/.zshrc 2>/dev/null || true
+python scripts/paperclip_routine_audit.py --focus all
+```
+If the script is unavailable in the runtime workspace, fall back to
+`paperclipApiRequest`, but preserve the same outcome checks manually.
+2. Use `paperclipApiRequest` with `method` = `"GET"`, `path` = `"/api/companies/96ee7b2e-6df2-43c8-bbe3-53e19297308a/routines"` only for freshness/status details not already shown by the script.
+3. For each routine, check BOTH **freshness** (did it run recently?) AND **health** (did it produce the expected outcome?):
    - **Daily Analyst Report** → ran in last 28h AND `lastRun.status` is not `failed`
    - **QA Log Scan** → ran in last 12h AND `lastRun.status` is not `failed`
    - **Weekly CEO Review** → ran in last 14 days AND `lastRun.status` is not `failed`
    - **Weekly Analyst Summary** → ran in last 14 days AND `lastRun.status` is not `failed`
-   - **gstack Update Check** → ran in last 48h AND `lastRun.status` is not `failed`
+   - **Daily Channel Post** → latest linked `[post:...]` issue has `outcome=published`, `telegram_message_id`, and `editorial_post_id`; draft/approval-only handoffs are YELLOW
+   - **gstack Update Check** → ran in last 48h, `lastRun.status` is not `failed`, and does NOT have `unknown_gstack_update_path` / degraded update flags
+   - **Paperclip Update Check** → ran in last 48h and includes version/changelog impact, not only SHA equality
    - **PR Review** → event-driven, skip unless no runs in 7 days
    - **Process Health Check** → skip (that's you)
-3. If any routine is STALE (hasn't run in time) or FAILED (`lastRun.status == "failed"`) → create **HIGH** priority task for CEO with: which routine, when it last ran, what the status was, and the `failureReason` if available
-4. If all routines are healthy → log "Process health: GREEN" in your QA report
+4. If any routine is STALE, FAILED, or has outcome flags from `paperclip_routine_audit.py`, create or update ONE `[maintenance:routine-outcome-health]` issue for CEO with: routine, issue id, flag, timestamp, and the exact expected outcome contract.
+5. If all routines are fresh and outcome-clean → log "Process health: GREEN" in your QA report.
 
 ## What NOT To Do
 - Do NOT fix bugs yourself (create tasks for **CTO**)
