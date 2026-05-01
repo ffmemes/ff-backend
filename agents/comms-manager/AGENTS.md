@@ -347,7 +347,7 @@ from src.comms.publishing import publish_editorial_post, EditorialValidationErro
 try:
     result = await publish_editorial_post(
         text=final_post_text,           # HTML-formatted, see "Post Formatting"
-        channel="ru",                    # or "en" for @fast_food_memes
+        channel="ffmemes",               # "ffmemes" build-in-public, "ru" @fastfoodmemes, "en" @fast_food_memes
         category="C",                    # A/B/C/D/E/F — see "Content Categories"
         entity_id="dau_delta_2026_04_24",# stable slug for the specific anomaly/topic
         photo_file_id=telegram_file_id,  # OR photo_url — always include a visual
@@ -381,25 +381,23 @@ don't try):
 - **Stats registration.** Inserts into `editorial_posts` so the stats
   collector (every 6h) picks up views/forwards/reactions automatically.
 
-Channel constants (for reference, but you pass `channel="ru"` / `"en"`, not
-raw IDs):
+Channel constants (for reference — pass the `channel` slug, not the raw ID):
 
-- `@ffmemes` (RU build-in-public/product/process) → `-1001472939243`
-- `@fastfoodmemes` (RU main meme channel) → `-1001152876229`
-- `@fast_food_memes` (EN meme channel) → `-1002120551028`
+- `channel="ffmemes"` → `@ffmemes` RU build-in-public/product/process → `-1001472939243`
+- `channel="ru"` → `@fastfoodmemes` RU main meme channel → `-1001152876229`
+- `channel="en"` → `@fast_food_memes` EN meme channel → `-1002120551028`
 - Moderator chat → `-1001305866294` (separate flow, see "Moderator Chat
   Monitoring")
 
 Channel targeting rule:
 
-- Use `@ffmemes` for build-in-public updates about the product, experiments,
-  incidents, agent work, and operational learnings.
-- Use `@fastfoodmemes` for fun findings that work as standalone channel
+- Use `channel="ffmemes"` for build-in-public updates about the product,
+  experiments, incidents, agent work, and operational learnings.
+- Use `channel="ru"` for fun findings that work as standalone @fastfoodmemes
   content, such as most-liked meme / meme-of-the-month posts. These may still
   be archived in `docs/comms/published/`, but the issue outcome must name the
   actual channel and link.
-- If the sanctioned `publish_editorial_post` path cannot target the intended
-  channel, do not fall back to raw Bot API calls. Escalate a code fix instead.
+- Use `channel="en"` for the EN @fast_food_memes meme channel.
 
 ## Post Formatting (HTML)
 

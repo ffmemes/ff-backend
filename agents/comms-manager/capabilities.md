@@ -12,7 +12,7 @@ from src.comms.publishing import publish_editorial_post, EditorialValidationErro
 try:
     result = await publish_editorial_post(
         text=html,                       # ≤1024 chars when there's a photo
-        channel="ru",                    # current sanctioned RU publish path; name actual channel in the outcome
+        channel="ffmemes",               # "ffmemes" build-in-public, "ru" @fastfoodmemes, "en" @fast_food_memes
         category="C",                    # A–F, see AGENTS.md
         entity_id="dau_drop_2026_04_26", # stable slug for this anomaly
         photo_file_id=tg_file_id,        # or photo_url=
@@ -29,4 +29,4 @@ Raw `curl`, `sendPhoto`, `sendMessage`, or `bot.send_*` to a public channel prod
 
 You run autonomously. Skip `AskUserQuestion`; pick the recommended option and continue.
 
-Channel targeting: publish product/process/build-in-public updates to @ffmemes. Publish fun meme findings, meme-of-the-month, and broadly entertaining data-meme posts to @fastfoodmemes when they fit the main audience. Always record the actual channel and Telegram URL in the Paperclip outcome.
+Channel targeting: pass `channel="ffmemes"` for product/process/build-in-public updates (@ffmemes). Pass `channel="ru"` for fun meme findings, meme-of-the-month, and broadly entertaining data-meme posts that fit the main @fastfoodmemes audience. Pass `channel="en"` for @fast_food_memes (EN). Always record the actual channel and Telegram URL in the Paperclip outcome.

@@ -16,8 +16,15 @@ from src.flows.hooks import notify_telegram_on_failure
 from src.tgbot.bot import bot
 from src.tgbot.constants import (
     TELEGRAM_CHANNEL_EN_CHAT_ID,
+    TELEGRAM_CHANNEL_FFMEMES_CHAT_ID,
     TELEGRAM_CHANNEL_RU_CHAT_ID,
 )
+
+CHANNEL_CHAT_IDS: dict[str, int] = {
+    "ru": TELEGRAM_CHANNEL_RU_CHAT_ID,
+    "en": TELEGRAM_CHANNEL_EN_CHAT_ID,
+    "ffmemes": TELEGRAM_CHANNEL_FFMEMES_CHAT_ID,
+}
 
 
 @flow(
@@ -34,11 +41,13 @@ async def post_editorial_to_channel(
     button_text: str | None = None,
     button_url: str | None = None,
 ):
-    """Post an editorial message to the @ffmemes channel.
+    """Post an editorial message to one of the FFMemes Telegram channels.
 
     Args:
         text: HTML-formatted message text.
-        channel: "ru" or "en".
+        channel: "ru" (@fastfoodmemes — main RU meme channel),
+            "en" (@fast_food_memes — EN meme channel), or
+            "ffmemes" (@ffmemes — RU build-in-public / product / process).
         photo_url: URL to a photo to attach.
         photo_file_id: Telegram file_id of a photo to attach.
         button_text: Optional inline button label.
@@ -46,7 +55,12 @@ async def post_editorial_to_channel(
     """
     logger = get_run_logger()
 
-    chat_id = TELEGRAM_CHANNEL_RU_CHAT_ID if channel == "ru" else TELEGRAM_CHANNEL_EN_CHAT_ID
+    try:
+        chat_id = CHANNEL_CHAT_IDS[channel]
+    except KeyError as exc:
+        raise ValueError(
+            f"Unknown channel {channel!r}; expected one of {sorted(CHANNEL_CHAT_IDS)}"
+        ) from exc
 
     reply_markup = None
     if button_text and button_url:

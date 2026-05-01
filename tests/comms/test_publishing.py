@@ -7,6 +7,7 @@ that would block a bad draft before any async work runs.
 import pytest
 
 from src.comms.publishing import (
+    ALLOWED_CHANNELS,
     ALLOWED_HTML_TAGS,
     TELEGRAM_CAPTION_MAX,
     compute_draft_hash,
@@ -285,3 +286,30 @@ def test_compute_draft_hash_includes_button():
     assert with_button != compute_draft_hash(
         "ru", "hello", "f1", "C", "e1", button_text="Поехали", button_url="https://t.me/x"
     )
+
+
+# ── Channel routing ───────────────────────────────────────────────────────
+
+
+def test_allowed_channels_includes_ffmemes():
+    # @ffmemes (build-in-public/product/process) is a sanctioned target.
+    assert ALLOWED_CHANNELS == {"ru", "en", "ffmemes"}
+
+
+def test_post_editorial_to_channel_routes_ffmemes_to_correct_chat_id():
+    from src.flows.crossposting.editorial import CHANNEL_CHAT_IDS
+    from src.tgbot.constants import (
+        TELEGRAM_CHANNEL_EN_CHAT_ID,
+        TELEGRAM_CHANNEL_FFMEMES_CHAT_ID,
+        TELEGRAM_CHANNEL_RU_CHAT_ID,
+    )
+
+    assert CHANNEL_CHAT_IDS == {
+        "ru": TELEGRAM_CHANNEL_RU_CHAT_ID,
+        "en": TELEGRAM_CHANNEL_EN_CHAT_ID,
+        "ffmemes": TELEGRAM_CHANNEL_FFMEMES_CHAT_ID,
+    }
+    # Hard-coded per the issue spec — keep these wired to the right chat ids.
+    assert TELEGRAM_CHANNEL_FFMEMES_CHAT_ID == -1001472939243
+    assert TELEGRAM_CHANNEL_RU_CHAT_ID == -1001152876229
+    assert TELEGRAM_CHANNEL_EN_CHAT_ID == -1002120551028
