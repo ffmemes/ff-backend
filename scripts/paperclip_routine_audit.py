@@ -90,6 +90,14 @@ def get_issue(client: Paperclip, issue_id: str) -> dict[str, Any] | None:
     return issue if isinstance(issue, dict) else None
 
 
+def issue_runs(client: Paperclip, issue_id: str) -> list[dict[str, Any]]:
+    try:
+        runs = client.get(f"/api/issues/{issue_id}/runs")
+    except RuntimeError:
+        return []
+    return runs if isinstance(runs, list) else []
+
+
 def list_issues(client: Paperclip, company_id: str, status: str, limit: int = 100) -> list[dict]:
     issues = client.get(
         f"/api/companies/{company_id}/issues",
@@ -173,7 +181,17 @@ def audit_routines(client: Paperclip, company_id: str, focus: str) -> list[dict[
         issue_id = run.get("linkedIssueId")
         issue = get_issue(client, issue_id) if issue_id else None
         comments = issue_comments(client, issue_id) if issue_id else []
+        runs = issue_runs(client, issue_id) if issue_id else []
         flags, latest = classify_issue(issue or {}, comments)
+        if (issue or {}).get("status") == "in_progress" and not (issue or {}).get("activeRun"):
+            if any(item.get("status") == "running" for item in runs):
+                flags.append("zombie_execution_run")
+        payload_pr = str(((run.get("triggerPayload") or {}).get("pr_number")) or "")
+        issue_title = (
+            ((run.get("linkedIssue") or {}).get("title")) or (issue or {}).get("title") or ""
+        )
+        if payload_pr and f"[pr:{payload_pr}]" not in issue_title:
+            flags.append("coalesced_pr_review_mismatch")
         row = {
             "routine": name,
             "routineId": routine.get("id"),

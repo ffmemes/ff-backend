@@ -59,6 +59,11 @@ release note from scratch.
   before closing as useful.
 - `@ffnerdbot` is only an activity feed. It is useful to see work starting and
   stopping, but not to judge value delivered.
+- PR Review can currently misqueue work: PR #215 was coalesced into active
+  `FFM-860 [pr:214] Review`, then both `FFM-860` and the re-triggered
+  `FFM-862 [pr:215] Review` showed `in_progress` + running run +
+  `activeRun=null` with no review comments. Treat this as Paperclip runtime
+  zombie execution, not as a real review in progress.
 
 ## Repo Changes Made
 

@@ -60,6 +60,17 @@ This is not only a SHA poll. Every run should record:
 If upstream changed, create one triage issue with the impact summary. Do not
 bury the analysis in a completed routine comment.
 
+### PR Review
+
+Each PR webhook must create or resume the matching `[pr:<number>] Review` issue.
+If trigger payload `pr_number=215` links to `[pr:214] Review`, that is
+`coalesced_pr_review_mismatch`, not healthy queueing.
+
+An issue with status `in_progress`, a latest run status of `running`, and
+`activeRun=null` is `zombie_execution_run`. It blocks future PR reviews while
+doing no visible work. The watchdog should escalate it as a Paperclip runtime
+issue and re-trigger the affected PR after the stale execution is closed.
+
 ## Telegram Activity Feed
 
 `@ffnerdbot` is only a low-signal activity feed. It proves that agents started
