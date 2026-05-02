@@ -32,6 +32,9 @@ from src.flows.crossposting.meme import (
 from src.flows.crossposting.stats_collector import collect_channel_stats
 from src.flows.crossposting.weekly_report import post_weekly_burger_report
 
+# Monitors
+from src.flows.monitors.ghost_users import monitor_ghost_users
+
 # Parsers
 from src.flows.parsers.tg import parse_telegram_sources
 from src.flows.parsers.vk import parse_vk_sources
@@ -166,6 +169,11 @@ if __name__ == "__main__":
         reward_en_users_for_weekly_top_uploaded_memes.to_deployment(
             name="Reward EN weekly",
             schedules=[CronSchedule(cron="0 18 * * 3", timezone=LON)],
+        ),
+        # ── Monitors ──
+        monitor_ghost_users.to_deployment(
+            name="Monitor ghost users",
+            schedules=[CronSchedule(cron="* * * * *", timezone=LON)],
         ),
         # ── Storage ──
         describe_memes_flow.to_deployment(

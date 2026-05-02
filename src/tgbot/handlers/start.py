@@ -82,6 +82,19 @@ def _is_blocked_acquisition_channel(deep_link: str | None) -> bool:
 
 
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Side effects every /start MUST run, regardless of deep_link branch:
+    #   1. user_tg + user upsert (save_user_data)
+    #   2. user_info cache populated (update_user_info_cache)
+    #   3. deep_link logged (log_user_deep_link)
+    #   4. admin chat notification (log_start_event)
+    #   5. user_language rows seeded if missing (lazy init below)
+    #
+    # If you add another universal onboarding side effect, hoist it
+    # ABOVE the deep_link ladder. Do NOT bury it inside a per-branch
+    # block — branches that early-return (kitchen, wrapped, giveaway,
+    # _is_blocked_acquisition_channel) silently skip anything below them.
+    # Drift here caused FFM-907 (kitchen ghosts: 9.4% of April 2026
+    # cohort registered but never received a meme).
     user_id = update.effective_user.id
     deep_link = context.args[0] if context.args else None
     language_code = update.effective_user.language_code
@@ -103,11 +116,11 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         created,
     )
 
-    # Ensure language rows exist before any branch that may serve memes.
-    # Covers: new users on every deep_link path (kitchen used to skip init),
-    # and historical orphans whose init was never run — they were stuck on
-    # "memes ended" because recommendations filter by user_language.
-    # Idempotent: add_user_languages uses ON CONFLICT DO NOTHING.
+    # Lazy language init. Covers: new users on every deep_link path
+    # (kitchen used to skip this), and historical orphans whose init
+    # was never run — they were stuck on "memes ended" because
+    # recommendations filter by user_language. Idempotent:
+    # add_user_languages uses ON CONFLICT DO NOTHING.
     if not await get_user_languages(user_id):
         await init_user_languages_from_tg_user(update.effective_user)
 
