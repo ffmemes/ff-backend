@@ -286,3 +286,68 @@ async def test_failed_pipeline_memes_excluded_from_denominator(conn: AsyncConnec
     result = await maybe_auto_snooze_source(SOURCE_ID, new_posts_count=5)
 
     assert result == "high_ad_rate"
+
+
+# Criterion 3a: extreme_ad_rate early-kill (FFM-847 follow-up).
+# Pure-pumper sources that post few but ~100% ad memes never reach the 30-meme
+# sample threshold on volume alone. Catch them at >=80% ad_rate with >=10 processed.
+
+
+@pytest.mark.asyncio
+async def test_snooze_on_extreme_ad_rate_below_standard_sample(conn: AsyncConnection):
+    """100% ad_rate with 12 processed memes (below the 30-meme standard threshold)
+    must early-kill via 'extreme_ad_rate'."""
+    await create_meme_source(conn, id=SOURCE_ID, status="parsing_enabled")
+    await _seed_memes(conn, source_id=SOURCE_ID, n_ad=12, n_ok=0)
+    await conn.commit()
+
+    result = await maybe_auto_snooze_source(SOURCE_ID, new_posts_count=5)
+
+    assert result == "extreme_ad_rate"
+    source = await fetch_one(meme_source.select().where(meme_source.c.id == SOURCE_ID))
+    assert source["status"] == MemeSourceStatus.SNOOZED.value
+    assert source["data"]["snoozed_reason"] == "extreme_ad_rate"
+
+
+@pytest.mark.asyncio
+async def test_snooze_on_extreme_ad_rate_at_80_pct_boundary(conn: AsyncConnection):
+    """Threshold is `>= 0.80`. Exactly 80% (8 ad / 10 processed) must snooze."""
+    await create_meme_source(conn, id=SOURCE_ID, status="parsing_enabled")
+    await _seed_memes(conn, source_id=SOURCE_ID, n_ad=8, n_ok=2)
+    await conn.commit()
+
+    result = await maybe_auto_snooze_source(SOURCE_ID, new_posts_count=5)
+
+    assert result == "extreme_ad_rate"
+
+
+@pytest.mark.asyncio
+async def test_no_snooze_on_extreme_ad_rate_below_min_sample(conn: AsyncConnection):
+    """9 processed memes (9 ad = 100% ad_rate) is below the 10-meme minimum sample
+    for the early-kill. Don't snooze — wait for one more meme."""
+    await create_meme_source(conn, id=SOURCE_ID, status="parsing_enabled")
+    await _seed_memes(conn, source_id=SOURCE_ID, n_ad=9, n_ok=0)
+    await conn.commit()
+
+    result = await maybe_auto_snooze_source(SOURCE_ID, new_posts_count=5)
+
+    assert result is None
+    source = await fetch_one(meme_source.select().where(meme_source.c.id == SOURCE_ID))
+    assert source["status"] == MemeSourceStatus.PARSING_ENABLED.value
+
+
+@pytest.mark.asyncio
+async def test_no_snooze_just_below_extreme_threshold(conn: AsyncConnection):
+    """79% ad_rate (mid-band: too high to be healthy, too low for early-kill, sample
+    too small for standard gate) must NOT snooze. Wait for the standard gate to
+    kick in once n_processed >= 30."""
+    await create_meme_source(conn, id=SOURCE_ID, status="parsing_enabled")
+    # 11 ad + 3 ok = 14 processed, ad_rate ≈ 78.6% — under 80%, under 30 sample
+    await _seed_memes(conn, source_id=SOURCE_ID, n_ad=11, n_ok=3)
+    await conn.commit()
+
+    result = await maybe_auto_snooze_source(SOURCE_ID, new_posts_count=5)
+
+    assert result is None
+    source = await fetch_one(meme_source.select().where(meme_source.c.id == SOURCE_ID))
+    assert source["status"] == MemeSourceStatus.PARSING_ENABLED.value
