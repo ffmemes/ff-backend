@@ -40,7 +40,7 @@ def _lang_group(language_code: str | None) -> str:
 
 
 async def get_ghost_users() -> list[dict]:
-    """Registered ≤12mo, never delivered a meme, not blocked, not banned."""
+    """Registered ≤12mo, never delivered a meme, not blocked, not waitlisted."""
     return await fetch_all(
         text(
             """
@@ -55,7 +55,7 @@ async def get_ghost_users() -> list[dict]:
         LEFT JOIN user_tg ut ON ut.id = u.id
         WHERE u.created_at > NOW() - INTERVAL '12 months'
           AND u.blocked_bot_at IS NULL
-          AND u.type NOT IN ('blocked_bot', 'banned', 'waitlist')
+          AND u.type NOT IN ('blocked_bot', 'waitlist')
           AND NOT EXISTS (
               SELECT 1 FROM user_meme_reaction r WHERE r.user_id = u.id
           )
