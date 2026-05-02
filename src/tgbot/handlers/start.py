@@ -21,6 +21,7 @@ from src.tgbot.senders.next_message import next_message
 from src.tgbot.service import (
     create_or_update_user,
     get_tg_user_by_id,
+    get_user_languages,
     log_user_deep_link,
     save_tg_user,
 )
@@ -102,18 +103,23 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         created,
     )
 
+    # Ensure language rows exist before any branch that may serve memes.
+    # Covers: new users on every deep_link path (kitchen used to skip init),
+    # and historical orphans whose init was never run — they were stuck on
+    # "memes ended" because recommendations filter by user_language.
+    # Idempotent: add_user_languages uses ON CONFLICT DO NOTHING.
+    if not await get_user_languages(user_id):
+        await init_user_languages_from_tg_user(update.effective_user)
+
     if deep_link == "kitchen":
         return await handle_show_kitchen(update, context)
 
     if deep_link == "wrapped":
         from src.tgbot.handlers.stats.wrapped import handle_wrapped
 
-        if created:
-            await init_user_languages_from_tg_user(update.effective_user)
         return await handle_wrapped(update, context)
 
     if created:  # new user:
-        await init_user_languages_from_tg_user(update.effective_user)
         await handle_language_settings(update, context)
 
         await handle_invited_user(
