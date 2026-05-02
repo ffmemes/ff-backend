@@ -69,7 +69,9 @@ async def maybe_auto_snooze_source(
     Snoozes the source if any criterion is met:
       1. 3 consecutive parse attempts returned 0 posts.
       2. like_rate < 10% with at least 100 total reactions.
-      3. ad_rate > 30% over rolling 7d window with >= 30 processed memes.
+      3a. ad_rate >= 80% over rolling 7d window with >= 10 processed memes
+          (early-kill for extreme pumpers).
+      3b. ad_rate > 30% over rolling 7d window with >= 30 processed memes.
     Returns the snooze reason string if snoozed, None otherwise.
     """
     source = await fetch_one(select(meme_source).where(meme_source.c.id == meme_source_id))
@@ -140,9 +142,24 @@ async def maybe_auto_snooze_source(
         ),
         {"sid": meme_source_id},
     )
-    if ad_stats and ad_stats["n_processed"] >= 30:
+    if ad_stats and ad_stats["n_processed"] >= 10:
         ad_rate = ad_stats["n_ads"] / ad_stats["n_processed"]
-        if ad_rate > 0.30:
+        # Criterion 3a: pure-pumper early-kill. A 100%-ad source has no legitimate
+        # signal regardless of volume; the 30-meme floor only protects against
+        # noise, which doesn't apply at >=80% ad_rate.
+        if ad_rate >= 0.80:
+            await update_meme_source(
+                meme_source_id,
+                status=MemeSourceStatus.SNOOZED.value,
+                data={
+                    **updated_data,
+                    "snoozed_reason": "extreme_ad_rate",
+                    "snoozed_at": now_iso,
+                },
+            )
+            return "extreme_ad_rate"
+        # Criterion 3b: standard high-ad-rate gate.
+        if ad_stats["n_processed"] >= 30 and ad_rate > 0.30:
             await update_meme_source(
                 meme_source_id,
                 status=MemeSourceStatus.SNOOZED.value,
