@@ -308,6 +308,7 @@ These are encrypted in Paperclip DB and injected as env vars during agent runs:
 | Secret | Used by | Purpose |
 |--------|---------|---------|
 | `ANALYST_DATABASE_URL` | Analyst, QA | Read-only prod DB access |
+| `DATABASE_URL` | Comms | Narrow-privilege `comms_writer` URL for `editorial_posts` only (see `docs/comms/comms-writer-role-setup.sql`). Do NOT reuse the app's full-write URL here. |
 | `COOLIFY_ACCESS_TOKEN` | CTO, QA, Release Engineer | Coolify API for container logs |
 | `COOLIFY_BASE_URL` | CTO, QA, Release Engineer | Coolify API URL |
 | `SENTRY_AUTH_TOKEN` | CTO, QA | Sentry CLI authentication (read-only project scope) |
