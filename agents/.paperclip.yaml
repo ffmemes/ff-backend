@@ -74,6 +74,14 @@ agents:
         ANALYST_DATABASE_URL:
           kind: "secret"
           requirement: "optional"
+        # Narrow-privilege writer role for editorial_posts (SELECT/INSERT/UPDATE
+        # on that one table). Required so publish_editorial_post can persist
+        # the row and stats collector picks it up. See
+        # docs/comms/comms-writer-role-setup.sql for the role bootstrap and
+        # FFM-919 for the rationale.
+        DATABASE_URL:
+          kind: "secret"
+          requirement: "required"
         FFMEMES_PROD_TELEGRAM_BOT_TOKEN:
           kind: "secret"
           requirement: "required"
