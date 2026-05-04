@@ -328,7 +328,7 @@ ORDER BY day;
 --
 -- Scheduled target: 9 memes/batch every 15 min, capped at 900 OpenRouter attempts/day
 -- Bottleneck: OpenRouter free-tier 429s; actual throughput varies by model/time window
--- Priority: processes most-liked memes first (nlikes DESC)
+-- Priority: recent user uploads first, then most-liked memes (nlikes DESC)
 -- Circuit breaker: auto-pauses after 3 failures in 1 hour
 --
 -- IMPORTANT: use ocr_result->>'calculated_at' to find recently described memes,
