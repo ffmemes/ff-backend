@@ -1,118 +1,65 @@
-# Describe Memes (Vision OCR)
+# Describe Memes
 
-## What It Does
+Vision OCR for memes. The flow extracts image text, language, and a short English description into `meme.ocr_result` for duplicate detection, upload moderation, search, stats, and product experiments.
 
-Background Prefect flow that uses vision LLMs to analyze meme images. Populates `meme.ocr_result` JSONB with description, OCR text, language, model used, and timestamp.
+## Business Goal
 
-Processes most-liked memes first (by `meme_stats.nlikes DESC`). Runs every 60 min, ~20 memes per batch.
+Use OpenRouter's free vision tier to process hundreds of memes/day without paid spend. The current target is **864 scheduled memes/day**, capped by a **900 OpenRouter-attempt/day Redis guard** so upload-time OCR and fallback attempts do not cross the 1,000/day free-model limit.
 
-## OpenRouter Free Tier Constraints
+## Source Of Truth
 
-**Provider**: OpenRouter API (`openrouter.ai/api/v1`)
+| Topic | Link |
+| --- | --- |
+| Flow and OpenRouter client | [`src/flows/storage/describe_memes.py`](../src/flows/storage/describe_memes.py) |
+| Prefect schedule | [`scripts/serve_flows.py`](../scripts/serve_flows.py) |
+| Upload-time OCR callsite | [`src/tgbot/handlers/upload/moderation.py`](../src/tgbot/handlers/upload/moderation.py) |
+| Dedup usage | [`src/storage/service.py`](../src/storage/service.py) |
+| Parsing/storage context | [`specs/parsing-etl.md`](parsing-etl.md) |
 
-### Rate Limits (as of 2026-04)
+## Production Settings
 
-| Account tier | RPM | Requests/day |
-|-------------|-----|-------------|
-| No purchases ever | 20 | **50** |
-| >= $10 purchased (lifetime) | 20 | **1,000** |
+- Schedule: every 30 minutes, `batch_size=18` (`15,45 * * * *` London time).
+- Daily target: `48 * 18 = 864` scheduled memes/day.
+- Local free-tier budget: `OPENROUTER_FREE_DAILY_REQUEST_BUDGET = 900`.
+- Redis counter: `openrouter:free_requests:YYYY-MM-DD` (UTC, 48h TTL).
+- Free-model RPM: stay below 20 rpm; code spaces attempts by at least 4 seconds.
+- Circuit breaker: Prefect pauses the deployment after repeated failures.
 
-- The $10 threshold is **lifetime total purchases**, not current balance.
-- Once crossed, the 1,000/day limit is permanent even if balance drops.
-- **If balance goes below $0, even free models return 402 errors.**
-- Monitor balance at: https://openrouter.ai/settings/credits
+## Free-Only Contract
 
-### NEVER Add Paid Models
+`VISION_MODELS` must contain only OpenRouter model IDs ending in `:free`.
 
-**Rule**: The `VISION_MODELS` list must contain ONLY `:free` models. No exceptions.
+The client enforces this twice:
 
-Why: If free models are rate-limited and the system falls through to paid models, each request costs money. If balance drops below $0, ALL models (including free) get blocked with 402. This creates a death spiral:
+- import-time validation via `_validate_free_vision_models`;
+- per-request validation before `POST /chat/completions`.
 
-1. Free models hit daily rate limit
-2. Paid fallbacks drain balance
-3. Balance goes below $0
-4. ALL models blocked → circuit breaker fires → describe_memes stops
+If Redis quota accounting fails, the client fails closed and does not call OpenRouter.
 
-This happened in April 2026 when AI agents added paid fallbacks during unsupervised operation.
+## Model Chain
 
-## Model Chain (production)
+Current production chain:
 
 ```python
-VISION_MODELS = [
-    "google/gemma-4-31b-it:free",     # 262k context, primary
-    "google/gemma-4-26b-a4b-it:free", # 262k context, MoE variant
-    "google/gemma-3-27b-it:free",     # 131k context, re-listed ~2026-04-20
-    "google/gemma-3-12b-it:free",     # 32k context, re-listed ~2026-04-20
+[
+    "google/gemma-4-31b-it:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "google/gemma-3-27b-it:free",
+    "google/gemma-3-12b-it:free",
 ]
 ```
 
-Falls through sequentially on 403 (access denied), timeout, or bad response.
-429 (rate limit) returns immediately — the 20 rpm limit is global across all free models, so trying the next model would also 429.
-
-**Model history** (Apr 2026): Gemma 3 free models delisted ~2026-04-15 (FFM-543), re-listed ~2026-04-20 and re-added to chain. `gemma-4-*:free` restored after earlier 403 issues (FFM-520).
-
-### Available Free Vision Models (as of 2026-04-20)
-
-| Model | Context | Notes |
-|-------|---------|-------|
-| `google/gemma-4-31b-it:free` | 262K | Primary |
-| `google/gemma-4-26b-a4b-it:free` | 262K | MoE variant fallback |
-| `google/gemma-3-27b-it:free` | 131K | Re-listed ~2026-04-20, restored as fallback |
-| `google/gemma-3-12b-it:free` | 32K | Re-listed ~2026-04-20, restored as fallback |
-| `google/gemma-3-4b-it:free` | 32K | Available but not used (4B too small for reliable JSON) |
-| `nvidia/nemotron-nano-12b-v2-vl:free` | 128K | **Removed** — returns 504s and invalid JSON/empty content |
-
-Check current availability: `curl https://openrouter.ai/api/v1/models | jq '.data[] | select(.id | endswith(":free")) | select(.architecture.modality | contains("image")) | .id'`
-
-## Output Schema
-
-Stored in `meme.ocr_result` JSONB:
-
-```json
-{
-  "model": "google/gemma-3-27b-it:free",
-  "calculated_at": "2026-04-11T12:00:00+00:00",
-  "raw_result": {
-    "ocr_text": "когда узнал что...",
-    "description": "A surprised cat looking at a phone screen...",
-    "language": "ru"
-  },
-  "description": "A surprised cat looking at a phone screen...",
-  "text": "когда узнал что...",
-  "describe_failures": 0
-}
-```
-
-- `calculated_at` is the monitoring field (NOT `meme.created_at`)
-- `describe_failures` >= 3 → meme skipped permanently
-- Language detection updates `meme.language_code` only for known languages
-
-## Failure Handling
-
-- **Per-meme**: 3 failures tracked in `ocr_result.describe_failures`, then skipped
-- **Per-batch**: 3 consecutive failures → batch stops early
-- **Quota exhausted**: HTTP 402 → immediate batch exit on first occurrence (no model fallback — 402 is account-wide)
-- **Rate limit**: all models return 429 → wait up to 65s using Retry-After header, retry same meme. After 3 waits without progress, stop batch (likely daily quota)
-- **Circuit breaker**: Prefect automation pauses deployment after 3 flow failures/hour
+Do not add paid fallbacks. A paid fallback can spend the account below zero, after which OpenRouter returns 402 for all models, including free models.
 
 ## Monitoring
 
-- Flow name: `Describe Memes (OpenRouter Vision)`
-- Emits event: `ff.describe_memes.completed` with `{described: N, failed: N}`
-- Healthy batch: 15-20 memes described, < 5 failures
-- Check: `SELECT count(*) FROM meme WHERE ocr_result->>'calculated_at' > (now() - interval '1 hour')::text`
+- Fresh OCR: `ocr_result->>'calculated_at'`, not `meme.created_at`.
+- Healthy batch: up to 18 described, low failures.
+- Daily attempts: inspect Redis key `openrouter:free_requests:YYYY-MM-DD`.
+- Resume paused deployment:
 
-## Key Files
+```bash
+prefect deployment resume "Describe Memes (OpenRouter Vision)/Describe Memes (OpenRouter)"
+```
 
-| File | Purpose |
-|------|---------|
-| `src/flows/storage/describe_memes.py` | Main flow + vision API client |
-| `src/config.py` | `OPENROUTER_API_KEY` setting |
-| `scripts/serve_flows.py` | Cron schedule (every 30 min) |
-
-## Known Issues
-
-1. **Free model churn**: OpenRouter frequently removes/changes free models. Gemma 3 → Gemma 4 → back to Gemma 3 happened within days (April 2026). Models need manual verification against the API.
-2. **No balance monitoring**: No alerting when OpenRouter balance approaches $0.
-3. **No daily request counter**: Can't tell if we're hitting the 1,000/day free limit vs getting rate-limited for other reasons.
-4. **Fallback chain multiplies quota usage**: Each failed model attempt (403, timeout, bad response) counts toward the 1,000/day limit. A 5-model chain with 2 broken models wastes 40% of requests. Keep the chain short and remove models that consistently fail (FFM-520, Apr 2026).
+Before resuming, check recent flow logs and confirm the root cause is fixed.

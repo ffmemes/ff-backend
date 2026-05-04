@@ -170,11 +170,11 @@ if __name__ == "__main__":
         # ── Storage ──
         describe_memes_flow.to_deployment(
             name="Describe Memes (OpenRouter)",
-            # Reduced to every 3 hours with batch_size=6 (8 runs × 6 = 48/day).
-            # At 50/day free quota (no $10+ purchases), hourly×20 was burning
-            # through the daily limit within 2-3 runs. Bump back to hourly×20
-            # once $10+ lifetime credit unlocks 1,000/day. See FFM-587.
-            schedules=[CronSchedule(cron="15 */3 * * *", timezone=LON)],
-            parameters={"batch_size": 6},
+            # $10+ lifetime OpenRouter credit unlocks 1,000 free-model req/day.
+            # Run 48 batches/day × 18 memes = 864 scheduled attempts/day, leaving
+            # headroom for upload-time OCR and model fallback attempts. The flow
+            # also has a Redis safety guard at 900 OpenRouter attempts/day.
+            schedules=[CronSchedule(cron="15,45 * * * *", timezone=LON)],
+            parameters={"batch_size": 18},
         ),
     )

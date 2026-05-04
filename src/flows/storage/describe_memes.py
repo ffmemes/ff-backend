@@ -8,14 +8,15 @@ Populates meme.ocr_result JSONB with:
 - described_by: model used
 - calculated_at: timestamp (use this field, NOT meme.created_at, for monitoring)
 
-Processes most popular memes first (by nlikes DESC).
-Runs every 60 min via Prefect cron, ~20 memes per batch.
+Processes recent user uploads first, then most popular memes (by nlikes DESC).
+Runs every 30 min via Prefect cron, 18 memes per scheduled batch.
 
 IMPORTANT — OpenRouter free tier rules:
-- Need $10+ lifetime purchases for 1,000 req/day (otherwise only 50/day).
-- NEVER add paid models — if balance drops below $0, ALL models (incl free) get 402.
+- Need $10+ lifetime purchases for 1,000 free-model req/day (otherwise 50/day).
+- NEVER add paid models — this client refuses any model not ending in ":free".
 - Current balance must stay >= $0. Monitor at https://openrouter.ai/settings/credits
 - Free model rate limit: 20 rpm across all free models.
+- Local safety budget: 900 OpenRouter attempts/day to leave room for uploads/retries.
 - See specs/describe-memes.md for full constraints.
 
 Circuit breaker: auto-paused after 3 failures in 1 hour.
@@ -36,17 +37,22 @@ from src.config import settings
 from src.database import execute, fetch_all, fetch_one, meme
 from src.flows.events import safe_emit
 from src.flows.hooks import notify_telegram_on_failure
+from src.redis import redis_client
 from src.storage.upload import download_meme_content_from_tg
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_FREE_DAILY_REQUEST_LIMIT = 1000
+OPENROUTER_FREE_DAILY_REQUEST_BUDGET = 900
+OPENROUTER_FREE_REQUEST_COUNTER_TTL_SECONDS = 60 * 60 * 48
 
 # FREE models only. Never add paid models here — spending balance below $0
 # blocks ALL models (even free ones) with HTTP 402. Free tier requires $10+
 # lifetime purchases for 1,000 req/day (vs 50/day without).
 # See specs/describe-memes.md for full OpenRouter constraints.
 #
-# Verified available on OpenRouter API as of 2026-04-20.
-# Ordered by preference. Falls back to next model on 429/403/error.
+# Verified available on OpenRouter API as of 2026-05-04.
+# Ordered by preference. Falls back to next model on 403/timeout/bad response.
+# 429 returns immediately because the free-model rate limit is account-wide.
 VISION_MODELS = [
     "google/gemma-4-31b-it:free",  # 262k context, primary
     "google/gemma-4-26b-a4b-it:free",  # 262k context, MoE variant
@@ -75,6 +81,74 @@ DESCRIBE_PROMPT = (
 RATE_LIMITED = "__rate_limited"
 ALL_FAILED = "__all_failed"
 QUOTA_EXHAUSTED = "__quota_exhausted"
+DAILY_BUDGET_EXHAUSTED = "__daily_budget_exhausted"
+
+
+class UnsafeOpenRouterModelError(ValueError):
+    """Raised when a non-free OpenRouter model is configured."""
+
+
+def _validate_free_vision_models(model_ids: list[str]) -> None:
+    paid_model_ids = [model_id for model_id in model_ids if not model_id.endswith(":free")]
+    if paid_model_ids:
+        raise UnsafeOpenRouterModelError(
+            "OpenRouter paid models are forbidden in VISION_MODELS: " + ", ".join(paid_model_ids)
+        )
+
+
+def _validate_openrouter_free_budget() -> None:
+    if OPENROUTER_FREE_DAILY_REQUEST_BUDGET >= OPENROUTER_FREE_DAILY_REQUEST_LIMIT:
+        raise ValueError(
+            "OpenRouter local safety budget must stay below the documented "
+            f"{OPENROUTER_FREE_DAILY_REQUEST_LIMIT}/day free-model cap"
+        )
+
+
+def _openrouter_free_request_counter_key(now: datetime | None = None) -> str:
+    now = now or datetime.now(timezone.utc)
+    return f"openrouter:free_requests:{now.date().isoformat()}"
+
+
+_RESERVE_OPENROUTER_FREE_REQUEST_LUA = """
+local current = tonumber(redis.call("GET", KEYS[1]) or "0")
+local budget = tonumber(ARGV[1])
+if current >= budget then
+    return {0, current}
+end
+
+current = redis.call("INCR", KEYS[1])
+if current == 1 then
+    redis.call("EXPIRE", KEYS[1], tonumber(ARGV[2]))
+end
+
+return {1, current}
+"""
+
+
+async def _reserve_openrouter_free_request(log) -> tuple[bool, int]:
+    """Reserve one daily free-model request attempt.
+
+    OpenRouter counts failed attempts toward the daily free quota, so we reserve
+    before every model attempt, including fallbacks. If Redis is unavailable, fail
+    closed and do not call OpenRouter.
+    """
+    key = _openrouter_free_request_counter_key()
+    try:
+        reserved, used_today = await redis_client.eval(
+            _RESERVE_OPENROUTER_FREE_REQUEST_LUA,
+            1,
+            key,
+            OPENROUTER_FREE_DAILY_REQUEST_BUDGET,
+            OPENROUTER_FREE_REQUEST_COUNTER_TTL_SECONDS,
+        )
+        return bool(int(reserved)), int(used_today)
+    except Exception as e:
+        log.error("OpenRouter quota guard failed via Redis; refusing request: %s", e)
+        return False, -1
+
+
+_validate_free_vision_models(VISION_MODELS)
+_validate_openrouter_free_budget()
 
 
 async def get_memes_to_describe(limit: int = 30) -> list[dict]:
@@ -197,6 +271,9 @@ async def call_openrouter_vision(image_b64: str, log, *, deadline: float | None 
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         for model_id in VISION_MODELS:
+            if not model_id.endswith(":free"):
+                raise UnsafeOpenRouterModelError(f"Refusing non-free OpenRouter model: {model_id}")
+
             # Stop trying more models if we're running out of time
             if deadline is not None and time.monotonic() > deadline - 35:
                 log.warning("Skipping remaining models — approaching deadline")
@@ -223,6 +300,16 @@ async def call_openrouter_vision(image_b64: str, log, *, deadline: float | None 
             }
 
             try:
+                reserved, used_today = await _reserve_openrouter_free_request(log)
+                if not reserved:
+                    log.warning(
+                        "OpenRouter free-model daily safety budget exhausted "
+                        "(%s/%s attempts). Refusing request.",
+                        used_today if used_today >= 0 else "unknown",
+                        OPENROUTER_FREE_DAILY_REQUEST_BUDGET,
+                    )
+                    return {DAILY_BUDGET_EXHAUSTED: True, "__used_today": used_today}
+
                 response = await client.post(
                     f"{OPENROUTER_BASE_URL}/chat/completions",
                     headers=headers,
@@ -340,6 +427,9 @@ async def describe_single_meme(meme_row: dict, log, *, deadline: float | None = 
 
     if result.get(QUOTA_EXHAUSTED):
         return "quota_exhausted"
+
+    if result.get(DAILY_BUDGET_EXHAUSTED):
+        return "daily_budget_exhausted"
 
     if result.get(ALL_FAILED):
         await _increment_describe_failures(meme_id, existing_ocr, "all models failed")
@@ -511,7 +601,16 @@ async def describe_memes_flow(batch_size: int = 20) -> None:
             )
             await asyncio.sleep(wait_secs)
             continue
-        elif status == "quota_exhausted":
+        elif status in {"quota_exhausted", "daily_budget_exhausted"}:
+            if status == "daily_budget_exhausted":
+                log.warning(
+                    "OpenRouter daily safety budget exhausted at meme %d (%d/%d). "
+                    "Stopping batch before the 1,000/day free-model cap.",
+                    meme_row["id"],
+                    i + 1,
+                    len(memes),
+                )
+                break
             log.warning(
                 "OpenRouter quota exhausted at meme %d (%d/%d). "
                 "Stopping batch — balance likely below $0. "
