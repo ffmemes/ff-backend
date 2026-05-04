@@ -6,6 +6,7 @@ from telegram.ext import (
 from src.flows.parsers.tg import parse_telegram_source
 from src.flows.parsers.vk import parse_vk_source
 from src.storage.constants import MemeSourceStatus, MemeSourceType
+from src.storage.etl import normalize_telegram_channel_url
 from src.tgbot.constants import UserType
 from src.tgbot.logs import log
 from src.tgbot.senders.keyboards import (
@@ -31,6 +32,18 @@ async def handle_meme_source_link(update: Update, context: ContextTypes.DEFAULT_
 
     url = update.message.text.strip().lower()
     if "https://t.me/" in url:
+        # Route through the same canonicalizer as the discovery pipeline
+        # so trailing slashes, post ids, and `?utm=...` suffixes collapse onto
+        # the canonical https://t.me/<channel> form. Without this, manual
+        # entries can leave duplicate `discovered` rows in the moderator queue
+        # because list_pending_source_candidates anti-joins on exact url match.
+        canonical = normalize_telegram_channel_url(url)
+        if canonical is None:
+            await update.message.reply_text(
+                "Unsupported telegram URL (private/invite link or unrecognized format)"
+            )
+            return
+        url = canonical
         meme_source_type = MemeSourceType.TELEGRAM
     elif "https://vk.com/" in url:
         meme_source_type = MemeSourceType.VK
