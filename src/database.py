@@ -157,7 +157,8 @@ meme_source_candidate = Table(
     Column("times_forwarded", Integer, nullable=False, server_default="1"),
     Column("first_seen_at", DateTime, server_default=func.now(), nullable=False),
     Column("last_seen_at", DateTime, server_default=func.now(), nullable=False),
-    Column("sample_meme_raw_telegram_id", Integer),
+    Column("sample_meme_source_id", Integer),
+    Column("sample_meme_raw_telegram_post_id", Integer),
     Column(
         "promoted_meme_source_id",
         ForeignKey("meme_source.id", ondelete="SET NULL"),

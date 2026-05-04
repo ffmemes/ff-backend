@@ -46,7 +46,8 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.Column("sample_meme_raw_telegram_id", sa.Integer(), nullable=True),
+        sa.Column("sample_meme_source_id", sa.Integer(), nullable=True),
+        sa.Column("sample_meme_raw_telegram_post_id", sa.Integer(), nullable=True),
         sa.Column("promoted_meme_source_id", sa.Integer(), nullable=True),
         sa.Column("dismissed_reason", sa.String(), nullable=True),
         sa.Column(

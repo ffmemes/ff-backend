@@ -55,11 +55,9 @@ async def insert_parsed_posts_from_telegram(
     )
     post_ids_in_db = {row["post_id"] for row in result}
 
-    posts_to_create = [
-        post.model_dump() | {"meme_source_id": meme_source_id}
-        for post in telegram_posts
-        if post.post_id not in post_ids_in_db
-    ]
+    new_posts = [post for post in telegram_posts if post.post_id not in post_ids_in_db]
+
+    posts_to_create = [post.model_dump() | {"meme_source_id": meme_source_id} for post in new_posts]
 
     if len(posts_to_create) > 0:
         print(f"Going to insert {len(posts_to_create)} new posts.")
@@ -84,10 +82,13 @@ async def insert_parsed_posts_from_telegram(
         )
         await execute(update_query)
 
-    await discover_source_candidates_from_telegram_posts(telegram_posts)
+    # Only newly-inserted posts feed candidate discovery; otherwise every parse
+    # cycle re-counts the same forwarded URLs and corrupts times_forwarded.
+    await discover_source_candidates_from_telegram_posts(meme_source_id, new_posts)
 
 
 async def discover_source_candidates_from_telegram_posts(
+    meme_source_id: int,
     telegram_posts: list[TgChannelPostParsingResult],
 ) -> None:
     """Upsert forward-source candidates from a parsed TG batch.
@@ -96,14 +97,14 @@ async def discover_source_candidates_from_telegram_posts(
     auto-promote to `meme_source`. Skips URLs already tracked as sources to
     keep the moderator queue clean. See FFM-933.
     """
-    seen: dict[str, int] = {}  # canonical_url -> first sample raw row id
+    seen_post_ids: dict[str, int] = {}  # canonical_url -> first sample TG post id
     increments: dict[str, int] = {}
     for post in telegram_posts:
         canonical = _normalize_telegram_channel_url(post.forwarded_url or "")
         if canonical is None:
             continue
         increments[canonical] = increments.get(canonical, 0) + 1
-        seen.setdefault(canonical, post.post_id)
+        seen_post_ids.setdefault(canonical, post.post_id)
 
     if not increments:
         return
@@ -127,7 +128,8 @@ async def discover_source_candidates_from_telegram_posts(
                     "url": canonical,
                     "status": "discovered",
                     "times_forwarded": delta,
-                    "sample_meme_raw_telegram_id": seen.get(canonical),
+                    "sample_meme_source_id": meme_source_id,
+                    "sample_meme_raw_telegram_post_id": seen_post_ids.get(canonical),
                 }
             )
             .on_conflict_do_update(
