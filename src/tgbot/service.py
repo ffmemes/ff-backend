@@ -146,9 +146,13 @@ async def update_meme_source(
 
 
 async def list_pending_source_candidates(limit: int = 20) -> list[dict[str, Any]]:
+    # Exclude candidates whose URL was added to meme_source via the manual URL
+    # flow — discovery's own dedup only fires at insert time, so without this
+    # filter such rows re-surface in /discoveredsources forever.
     select_statement = (
         select(meme_source_candidate)
         .where(meme_source_candidate.c.status == "discovered")
+        .where(~select(1).where(meme_source.c.url == meme_source_candidate.c.url).exists())
         .order_by(meme_source_candidate.c.times_forwarded.desc())
         .limit(limit)
     )
