@@ -2,18 +2,19 @@
 
 This is the compact handoff from the May 1 update routine audit. Use it as
 input for the next Paperclip/gstack update check instead of re-reading every
-release note from scratch.
+release note from scratch. Follow-up simplification notes from May 4 live in
+[`paperclip-simplification-2026-05-04.md`](paperclip-simplification-2026-05-04.md).
 
 ## Sources Checked
 
 - Paperclip stable npm line: `paperclipai` / `@paperclipai/mcp-server`
-  latest stable `2026.428.0`; canary line `2026.430.0-canary.*` is not a prod
-  target unless explicitly requested.
+  latest stable `2026.428.0`; canary line observed on 2026-05-04 was
+  `2026.504.0-canary.6`, not a prod target unless explicitly requested.
 - Paperclip releases:
   - https://github.com/paperclipai/paperclip/releases/tag/v2026.427.0
   - https://github.com/paperclipai/paperclip/releases/tag/v2026.428.0
 - gstack changelog: https://github.com/garrytan/gstack/blob/main/CHANGELOG.md
-- Telegram plugin npm line: `paperclip-plugin-telegram` latest `0.6.0`.
+- Telegram plugin npm line: `paperclip-plugin-telegram` latest `0.6.1`.
 
 ## Paperclip Changes That Matter Here
 

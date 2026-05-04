@@ -4,6 +4,19 @@ Branch: `feat/paperclip-native-migration`. Prod is on **Paperclip v2026.416.0** 
 
 Goal: stop maintaining custom scaffolding for things Paperclip ships natively, so upstream fixes apply to us for free.
 
+## 2026-05-04 docs/release learnings
+
+Paperclip latest stable is **v2026.428.0** ([release notes](https://github.com/paperclipai/paperclip/releases/tag/v2026.428.0); mirror: [newreleases](https://newreleases.io/project/github/paperclipai/paperclip/release/v2026.428.0)). Canary builds exist, but production should stay on stable unless a specific blocker requires a canary and the rollback path is explicit.
+
+Native Paperclip docs and shipped skills now cover most scaffolding we previously had to hand-roll: heartbeat scoped-wake fast paths, inbox-lite, `heartbeat-context`, structured interactions, blocker and child-issue wakes, documents, approvals, and workspace/runtime controls. Relevant upstream entry points:
+- [Heartbeat protocol](https://github.com/paperclipai/paperclip/blob/master/docs/guides/agent-developer/heartbeat-protocol.md)
+- [Task workflow](https://github.com/paperclipai/paperclip/blob/master/docs/guides/agent-developer/task-workflow.md)
+- [Agents REST API](https://github.com/paperclipai/paperclip/blob/master/docs/api/agents.md)
+- [MCP server tools](https://github.com/paperclipai/paperclip/blob/master/packages/mcp-server/README.md)
+- [Paperclip skill source](https://github.com/paperclipai/paperclip/blob/master/skills/paperclip/SKILL.md)
+
+Safe company import still rejects `replace` for existing companies, so the repo's native-API deploy/sync path remains justified. Current local touchpoints are [`agents/deploy.sh`](../agents/deploy.sh), [`agents/_sync_config.py`](../agents/_sync_config.py), [`agents/.paperclip.yaml`](../agents/.paperclip.yaml), and the still-custom PR trigger in [`.github/workflows/staff-engineer-trigger.yml`](../.github/workflows/staff-engineer-trigger.yml). Next simplification: use native `POST /api/agents/:id/skills/sync` for desired-skill assignment and reduce direct `adapterConfig` mutation to only fields that do not yet have a narrower native endpoint. See the short linked handoff in [`docs/agents/paperclip-simplification-2026-05-04.md`](agents/paperclip-simplification-2026-05-04.md).
+
 ## Pre-flight backups (taken 2026-04-24 09:27 UTC)
 
 On `t.ffmemes.com:/root/paperclip-backups/pre-export-2026-04-24/`:

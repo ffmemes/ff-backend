@@ -22,10 +22,12 @@ Terminal success is `outcome=published` with both:
 - `telegram_message_id`
 - `editorial_post_id`
 
-`draft_created`, `approval_pending`, and `APPROVED_TO_PUBLISH` are intermediate
-states. CEO approval must reassign the `[post:...]` issue to Comms Manager with
-status `todo`; CEO must not close the issue. Comms Manager is the only terminal
-owner and closes it after publishing through `publish_editorial_post()`.
+`draft_created`, `approval_pending`, accepted `request_confirmation`, and
+`APPROVED_TO_PUBLISH` are intermediate states. CEO approval must reassign the
+`[post:...]` issue to Comms Manager with status `todo`; CEO must not close the
+issue. Comms Manager is the only terminal owner and closes it after publishing
+through `publish_editorial_post()` using the returned `result.message_id` and
+`result.editorial_post_id`.
 
 If a `[post:...]` draft is older than 24 hours, refresh or skip it explicitly.
 Do not publish stale daily metrics silently.
@@ -85,5 +87,9 @@ issues/comments, not from Telegram notifications.
   configs, issue lists, or server logs into context.
 - Summarize upstream changelogs into a repo doc or Paperclip issue first, then
   reason from that artifact.
+- For Paperclip runtime and sync simplifications, start from
+  [`paperclip-simplification-2026-05-04.md`](paperclip-simplification-2026-05-04.md).
+- For organization-level autonomy measurement, use
+  [`autonomy-metrics.md`](autonomy-metrics.md).
 - Treat secrets in Paperclip agent config as toxic output. Never paste values
   into comments, docs, or chat.

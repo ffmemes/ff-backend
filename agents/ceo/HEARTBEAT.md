@@ -4,8 +4,8 @@ Run this checklist on every heartbeat. This covers both your local planning/memo
 
 ## 1. Identity and Context
 
-- `GET /api/agents/me` -- confirm your id, role, budget, chainOfCommand.
-- Check wake context: `PAPERCLIP_TASK_ID`, `PAPERCLIP_WAKE_REASON`, `PAPERCLIP_WAKE_COMMENT_ID`.
+- Use the native Paperclip skill to confirm identity, wake context, inbox
+  state, and any scoped task. Do not hand-roll the task-id/inbox race flow here.
 
 ## 2. Local Planning Check
 
@@ -24,20 +24,23 @@ If `PAPERCLIP_APPROVAL_ID` is set:
 
 ## 4. Get Assignments
 
-- `GET /api/companies/{companyId}/issues?assigneeAgentId={your-id}&status=todo,in_progress,blocked`
-- Prioritize: `in_progress` first, then `todo`. Skip `blocked` unless you can unblock it.
-- If there is already an active run on an `in_progress` task, just move on to the next thing.
-- If `PAPERCLIP_TASK_ID` is set and assigned to you, prioritize that task.
+- Use `paperclipInboxLite` and `paperclipGetHeartbeatContext`.
+- Prioritize: scoped wake task first, then `in_progress`, then `todo`.
+- Skip `blocked` unless you can unblock it. Use `blockedByIssueIds` when another
+  issue is the dependency.
+- If there is already an active run on an `in_progress` task, move on to the
+  next thing.
 
 ## 5. Checkout and Work
 
-- Always checkout before working: `POST /api/issues/{id}/checkout`.
-- Never retry a 409 -- that task belongs to someone else.
+- Always checkout before working with `paperclipCheckoutIssue`.
+- Never retry a 409; that task belongs to someone else.
 - Do the work. Update status and comment when done.
 
 ## 6. Delegation
 
-- Create subtasks with `POST /api/companies/{companyId}/issues`. Always set `parentId` and `goalId`.
+- Create subtasks with `paperclipCreateIssue`. Set parent/goal fields when the
+  task belongs under an existing issue or goal.
 - Use `paperclip-create-agent` skill when hiring new agents.
 - Assign work to the right agent for the job.
 
