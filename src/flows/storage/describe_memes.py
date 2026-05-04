@@ -9,7 +9,7 @@ Populates meme.ocr_result JSONB with:
 - calculated_at: timestamp (use this field, NOT meme.created_at, for monitoring)
 
 Processes recent user uploads first, then most popular memes (by nlikes DESC).
-Runs every 30 min via Prefect cron, 18 memes per scheduled batch.
+Runs every 15 min via Prefect cron, 9 memes per scheduled batch.
 
 IMPORTANT — OpenRouter free tier rules:
 - Need $10+ lifetime purchases for 1,000 free-model req/day (otherwise 50/day).
@@ -17,6 +17,7 @@ IMPORTANT — OpenRouter free tier rules:
 - Current balance must stay >= $0. Monitor at https://openrouter.ai/settings/credits
 - Free model rate limit: 20 rpm across all free models.
 - Local safety budget: 900 OpenRouter attempts/day to leave room for uploads/retries.
+- Free-model 429s/timeouts are normal. Cool down the model and retry in later runs.
 - See specs/describe-memes.md for full constraints.
 
 Circuit breaker: auto-paused after 3 failures in 1 hour.
@@ -44,6 +45,11 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_FREE_DAILY_REQUEST_LIMIT = 1000
 OPENROUTER_FREE_DAILY_REQUEST_BUDGET = 900
 OPENROUTER_FREE_REQUEST_COUNTER_TTL_SECONDS = 60 * 60 * 48
+OPENROUTER_FREE_STATS_TTL_SECONDS = 60 * 60 * 24 * 14
+OPENROUTER_DEFAULT_RATE_LIMIT_COOLDOWN_SECONDS = 60 * 15
+OPENROUTER_MAX_RATE_LIMIT_COOLDOWN_SECONDS = 60 * 60
+OPENROUTER_TRANSIENT_MODEL_COOLDOWN_SECONDS = 60 * 15
+OPENROUTER_FORBIDDEN_MODEL_COOLDOWN_SECONDS = 60 * 60 * 6
 
 # FREE models only. Never add paid models here — spending balance below $0
 # blocks ALL models (even free ones) with HTTP 402. Free tier requires $10+
@@ -51,8 +57,8 @@ OPENROUTER_FREE_REQUEST_COUNTER_TTL_SECONDS = 60 * 60 * 48
 # See specs/describe-memes.md for full OpenRouter constraints.
 #
 # Verified available on OpenRouter API as of 2026-05-04.
-# Ordered by preference. Falls back to next model on 403/timeout/bad response.
-# 429 returns immediately because the free-model rate limit is account-wide.
+# Ordered by preference. Falls back to next model on 429/403/timeout/bad response.
+# 429s set a temporary Redis cooldown so later memes/runs try other free models.
 VISION_MODELS = [
     "google/gemma-4-31b-it:free",  # 262k context, primary
     "google/gemma-4-26b-a4b-it:free",  # 262k context, MoE variant
@@ -109,6 +115,35 @@ def _openrouter_free_request_counter_key(now: datetime | None = None) -> str:
     return f"openrouter:free_requests:{now.date().isoformat()}"
 
 
+def _openrouter_stats_key(now: datetime | None = None) -> str:
+    now = now or datetime.now(timezone.utc)
+    return f"openrouter:free_ocr_stats:{now.strftime('%Y-%m-%d:%H')}"
+
+
+def _openrouter_model_cooldown_key(model_id: str) -> str:
+    return f"openrouter:free_model_cooldown:{model_id}"
+
+
+def _normalize_retry_after(raw_retry_after: float | None) -> float | None:
+    if raw_retry_after is None:
+        return None
+    if raw_retry_after > 60 * 60 * 24:
+        return max(0.0, raw_retry_after - time.time())
+    return max(0.0, raw_retry_after)
+
+
+def _rate_limit_cooldown_seconds(raw_retry_after: float | None) -> int:
+    retry_after = _normalize_retry_after(raw_retry_after)
+    if retry_after is None:
+        return OPENROUTER_DEFAULT_RATE_LIMIT_COOLDOWN_SECONDS
+    return int(
+        min(
+            max(retry_after, 60.0),
+            OPENROUTER_MAX_RATE_LIMIT_COOLDOWN_SECONDS,
+        )
+    )
+
+
 _RESERVE_OPENROUTER_FREE_REQUEST_LUA = """
 local current = tonumber(redis.call("GET", KEYS[1]) or "0")
 local budget = tonumber(ARGV[1])
@@ -145,6 +180,46 @@ async def _reserve_openrouter_free_request(log) -> tuple[bool, int]:
     except Exception as e:
         log.error("OpenRouter quota guard failed via Redis; refusing request: %s", e)
         return False, -1
+
+
+async def _record_openrouter_metric(model_id: str, outcome: str) -> None:
+    key = _openrouter_stats_key()
+    field = f"{model_id}:{outcome}"
+    try:
+        async with redis_client.pipeline(transaction=True) as pipe:
+            await pipe.hincrby(key, field, 1)
+            await pipe.expire(key, OPENROUTER_FREE_STATS_TTL_SECONDS)
+            await pipe.execute()
+    except Exception:
+        pass
+
+
+async def _get_openrouter_model_cooldown(model_id: str) -> int:
+    try:
+        ttl = await redis_client.ttl(_openrouter_model_cooldown_key(model_id))
+    except Exception:
+        return 0
+    return int(ttl) if ttl and ttl > 0 else 0
+
+
+async def _cool_down_openrouter_model(model_id: str, seconds: int, reason: str) -> None:
+    try:
+        await redis_client.set(
+            _openrouter_model_cooldown_key(model_id),
+            reason,
+            ex=max(1, int(seconds)),
+        )
+    except Exception:
+        pass
+
+
+async def _cool_down_transient_openrouter_model(model_id: str, reason: str) -> float:
+    await _cool_down_openrouter_model(
+        model_id,
+        OPENROUTER_TRANSIENT_MODEL_COOLDOWN_SECONDS,
+        reason,
+    )
+    return float(OPENROUTER_TRANSIENT_MODEL_COOLDOWN_SECONDS)
 
 
 _validate_free_vision_models(VISION_MODELS)
@@ -269,10 +344,24 @@ async def call_openrouter_vision(image_b64: str, log, *, deadline: float | None 
         "Content-Type": "application/json",
     }
 
+    next_retry_after: float | None = None
+    tried_models = 0
+
     async with httpx.AsyncClient(timeout=30.0) as client:
         for model_id in VISION_MODELS:
             if not model_id.endswith(":free"):
                 raise UnsafeOpenRouterModelError(f"Refusing non-free OpenRouter model: {model_id}")
+
+            cooldown_ttl = await _get_openrouter_model_cooldown(model_id)
+            if cooldown_ttl > 0:
+                log.info(
+                    "Skipping %s — free-model cooldown has %ss remaining.",
+                    model_id,
+                    cooldown_ttl,
+                )
+                if next_retry_after is None or cooldown_ttl < next_retry_after:
+                    next_retry_after = float(cooldown_ttl)
+                continue
 
             # Stop trying more models if we're running out of time
             if deadline is not None and time.monotonic() > deadline - 35:
@@ -300,6 +389,7 @@ async def call_openrouter_vision(image_b64: str, log, *, deadline: float | None 
             }
 
             try:
+                tried_models += 1
                 reserved, used_today = await _reserve_openrouter_free_request(log)
                 if not reserved:
                     log.warning(
@@ -309,6 +399,7 @@ async def call_openrouter_vision(image_b64: str, log, *, deadline: float | None 
                         OPENROUTER_FREE_DAILY_REQUEST_BUDGET,
                     )
                     return {DAILY_BUDGET_EXHAUSTED: True, "__used_today": used_today}
+                await _record_openrouter_metric(model_id, "attempt")
 
                 response = await client.post(
                     f"{OPENROUTER_BASE_URL}/chat/completions",
@@ -322,18 +413,32 @@ async def call_openrouter_vision(image_b64: str, log, *, deadline: float | None 
                         "Balance likely below $0 — all models blocked. "
                         "Check https://openrouter.ai/settings/credits"
                     )
+                    await _record_openrouter_metric(model_id, "quota_exhausted")
                     return {QUOTA_EXHAUSTED: True}
 
                 if response.status_code == 429:
-                    retry_after = _parse_retry_after(response)
+                    raw_retry_after = _parse_retry_after(response)
+                    retry_after = _normalize_retry_after(raw_retry_after)
+                    cooldown = _rate_limit_cooldown_seconds(raw_retry_after)
+                    await _record_openrouter_metric(model_id, "rate_limited")
+                    await _cool_down_openrouter_model(model_id, cooldown, "rate_limited")
+                    if next_retry_after is None or cooldown < next_retry_after:
+                        next_retry_after = float(cooldown)
                     log.info(
-                        "Rate-limited (429) on %s (retry-after: %ss)",
+                        "Rate-limited (429) on %s (retry-after: %ss, cooldown: %ss)",
                         model_id,
                         retry_after or "unknown",
+                        cooldown,
                     )
-                    return {RATE_LIMITED: True, "__retry_after": retry_after}
+                    continue
 
                 if response.status_code == 403:
+                    await _record_openrouter_metric(model_id, "forbidden")
+                    await _cool_down_openrouter_model(
+                        model_id,
+                        OPENROUTER_FORBIDDEN_MODEL_COOLDOWN_SECONDS,
+                        "forbidden",
+                    )
                     log.warning("Model %s HTTP 403 (access denied), trying next...", model_id)
                     continue
 
@@ -342,41 +447,73 @@ async def call_openrouter_vision(image_b64: str, log, *, deadline: float | None 
                 body = response.text.strip()
                 json_start = body.find("{")
                 if json_start < 0:
+                    await _record_openrouter_metric(model_id, "bad_response")
                     log.warning("Model %s returned no JSON: %s", model_id, body[:100])
                     continue
                 data = json.loads(body[json_start:])
 
                 if "choices" not in data:
+                    await _record_openrouter_metric(model_id, "bad_response")
                     log.warning("Model %s no choices: %s", model_id, str(data)[:200])
                     continue
 
                 content = data["choices"][0]["message"]["content"]
                 if not content:
+                    await _record_openrouter_metric(model_id, "empty_content")
                     log.warning("Model %s empty content", model_id)
                     continue
                 result = _parse_vision_response(content)
 
                 if "description" not in result and "ocr_text" not in result:
+                    await _record_openrouter_metric(model_id, "bad_json")
                     log.warning("Model %s bad JSON: %s", model_id, str(result)[:200])
                     continue
 
                 result["__model"] = model_id
+                await _record_openrouter_metric(model_id, "success")
                 return result
 
             except json.JSONDecodeError as e:
+                await _record_openrouter_metric(model_id, "invalid_json")
                 log.warning("Model %s invalid JSON: %s", model_id, e)
                 continue
             except httpx.HTTPStatusError as e:
+                await _record_openrouter_metric(model_id, f"http_{e.response.status_code}")
+                if e.response.status_code >= 500:
+                    retry_after = await _cool_down_transient_openrouter_model(
+                        model_id,
+                        f"http_{e.response.status_code}",
+                    )
+                    if next_retry_after is None or retry_after < next_retry_after:
+                        next_retry_after = retry_after
                 log.warning("Model %s HTTP %s", model_id, e.response.status_code)
                 continue
             except (httpx.ReadTimeout, httpx.ConnectTimeout) as e:
+                await _record_openrouter_metric(model_id, "timeout")
+                retry_after = await _cool_down_transient_openrouter_model(model_id, "timeout")
+                if next_retry_after is None or retry_after < next_retry_after:
+                    next_retry_after = retry_after
                 log.warning("Model %s timeout: %s", model_id, type(e).__name__)
                 continue
+            except httpx.RequestError as e:
+                await _record_openrouter_metric(model_id, "request_error")
+                retry_after = await _cool_down_transient_openrouter_model(
+                    model_id,
+                    "request_error",
+                )
+                if next_retry_after is None or retry_after < next_retry_after:
+                    next_retry_after = retry_after
+                log.warning("Model %s request error: %s", model_id, type(e).__name__)
+                continue
             except Exception as e:
+                await _record_openrouter_metric(model_id, "error")
                 log.warning("Model %s error: %s", model_id, e)
                 continue
 
-    # All models exhausted (403, timeout, bad response — not 429, which returns early)
+    if tried_models == 0 or next_retry_after is not None:
+        return {RATE_LIMITED: True, "__retry_after": next_retry_after}
+
+    # All models exhausted on non-retryable responses.
     return {ALL_FAILED: True}
 
 
@@ -512,16 +649,14 @@ async def describe_memes_flow(batch_size: int = 20) -> None:
     ok = 0
     failed = 0
     consecutive_fails = 0
-    rate_limit_waits = 0
-    max_rate_limit_waits = 3
     # Hard deadline: stop 120s before the 900s flow timeout.
     # Anchored to flow_start so pre-batch query time is accounted for.
     batch_deadline = flow_start + 780
     # Per-meme timeout: no single meme should block the batch
     per_meme_timeout = 120
     # Minimum interval between request starts to stay under 20 rpm rate limit.
-    # 4.0s = 15 rpm effective, well under the 20 rpm cap with margin for bursts.
-    min_request_interval = 4.0
+    # 10s = 6 rpm effective: slower, but friendlier to free model capacity.
+    min_request_interval = 10.0
 
     i = 0
     while i < len(memes):
@@ -569,38 +704,18 @@ async def describe_memes_flow(batch_size: int = 20) -> None:
         if status == "ok":
             ok += 1
             consecutive_fails = 0
-            rate_limit_waits = 0
             log.info("Described meme %d (%d/%d)", meme_row["id"], i + 1, len(memes))
         elif status == "rate_limited":
-            if rate_limit_waits >= max_rate_limit_waits:
-                log.warning(
-                    "Rate-limited %d times at meme %d (%d/%d). "
-                    "Likely daily quota exhausted — stopping batch.",
-                    rate_limit_waits + 1,
-                    meme_row["id"],
-                    i + 1,
-                    len(memes),
-                )
-                break
-            wait_secs = min(retry_after or 65.0, 65.0)
-            if batch_deadline - time.monotonic() < wait_secs + per_meme_timeout + 15:
-                log.warning(
-                    "Rate-limited but not enough time to wait %.0fs — stopping batch.",
-                    wait_secs,
-                )
-                break
-            rate_limit_waits += 1
             log.info(
-                "Rate-limited at meme %d (%d/%d). Waiting %.0fs before retry (%d/%d waits).",
+                "All currently usable free models are rate-limited/cooling down "
+                "at meme %d (%d/%d). Stopping batch; next scheduled run will retry "
+                "after cooldowns (next retry in %ss).",
                 meme_row["id"],
                 i + 1,
                 len(memes),
-                wait_secs,
-                rate_limit_waits,
-                max_rate_limit_waits,
+                int(retry_after) if retry_after is not None else "unknown",
             )
-            await asyncio.sleep(wait_secs)
-            continue
+            break
         elif status in {"quota_exhausted", "daily_budget_exhausted"}:
             if status == "daily_budget_exhausted":
                 log.warning(

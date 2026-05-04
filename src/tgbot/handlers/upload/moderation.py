@@ -76,7 +76,7 @@ async def _get_uploader_lang(user_id: int) -> str | None:
 async def _check_duplicate_via_ocr(meme: dict[str, Any]) -> tuple[dict[str, Any], int | None]:
     """Describe the meme inline via OpenRouter vision and check for OCR-text duplicates.
 
-    Why: describe_memes cron runs hourly; for uploads we can't wait — run it synchronously
+    Why: describe_memes cron is intentionally slow; for uploads we can't wait — run it synchronously
     so the uploader gets immediate feedback and the moderator queue stays clean of dupes.
     Non-images skip describe (OCR is image-only).
     Failures (rate limit, model errors, short text) fall through silently — manual review kicks in.

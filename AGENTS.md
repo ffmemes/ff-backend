@@ -26,12 +26,13 @@
 
 The `describe_memes` flow (`src/flows/storage/describe_memes.py`) uses **FREE OpenRouter vision models only** to extract text and descriptions from meme images.
 
-- **Schedule**: current deployment runs every 30 minutes, 18 memes/batch (about 864/day)
+- **Schedule**: current deployment runs every 15 minutes, 9 memes/batch (about 864/day)
 - **Priority**: processes recent user uploads first, then most-liked memes (`nlikes DESC`)
 - **Storage**: writes to `meme.ocr_result` JSONB with `calculated_at` timestamp
 - **Monitoring**: use `ocr_result->>'calculated_at'` to check recency, NOT `meme.created_at`
 - **Circuit breaker**: auto-pauses after 3 failures in 1 hour
 - **Quota guard**: Redis stops OpenRouter calls after 900 free-model attempts/day (UTC)
+- **Backpressure strategy**: treat free-tier 429s/timeouts as normal; cool down that model in Redis and retry in later scheduled runs
 
 ### OpenRouter constraints (CRITICAL)
 

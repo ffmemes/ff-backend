@@ -12,7 +12,7 @@ Source Channels (TG/VK/IG)
   -> Ad filter (caption keyword check, 48 stop words)
   -> Dedup (OCR text trigram similarity, if OCR enabled)
   -> status='ok' (enters recommendation pool)
-  -> Describe Memes (async, every 30min, OpenRouter free vision) -> ocr_result JSONB
+  -> Describe Memes (async, every 15min, OpenRouter free vision) -> ocr_result JSONB
 ```
 
 Note: Legacy Modal OCR has been removed. [Describe Memes](describe-memes.md) (OpenRouter free vision) is the active system for image analysis.

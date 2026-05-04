@@ -171,10 +171,10 @@ if __name__ == "__main__":
         describe_memes_flow.to_deployment(
             name="Describe Memes (OpenRouter)",
             # $10+ lifetime OpenRouter credit unlocks 1,000 free-model req/day.
-            # Run 48 batches/day × 18 memes = 864 scheduled attempts/day, leaving
-            # headroom for upload-time OCR and model fallback attempts. The flow
-            # also has a Redis safety guard at 900 OpenRouter attempts/day.
-            schedules=[CronSchedule(cron="15,45 * * * *", timezone=LON)],
-            parameters={"batch_size": 18},
+            # Run 96 batches/day × 9 memes = 864 scheduled attempts/day. Smaller,
+            # more frequent batches sample good free-tier windows without rushing.
+            # The flow also has a Redis safety guard at 900 OpenRouter attempts/day.
+            schedules=[CronSchedule(cron="*/15 * * * *", timezone=LON)],
+            parameters={"batch_size": 9},
         ),
     )

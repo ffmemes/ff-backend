@@ -44,7 +44,7 @@ Sources (TG/VK/IG) -> Parsers (hourly) -> meme_raw_* tables
   -> ETL (filter, type detect) -> meme (status=created)
   -> Download + Watermark + Upload to TG -> telegram_file_id
   -> Ad filter + Dedup -> status='ok'
-  -> Describe Memes (async, every 30min) -> ocr_result JSONB (description, text, language)
+  -> Describe Memes (async, every 15min) -> ocr_result JSONB (description, text, language)
   -> Recommendation engines -> Blender -> Redis queue -> User
 ```
 

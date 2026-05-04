@@ -4,7 +4,9 @@ Vision OCR for memes. The flow extracts image text, language, and a short Englis
 
 ## Business Goal
 
-Use OpenRouter's free vision tier to process hundreds of memes/day without paid spend. The current target is **864 scheduled memes/day**, capped by a **900 OpenRouter-attempt/day Redis guard** so upload-time OCR and fallback attempts do not cross the 1,000/day free-model limit.
+Use OpenRouter's free vision tier to process memes every day with **zero paid spend**. Throughput is useful, but consistency is the main goal: accept 429s/timeouts as normal free-tier backpressure, try another free model when possible, then retry later.
+
+Current target: **864 scheduled memes/day**, capped by a **900 OpenRouter-attempt/day Redis guard** so upload-time OCR and fallback attempts do not cross the 1,000/day free-model limit.
 
 ## Source Of Truth
 
@@ -18,11 +20,11 @@ Use OpenRouter's free vision tier to process hundreds of memes/day without paid 
 
 ## Production Settings
 
-- Schedule: every 30 minutes, `batch_size=18` (`15,45 * * * *` London time).
-- Daily target: `48 * 18 = 864` scheduled memes/day.
+- Schedule: every 15 minutes, `batch_size=9` (`*/15 * * * *` London time).
+- Daily target: `96 * 9 = 864` scheduled memes/day.
 - Local free-tier budget: `OPENROUTER_FREE_DAILY_REQUEST_BUDGET = 900`.
 - Redis counter: `openrouter:free_requests:YYYY-MM-DD` (UTC, 48h TTL).
-- Free-model RPM: stay below 20 rpm; code spaces attempts by at least 4 seconds.
+- Free-model RPM: stay below 20 rpm; code spaces meme attempts by at least 10 seconds.
 - Circuit breaker: Prefect pauses the deployment after repeated failures.
 
 ## Free-Only Contract
@@ -51,11 +53,20 @@ Current production chain:
 
 Do not add paid fallbacks. A paid fallback can spend the account below zero, after which OpenRouter returns 402 for all models, including free models.
 
+429 handling:
+
+- A 429 on one model records `rate_limited`, sets `openrouter:free_model_cooldown:{model_id}`, and tries the next free model.
+- Timeouts/request errors/HTTP 5xx responses also set short model cooldowns, because those are usually provider-window failures rather than meme-specific failures.
+- If every usable model is cooled down/rate-limited, the batch stops without marking the meme failed.
+- The next 15-minute scheduled run samples again. This intentionally discovers better low-contention windows over time.
+
 ## Monitoring
 
 - Fresh OCR: `ocr_result->>'calculated_at'`, not `meme.created_at`.
-- Healthy batch: up to 18 described, low failures.
+- Healthy batch: up to 9 described, low failures. 429-only batches are acceptable.
 - Daily attempts: inspect Redis key `openrouter:free_requests:YYYY-MM-DD`.
+- Hourly model stats: inspect Redis hashes `openrouter:free_ocr_stats:YYYY-MM-DD:HH` (UTC, 14d TTL). Fields are `{model_id}:{outcome}`, e.g. `...:success`, `...:rate_limited`, `...:timeout`.
+- Time-window tuning: compare hourly `success / attempt` by UTC hour, then shift the Prefect schedule or batch size if nights are consistently better.
 - Resume paused deployment:
 
 ```bash

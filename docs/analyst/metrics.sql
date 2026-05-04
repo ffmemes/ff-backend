@@ -326,8 +326,8 @@ ORDER BY day;
 -- Tracks the describe_memes flow which uses free OpenRouter vision models
 -- to extract text + description from meme images.
 --
--- Throughput: ~30 memes/batch, every 30 min, ~500-600 described/day
--- Bottleneck: OpenRouter free tier limits (20 rpm, ~1000 req/day)
+-- Scheduled target: 9 memes/batch every 15 min, capped at 900 OpenRouter attempts/day
+-- Bottleneck: OpenRouter free-tier 429s; actual throughput varies by model/time window
 -- Priority: processes most-liked memes first (nlikes DESC)
 -- Circuit breaker: auto-pauses after 3 failures in 1 hour
 --
