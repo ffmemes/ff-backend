@@ -15,7 +15,8 @@ Things that trip people up:
   are different chats with different message id sequences.
 - CEO approval is not publication. If approval is required, the routine may close
   its execution issue with `outcome=draft_created`, but the linked `[post:...]`
-  issue must later be reassigned to Comms and closed only after
-  `publish_editorial_post()` returns `telegram_message_id` / `editorial_post_id`.
+  issue must carry a `request_confirmation` approval card when available. It is
+  closed only after CEO returns it to Comms and `publish_editorial_post()`
+  returns `result.message_id` / `result.editorial_post_id`.
 
 Validation, rotation, and the topic ban-list are enforced in code. If `EditorialValidationError` fires, fix the draft.
