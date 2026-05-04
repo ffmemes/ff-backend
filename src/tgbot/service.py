@@ -216,9 +216,16 @@ async def promote_source_candidate(
     if promoted is None:
         return None
 
+    # Status guard prevents TOCTOU between concurrent moderator clicks: two
+    # callers can both pass the existence check, both insert into meme_source
+    # (one no-ops via on_conflict_do_nothing), but without this WHERE the
+    # second UPDATE would silently overwrite a `rejected` / `dismissed` status
+    # set by another moderator in the gap. With the guard, the trailing UPDATE
+    # is a no-op once the candidate has been resolved.
     await execute(
         meme_source_candidate.update()
         .where(meme_source_candidate.c.id == candidate_id)
+        .where(meme_source_candidate.c.status == "discovered")
         .values(
             status="promoted",
             promoted_meme_source_id=promoted["id"],

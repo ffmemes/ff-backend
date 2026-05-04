@@ -22,7 +22,7 @@ from src.storage.parsers.schemas import (
 _TG_FORWARD_URL_PATTERN = re.compile(r"^https?://t\.me/(?:s/)?([a-zA-Z0-9_]+)(?:/\d+)?/?$")
 
 
-def _normalize_telegram_channel_url(forwarded_url: str) -> Optional[str]:
+def normalize_telegram_channel_url(forwarded_url: str) -> Optional[str]:
     """Strip post id, lowercase username, return canonical https://t.me/<channel>.
 
     Returns None for joinchat/private/invite links and anything we can't safely
@@ -30,7 +30,11 @@ def _normalize_telegram_channel_url(forwarded_url: str) -> Optional[str]:
     """
     if not forwarded_url:
         return None
-    match = _TG_FORWARD_URL_PATTERN.match(forwarded_url.strip())
+    # Drop query string + fragment so `?utm=...` or `#anchor` don't break the
+    # regex and so manual moderator entries collapse onto the same canonical
+    # form as discovery-pipeline candidates.
+    cleaned = forwarded_url.strip().split("?", 1)[0].split("#", 1)[0]
+    match = _TG_FORWARD_URL_PATTERN.match(cleaned)
     if not match:
         return None
     username = match.group(1).lower()
@@ -100,7 +104,7 @@ async def discover_source_candidates_from_telegram_posts(
     seen_post_ids: dict[str, int] = {}  # canonical_url -> first sample TG post id
     increments: dict[str, int] = {}
     for post in telegram_posts:
-        canonical = _normalize_telegram_channel_url(post.forwarded_url or "")
+        canonical = normalize_telegram_channel_url(post.forwarded_url or "")
         if canonical is None:
             continue
         increments[canonical] = increments.get(canonical, 0) + 1
