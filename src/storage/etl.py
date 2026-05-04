@@ -1,4 +1,6 @@
+import re
 from datetime import datetime, timezone
+from typing import Optional
 
 from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
@@ -9,11 +11,33 @@ from src.database import (
     meme,
     meme_raw_telegram,
     meme_raw_vk,
+    meme_source_candidate,
 )
+from src.storage.constants import MemeSourceType
 from src.storage.parsers.schemas import (
     TgChannelPostParsingResult,
     VkGroupPostParsingResult,
 )
+
+_TG_FORWARD_URL_PATTERN = re.compile(r"^https?://t\.me/(?:s/)?([a-zA-Z0-9_]+)(?:/\d+)?/?$")
+
+
+def _normalize_telegram_channel_url(forwarded_url: str) -> Optional[str]:
+    """Strip post id, lowercase username, return canonical https://t.me/<channel>.
+
+    Returns None for joinchat/private/invite links and anything we can't safely
+    promote to a public channel source.
+    """
+    if not forwarded_url:
+        return None
+    match = _TG_FORWARD_URL_PATTERN.match(forwarded_url.strip())
+    if not match:
+        return None
+    username = match.group(1).lower()
+    # private/invite links and bot-update aliases aren't usable as sources
+    if username in {"joinchat", "addstickers", "share", "proxy"}:
+        return None
+    return f"https://t.me/{username}"
 
 
 async def insert_parsed_posts_from_telegram(
@@ -59,6 +83,63 @@ async def insert_parsed_posts_from_telegram(
             .values(post)
         )
         await execute(update_query)
+
+    await discover_source_candidates_from_telegram_posts(telegram_posts)
+
+
+async def discover_source_candidates_from_telegram_posts(
+    telegram_posts: list[TgChannelPostParsingResult],
+) -> None:
+    """Upsert forward-source candidates from a parsed TG batch.
+
+    Conservative-by-default: candidates land with status='discovered' and never
+    auto-promote to `meme_source`. Skips URLs already tracked as sources to
+    keep the moderator queue clean. See FFM-933.
+    """
+    seen: dict[str, int] = {}  # canonical_url -> first sample raw row id
+    increments: dict[str, int] = {}
+    for post in telegram_posts:
+        canonical = _normalize_telegram_channel_url(post.forwarded_url or "")
+        if canonical is None:
+            continue
+        increments[canonical] = increments.get(canonical, 0) + 1
+        seen.setdefault(canonical, post.post_id)
+
+    if not increments:
+        return
+
+    # Drop any URL that is already a tracked source — no point queueing it for
+    # moderator promotion if we're already parsing it.
+    existing_rows = await fetch_all(
+        text("SELECT url FROM meme_source WHERE url = ANY(:urls)"),
+        {"urls": list(increments.keys())},
+    )
+    already_tracked = {row["url"] for row in existing_rows}
+
+    for canonical, delta in increments.items():
+        if canonical in already_tracked:
+            continue
+        stmt = (
+            insert(meme_source_candidate)
+            .values(
+                {
+                    "type": MemeSourceType.TELEGRAM.value,
+                    "url": canonical,
+                    "status": "discovered",
+                    "times_forwarded": delta,
+                    "sample_meme_raw_telegram_id": seen.get(canonical),
+                }
+            )
+            .on_conflict_do_update(
+                index_elements=[meme_source_candidate.c.url],
+                set_={
+                    "times_forwarded": (meme_source_candidate.c.times_forwarded + delta),
+                    "last_seen_at": text("now()"),
+                    "updated_at": text("now()"),
+                },
+            )
+        )
+        await execute(stmt)
 
 
 async def insert_parsed_posts_from_vk(
