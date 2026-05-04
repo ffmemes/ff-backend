@@ -9,6 +9,7 @@ from src.tgbot.constants import (
     MEME_BUTTON_CALLBACK_DATA_PATTERN,
     MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA,
     MEME_SOURCE_SET_LANG_PATTERN,
+    SOURCE_CANDIDATE_ACTION_PATTERN,
     Reaction,
 )
 
@@ -132,5 +133,26 @@ def meme_source_change_status_keyboard(
             ]
             for status in MemeSourceStatus
             if status != current_status
+        ]
+    )
+
+
+def source_candidate_actions_keyboard(candidate_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(
+                    "✅ Promote",
+                    callback_data=SOURCE_CANDIDATE_ACTION_PATTERN.format(
+                        candidate_id=candidate_id, action="promote"
+                    ),
+                ),
+                InlineKeyboardButton(
+                    "🗑 Dismiss",
+                    callback_data=SOURCE_CANDIDATE_ACTION_PATTERN.format(
+                        candidate_id=candidate_id, action="dismiss"
+                    ),
+                ),
+            ]
         ]
     )

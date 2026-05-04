@@ -41,6 +41,10 @@ MEME_SOURCE_SET_LANG_REGEXP = r"^ms:\d+:set_lang:\w{2}$"
 MEME_SOURCE_SET_STATUS_PATTERN = "ms:{meme_source_id}:set_status:{status}"
 MEME_SOURCE_SET_STATUS_REGEXP = r"^ms:\d+:set_status:\w+$"
 
+# Source-candidate (discovered from forwarded TG posts) approval buttons.
+SOURCE_CANDIDATE_ACTION_PATTERN = "msc:{candidate_id}:{action}"
+SOURCE_CANDIDATE_ACTION_REGEXP = r"^msc:\d+:(promote|dismiss)$"
+
 LOADING_EMOJIS = [
     "🕛",
     "🕧",

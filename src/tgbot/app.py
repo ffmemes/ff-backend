@@ -22,6 +22,7 @@ from src.tgbot.constants import (
     MEME_SOURCE_SET_LANG_REGEXP,
     MEME_SOURCE_SET_STATUS_REGEXP,
     POPUP_BUTTON_CALLBACK_DATA_REGEXP,
+    SOURCE_CANDIDATE_ACTION_REGEXP,
     TELEGRAM_CHANNEL_RU_CHAT_ID,
     TELEGRAM_FEEDBACK_CHAT_ID,
     TELEGRAM_MODERATOR_CHAT_ID,
@@ -69,6 +70,10 @@ from src.tgbot.handlers.moderator import get_meme, meme_source
 from src.tgbot.handlers.moderator.invite import (
     MODERATOR_INVITE_CALLBACK_DATA,
     handle_moderator_invite_callback,
+)
+from src.tgbot.handlers.moderator.source_candidates import (
+    handle_discovered_sources_command,
+    handle_source_candidate_action,
 )
 from src.tgbot.handlers.payments.purchase import (
     PURCHASE_TOKEN_CALLBACK_DATA_REGEXP,
@@ -407,6 +412,15 @@ def add_handlers(application: Application) -> None:
             CallbackQueryHandler(
                 meme_source.handle_meme_source_change_status,
                 pattern=MEME_SOURCE_SET_STATUS_REGEXP,
+            ),
+            CommandHandler(
+                "discoveredsources",
+                handle_discovered_sources_command,
+                filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+            ),
+            CallbackQueryHandler(
+                handle_source_candidate_action,
+                pattern=SOURCE_CANDIDATE_ACTION_REGEXP,
             ),
         ]
     )

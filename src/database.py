@@ -144,6 +144,36 @@ meme_source = Table(
 )
 
 
+# Pool of channels we've seen forwarded into already-tracked sources, awaiting
+# moderator promotion into `meme_source`. Never auto-enabled; populated by the
+# TG ETL hook in `discover_source_candidates_from_telegram_posts`.
+meme_source_candidate = Table(
+    "meme_source_candidate",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("type", String, nullable=False),
+    Column("url", String, nullable=False, unique=True),
+    Column("status", String, nullable=False, server_default="discovered", index=True),
+    Column("times_forwarded", Integer, nullable=False, server_default="1"),
+    Column("first_seen_at", DateTime, server_default=func.now(), nullable=False),
+    Column("last_seen_at", DateTime, server_default=func.now(), nullable=False),
+    Column("sample_meme_source_id", Integer),
+    Column("sample_meme_raw_telegram_post_id", Integer),
+    Column(
+        "promoted_meme_source_id",
+        ForeignKey("meme_source.id", ondelete="SET NULL"),
+    ),
+    Column("dismissed_reason", String),
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime, onupdate=func.now()),
+    Index(
+        "ix_meme_source_candidate_status_times",
+        "status",
+        text("times_forwarded DESC"),
+    ),
+)
+
+
 meme_raw_telegram = Table(
     "meme_raw_telegram",
     metadata,
