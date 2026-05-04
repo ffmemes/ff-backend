@@ -58,7 +58,7 @@ OPENROUTER_FORBIDDEN_MODEL_COOLDOWN_SECONDS = 60 * 60 * 6
 #
 # Verified available on OpenRouter API as of 2026-05-04.
 # Ordered by preference. Falls back to next model on 429/403/timeout/bad response.
-# 429s set a temporary Redis cooldown so later memes/runs try other free models.
+# Transient failures set Redis cooldowns so later memes/runs try other free models.
 VISION_MODELS = [
     "google/gemma-4-31b-it:free",  # 262k context, primary
     "google/gemma-4-26b-a4b-it:free",  # 262k context, MoE variant
@@ -448,24 +448,48 @@ async def call_openrouter_vision(image_b64: str, log, *, deadline: float | None 
                 json_start = body.find("{")
                 if json_start < 0:
                     await _record_openrouter_metric(model_id, "bad_response")
+                    retry_after = await _cool_down_transient_openrouter_model(
+                        model_id,
+                        "bad_response",
+                    )
+                    if next_retry_after is None or retry_after < next_retry_after:
+                        next_retry_after = retry_after
                     log.warning("Model %s returned no JSON: %s", model_id, body[:100])
                     continue
                 data = json.loads(body[json_start:])
 
                 if "choices" not in data:
                     await _record_openrouter_metric(model_id, "bad_response")
+                    retry_after = await _cool_down_transient_openrouter_model(
+                        model_id,
+                        "bad_response",
+                    )
+                    if next_retry_after is None or retry_after < next_retry_after:
+                        next_retry_after = retry_after
                     log.warning("Model %s no choices: %s", model_id, str(data)[:200])
                     continue
 
                 content = data["choices"][0]["message"]["content"]
                 if not content:
                     await _record_openrouter_metric(model_id, "empty_content")
+                    retry_after = await _cool_down_transient_openrouter_model(
+                        model_id,
+                        "empty_content",
+                    )
+                    if next_retry_after is None or retry_after < next_retry_after:
+                        next_retry_after = retry_after
                     log.warning("Model %s empty content", model_id)
                     continue
                 result = _parse_vision_response(content)
 
                 if "description" not in result and "ocr_text" not in result:
                     await _record_openrouter_metric(model_id, "bad_json")
+                    retry_after = await _cool_down_transient_openrouter_model(
+                        model_id,
+                        "bad_json",
+                    )
+                    if next_retry_after is None or retry_after < next_retry_after:
+                        next_retry_after = retry_after
                     log.warning("Model %s bad JSON: %s", model_id, str(result)[:200])
                     continue
 
@@ -475,6 +499,12 @@ async def call_openrouter_vision(image_b64: str, log, *, deadline: float | None 
 
             except json.JSONDecodeError as e:
                 await _record_openrouter_metric(model_id, "invalid_json")
+                retry_after = await _cool_down_transient_openrouter_model(
+                    model_id,
+                    "invalid_json",
+                )
+                if next_retry_after is None or retry_after < next_retry_after:
+                    next_retry_after = retry_after
                 log.warning("Model %s invalid JSON: %s", model_id, e)
                 continue
             except httpx.HTTPStatusError as e:

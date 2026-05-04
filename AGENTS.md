@@ -32,7 +32,7 @@ The `describe_memes` flow (`src/flows/storage/describe_memes.py`) uses **FREE Op
 - **Monitoring**: use `ocr_result->>'calculated_at'` to check recency, NOT `meme.created_at`
 - **Circuit breaker**: auto-pauses after 3 failures in 1 hour
 - **Quota guard**: Redis stops OpenRouter calls after 900 free-model attempts/day (UTC)
-- **Backpressure strategy**: treat free-tier 429s/timeouts as normal; cool down that model in Redis and retry in later scheduled runs
+- **Backpressure strategy**: treat free-tier 429s/timeouts/invalid model output as normal; cool down that model in Redis and retry in later scheduled runs
 
 ### OpenRouter constraints (CRITICAL)
 

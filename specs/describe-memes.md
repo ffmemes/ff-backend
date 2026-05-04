@@ -4,7 +4,7 @@ Vision OCR for memes. The flow extracts image text, language, and a short Englis
 
 ## Business Goal
 
-Use OpenRouter's free vision tier to process memes every day with **zero paid spend**. Throughput is useful, but consistency is the main goal: accept 429s/timeouts as normal free-tier backpressure, try another free model when possible, then retry later.
+Use OpenRouter's free vision tier to process memes every day with **zero paid spend**. Throughput is useful, but consistency is the main goal: accept 429s/timeouts/invalid model output as normal free-tier backpressure, try another free model when possible, then retry later.
 
 Current target: **864 scheduled memes/day**, capped by a **900 OpenRouter-attempt/day Redis guard** so upload-time OCR and fallback attempts do not cross the 1,000/day free-model limit.
 
@@ -56,7 +56,7 @@ Do not add paid fallbacks. A paid fallback can spend the account below zero, aft
 429 handling:
 
 - A 429 on one model records `rate_limited`, sets `openrouter:free_model_cooldown:{model_id}`, and tries the next free model.
-- Timeouts/request errors/HTTP 5xx responses also set short model cooldowns, because those are usually provider-window failures rather than meme-specific failures.
+- Timeouts/request errors/HTTP 5xx/bad or invalid model responses also set short model cooldowns, because those are usually provider-window failures rather than meme-specific failures.
 - If every usable model is cooled down/rate-limited, the batch stops without marking the meme failed.
 - The next 15-minute scheduled run samples again. This intentionally discovers better low-contention windows over time.
 

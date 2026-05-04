@@ -47,7 +47,7 @@ docker compose exec app pytest tests/recommendations/test_blender.py
 - **DB**: PostgreSQL 14 (asyncpg + SQLAlchemy 2.0 raw `Table` objects, NOT declarative ORM)
 - **Cache/Queue**: Redis 6.2 (recommendation queues per user, user info cache, 1h TTL)
 - **Jobs**: Prefect 3.4 (parsing, stats, crossposting crons)
-- **Describe Memes**: OpenRouter FREE vision models only ([`src/flows/storage/describe_memes.py`](src/flows/storage/describe_memes.py)), runs every 15 min, 9/batch (~864/day). **NEVER add paid models** — the client rejects models not ending in `:free` and Redis caps calls at 900 attempts/day. Free-tier 429s/timeouts are normal: cool down that model and retry in later scheduled runs. Need $10+ lifetime purchases for 1,000 req/day. See [specs/describe-memes.md](specs/describe-memes.md). Circuit breaker auto-pauses after 3 failures/hour
+- **Describe Memes**: OpenRouter FREE vision models only ([`src/flows/storage/describe_memes.py`](src/flows/storage/describe_memes.py)), runs every 15 min, 9/batch (~864/day). **NEVER add paid models** — the client rejects models not ending in `:free` and Redis caps calls at 900 attempts/day. Free-tier 429s/timeouts/invalid model output are normal: cool down that model and retry in later scheduled runs. Need $10+ lifetime purchases for 1,000 req/day. See [specs/describe-memes.md](specs/describe-memes.md). Circuit breaker auto-pauses after 3 failures/hour
 - **Python**: 3.10 (dev), 3.12 (prod)
 
 ### Docker Compose Services
