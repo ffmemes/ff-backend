@@ -208,9 +208,16 @@ def audit_routines(client: Paperclip, company_id: str, focus: str) -> list[dict[
         comments = issue_comments(client, issue_id) if issue_id else []
         runs = issue_runs(client, issue_id) if issue_id else []
         flags, latest = classify_issue(issue or {}, comments)
-        if (issue or {}).get("status") == "in_progress" and not (issue or {}).get("activeRun"):
-            if any(item.get("status") == "running" for item in runs):
-                flags.append("zombie_execution_run")
+        # `GET /api/issues/{id}` does not serialize `activeRun` (only the list
+        # endpoint does), so check `executionRunId` plus a fresh /runs lookup
+        # instead. Zombie = issue is in_progress with an executionRunId set,
+        # but no run is currently running.
+        if (
+            (issue or {}).get("status") == "in_progress"
+            and (issue or {}).get("executionRunId")
+            and not any(item.get("status") == "running" for item in runs)
+        ):
+            flags.append("zombie_execution_run")
         payload_pr = str(((run.get("triggerPayload") or {}).get("pr_number")) or "")
         issue_title = (
             ((run.get("linkedIssue") or {}).get("title")) or (issue or {}).get("title") or ""
