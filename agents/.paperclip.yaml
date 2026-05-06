@@ -109,6 +109,9 @@ agents:
         SENTRY_AUTH_TOKEN:
           kind: "secret"
           requirement: "optional"
+        SENTRY_ORG:
+          kind: "secret"
+          requirement: "optional"
         COOLIFY_ACCESS_TOKEN:
           kind: "secret"
           requirement: "optional"
@@ -153,9 +156,8 @@ agents:
           default: "k4w804sco4s8kc88kwcw0ow4-131756368009"
           requirement: "optional"
         PREFECT_API_URL:
-          kind: "plain"
-          default: "http://65.108.127.32:4200/api"
-          requirement: "optional"
+          kind: "secret"
+          requirement: "required"
         ANALYST_DATABASE_URL:
           kind: "secret"
           requirement: "required"
@@ -163,6 +165,9 @@ agents:
           kind: "secret"
           requirement: "required"
         SENTRY_AUTH_TOKEN:
+          kind: "secret"
+          requirement: "required"
+        SENTRY_ORG:
           kind: "secret"
           requirement: "required"
         PREFECT_AUTH_STRING:

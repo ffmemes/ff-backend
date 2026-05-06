@@ -23,7 +23,8 @@ COMPANY = os.environ["COMPANY_ID"]
 SCRIPT_DIR = os.environ["SCRIPT_DIR"]
 DRY = os.environ.get("DRY_RUN", "0") == "1"
 
-# Skills published under paperclipai/paperclip/ — preserve when present, don't expect them in frontmatter.
+# Skills published under paperclipai/paperclip/ are preserved when present; they
+# do not need to appear in frontmatter.
 PAPERCLIP_NS_SKILLS = {
     "paperclip",
     "paperclip-create-agent",
@@ -47,6 +48,23 @@ def api(method: str, path: str, body=None):
         raise
 
 
+def fetch_secrets_by_name() -> dict[str, str]:
+    """Return company secret name -> id when the deploy token can read secrets."""
+    try:
+        secrets = api("GET", f"/api/companies/{COMPANY}/secrets")
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403, 404):
+            return {}
+        raise
+    if not isinstance(secrets, list):
+        return {}
+    return {
+        item["name"]: item["id"]
+        for item in secrets
+        if isinstance(item, dict) and item.get("name") and item.get("id")
+    }
+
+
 def skill_to_path(slug: str) -> str:
     if slug in PAPERCLIP_NS_SKILLS:
         return f"paperclipai/paperclip/{slug}"
@@ -65,17 +83,76 @@ def read_frontmatter_skills(agents_md_path: str) -> list[str]:
     return list(fm.get("skills") or [])
 
 
+def target_env_bindings(
+    cur_env: dict | None,
+    target_inputs: dict | None,
+    secrets_by_name: dict[str, str],
+) -> tuple[dict, list[str]]:
+    """Build runtime adapterConfig.env bindings from portable manifest inputs."""
+    target_env = ((target_inputs or {}).get("env")) or {}
+    cur_env = cur_env or {}
+    bindings = {}
+    missing_required_secrets = []
+
+    for key, spec in target_env.items():
+        if not isinstance(spec, dict):
+            continue
+        if spec.get("kind") == "plain":
+            bindings[key] = {"type": "plain", "value": str(spec.get("default", ""))}
+            continue
+
+        current = cur_env.get(key)
+        if isinstance(current, dict) and current.get("type") == "secret_ref":
+            bindings[key] = current
+            continue
+
+        secret_id = secrets_by_name.get(key)
+        if secret_id:
+            bindings[key] = {
+                "type": "secret_ref",
+                "secretId": secret_id,
+                "version": "latest",
+            }
+        elif spec.get("requirement") == "required":
+            missing_required_secrets.append(key)
+
+    return bindings, missing_required_secrets
+
+
+def merged_adapter_env(cur_env: dict | None, target_bindings: dict) -> dict:
+    """Merge manifest-managed env keys without removing runtime-only env keys."""
+    return {**(cur_env or {}), **target_bindings}
+
+
+def adapter_env_changes(cur_env: dict | None, target_bindings: dict) -> list[str]:
+    """Return human-readable env binding drift without exposing secret values."""
+    cur_env = cur_env or {}
+    added = sorted(set(target_bindings) - set(cur_env))
+    changed = sorted(
+        k for k in set(target_bindings) & set(cur_env) if target_bindings[k] != cur_env[k]
+    )
+
+    changes = []
+    if added:
+        changes.append(f"+adapterConfig.env: {added}")
+    if changed:
+        changes.append(f"~adapterConfig.env: {changed}")
+    return changes
+
+
 def main() -> int:
     with open(f"{SCRIPT_DIR}/.paperclip.yaml") as f:
         manifest = yaml.safe_load(f)
 
     agents_list = api("GET", f"/api/companies/{COMPANY}/agents")
     by_slug = {a["urlKey"]: a for a in agents_list}
+    secrets_by_name = fetch_secrets_by_name()
 
     patched = 0
     skipped = 0
     failed = 0
     would_patch = 0
+    missing_required_secret_errors = 0
     for slug, mblock in (manifest.get("agents") or {}).items():
         if slug not in by_slug:
             print(f"  SKIP {slug} — not in prod")
@@ -88,6 +165,7 @@ def main() -> int:
         target_max_turns = ad_cfg.get("maxTurnsPerRun")
         target_heartbeat = (mblock.get("runtime") or {}).get("heartbeat") or {}
         target_perms = mblock.get("permissions") or {}
+        target_inputs = mblock.get("inputs") or {}
 
         # Frontmatter → desiredSkills (preserve any paperclipai/* currently attached)
         fm_skills = read_frontmatter_skills(f"{SCRIPT_DIR}/{slug}/AGENTS.md")
@@ -102,9 +180,7 @@ def main() -> int:
         if target_model and cur_ac.get("model") != target_model:
             changes.append(f"model: {cur_ac.get('model')} → {target_model}")
         if target_max_turns and cur_ac.get("maxTurnsPerRun") != target_max_turns:
-            changes.append(
-                f"maxTurnsPerRun: {cur_ac.get('maxTurnsPerRun')} → {target_max_turns}"
-            )
+            changes.append(f"maxTurnsPerRun: {cur_ac.get('maxTurnsPerRun')} → {target_max_turns}")
         if target_skills != cur_skills_sorted:
             added = sorted(set(target_skills) - set(cur_skills_sorted))
             removed = sorted(set(cur_skills_sorted) - set(target_skills))
@@ -126,6 +202,17 @@ def main() -> int:
                 perm_changes.append((k, v))
                 changes.append(f"permissions.{k}: {cur_perms.get(k)} → {v}")
 
+        cur_env = cur_ac.get("env") or {}
+        target_bindings, missing_required_secrets = target_env_bindings(
+            cur_env,
+            target_inputs,
+            secrets_by_name,
+        )
+        if missing_required_secrets:
+            changes.append(f"!missing required secrets: {missing_required_secrets}")
+            missing_required_secret_errors += 1
+        changes.extend(adapter_env_changes(cur_env, target_bindings))
+
         if not changes:
             print(f"  skip {slug} (no config drift)")
             skipped += 1
@@ -142,6 +229,8 @@ def main() -> int:
             new_ac["model"] = target_model
         if target_max_turns:
             new_ac["maxTurnsPerRun"] = target_max_turns
+        if target_bindings:
+            new_ac["env"] = merged_adapter_env(cur_env, target_bindings)
         new_skill_sync = dict(new_ac.get("paperclipSkillSync") or {})
         new_skill_sync["desiredSkills"] = target_skills
         new_ac["paperclipSkillSync"] = new_skill_sync
@@ -156,6 +245,7 @@ def main() -> int:
             "adapterConfig": new_ac,
             "runtimeConfig": new_rt,
         }
+
         try:
             api("PATCH", f"/api/agents/{cur['id']}", body)
             print(f"  PATCHED {slug}: {'; '.join(changes)}")
@@ -177,6 +267,13 @@ def main() -> int:
         print(f"\nConfig sync (dry-run): would patch {would_patch}, skip {skipped} (no drift).")
     else:
         print(f"\nConfig sync: patched={patched}, skipped={skipped}, failed={failed}.")
+    if missing_required_secret_errors:
+        print(
+            f"ERROR: {missing_required_secret_errors} agent(s) reference required secrets "
+            "that are not visible to this deploy token.",
+            file=sys.stderr,
+        )
+        return 1
     return 1 if failed > 0 else 0
 
 

@@ -41,26 +41,23 @@ This happened in April 2026 when AI agents added paid fallbacks during unsupervi
 VISION_MODELS = [
     "google/gemma-4-31b-it:free",     # 262k context, primary
     "google/gemma-4-26b-a4b-it:free", # 262k context, MoE variant
-    "google/gemma-3-27b-it:free",     # 131k context, re-listed ~2026-04-20
-    "google/gemma-3-12b-it:free",     # 32k context, re-listed ~2026-04-20
 ]
 ```
 
 Falls through sequentially on 403 (access denied), timeout, or bad response.
 429 (rate limit) returns immediately — the 20 rpm limit is global across all free models, so trying the next model would also 429.
 
-**Model history** (Apr 2026): Gemma 3 free models delisted ~2026-04-15 (FFM-543), re-listed ~2026-04-20 and re-added to chain. `gemma-4-*:free` restored after earlier 403 issues (FFM-520).
+**Model history**: Gemma 3 free models delisted ~2026-04-15 (FFM-543), re-listed ~2026-04-20, then removed again by 2026-05-06. `gemma-4-*:free` restored after earlier 403 issues (FFM-520).
 
-### Available Free Vision Models (as of 2026-04-20)
+### Available Free Vision Models (as of 2026-05-06)
 
 | Model | Context | Notes |
 |-------|---------|-------|
 | `google/gemma-4-31b-it:free` | 262K | Primary |
 | `google/gemma-4-26b-a4b-it:free` | 262K | MoE variant fallback |
-| `google/gemma-3-27b-it:free` | 131K | Re-listed ~2026-04-20, restored as fallback |
-| `google/gemma-3-12b-it:free` | 32K | Re-listed ~2026-04-20, restored as fallback |
-| `google/gemma-3-4b-it:free` | 32K | Available but not used (4B too small for reliable JSON) |
-| `nvidia/nemotron-nano-12b-v2-vl:free` | 128K | **Removed** — returns 504s and invalid JSON/empty content |
+| `baidu/qianfan-ocr-fast:free` | Unknown | OCR-only fallback candidate, not used until quality is evaluated |
+| `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` | Unknown | Available but not used until JSON quality is evaluated |
+| `nvidia/nemotron-nano-12b-v2-vl:free` | 128K | Available but not used — returns 504s and invalid JSON/empty content |
 
 Check current availability: `curl https://openrouter.ai/api/v1/models | jq '.data[] | select(.id | endswith(":free")) | select(.architecture.modality | contains("image")) | .id'`
 
