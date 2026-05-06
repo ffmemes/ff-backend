@@ -10,6 +10,7 @@ Detailed specifications for each subsystem. See root [SPEC.md](../SPEC.md) for p
 | [dedup.md](dedup.md) | Current dedup mechanisms + cheap improvement plan |
 | [testing.md](testing.md) | Test strategy, coverage gaps, priority order |
 | [describe-memes.md](describe-memes.md) | Vision OCR: OpenRouter free tier limits, model chain, constraints |
+| [product-ideas-2026-05-03.md](product-ideas-2026-05-03.md) | Product/data ideas: text-heavy memes, language segments, sharing CTA |
 | [issues.md](issues.md) | Prioritized backlog of known bugs and improvements |
 | [error-profile.md](error-profile.md) | Production error analysis from logs |
 | [data-hypotheses.md](data-hypotheses.md) | Data analysis findings (H1-H7) |
