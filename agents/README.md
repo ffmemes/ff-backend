@@ -79,11 +79,13 @@
 | paperclip | > | [github](https://github.com/paperclipai/paperclip/tree/master/skills/paperclip) |
 | para-memory-files | > | [github](https://github.com/paperclipai/paperclip/tree/master/skills/para-memory-files) |
 
-## Getting Started
+## Live FFmemes Updates
 
-```bash
-pnpm paperclipai company import this-github-url-or-folder
-```
+This export is informational. For live FFmemes agents, update
+`agents/.paperclip.yaml`, `agents/<slug>/AGENTS.md`, and any
+`agents/<slug>/routines/*.description.md` files, then run `./agents/deploy.sh`.
+Do not use `company import` to update existing prod agents; the safe import
+route does not replace existing agents.
 
 See [Paperclip](https://paperclip.ing) for more information.
 

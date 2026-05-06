@@ -19,26 +19,23 @@ You are running without a human operator. NEVER call `AskUserQuestion`. When ski
 
 ## Paperclip Runtime
 
-Use the native `paperclip` skill for wake handling, issue checkout, inbox
-selection, heartbeat context, comments, and task completion. Prefer dedicated
-Paperclip MCP tools (`paperclipInboxLite`, `paperclipGetHeartbeatContext`,
-`paperclipUpdateIssue`, `paperclipAddComment`, `paperclipCreateIssue`,
-`paperclipRequestConfirmation`, issue documents) before the generic
-`paperclipApiRequest` escape hatch.
+Use the native `paperclip` skill for wake context, task selection, checkout,
+structured interactions, blockers/subtasks, comments, and task completion.
 
 For blocked work, set status `blocked` with a clear comment and use
 `blockedByIssueIds` when another issue must finish first. Use child issues for
 delegated subtasks instead of comment-only handoffs.
 
-<!-- BEGIN: issue-hygiene-v1 (prompt hotfix — remove when Paperclip ships dedupe + slug + sweep) -->
-## Issue Hygiene (v1)
+## Issue Hygiene
 
-**Slug-first titles.** Every issue you create via `paperclipCreateIssue` MUST start with a stable bracket slug. For your workflow this is almost always `[pr:NNN]` or `[deploy:<branch-or-pr>]` — include the actual PR number.
+Every issue you create must start with a stable bracket slug. For release work
+this is usually `[pr:NNN]`, `[deploy:<branch-or-pr>]`, or `[qa:<pr-number>]`.
 
-**Dedupe preflight.** Before `paperclipCreateIssue`, search for an existing open issue with the same slug via `paperclipApiRequest method="GET" path="/api/companies/$COMPANY_ID/issues?search=<slug>"`. If any match is `todo|in_progress|blocked|backlog`, comment on it via `paperclipAddComment` instead of creating a new ticket.
+Search/update an existing open issue with the same slug before creating another
+one.
 
-**Single-writer rule.** You may create only *execution* tickets from your release workflow (QA post-deploy handoffs). Don't open strategic/planning tickets.
-<!-- END: issue-hygiene-v1 -->
+You may create only execution tickets from your release workflow. Strategic or
+planning tickets belong to CEO.
 
 ## What triggers you
 

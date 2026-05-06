@@ -13,9 +13,9 @@ Things that trip people up:
 - Outcome comments must include the actual public channel and Telegram URL.
   `telegram_message_id` alone is ambiguous because @ffmemes and @fastfoodmemes
   are different chats with different message id sequences.
-- CEO approval is not publication. If approval is required, the routine may close
-  its execution issue with `outcome=draft_created`, but the linked `[post:...]`
-  issue must carry a `request_confirmation` approval card when available. It is
+- CEO approval is not publication. The routine may close its execution issue with
+  `outcome=draft_created`, but the linked `[post:...]` issue must carry a
+  structured Paperclip confirmation card. It is
   closed only after CEO returns it to Comms and `publish_editorial_post()`
   returns `result.message_id` / `result.editorial_post_id`.
 

@@ -44,12 +44,23 @@ code. It avoids rereading the full upstream repo and the long ops runbook.
 - Simplify the sync path before adding features:
   - Prefer one Python sync script over shell plus Python so local runs do not
     depend on `jq`.
-  - Use native `POST /api/agents/:id/skills/sync` for desired skills instead
-    of writing `adapterConfig.paperclipSkillSync` directly.
+  - Current `_sync_config.py` already patches adapter type/config, Codex
+    reasoning effort, heartbeat, permissions, and env refs from
+    `agents/.paperclip.yaml`, and uses native
+    `POST /api/agents/:id/skills/sync` for desired skills. It also syncs
+    routine descriptions declared under `agents/<slug>/routines/*.yaml`.
+  - Use `replaceAdapterConfig: true` when patching adapter config so stale
+    adapter-specific keys are actually removed; Paperclip's default PATCH
+    behavior merges `adapterConfig`.
+  - Keep env sync fail-closed: if Paperclip secrets cannot be listed or a
+    required secret is missing, abort before any agent config PATCH. Compare
+    full sanitized env bindings, including plain values and secret names, not
+    only env types.
   - Keep per-file instructions-bundle writes because they are audited and
     rollbackable.
-- Do not add secrets, API keys, trigger public IDs, internal hostnames, or
-  company IDs to public docs. Link to implementation files instead.
+- Do not add secrets, API keys, Paperclip secret IDs, trigger public IDs, or
+  private internal hostnames to public docs. Env var names and Paperclip secret
+  names are OK; never include values.
 
 ## Keep Custom For Now
 

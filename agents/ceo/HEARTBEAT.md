@@ -1,11 +1,12 @@
 # HEARTBEAT.md -- CEO Heartbeat Checklist
 
-Run this checklist on every heartbeat. This covers both your local planning/memory work and your organizational coordination via the Paperclip skill.
+Run this checklist on every heartbeat. The native `paperclip` skill owns wake
+context, scoped tasks, inbox state, checkout, and structured approvals.
 
 ## 1. Identity and Context
 
-- Use the native Paperclip skill to confirm identity, wake context, inbox
-  state, and any scoped task. Do not hand-roll the task-id/inbox race flow here.
+- Start from the native Paperclip context. Do not hand-roll task-id, inbox, or
+  checkout mechanics here.
 
 ## 2. Local Planning Check
 
@@ -17,25 +18,18 @@ Run this checklist on every heartbeat. This covers both your local planning/memo
 
 ## 3. Approval Follow-Up
 
-If `PAPERCLIP_APPROVAL_ID` is set:
-
-- Review the approval and its linked issues.
-- Close resolved issues or comment on what remains open.
+Handle pending structured approvals surfaced by the native `paperclip` skill.
+Close resolved issues or comment on what remains open.
 
 ## 4. Get Assignments
 
-- Use `paperclipInboxLite` and `paperclipGetHeartbeatContext`.
 - Prioritize: scoped wake task first, then `in_progress`, then `todo`.
 - Skip `blocked` unless you can unblock it. Use `blockedByIssueIds` when another
   issue is the dependency.
-- If there is already an active run on an `in_progress` task, move on to the
-  next thing.
 
 ## 5. Checkout and Work
 
-- Always checkout before working with `paperclipCheckoutIssue`.
-- Never retry a 409; that task belongs to someone else.
-- Do the work. Update status and comment when done.
+- Do the work selected by the native skill. Update status and comment when done.
 
 ## 6. Delegation
 
@@ -70,6 +64,5 @@ If `PAPERCLIP_APPROVAL_ID` is set:
 ## Rules
 
 - Always use the Paperclip skill for coordination.
-- Always include `X-Paperclip-Run-Id` header on mutating API calls.
 - Comment in concise markdown: status line + bullets + links.
 - Self-assign via checkout only when explicitly @-mentioned.

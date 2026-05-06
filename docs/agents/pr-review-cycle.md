@@ -7,18 +7,20 @@ agent infrastructure, see `paperclip-ops-runbook.md`.
 
 1. PR `opened`, `reopened`, or `synchronize` (push to PR branch) →
    `.github/workflows/staff-engineer-trigger.yml` fires.
-2. Workflow `POST`s the bearer trigger at
-   `https://org.ffmemes.com/api/routine-triggers/public/910d844a954042dc060c56bf/fire`
-   with `{pr_number, pr_url}`. Secret is in repo secret `PAPERCLIP_TRIGGER_SECRET`.
+2. Workflow `POST`s the Paperclip PR Review routine trigger with
+   `{pr_number, pr_url}`. URL and bearer secret live in GitHub Actions secrets
+   / workflow config; do not paste trigger IDs into public docs.
 3. Paperclip routes to the **Staff Engineer** agent (id
    `1a323bb6-2b4d-46bf-9c33-7971fa1673d5`). Its status flips
    `idle → running` and `lastHeartbeatAt` ticks.
-4. Staff Engineer reads CI state, runs `gh pr checkout`, runs the `review`
-   skill (codex pass + structural checks), then either:
-   - **Approve** — `gh pr review --approve` and `gh pr merge --squash`.
-   - **Hold** — posts a `## Staff Engineer review — changes requested`
-     comment listing P1/P2 issues. (Self-authored PRs can't be reviewed
-     with `--request-changes`, so a comment is the canonical signal.)
+4. Staff Engineer reads CI state, checks out the PR, runs `/review` plus
+   `/codex review`, posts a GitHub-visible review signal, then either:
+   - **Approve** — real `gh pr review --approve` when allowed, or a
+     `STAFF ENGINEER REVIEW: APPROVED` comment fallback for self-review-blocked
+     PRs; internal PRs are queued with `gh pr merge --squash --auto`.
+   - **Hold** — real request-changes review when allowed, or a
+     `STAFF ENGINEER REVIEW: CHANGES REQUESTED` comment fallback. A CTO issue
+     is created for required fixes.
 
 ## What "running" means
 
@@ -36,18 +38,22 @@ review unless it left a comment.
 ## Pre-merge invariants the agent enforces
 
 - All required CI checks (`lint`, `test`) must be green.
+- Auto-merge must be enabled before merge; the agent queues `--auto` instead of
+  racing CI with a bare merge.
 - A single alembic head (lint catches this).
+- External/fork PRs are never auto-merged, even if their branch name looks
+  internal.
 - The PR description's "Test plan" boxes don't have to all be ticked, but
   obvious gaps (e.g. "no tests added for new public function") will hold.
 - No banned-substring violations introduced into agent-facing instructions.
+- Coolify A3 deploy timestamp probe failures file `[chain-broken:*]` follow-up
+  issues instead of blocking the already-delivered review/merge issue.
 
 ## Manual fire (if the GitHub workflow misses)
 
-Per `~/.claude/projects/.../memory/reference_paperclip_trigger_secrets.md`:
-
 ```bash
 curl -s -X POST \
-  "https://org.ffmemes.com/api/routine-triggers/public/910d844a954042dc060c56bf/fire" \
+  "$PAPERCLIP_PR_REVIEW_TRIGGER_URL" \
   -H "Authorization: Bearer $PAPERCLIP_TRIGGER_SECRET" \
   -H "Content-Type: application/json" \
   -d '{"pr_number": 183, "pr_url": "https://github.com/ffmemes/ff-backend/pull/183"}'

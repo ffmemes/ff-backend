@@ -9,7 +9,7 @@
 # What it does, per agent slug found under agents/<slug>/:
 #   1. Resolve agent ID by slug via GET /api/companies/<id>/agents
 #   2. PUT every *.md in agents/<slug>/ to /api/agents/<id>/instructions-bundle/file
-#   3. (skipped for now) PATCH /api/agents/<id> with adapterConfig from .paperclip.yaml
+#   3. PATCH /api/agents/<id> with adapter/runtime/env config from .paperclip.yaml
 #
 # Paperclip records audit + config revision per write — rollback via API if needed.
 
@@ -58,6 +58,7 @@ synced_files=0
 
 for agent_dir in "$SCRIPT_DIR"/*/; do
   slug=$(basename "$agent_dir")
+  [[ -f "$agent_dir/AGENTS.md" ]] || continue
   agent_id=$(slug_to_id "$slug")
 
   if [[ -z "$agent_id" ]]; then
@@ -87,9 +88,10 @@ for agent_dir in "$SCRIPT_DIR"/*/; do
 done
 
 echo
-echo "Syncing adapter config + skills (diff-first PATCH)..."
+echo "Syncing adapter config + env + skills + routine descriptions (diff-first PATCH)..."
 
-# Pass 2: model, maxTurnsPerRun, desiredSkills, runtime.heartbeat, permissions.
+# Pass 2: adapter type/config, env secret refs, desiredSkills, runtime.heartbeat,
+# permissions, and routine descriptions declared under agents/<slug>/routines/.
 # Diff first; PATCH only on change so we don't spam Paperclip's config-revision history.
 COMPANY_ID="$COMPANY_ID" SCRIPT_DIR="$SCRIPT_DIR" DRY_RUN="$DRY_RUN" \
   python3 "$SCRIPT_DIR/_sync_config.py" || {

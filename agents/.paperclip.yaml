@@ -30,11 +30,12 @@ agents:
   ceo:
     role: "ceo"
     adapter:
-      type: "claude_local"
+      type: "codex_local"
       config:
-        dangerouslySkipPermissions: true
+        dangerouslyBypassApprovalsAndSandbox: true
         maxTurnsPerRun: 300
-        model: "claude-opus-4-7"
+        model: "gpt-5.5"
+        modelReasoningEffort: "xhigh"
     runtime:
       heartbeat:
         enabled: true
@@ -47,6 +48,13 @@ agents:
         OPENCLAW_SESSION:
           kind: "plain"
           default: "1"
+          requirement: "optional"
+        PATH:
+          kind: "plain"
+          default: "/paperclip/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+          requirement: "optional"
+        OPENAI_API_KEY:
+          kind: "secret"
           requirement: "optional"
         ANALYST_DATABASE_URL:
           kind: "secret"
@@ -74,13 +82,11 @@ agents:
         ANALYST_DATABASE_URL:
           kind: "secret"
           requirement: "optional"
-        # Narrow-privilege writer role for editorial_posts (SELECT/INSERT/UPDATE
-        # on that one table). Required so publish_editorial_post can persist
-        # the row and stats collector picks it up. See
-        # docs/comms/comms-writer-role-setup.sql for the role bootstrap and
-        # FFM-919 for the rationale.
+        # Bound to the existing Analyst read-only DB secret by CEO decision.
+        # This is for Comms data reads; do not map to FFMEMES_DATABASE_URL.
         DATABASE_URL:
           kind: "secret"
+          secretName: "ANALYST_DATABASE_URL"
           requirement: "required"
         FFMEMES_PROD_TELEGRAM_BOT_TOKEN:
           kind: "secret"
@@ -89,11 +95,12 @@ agents:
   cto:
     role: "cto"
     adapter:
-      type: "claude_local"
+      type: "codex_local"
       config:
-        dangerouslySkipPermissions: true
+        dangerouslyBypassApprovalsAndSandbox: true
         maxTurnsPerRun: 300
-        model: "claude-opus-4-7"
+        model: "gpt-5.5"
+        modelReasoningEffort: "high"
     runtime:
       heartbeat:
         maxConcurrentRuns: 1
@@ -102,6 +109,13 @@ agents:
         OPENCLAW_SESSION:
           kind: "plain"
           default: "1"
+          requirement: "optional"
+        PATH:
+          kind: "plain"
+          default: "/paperclip/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+          requirement: "optional"
+        OPENAI_API_KEY:
+          kind: "secret"
           requirement: "optional"
         ANALYST_DATABASE_URL:
           kind: "secret"
@@ -140,10 +154,13 @@ agents:
           kind: "plain"
           default: "1"
           requirement: "optional"
-        COOLIFY_URL:
+        PATH:
           kind: "plain"
-          default: "https://org.ffmemes.com"
+          default: "/paperclip/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
           requirement: "optional"
+        COOLIFY_BASE_URL:
+          kind: "secret"
+          requirement: "required"
         COOLIFY_RESOURCE_UUID:
           kind: "plain"
           default: "k4w804sco4s8kc88kwcw0ow4"
@@ -214,11 +231,12 @@ agents:
   staff-engineer:
     role: "engineer"
     adapter:
-      type: "claude_local"
+      type: "codex_local"
       config:
-        dangerouslySkipPermissions: true
+        dangerouslyBypassApprovalsAndSandbox: true
         maxTurnsPerRun: 200
-        model: "claude-opus-4-7"
+        model: "gpt-5.5"
+        modelReasoningEffort: "high"
     runtime:
       heartbeat:
         maxConcurrentRuns: 1
@@ -227,6 +245,13 @@ agents:
         OPENCLAW_SESSION:
           kind: "plain"
           default: "1"
+          requirement: "optional"
+        PATH:
+          kind: "plain"
+          default: "/paperclip/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+          requirement: "optional"
+        OPENAI_API_KEY:
+          kind: "secret"
           requirement: "optional"
         ANALYST_DATABASE_URL:
           kind: "secret"

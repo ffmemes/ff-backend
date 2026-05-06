@@ -1,12 +1,23 @@
 # Paperclip-native migration
 
-Branch: `feat/paperclip-native-migration`. Prod is on **Paperclip v2026.416.0** (verified by deployed commit `4bdae1f42` → tag `v2026.416.0`). CLI is `paperclipai@2026.416.0`.
+Prod is on **Paperclip v2026.428.0** as of 2026-05-06. Verified deployment:
+Coolify deployment `v8s5shyjid9n9c7l2gtghig9`, fork branch
+`ohld/paperclip:ffmemes/v2026.428.0`, commit
+`3494e84a2920f3e2bc5f627f916da29e224086dc`, health check green.
 
 Goal: stop maintaining custom scaffolding for things Paperclip ships natively, so upstream fixes apply to us for free.
 
-## 2026-05-04 docs/release learnings
+## 2026-05-06 stable deployment
 
 Paperclip latest stable is **v2026.428.0** ([release notes](https://github.com/paperclipai/paperclip/releases/tag/v2026.428.0); mirror: [newreleases](https://newreleases.io/project/github/paperclipai/paperclip/release/v2026.428.0)). Canary builds exist, but production should stay on stable unless a specific blocker requires a canary and the rollback path is explicit.
+
+The deployed target is upstream tag `v2026.428.0` at commit
+`3494e84a2920f3e2bc5f627f916da29e224086dc`. Coolify deploys
+`ohld/paperclip`, so create/use a pinned fork branch such as
+`ffmemes/v2026.428.0` pointing to that exact commit. Do **not** sync
+`ohld/paperclip:master` to upstream `master`; upstream master can be newer than
+stable. The old fork-only Dockerfile checksum workaround is no longer needed at
+`v2026.428.0`.
 
 Native Paperclip docs and shipped skills now cover most scaffolding we previously had to hand-roll: heartbeat scoped-wake fast paths, inbox-lite, `heartbeat-context`, structured interactions, blocker and child-issue wakes, documents, approvals, and workspace/runtime controls. Relevant upstream entry points:
 - [Heartbeat protocol](https://github.com/paperclipai/paperclip/blob/master/docs/guides/agent-developer/heartbeat-protocol.md)
@@ -15,9 +26,16 @@ Native Paperclip docs and shipped skills now cover most scaffolding we previousl
 - [MCP server tools](https://github.com/paperclipai/paperclip/blob/master/packages/mcp-server/README.md)
 - [Paperclip skill source](https://github.com/paperclipai/paperclip/blob/master/skills/paperclip/SKILL.md)
 
-Safe company import still rejects `replace` for existing companies, so the repo's native-API deploy/sync path remains justified. Current local touchpoints are [`agents/deploy.sh`](../agents/deploy.sh), [`agents/_sync_config.py`](../agents/_sync_config.py), [`agents/.paperclip.yaml`](../agents/.paperclip.yaml), and the still-custom PR trigger in [`.github/workflows/staff-engineer-trigger.yml`](../.github/workflows/staff-engineer-trigger.yml). Next simplification: use native `POST /api/agents/:id/skills/sync` for desired-skill assignment and reduce direct `adapterConfig` mutation to only fields that do not yet have a narrower native endpoint. See the short linked handoff in [`docs/agents/paperclip-simplification-2026-05-04.md`](agents/paperclip-simplification-2026-05-04.md).
+Safe company import still rejects `replace` for existing companies, so the repo's native-API deploy/sync path remains justified. Current local touchpoints are [`agents/deploy.sh`](../agents/deploy.sh), [`agents/_sync_config.py`](../agents/_sync_config.py), [`agents/.paperclip.yaml`](../agents/.paperclip.yaml), and the still-custom PR trigger in [`.github/workflows/staff-engineer-trigger.yml`](../.github/workflows/staff-engineer-trigger.yml). The sync path now uses native `POST /api/agents/:id/skills/sync` for desired-skill assignment and patches adapter/runtime/env config from the manifest only where no narrower endpoint exists. See the short linked handoff in [`docs/agents/paperclip-simplification-2026-05-04.md`](agents/paperclip-simplification-2026-05-04.md).
 
-## Pre-flight backups (taken 2026-04-24 09:27 UTC)
+## Pre-flight backups
+
+Fresh upgrade backups taken 2026-05-06 on `t.ffmemes.com:/root/paperclip-backups/`:
+
+- `paperclip-20260506T160310Z.sql.gz` — DB dump, gzip verified.
+- `paperclip-volume-clean-20260506T160914Z.tgz` — Paperclip named-volume archive, tar verified.
+
+Earlier migration backups taken 2026-04-24 09:27 UTC:
 
 On `t.ffmemes.com:/root/paperclip-backups/pre-export-2026-04-24/`:
 - `preexport-20260424-092754.sql.gz` — 16 MB DB dump via `paperclipai db:backup`
@@ -28,7 +46,7 @@ Restore (only if needed):
 gunzip -c preexport-20260424-092754.sql.gz | docker exec -i <paperclip-container> psql "$DATABASE_URL"
 ```
 
-## What Paperclip-native looks like (v2026.416)
+## What Paperclip-native looks like (v2026.428)
 
 CLI commands we now rely on:
 - `paperclipai db:backup` — native DB dump.
@@ -40,7 +58,10 @@ API endpoints we now use directly (no SSH, no `docker cp`):
 - `GET  /api/companies/<id>/agents` — slug → agent ID resolution.
 - `GET  /api/agents/<id>/instructions-bundle?companyId=<id>` — list current instruction files.
 - `PUT  /api/agents/<id>/instructions-bundle/file?companyId=<id>` — body `{path, content}`. Records audit + config revision (rollbackable).
-- `PATCH /api/agents/<id>` — adapter config, `desiredSkills`, runtime, permissions (not yet wired in deploy script — see "Future work").
+- `PATCH /api/agents/<id>` — adapter type, adapter config, env bindings, and runtime heartbeat.
+- `POST  /api/agents/<id>/skills/sync?companyId=<id>` — desired skills parsed from AGENTS.md frontmatter.
+- `PATCH /api/agents/<id>/permissions` — create-agent and related permission drift.
+- `PATCH /api/routines/<id>` — routine descriptions declared under `agents/<slug>/routines/*.yaml`.
 
 ## Why `company import` is **not** the deploy path
 
@@ -58,9 +79,9 @@ What changed in `agents/`:
 - **Slug renames**: `comms/` → `comms-manager/`, `qa/` → `qa-engineer/` to match prod `urlKey`s. Done via `git mv` to preserve history.
 - **CEO additions**: `agents/ceo/{SOUL,TOOLS,HEARTBEAT}.md` pulled from prod (Paperclip pattern; CEO-only for now).
 - **Top-level files**: `agents/COMPANY.md`, `agents/README.md`, `agents/images/{org-chart.png,company-logo.jpg}` pulled from prod.
-- **Manifest** `agents/.paperclip.yaml` rewritten in `paperclip/v1` schema with full prod structure (heartbeat, model, maxTurnsPerRun, env-default declarations, sidebar order, brand color) and the union of repo + prod env var declarations. The inlined `capabilities` text from prod's `comms-manager` was dropped — `AGENTS.md` is the single source.
+- **Manifest** `agents/.paperclip.yaml` rewritten in `paperclip/v1` schema with full prod structure (heartbeat, model, reasoning effort, maxTurnsPerRun, env declarations, sidebar order, brand color) and the union of repo + prod env var declarations. The inlined `capabilities` text from prod's `comms-manager` was dropped — `AGENTS.md` is the single source.
 - **Removed** `agents/backup/` (legacy local snapshots; server-side backups now exist).
-- **Replaced** `agents/deploy.sh`: now 70 LOC of curl + jq against the native API. No SSH. No docker cp.
+- **Replaced** `agents/deploy.sh`: native API only. No SSH. No docker cp. The second pass calls `_sync_config.py` to diff and patch adapter type/config, env `secret_ref`s, runtime heartbeat, permissions, and desired skills.
 
 What did **not** change in this PR:
 - `agents/<slug>/AGENTS.md` text content. Repo content is preserved as-is per CEO direction ("repo is final").
@@ -97,10 +118,10 @@ Required GitHub repo secrets (set before merging this PR):
 
 Concurrency group `paperclip-deploy-agents` prevents overlapping runs; `cancel-in-progress: false` ensures in-flight syncs complete.
 
-## Phase 3 — Pending (separate PRs)
+## Phase 3 — Follow-ups
 
-**3a. Adapter config sync from `.paperclip.yaml`** (next iteration of `agents/deploy.sh`).
-Read agent block from manifest, PATCH `/api/agents/<id>` with `adapterConfig`, `runtimeConfig`, `permissions`, `desiredSkills` (parsed from AGENTS.md frontmatter). Currently we only sync the prompt text.
+**3a. Adapter config sync from `.paperclip.yaml`.** ✅ Done 2026-05-06.
+`agents/_sync_config.py` reads each agent block from the manifest, resolves Paperclip company secrets by name, preflights every required env binding before any agent config PATCH, applies `adapterType`, `adapterConfig` with `replaceAdapterConfig: true`, env bindings, `runtimeConfig.heartbeat`, permissions, and syncs desired skills through the native skills endpoint. It also syncs routine description files declared under `agents/<slug>/routines/*.yaml`. Current Codex split: CEO/CTO/Staff Engineer use `codex_local` + `gpt-5.5`; CEO runs effort `xhigh`, CTO/Staff run effort `high`.
 
 **3b. Retire the webhook proxy.** ✅ Done 2026-04-29. QA trigger `30901464-...` flipped to `signingMode: none`, Sentry Internal Integration `paperclip-qa-alert-b86aa3` now POSTs directly to `https://org.ffmemes.com/api/routine-triggers/public/18a2f9e439c396e9b21a02fa/fire`. Deleted: `src/integrations/paperclip.py`, `notify_qa_sync` callsite in `src/flows/hooks.py`, env vars `WEBHOOK_PROXY_SECRET` / `SENTRY_CLIENT_SECRET` / `PAPERCLIP_QA_TRIGGER_URL` / `PAPERCLIP_QA_TRIGGER_SECRET`. Coolify webhook path was unused (no hits in 24h prior to removal). Prefect failures now surface via the QA Log Scan 3h cron instead of an instant push — accepted tradeoff for less code. Trigger publicId leakage = at most noisy QA scans (no user input or commands accepted).
 
@@ -126,3 +147,4 @@ Prefer Paperclip's native skill-update mechanism over a custom-rolled routine if
 - **`--collision replace` was rejected** by the v416 safe-import server — we work around with per-file PUT, but if Paperclip changes the instructions-bundle endpoint behavior in a future version, we re-evaluate.
 - **No drift monitoring yet.** Auto-deploy reduces drift; UI edits between deploys still possible. Codex recommended a nightly `company export` artifact job; deferred per CEO call. Revisit if drift bites.
 - **CI auth uses a single API key.** No first-class service-account exists in Paperclip. The key must be scoped to this company and rotated if leaked.
+- **Env sync replaces live `adapterConfig.env` from the manifest.** Required missing secrets now abort before PATCH; optional missing secrets are omitted. Comms `DATABASE_URL` intentionally maps to the read-only `ANALYST_DATABASE_URL` secret, so `editorial_posts` writes from agent runtime are not guaranteed until a dedicated writer secret is created.

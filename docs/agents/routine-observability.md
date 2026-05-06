@@ -51,16 +51,22 @@ green.
 
 ### Paperclip Update Check
 
-This is not only a SHA poll. Every run should record:
+This is not only a SHA poll, and queueing a Coolify deployment is not terminal
+success. Every run should record:
 
 - deployed Paperclip version/ref
+- actual Coolify deployment commit, written as `coolify_deployment_commit` or
+  `verified_deployed_commit`
 - latest stable npm version
 - latest canary version, ignored unless explicitly requested
 - changelog delta since deployed version
 - impact on this agent system: simplifications, bug fixes, new skills/tools
 
 If upstream changed, create one triage issue with the impact summary. Do not
-bury the analysis in a completed routine comment.
+bury the analysis in a completed routine comment. If a deployment is attempted,
+only advance any state file and close green after Coolify reports a finished
+deployment whose commit equals the intended target; otherwise leave the run
+blocked with `unverified_paperclip_deploy`.
 
 ### PR Review
 
@@ -68,10 +74,10 @@ Each PR webhook must create or resume the matching `[pr:<number>] Review` issue.
 If trigger payload `pr_number=215` links to `[pr:214] Review`, that is
 `coalesced_pr_review_mismatch`, not healthy queueing.
 
-An issue with status `in_progress`, a latest run status of `running`, and
-`activeRun=null` is `zombie_execution_run`. It blocks future PR reviews while
-doing no visible work. The watchdog should escalate it as a Paperclip runtime
-issue and re-trigger the affected PR after the stale execution is closed.
+Paperclip v2026.427+ owns liveness continuations, active-run recovery, and
+productivity-review escalation. Keep this audit focused on business outcome
+mismatches, then file a Paperclip runtime issue only if the native recovery
+surface reports a persistent failure.
 
 ## Telegram Activity Feed
 

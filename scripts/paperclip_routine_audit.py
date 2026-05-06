@@ -38,6 +38,11 @@ PUBLISHED_MARKER_PATTERNS = (
     re.compile(r"\b(?:editorial_post_id|editorial post id)\b", re.IGNORECASE),
     re.compile(r"\b(?:telegram_message_id|telegram message id)\b", re.IGNORECASE),
 )
+VERIFIED_PAPERCLIP_DEPLOY_PATTERNS = (
+    re.compile(r"\bverified_deployed_commit\b", re.IGNORECASE),
+    re.compile(r"\bcoolify_deployment_commit\b", re.IGNORECASE),
+    re.compile(r"\bactual_deployed_commit\b", re.IGNORECASE),
+)
 SENSITIVE_PATTERNS = (
     (
         re.compile(r"(?i)\b(bearer\s+)[a-z0-9._~+/=-]{20,}"),
@@ -113,14 +118,6 @@ def get_issue(client: Paperclip, issue_id: str) -> dict[str, Any] | None:
     return issue if isinstance(issue, dict) else None
 
 
-def issue_runs(client: Paperclip, issue_id: str) -> list[dict[str, Any]]:
-    try:
-        runs = client.get(f"/api/issues/{issue_id}/runs")
-    except RuntimeError:
-        return []
-    return runs if isinstance(runs, list) else []
-
-
 def list_issues(client: Paperclip, company_id: str, status: str, limit: int = 100) -> list[dict]:
     issues = client.get(
         f"/api/companies/{company_id}/issues",
@@ -149,6 +146,16 @@ def classify_issue(issue: dict[str, Any], comments: list[dict[str, Any]]) -> tup
     if "last deployed sha" in lower and "current master sha" in lower:
         if "latest stable" not in lower and "changelog" not in lower:
             flags.append("sha_only_update_check")
+    if (
+        (
+            "deployed paperclip update" in lower
+            or "coolify deployment queued" in lower
+            or "state file updated" in lower
+            or "deployed paperclip" in lower
+        )
+        and not any(pattern.search(text) for pattern in VERIFIED_PAPERCLIP_DEPLOY_PATTERNS)
+    ):
+        flags.append("unverified_paperclip_deploy")
     if "gstack-derived skills" in lower and "paperclip skills runtime" in lower:
         flags.append("unknown_gstack_update_path")
     if "draft issue exists" in lower or "awaiting ceo approval" in lower:
@@ -206,18 +213,7 @@ def audit_routines(client: Paperclip, company_id: str, focus: str) -> list[dict[
         issue_id = run.get("linkedIssueId")
         issue = get_issue(client, issue_id) if issue_id else None
         comments = issue_comments(client, issue_id) if issue_id else []
-        runs = issue_runs(client, issue_id) if issue_id else []
         flags, latest = classify_issue(issue or {}, comments)
-        # `GET /api/issues/{id}` does not serialize `activeRun` (only the list
-        # endpoint does), so check `executionRunId` plus a fresh /runs lookup
-        # instead. Zombie = issue is in_progress with an executionRunId set,
-        # but no run is currently running.
-        if (
-            (issue or {}).get("status") == "in_progress"
-            and (issue or {}).get("executionRunId")
-            and not any(item.get("status") == "running" for item in runs)
-        ):
-            flags.append("zombie_execution_run")
         payload_pr = str(((run.get("triggerPayload") or {}).get("pr_number")) or "")
         issue_title = (
             ((run.get("linkedIssue") or {}).get("title")) or (issue or {}).get("title") or ""
