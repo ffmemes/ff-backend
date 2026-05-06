@@ -140,6 +140,7 @@ def routine_matches(name: str, focus: str) -> bool:
 def classify_issue(issue: dict[str, Any], comments: list[dict[str, Any]]) -> tuple[list[str], str]:
     text = "\n".join([issue.get("description") or ""] + [c.get("body") or "" for c in comments])
     lower = text.lower()
+    title = (issue.get("title") or "").lower()
     flags: list[str] = []
     if any(pattern in lower for pattern in DEGRADED_PATTERNS):
         flags.append("degraded_green")
@@ -160,8 +161,17 @@ def classify_issue(issue: dict[str, Any], comments: list[dict[str, Any]]) -> tup
         flags.append("unknown_gstack_update_path")
     if "draft issue exists" in lower or "awaiting ceo approval" in lower:
         flags.append("draft_handoff")
-    if "approved" in lower and not all(
-        pattern.search(text) for pattern in PUBLISHED_MARKER_PATTERNS
+    is_publish_flow = (
+        title.startswith("[post:")
+        or "daily channel post" in title
+        or "outcome=draft_created" in lower
+        or "outcome=published" in lower
+        or "ceo approval" in lower
+    )
+    if (
+        is_publish_flow
+        and "approved" in lower
+        and not all(pattern.search(text) for pattern in PUBLISHED_MARKER_PATTERNS)
     ):
         flags.append("approved_without_publish_marker")
     if not comments and issue.get("status") == "done":
