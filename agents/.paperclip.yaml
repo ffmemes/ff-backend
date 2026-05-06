@@ -123,6 +123,14 @@ agents:
         SENTRY_AUTH_TOKEN:
           kind: "secret"
           requirement: "optional"
+        SENTRY_ORG:
+          kind: "plain"
+          default: "ffmemes"
+          requirement: "optional"
+        SENTRY_PROJECT:
+          kind: "plain"
+          default: "ff-backend"
+          requirement: "optional"
         COOLIFY_ACCESS_TOKEN:
           kind: "secret"
           requirement: "optional"
@@ -182,6 +190,14 @@ agents:
         SENTRY_AUTH_TOKEN:
           kind: "secret"
           requirement: "required"
+        SENTRY_ORG:
+          kind: "plain"
+          default: "ffmemes"
+          requirement: "optional"
+        SENTRY_PROJECT:
+          kind: "plain"
+          default: "ff-backend"
+          requirement: "optional"
         PREFECT_AUTH_STRING:
           kind: "secret"
           requirement: "required"
