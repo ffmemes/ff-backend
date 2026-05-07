@@ -4,6 +4,7 @@ import time
 from dataclasses import dataclass
 
 from agents import Agent, OpenAIChatCompletionsModel, Runner, set_tracing_export_api_key
+from agents.exceptions import MaxTurnsExceeded
 from openai import AsyncOpenAI
 from sqlalchemy import text
 
@@ -100,6 +101,14 @@ async def run_chat_agent(
             context=ctx,
             max_turns=MAX_TURNS,
         )
+    except MaxTurnsExceeded as e:
+        logger.warning(
+            "Chat agent hit max turns in chat %s after %s turns: %s",
+            chat_id,
+            MAX_TURNS,
+            e,
+        )
+        return None
     except Exception as e:
         logger.error("Agent SDK error in chat %s: %s", chat_id, e, exc_info=True)
         return None
