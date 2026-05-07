@@ -29,6 +29,6 @@ async def test_run_chat_agent_handles_max_turns_as_fallback(monkeypatch):
         reply_to_message_id=789,
     )
 
-    assert response is None
+    assert response == runner.MAX_TURNS_FALLBACK_RESPONSE
     warning.assert_called_once()
     error.assert_not_called()
