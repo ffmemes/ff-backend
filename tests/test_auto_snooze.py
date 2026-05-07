@@ -4,11 +4,12 @@ from datetime import datetime, timedelta
 
 import pytest
 import pytest_asyncio
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from src.database import engine, fetch_one, meme_source
-from src.storage.constants import MemeSourceStatus
-from src.storage.service import maybe_auto_snooze_source
+from src.database import engine, fetch_one, meme_raw_telegram, meme_source
+from src.storage.constants import MemeSourceStatus, MemeSourceType
+from src.storage.service import auto_snooze_stale_sources, maybe_auto_snooze_source
 from tests.factories import (
     TEST_ID_START,
     cleanup_test_data,
@@ -26,6 +27,31 @@ async def conn():
 
 
 SOURCE_ID = TEST_ID_START + 500
+STALE_INSTAGRAM_SOURCE_ID = TEST_ID_START + 501
+RECENT_TELEGRAM_SOURCE_ID = TEST_ID_START + 502
+RAW_ACTIVE_SOURCE_ID = TEST_ID_START + 503
+
+# Recent timestamp inside the 7d rolling window. Factory default FIXED_DT (2024-06-01)
+# is outside the window, so tests for time-based criteria must pass an explicit recent
+# created_at/parsed_at.
+RECENT = datetime.utcnow() - timedelta(hours=1)
+
+
+async def _insert_recent_raw_telegram(conn: AsyncConnection, source_id: int) -> None:
+    await conn.execute(
+        insert(meme_raw_telegram).values(
+            {
+                "meme_source_id": source_id,
+                "post_id": source_id,
+                "url": f"https://t.me/test_source_{source_id}/{source_id}",
+                "date": RECENT,
+                "content": "recent raw post",
+                "media": [],
+                "views": 1,
+                "created_at": RECENT,
+            }
+        )
+    )
 
 
 @pytest.mark.asyncio
@@ -160,11 +186,71 @@ async def test_already_snoozed_source_skipped(conn: AsyncConnection):
     assert result is None
 
 
-# Criterion 3: rolling 7d ad_rate > 30% with min 30 processed memes (FFM-847).
+@pytest.mark.asyncio
+async def test_auto_snooze_stale_source_without_recent_raw_posts(conn: AsyncConnection):
+    await create_meme_source(
+        conn,
+        id=STALE_INSTAGRAM_SOURCE_ID,
+        type=MemeSourceType.INSTAGRAM.value,
+        status="parsing_enabled",
+    )
+    await conn.commit()
 
-# Recent timestamp inside the 7d rolling window. Factory default FIXED_DT (2024-06-01)
-# is outside the window, so tests for criterion 3 must pass an explicit recent created_at.
-RECENT = datetime.utcnow() - timedelta(hours=1)
+    result = await auto_snooze_stale_sources(meme_source_ids=[STALE_INSTAGRAM_SOURCE_ID])
+
+    assert [source["id"] for source in result] == [STALE_INSTAGRAM_SOURCE_ID]
+    source = await fetch_one(
+        meme_source.select().where(meme_source.c.id == STALE_INSTAGRAM_SOURCE_ID)
+    )
+    assert source["status"] == MemeSourceStatus.SNOOZED.value
+    assert source["data"]["snoozed_reason"] == "stale_no_raw_posts_7d"
+    assert source["data"]["stale_after_days"] == 7
+    assert "snoozed_at" in source["data"]
+
+
+@pytest.mark.asyncio
+async def test_no_stale_snooze_for_recently_parsed_source(conn: AsyncConnection):
+    await create_meme_source(
+        conn,
+        id=RECENT_TELEGRAM_SOURCE_ID,
+        type=MemeSourceType.TELEGRAM.value,
+        status="parsing_enabled",
+    )
+    await conn.execute(
+        meme_source.update()
+        .where(meme_source.c.id == RECENT_TELEGRAM_SOURCE_ID)
+        .values(parsed_at=RECENT)
+    )
+    await conn.commit()
+
+    result = await auto_snooze_stale_sources(meme_source_ids=[RECENT_TELEGRAM_SOURCE_ID])
+
+    assert result == []
+    source = await fetch_one(
+        meme_source.select().where(meme_source.c.id == RECENT_TELEGRAM_SOURCE_ID)
+    )
+    assert source["status"] == MemeSourceStatus.PARSING_ENABLED.value
+
+
+@pytest.mark.asyncio
+async def test_no_stale_snooze_when_source_has_recent_raw_posts(conn: AsyncConnection):
+    await create_meme_source(
+        conn,
+        id=RAW_ACTIVE_SOURCE_ID,
+        type=MemeSourceType.TELEGRAM.value,
+        status="parsing_enabled",
+    )
+    await _insert_recent_raw_telegram(conn, RAW_ACTIVE_SOURCE_ID)
+    await conn.commit()
+
+    result = await auto_snooze_stale_sources(meme_source_ids=[RAW_ACTIVE_SOURCE_ID])
+
+    assert result == []
+    source = await fetch_one(meme_source.select().where(meme_source.c.id == RAW_ACTIVE_SOURCE_ID))
+    assert source["status"] == MemeSourceStatus.PARSING_ENABLED.value
+
+
+# Criterion 3: rolling 7d ad_rate > 30% with min 30 processed memes (FFM-847).
 
 
 async def _seed_memes(

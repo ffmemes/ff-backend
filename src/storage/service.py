@@ -17,6 +17,8 @@ from src.storage.constants import (
     MemeStatus,
 )
 
+STALE_SOURCE_SNOOZE_AFTER_DAYS = 7
+
 
 async def get_telegram_sources_to_parse(limit=25) -> list[dict[str, Any]]:
     # Quality-weighted selection: best sources parse first.
@@ -58,6 +60,97 @@ async def update_meme_source(meme_source_id: int, **kwargs) -> dict[str, Any] | 
         .returning(meme_source)
     )
     return await fetch_one(update_query)
+
+
+async def auto_snooze_stale_sources(
+    stale_after_days: int = STALE_SOURCE_SNOOZE_AFTER_DAYS,
+    limit: int = 50,
+    meme_source_ids: list[int] | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Snooze parsing-enabled sources that have produced no raw posts for a full stale window.
+
+    This catches sources that no longer reach maybe_auto_snooze_source because the
+    parser is gone, disabled, or failing before parsed_at can advance. The 7-day
+    floor keeps one quiet day from snoozing a valid low-volume source.
+    """
+    query = text(
+        """
+        WITH raw_activity AS (
+            SELECT
+                meme_source_id,
+                MAX(created_at) AS last_raw_insert_at
+            FROM (
+                SELECT meme_source_id, created_at FROM meme_raw_telegram
+                UNION ALL
+                SELECT meme_source_id, created_at FROM meme_raw_vk
+                UNION ALL
+                SELECT meme_source_id, created_at FROM meme_raw_ig
+            ) raw_posts
+            GROUP BY meme_source_id
+        ),
+        stale_candidates AS (
+            SELECT
+                ms.id,
+                ms.type,
+                ms.url,
+                ms.parsed_at,
+                raw_activity.last_raw_insert_at
+            FROM meme_source ms
+            LEFT JOIN raw_activity
+                ON raw_activity.meme_source_id = ms.id
+            WHERE ms.status = 'parsing_enabled'
+              AND (
+                  NOT :filter_meme_source_ids
+                  OR ms.id = ANY(:meme_source_ids)
+              )
+              AND ms.created_at < NOW() - make_interval(days => :stale_after_days)
+              AND (
+                  ms.parsed_at IS NULL
+                  OR ms.parsed_at < NOW() - make_interval(days => :stale_after_days)
+              )
+              AND (
+                  raw_activity.last_raw_insert_at IS NULL
+                  OR raw_activity.last_raw_insert_at
+                      < NOW() - make_interval(days => :stale_after_days)
+              )
+            ORDER BY ms.parsed_at NULLS FIRST, ms.id
+            LIMIT :limit
+        )
+        UPDATE meme_source ms
+        SET
+            status = 'snoozed',
+            data = COALESCE(ms.data, '{}'::jsonb) || jsonb_build_object(
+                'snoozed_reason',
+                'stale_no_raw_posts_7d',
+                'snoozed_at',
+                to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US'),
+                'stale_after_days',
+                :stale_after_days,
+                'stale_last_parsed_at',
+                stale_candidates.parsed_at,
+                'stale_last_raw_insert_at',
+                stale_candidates.last_raw_insert_at
+            )
+        FROM stale_candidates
+        WHERE ms.id = stale_candidates.id
+        RETURNING
+            ms.id,
+            ms.type,
+            ms.url,
+            ms.parsed_at,
+            stale_candidates.last_raw_insert_at
+        """
+    )
+    return await fetch_all(
+        query,
+        {
+            "stale_after_days": int(stale_after_days),
+            "limit": int(limit),
+            "filter_meme_source_ids": meme_source_ids is not None,
+            "meme_source_ids": meme_source_ids or [],
+        },
+    )
 
 
 async def maybe_auto_snooze_source(

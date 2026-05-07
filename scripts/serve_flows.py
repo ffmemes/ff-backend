@@ -59,6 +59,7 @@ from src.flows.storage.memes import (
     tg_meme_pipeline,
     vk_meme_pipeline,
 )
+from src.flows.storage.source_health import auto_snooze_stale_sources_flow
 
 LON = "Europe/London"
 MSK = "Europe/Moscow"
@@ -104,6 +105,11 @@ if __name__ == "__main__":
         tg_meme_pipeline.to_deployment(name="TG Meme Pipeline"),
         vk_meme_pipeline.to_deployment(name="VK Meme Pipeline"),
         final_meme_pipeline.to_deployment(name="Final Meme Pipeline"),
+        # ── Source health (daily) ──
+        auto_snooze_stale_sources_flow.to_deployment(
+            name="Auto-snooze stale meme sources",
+            schedules=[CronSchedule(cron="15 1 * * *", timezone=LON)],
+        ),
         # ── Broadcasts ──
         broadcast_next_meme_to_active_15m_ago.to_deployment(
             name="Broadcast 15m",
