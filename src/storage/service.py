@@ -116,30 +116,47 @@ async def auto_snooze_stale_sources(
               )
             ORDER BY ms.parsed_at NULLS FIRST, ms.id
             LIMIT :limit
-        )
-        UPDATE meme_source ms
-        SET
-            status = 'snoozed',
-            data = COALESCE(ms.data, '{}'::jsonb) || jsonb_build_object(
-                'snoozed_reason',
-                'stale_no_raw_posts_7d',
-                'snoozed_at',
-                to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US'),
-                'stale_after_days',
-                :stale_after_days,
-                'stale_last_parsed_at',
-                stale_candidates.parsed_at,
-                'stale_last_raw_insert_at',
+        ),
+        updated_sources AS (
+            UPDATE meme_source ms
+            SET
+                status = 'snoozed',
+                data = COALESCE(ms.data, '{}'::jsonb) || jsonb_build_object(
+                    'snoozed_reason',
+                    'stale_no_raw_posts_7d',
+                    'snoozed_at',
+                    to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US'),
+                    'stale_after_days',
+                    :stale_after_days,
+                    'stale_last_parsed_at',
+                    stale_candidates.parsed_at,
+                    'stale_last_raw_insert_at',
+                    stale_candidates.last_raw_insert_at
+                )
+            FROM stale_candidates
+            WHERE ms.id = stale_candidates.id
+            RETURNING
+                ms.id,
+                ms.type,
+                ms.url,
+                ms.parsed_at,
                 stale_candidates.last_raw_insert_at
-            )
-        FROM stale_candidates
-        WHERE ms.id = stale_candidates.id
-        RETURNING
-            ms.id,
-            ms.type,
-            ms.url,
-            ms.parsed_at,
-            stale_candidates.last_raw_insert_at
+        ),
+        updated_memes AS (
+            UPDATE meme m
+            SET status = 'snoozed'
+            FROM updated_sources
+            WHERE m.meme_source_id = updated_sources.id
+              AND m.status = 'ok'
+            RETURNING m.id
+        )
+        SELECT
+            id,
+            type,
+            url,
+            parsed_at,
+            last_raw_insert_at
+        FROM updated_sources
         """
     )
     return await fetch_all(

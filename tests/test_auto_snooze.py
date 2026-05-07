@@ -7,8 +7,8 @@ import pytest_asyncio
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from src.database import engine, fetch_one, meme_raw_telegram, meme_source
-from src.storage.constants import MemeSourceStatus, MemeSourceType
+from src.database import engine, fetch_one, meme, meme_raw_telegram, meme_source
+from src.storage.constants import MemeSourceStatus, MemeSourceType, MemeStatus
 from src.storage.service import auto_snooze_stale_sources, maybe_auto_snooze_source
 from tests.factories import (
     TEST_ID_START,
@@ -30,6 +30,7 @@ SOURCE_ID = TEST_ID_START + 500
 STALE_INSTAGRAM_SOURCE_ID = TEST_ID_START + 501
 RECENT_TELEGRAM_SOURCE_ID = TEST_ID_START + 502
 RAW_ACTIVE_SOURCE_ID = TEST_ID_START + 503
+STALE_SOURCE_MEME_ID = TEST_ID_START + 1501
 
 # Recent timestamp inside the 7d rolling window. Factory default FIXED_DT (2024-06-01)
 # is outside the window, so tests for time-based criteria must pass an explicit recent
@@ -206,6 +207,29 @@ async def test_auto_snooze_stale_source_without_recent_raw_posts(conn: AsyncConn
     assert source["data"]["snoozed_reason"] == "stale_no_raw_posts_7d"
     assert source["data"]["stale_after_days"] == 7
     assert "snoozed_at" in source["data"]
+
+
+@pytest.mark.asyncio
+async def test_auto_snooze_stale_source_snoozes_existing_ok_memes(conn: AsyncConnection):
+    await create_meme_source(
+        conn,
+        id=STALE_INSTAGRAM_SOURCE_ID,
+        type=MemeSourceType.INSTAGRAM.value,
+        status="parsing_enabled",
+    )
+    await create_meme(
+        conn,
+        id=STALE_SOURCE_MEME_ID,
+        meme_source_id=STALE_INSTAGRAM_SOURCE_ID,
+        status=MemeStatus.OK.value,
+    )
+    await conn.commit()
+
+    result = await auto_snooze_stale_sources(meme_source_ids=[STALE_INSTAGRAM_SOURCE_ID])
+
+    assert [source["id"] for source in result] == [STALE_INSTAGRAM_SOURCE_ID]
+    stored_meme = await fetch_one(meme.select().where(meme.c.id == STALE_SOURCE_MEME_ID))
+    assert stored_meme["status"] == MemeStatus.SNOOZED.value
 
 
 @pytest.mark.asyncio
