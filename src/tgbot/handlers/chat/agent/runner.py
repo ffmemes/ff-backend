@@ -18,6 +18,7 @@ from src.tgbot.handlers.chat.service import get_latest_chat_messages
 logger = logging.getLogger(__name__)
 
 MAX_TURNS = 5
+MAX_TURNS_FALLBACK_RESPONSE = "Слишком сложный вопрос, попробуй переформулировать покороче."
 
 # DSML cleanup: DeepSeek sometimes leaks internal XML as plain text
 _DSML_RE = re.compile(r"<[｜\|]DSML[｜\|].*?</[｜\|]DSML[｜\|]\w+>", re.DOTALL)
@@ -108,7 +109,7 @@ async def run_chat_agent(
             MAX_TURNS,
             e,
         )
-        return None
+        return MAX_TURNS_FALLBACK_RESPONSE
     except Exception as e:
         logger.error("Agent SDK error in chat %s: %s", chat_id, e, exc_info=True)
         return None
