@@ -27,7 +27,6 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -81,19 +80,40 @@ def _mark_bad_connection_as_disconnect(context: object) -> None:
     it is never handed out again.
     """
     original = getattr(context, "original_exception", None)
-    if original is not None and type(original).__name__ in (
-        "ConnectionDoesNotExistError",
-        "InternalClientError",
+    if original is not None and (
+        _has_exception_named(original, "ConnectionDoesNotExistError")
+        or _is_concurrent_use_error(original)
     ):
         context.is_disconnect = True  # type: ignore[union-attr]
 
 
+def _walk_exception_chain(exc: BaseException) -> list[BaseException]:
+    """Return SQLAlchemy + asyncpg wrapper exceptions without looping forever."""
+    chain: list[BaseException] = []
+    stack: list[BaseException] = [exc]
+    seen: set[int] = set()
+
+    while stack:
+        current = stack.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        chain.append(current)
+
+        for attr in ("orig", "__cause__", "__context__"):
+            nested = getattr(current, attr, None)
+            if isinstance(nested, BaseException):
+                stack.append(nested)
+
+    return chain
+
+
+def _has_exception_named(exc: BaseException, name: str) -> bool:
+    return any(type(current).__name__ == name for current in _walk_exception_chain(exc))
+
+
 def _is_stale_connection_error(exc: BaseException) -> bool:
-    return (
-        isinstance(exc, DBAPIError)
-        and exc.__cause__ is not None
-        and type(exc.__cause__).__name__ == "ConnectionDoesNotExistError"
-    )
+    return _has_exception_named(exc, "ConnectionDoesNotExistError")
 
 
 def _is_concurrent_use_error(exc: BaseException) -> bool:
@@ -104,11 +124,13 @@ def _is_concurrent_use_error(exc: BaseException) -> bool:
     InternalClientError("cannot switch to state …; another operation … is in
     progress").  Retrying with a fresh connection resolves the issue.
     """
-    return (
-        isinstance(exc, DBAPIError)
-        and exc.__cause__ is not None
-        and type(exc.__cause__).__name__ == "InternalClientError"
-    )
+    for current in _walk_exception_chain(exc):
+        if type(current).__name__ != "InternalClientError":
+            continue
+        message = str(current)
+        if "another operation" in message and "in progress" in message:
+            return True
+    return False
 
 
 def _is_deadlock_error(exc: BaseException) -> bool:
@@ -118,11 +140,7 @@ def _is_deadlock_error(exc: BaseException) -> bool:
     automatically.  Retrying the statement (with a small backoff to let the
     winning transaction finish) is the standard resolution per PG docs.
     """
-    return (
-        isinstance(exc, DBAPIError)
-        and exc.__cause__ is not None
-        and type(exc.__cause__).__name__ == "DeadlockDetectedError"
-    )
+    return _has_exception_named(exc, "DeadlockDetectedError")
 
 
 metadata = MetaData(naming_convention=DB_NAMING_CONVENTION)
