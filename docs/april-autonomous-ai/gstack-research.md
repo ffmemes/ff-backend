@@ -1,5 +1,10 @@
 # GStack Research
 
+> Historical research note (March-April 2026 PoC). Skill list and
+> install steps may be stale. Live skill set is in `CLAUDE.md` and
+> per-agent `agents/<role>/AGENTS.md`. Do not run setup commands from
+> this file against the live install.
+
 By Garry Tan (YC CEO). MIT license. ~20K GitHub stars.
 Repo: github.com/garrytan/gstack
 

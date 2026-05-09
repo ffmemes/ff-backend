@@ -180,22 +180,33 @@ Verification:
 
 ### Task 3: Public Repo Redaction And Stale Spec Guard
 
-- [ ] Add or update a redaction audit that fails on trigger public paths,
+- [x] Add or update a redaction audit that fails on trigger public paths,
       trigger IDs, raw bearer headers, DB URLs, API keys, session strings, and
-      secret values in tracked docs/config.
-- [ ] Replace any tracked full trigger URL or operational secret material with
-      a lookup path and env var/secret name.
-- [ ] Split "current Paperclip state" from historical incident notes so docs do
-      not preserve stale versions as live truth.
-- [ ] Add a short docs rule: public repo may contain env var names and redacted
+      secret values in tracked docs/config. (`scripts/redaction_audit.py` +
+      `tests/test_redaction_audit.py` — 14 fixture tests + tracked-files scan.)
+- [x] Replace any tracked full trigger URL or operational secret material with
+      a lookup path and env var/secret name. (Verified in main checkout: no
+      `routine-triggers/public/*`, no raw bearer literals, no full DB URLs;
+      worktree leftovers are out of scope.)
+- [x] Split "current Paperclip state" from historical incident notes so docs do
+      not preserve stale versions as live truth. (Top-of-file fencing banner +
+      `agent-runtime: ok` / `human-only` tags on Routines, API operations,
+      CLI/SSH operations, Coolify Quirks, and Incidents in
+      `docs/paperclip-ops-runbook.md`; historical-only banner on
+      `docs/april-autonomous-ai/{README,paperclip-research,gstack-research,autoresearch-research}.md`.)
+- [x] Add a short docs rule: public repo may contain env var names and redacted
       issue slugs, not secret values or full live trigger material.
+      (`docs/public-repo-rule.md`.)
 
 Verification:
 
-- [ ] Redaction audit passes.
-- [ ] `rg` finds no tracked `routine-triggers/public`, raw bearer header,
-      full DB URL, or session string.
-- [ ] `git diff --check` passes.
+- [x] Redaction audit passes. (`python3 scripts/redaction_audit.py` →
+      `clean (386 files scanned)`.)
+- [x] `rg` finds no tracked `routine-triggers/public`, raw bearer header,
+      full DB URL, or session string. (Only matches are placeholders in
+      `.env.example`, `pytest.ini`, `docker-compose.yml`, and the audit /
+      tests / rule files themselves.)
+- [x] `git diff --check` passes.
 
 ### Task 4: GStack And Paperclip Capability Source Of Truth
 

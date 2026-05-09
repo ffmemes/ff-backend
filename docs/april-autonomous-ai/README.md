@@ -1,5 +1,10 @@
 # April 1-14: Autonomous AI Development Experiment
 
+> Historical research only. This describes the original PoC plan and
+> stack assumptions. Live operations live in `docs/paperclip-ops-runbook.md`
+> and `docs/paperclip-native-migration.md`. Do not execute setup commands
+> from any file in this directory against the live install.
+
 ## Overview
 While on vacation (Apr 1-14, 2026), AI agents autonomously improve the meme bot.
 "Build in public" — TG channel @ffmemes updates, public dashboard.

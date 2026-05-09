@@ -1,5 +1,12 @@
 # Paperclip Research
 
+> Historical research note (March-April 2026 PoC). DO NOT execute any
+> setup commands in this file. The live install is documented in
+> `docs/paperclip-ops-runbook.md` and `docs/paperclip-native-migration.md`.
+> Running `npx paperclipai onboard --yes` against the existing install
+> would re-bootstrap a new instance and wipe the production Paperclip
+> database.
+
 Open-source, self-hosted Node.js + React. MIT license. ~30K GitHub stars.
 Repo: github.com/paperclipai/paperclip
 Site: paperclip.ing
