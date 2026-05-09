@@ -17,13 +17,18 @@ import json
 import os
 import re
 import sys
-import urllib.error
-import urllib.parse
-import urllib.request
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+
+from paperclip_http import (
+    PaperclipAPIError,
+    PaperclipClient,
+    paperclip_base_url,
+    parse_ts,
+    redact,
+)
 
 DEFAULT_COMPANY_ID = "96ee7b2e-6df2-43c8-bbe3-53e19297308a"
 ROOT = Path(__file__).resolve().parents[1]
@@ -44,77 +49,32 @@ OUTCOME_ACTIONS = DECISION_ACTIONS | {
     "post_published",
     "bug_fixed",
 }
-SENSITIVE_PATTERNS = (
-    (
-        re.compile(r"(?i)\b(bearer\s+)[a-z0-9._~+/=-]{20,}"),
-        r"\1[REDACTED]",
-    ),
-    (
-        re.compile(r"(https?://)[^@\s/:]+:[^@\s@]+@"),
-        r"\1[REDACTED]@",
-    ),
-    (
-        re.compile(
-            r"(?i)\b([a-z0-9_]*(?:token|secret|api_key|auth)[a-z0-9_]*\s*[:=]\s*)"
-            r"([^\s,;]+)"
-        ),
-        r"\1[REDACTED]",
-    ),
-)
 
 
 class Paperclip:
+    """Backwards-compatible facade over the shared `PaperclipClient`."""
+
     def __init__(self, base_url: str, api_key: str) -> None:
-        self.base_url = base_url.rstrip("/")
+        self._client = PaperclipClient(
+            base_url,
+            api_key,
+            user_agent="ffmemes-paperclip-outcome-audit/1.0",
+        )
+        self.base_url = self._client.base_url
         self.api_key = api_key
 
     def get(self, path: str, query: dict[str, str] | None = None) -> Any:
-        url = self.base_url + path
-        if query:
-            url += "?" + urllib.parse.urlencode(query)
-        req = urllib.request.Request(url)
-        req.add_header("Authorization", f"Bearer {self.api_key}")
-        req.add_header("User-Agent", "ffmemes-paperclip-outcome-audit/1.0")
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                return json.loads(resp.read())
-        except urllib.error.HTTPError as exc:
-            body = compact_body(exc.read().decode("utf-8", errors="replace"), limit=500)
-            raise RuntimeError(f"HTTP {exc.code} for {path}: {body}") from exc
-        except urllib.error.URLError as exc:
-            raise RuntimeError(f"transport error for {path}: {exc.reason}") from exc
-        except (TimeoutError, OSError, json.JSONDecodeError) as exc:
-            raise RuntimeError(f"transport/decode failure for {path}: {exc}") from exc
+            return self._client.get(path, query=query)
+        except PaperclipAPIError as exc:
+            raise RuntimeError(str(exc)) from exc
 
-
-def paperclip_base_url() -> str | None:
-    base_url = os.getenv("PAPERCLIP_API_URL") or os.getenv("PAPERCLIP_URL")
-    if base_url and base_url.rstrip("/").endswith("/api"):
-        return base_url.rstrip("/")[:-4]
-    return base_url
+    def paginate(self, path: str, **kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        return self._client.paginate(path, **kwargs)
 
 
 def compact_body(body: str, limit: int = 240) -> str:
-    body = " ".join(body.split())
-    for pattern, replacement in SENSITIVE_PATTERNS:
-        body = pattern.sub(replacement, body)
-    return body if len(body) <= limit else body[: limit - 1] + "..."
-
-
-def parse_ts(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    # A single garbage timestamp (API drift, truncated value, hand-edited
-    # experiments/log.jsonl) used to crash the whole audit via uncaught
-    # ValueError. Treat unparseable as "no signal" and warn once on stderr.
-    try:
-        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except (TypeError, ValueError):
-        print(f"warning: parse_ts unparseable value {value!r}", file=sys.stderr)
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt
+    return redact(body, limit=limit)
 
 
 def parse_date(value: str | None) -> date | None:
@@ -153,133 +113,18 @@ def list_agents(client: Paperclip, company_id: str) -> dict[str, str]:
 def list_issues(
     client: Paperclip, company_id: str, limit: int
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    # Paginate so the audit doesn't silently undercount once the company crosses
-    # the API's per-request cap. We dedupe by issue id and stop only on an empty
-    # page (end of data) or on a full duplicate page (API ignored `offset`).
-    # We deliberately do NOT short-circuit on a "short" page: if the server
-    # enforces a hidden per-request cap below our requested page_size, that
-    # short page would otherwise look like end-of-data and silently truncate.
-    # Instead, we keep advancing `offset` by what the server actually returned
-    # and let the empty-page or duplicate-page check terminate.
-    PAGE_SIZE = 200
-    collected: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    offset = 0
-    truncation: dict[str, Any] = {"truncated": False, "reason": None, "atOffset": None}
-    while len(collected) < limit:
-        page_size = min(PAGE_SIZE, limit - len(collected))
-        page = client.get(
-            f"/api/companies/{company_id}/issues",
-            {
-                "status": ALL_STATUSES,
-                "limit": str(page_size),
-                "offset": str(offset),
-            },
-        )
-        if not isinstance(page, list):
-            # Shape drift (e.g., wrapped object instead of bare list). Without
-            # this, the pagination silently breaks at offset 0 and returns 0
-            # issues with no degradation flag, which `--json` consumers would
-            # read as a healthy zero-activity week.
-            print(
-                f"warning: list_issues got unexpected response shape "
-                f"{type(page).__name__} at offset={offset}; treating as degraded",
-                file=sys.stderr,
-            )
-            truncation = {
-                "truncated": True,
-                "reason": "unexpected_response_shape",
-                "atOffset": offset,
-            }
-            break
-        if not page:
-            break
-        dict_page = [item for item in page if isinstance(item, dict)]
-        if len(dict_page) != len(page):
-            print(
-                f"warning: list_issues page at offset={offset} contained "
-                f"{len(page) - len(dict_page)} non-dict element(s); treating as degraded",
-                file=sys.stderr,
-            )
-            truncation = {
-                "truncated": True,
-                "reason": "unexpected_response_shape",
-                "atOffset": offset,
-            }
-            break
-        items_with_id = [item for item in dict_page if item.get("id")]
-        if len(items_with_id) != len(dict_page):
-            print(
-                f"warning: list_issues page at offset={offset} contained "
-                f"{len(dict_page) - len(items_with_id)} dict element(s) missing `id`; "
-                f"treating as degraded",
-                file=sys.stderr,
-            )
-            truncation = {
-                "truncated": True,
-                "reason": "unexpected_response_shape",
-                "atOffset": offset,
-            }
-            break
-        new_items = [item for item in items_with_id if item["id"] not in seen]
-        if not new_items:
-            print(
-                f"warning: list_issues paginate stalled at offset={offset} "
-                f"(page of duplicates); API likely ignores `offset` or has "
-                f"a server-side cap; results may be truncated",
-                file=sys.stderr,
-            )
-            truncation = {
-                "truncated": True,
-                "reason": "duplicate_page_offset_ignored",
-                "atOffset": offset,
-            }
-            break
-        for item in new_items:
-            seen.add(item["id"])
-            collected.append(item)
-        offset += len(page)
-    if not truncation["truncated"] and len(collected) >= limit:
-        # Probe one extra item so a dataset that happens to be exactly `limit`
-        # rows isn't falsely reported as truncated. If the probe is non-empty
-        # (or shape-degraded), we really did hit the ceiling. If the probe
-        # itself fails (HTTP/transport), don't abort the whole audit — we
-        # already collected a full result set; degrade to a truncation flag
-        # instead so callers still get a JSON report.
-        try:
-            probe = client.get(
-                f"/api/companies/{company_id}/issues",
-                {
-                    "status": ALL_STATUSES,
-                    "limit": "1",
-                    "offset": str(len(collected)),
-                },
-            )
-        except RuntimeError as exc:
-            print(
-                f"warning: list_issues ceiling probe failed at limit={limit}: {exc}; "
-                f"treating as truncated",
-                file=sys.stderr,
-            )
-            truncation = {
-                "truncated": True,
-                "reason": "hit_limit_ceiling_probe_failed",
-                "atOffset": len(collected),
-            }
-        else:
-            if isinstance(probe, list) and not probe:
-                pass  # exactly `limit` rows existed; not truncated
-            else:
-                print(
-                    f"warning: list_issues hit ceiling limit={limit}; results may be truncated",
-                    file=sys.stderr,
-                )
-                truncation = {
-                    "truncated": True,
-                    "reason": "hit_limit_ceiling",
-                    "atOffset": len(collected),
-                }
-    return collected, truncation
+    """Paginate every status so the audit doesn't silently undercount once the
+    company crosses the API's per-request cap.
+
+    Deduplication, shape-drift detection, duplicate-page bail, and the
+    ceiling probe live in `PaperclipClient.paginate`; this wrapper just
+    binds the FFmemes-specific path and status filter.
+    """
+    return client.paginate(
+        f"/api/companies/{company_id}/issues",
+        query={"status": ALL_STATUSES},
+        limit=limit,
+    )
 
 
 def bracket_slug(title: str) -> str | None:
