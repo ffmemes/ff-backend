@@ -70,7 +70,9 @@ green.
 This is not only a SHA poll, and queueing a Coolify deployment is not terminal
 success. Every run should record:
 
-- deployed Paperclip version/ref
+- deployed Paperclip version/ref when `/api/health` reports it; otherwise
+  `health.version=not_reported` is acceptable only with a verified Coolify
+  finished deployment commit
 - actual Coolify deployment commit, written as `coolify_deployment_commit` or
   `verified_deployed_commit`
 - latest stable npm version
@@ -82,7 +84,8 @@ If upstream changed, create one triage issue with the impact summary. Do not
 bury the analysis in a completed routine comment. If a deployment is attempted,
 only advance any state file and close green after Coolify reports a finished
 deployment whose commit equals the intended target; otherwise leave the run
-blocked with `unverified_paperclip_deploy`.
+blocked with `unverified_paperclip_deploy`. Channel publication markers such as
+`telegram_message_id` and `editorial_post_id` do not apply to this routine.
 
 ### PR Review
 

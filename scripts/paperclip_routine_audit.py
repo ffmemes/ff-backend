@@ -228,29 +228,25 @@ def classify_issue(
         if "latest stable" not in lower and "changelog" not in lower:
             flags.append("sha_only_update_check")
     if (
-        (
-            "deployed paperclip update" in lower
-            or "coolify deployment queued" in lower
-            or "state file updated" in lower
-            or "deployed paperclip" in lower
-        )
-        and not any(pattern.search(text) for pattern in VERIFIED_PAPERCLIP_DEPLOY_PATTERNS)
-    ):
+        "deployed paperclip update" in lower
+        or "coolify deployment queued" in lower
+        or "state file updated" in lower
+        or "deployed paperclip" in lower
+    ) and not any(pattern.search(text) for pattern in VERIFIED_PAPERCLIP_DEPLOY_PATTERNS):
         flags.append("unverified_paperclip_deploy")
     if "gstack-derived skills" in lower and "paperclip skills runtime" in lower:
         flags.append("unknown_gstack_update_path")
     if "draft issue exists" in lower or "awaiting ceo approval" in lower:
         flags.append("draft_handoff")
-    is_publish_flow = (
-        title.startswith("[post:")
-        or "daily channel post" in title
-        or "outcome=draft_created" in lower
-        or "outcome=published" in lower
-        or "ceo approval" in lower
-    )
+    # Publication markers are a Daily Channel Post contract. Other routines
+    # often mention approvals, posts, or prior watchdog flags while summarizing
+    # their work; those must not inherit the channel-publication contract.
+    is_publish_flow = title.startswith("[post:") or "daily channel post" in title
     has_approval_signal = "approved" in lower or has_accepted_confirmation(interactions or [])
-    if is_publish_flow and has_approval_signal and not all(
-        pattern.search(text) for pattern in PUBLISHED_MARKER_PATTERNS
+    if (
+        is_publish_flow
+        and has_approval_signal
+        and not all(pattern.search(text) for pattern in PUBLISHED_MARKER_PATTERNS)
     ):
         flags.append("approved_without_publish_marker")
     # Generic stall / no-comment / zombie-run classification is intentionally

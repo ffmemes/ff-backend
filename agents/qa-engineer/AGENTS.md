@@ -196,7 +196,7 @@ checks manually.
    - **Weekly Analyst Summary** → latest summary issue/report names product changes and anomalies
    - **Daily Channel Post** → latest linked `[post:...]` issue has `outcome=published`, `telegram_message_id`, and `editorial_post_id`; draft/approval-only handoffs are YELLOW
    - **gstack Update Check** → latest outcome names the update method and does NOT have `unknown_gstack_update_path` / degraded update flags
-   - **Paperclip Update Check** → latest outcome includes version/changelog impact, and any deploy claim includes `coolify_deployment_commit` or `verified_deployed_commit` matching the intended target
+   - **Paperclip Update Check** → latest outcome includes version/changelog impact, or `health.version=not_reported` plus `coolify_deployment_commit`, latest stable/canary, and `impact=none`; any deploy claim needs `verified_deployed_commit` or equivalent finished Coolify commit matching the intended target
    - **PR Review** → latest run's payload PR number matches the linked issue title/review signal
    - **Process Health Check** → skip (that's you)
 4. If any routine has outcome-contract flags from `paperclip_routine_audit.py`
