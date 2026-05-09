@@ -15,7 +15,7 @@ try:
         channel="ffmemes",               # "ffmemes" build-in-public, "ru" @fastfoodmemes, "en" @fast_food_memes
         category="C",                    # A–F, see AGENTS.md
         entity_id="dau_drop_2026_04_26", # stable slug for this anomaly
-        photo_file_id=tg_file_id,        # or photo_url=
+        photo_bytes=png,                 # or photo_file_id= / photo_url=
         topic_slug="dau-drop",
     )
 except EditorialValidationError as e:
@@ -23,7 +23,7 @@ except EditorialValidationError as e:
     ...
 ```
 
-Raw `curl`, `sendPhoto`, `sendMessage`, or `bot.send_*` to a public channel produce broken posts. They're fine for the moderator chat (`-1001305866294`) — see AGENTS.md.
+Raw `curl`, `sendPhoto`, `sendMessage`, or `bot.send_*` to a public channel produce broken posts. Generated/local visuals should go directly through `photo_bytes`; do not send them to the moderator chat just to get a Telegram `file_id`.
 
 ## Operating
 

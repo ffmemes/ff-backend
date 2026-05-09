@@ -10,7 +10,9 @@ from src.comms.publishing import (
     ALLOWED_CHANNELS,
     ALLOWED_HTML_TAGS,
     TELEGRAM_CAPTION_MAX,
+    EditorialValidationError,
     compute_draft_hash,
+    media_key,
     normalize_blockquote,
     validate_post_draft,
 )
@@ -286,6 +288,30 @@ def test_compute_draft_hash_includes_button():
     assert with_button != compute_draft_hash(
         "ru", "hello", "f1", "C", "e1", button_text="Поехали", button_url="https://t.me/x"
     )
+
+
+# ── Media identity ────────────────────────────────────────────────────────
+
+
+def test_media_key_keeps_file_id_identity_stable():
+    assert media_key(photo_file_id="telegram_file_id") == "telegram_file_id"
+
+
+def test_media_key_hashes_raw_bytes():
+    key = media_key(photo_bytes=b"png-bytes")
+    assert key.startswith("bytes:")
+    assert key == media_key(photo_bytes=b"png-bytes")
+    assert key != media_key(photo_bytes=b"other-png-bytes")
+
+
+def test_media_key_rejects_multiple_sources():
+    with pytest.raises(EditorialValidationError):
+        media_key(photo_file_id="telegram_file_id", photo_bytes=b"png")
+
+
+def test_media_key_rejects_empty_bytes():
+    with pytest.raises(EditorialValidationError):
+        media_key(photo_bytes=b"")
 
 
 # ── Channel routing ───────────────────────────────────────────────────────

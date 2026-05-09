@@ -91,6 +91,9 @@ agents:
         FFMEMES_PROD_TELEGRAM_BOT_TOKEN:
           kind: "secret"
           requirement: "required"
+        OPENAI_API_KEY:
+          kind: "secret"
+          requirement: "optional"
 
   cto:
     role: "cto"

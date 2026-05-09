@@ -19,6 +19,9 @@ Invariants enforced here (not in prompt):
   after send returns. A retry that races with a previous in-flight call
   loses the ON CONFLICT and refuses to double-post; a retry after the
   previous call succeeded short-circuits via the existing-row fast path.
+- Local/generated images can be passed as raw PNG/JPEG bytes. This avoids
+  staging a generated visual in the moderator chat just to obtain a Telegram
+  file_id.
 """
 
 from __future__ import annotations
@@ -295,6 +298,29 @@ def compute_draft_hash(
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:32]
 
 
+def media_key(
+    photo_file_id: str | None = None,
+    photo_url: str | None = None,
+    photo_bytes: bytes | None = None,
+) -> str | None:
+    """Stable identity for the attached visual.
+
+    `photo_file_id` and `photo_url` keep their historical raw string identity
+    so old idempotency hashes remain stable. Raw bytes use a content hash
+    because Telegram will not assign a reusable file_id until after upload.
+    """
+    provided = [value is not None for value in (photo_file_id, photo_url, photo_bytes)]
+    if sum(provided) > 1:
+        raise EditorialValidationError(
+            ["Pass exactly one visual source: photo_file_id, photo_url, or photo_bytes."]
+        )
+    if photo_bytes is not None:
+        if not photo_bytes:
+            raise EditorialValidationError(["photo_bytes must not be empty."])
+        return "bytes:" + hashlib.sha256(photo_bytes).hexdigest()
+    return photo_file_id or photo_url
+
+
 async def _recent_rotation_keys(
     channel: str, limit: int = 14
 ) -> list[tuple[str | None, str | None]]:
@@ -314,6 +340,7 @@ async def publish_editorial_post(
     entity_id: str,
     photo_file_id: str | None = None,
     photo_url: str | None = None,
+    photo_bytes: bytes | None = None,
     button_text: str | None = None,
     button_url: str | None = None,
     topic_slug: str | None = None,
@@ -329,7 +356,11 @@ async def publish_editorial_post(
         )
 
     normalized_text = normalize_blockquote(text)
-    photo_key = photo_file_id or photo_url
+    photo_key = media_key(
+        photo_file_id=photo_file_id,
+        photo_url=photo_url,
+        photo_bytes=photo_bytes,
+    )
     has_media = bool(photo_key)
 
     draft_hash = compute_draft_hash(
@@ -409,6 +440,7 @@ async def publish_editorial_post(
         channel=channel,
         photo_file_id=photo_file_id,
         photo_url=photo_url,
+        photo_bytes=photo_bytes,
         button_text=button_text,
         button_url=button_url,
     )
@@ -458,6 +490,7 @@ __all__ = [
     "compute_draft_hash",
     "execute",
     "mark_tracked_message_ids",
+    "media_key",
     "normalize_blockquote",
     "publish_editorial_post",
     "validate_post_draft",
