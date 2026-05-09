@@ -24,6 +24,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
+from urllib.parse import unquote, urlsplit
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -47,6 +48,22 @@ PLACEHOLDER_TOKENS = {
     "@localhost",
     "@db:",
     "@app_db:",
+}
+
+DB_CREDENTIAL_PLACEHOLDER_TOKENS = {
+    "changeme",
+    "redacted",
+    "<password>",
+    "<token>",
+    "<secret>",
+    "example",
+    "xxxxxxxx",
+    "mystrongpassword",
+}
+
+DB_CREDENTIAL_PLACEHOLDER_PAIRS = {
+    ("app", "app"),
+    ("postgres", "postgres"),
 }
 
 
@@ -202,6 +219,24 @@ def is_placeholder(match_text: str) -> bool:
     return False
 
 
+def is_db_url_placeholder(match_text: str) -> bool:
+    parsed = urlsplit(match_text)
+    username = unquote(parsed.username or "")
+    password = unquote(parsed.password or "")
+    if not username or not password:
+        return False
+
+    lowered_pair = (username.lower(), password.lower())
+    if lowered_pair in DB_CREDENTIAL_PLACEHOLDER_PAIRS:
+        return True
+
+    credential_text = f"{username}:{password}".lower()
+    for token in DB_CREDENTIAL_PLACEHOLDER_TOKENS:
+        if token in credential_text:
+            return True
+    return False
+
+
 def list_tracked_files() -> list[str]:
     result = subprocess.run(
         ["git", "ls-files"],
@@ -238,9 +273,13 @@ def scan_file(rel_path: str) -> list[Finding]:
     for pattern in PATTERNS:
         for match in pattern.regex.finditer(text):
             matched = match.group(0)
-            if is_placeholder_file and is_placeholder(matched):
+            if pattern.name == "db_url_with_password":
+                is_placeholder_match = is_db_url_placeholder(matched)
+            else:
+                is_placeholder_match = is_placeholder(matched)
+            if is_placeholder_file and is_placeholder_match:
                 continue
-            if is_placeholder(matched):
+            if is_placeholder_match:
                 # heuristic for non-env files too: if the value clearly
                 # contains a placeholder marker, skip.
                 continue

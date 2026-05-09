@@ -85,6 +85,14 @@ def test_postgres_url_with_password_flagged(tmp_path: Path) -> None:
     assert any(f.pattern == "db_url_with_password" for f in findings)
 
 
+def test_postgres_url_with_real_password_on_db_host_flagged(tmp_path: Path) -> None:
+    findings = _scan_file(
+        tmp_path,
+        "DATABASE_URL=postgresql://prod_user:HotPassword2026@db:5432/app",
+    )
+    assert any(f.pattern == "db_url_with_password" for f in findings)
+
+
 def test_postgres_placeholders_clean(tmp_path: Path) -> None:
     findings = _scan_file(
         tmp_path,
