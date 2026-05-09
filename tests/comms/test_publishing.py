@@ -314,6 +314,22 @@ def test_media_key_rejects_empty_bytes():
         media_key(photo_bytes=b"")
 
 
+@pytest.mark.parametrize(
+    ("kwargs", "field"),
+    [
+        ({"photo_file_id": ""}, "photo_file_id"),
+        ({"photo_file_id": "   "}, "photo_file_id"),
+        ({"photo_url": ""}, "photo_url"),
+        ({"photo_url": "   "}, "photo_url"),
+    ],
+)
+def test_media_key_rejects_blank_string_sources(kwargs, field):
+    with pytest.raises(EditorialValidationError) as excinfo:
+        media_key(**kwargs)
+
+    assert field in str(excinfo.value)
+
+
 # ── Channel routing ───────────────────────────────────────────────────────
 
 

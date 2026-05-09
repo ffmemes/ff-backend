@@ -73,6 +73,12 @@ async def post_editorial_to_channel(
     media_sources = [photo_file_id is not None, photo_url is not None, photo_bytes is not None]
     if sum(media_sources) > 1:
         raise ValueError("Pass exactly one of photo_file_id, photo_url, or photo_bytes")
+    if photo_file_id is not None and not photo_file_id.strip():
+        raise ValueError("photo_file_id must not be empty")
+    if photo_url is not None and not photo_url.strip():
+        raise ValueError("photo_url must not be empty")
+    if photo_bytes is not None and not photo_bytes:
+        raise ValueError("photo_bytes must not be empty")
 
     if photo_file_id is not None:
         photo = photo_file_id
