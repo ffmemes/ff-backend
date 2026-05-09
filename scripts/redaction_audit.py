@@ -138,6 +138,11 @@ ALLOWLIST_PATHS: frozenset[str] = frozenset(
         "scripts/redaction_audit.py",
         "scripts/pre-commit-secrets-check.sh",
         "tests/test_redaction_audit.py",
+        # Audit-fixture tests that intentionally embed `Bearer <literal>` to
+        # prove the redaction code path strips it; these are the fakes
+        # referenced in `docs/public-repo-rule.md`.
+        "tests/test_paperclip_http.py",
+        "tests/test_paperclip_execution_audit.py",
         "docs/public-repo-rule.md",
     }
 )

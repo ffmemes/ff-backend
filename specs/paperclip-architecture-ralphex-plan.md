@@ -310,24 +310,60 @@ Verification:
 
 ### Task 6: Issue, Routine, And Outcome Contracts
 
-- [ ] Centralize issue slug parsing and allowed issue classes.
-- [ ] Centralize outcome event names and counting rules. Fix known drift such
+- [x] Centralize issue slug parsing and allowed issue classes.
+      (`scripts/paperclip_contracts.py`: `ISSUE_SLUG_RE`, `ISSUE_CLASSES`,
+      `ALLOWED_ISSUE_CLASSES`, `parse_bracket_slug`, `issue_slug`.
+      Outcome and routine audits import the slug map instead of
+      hand-rolling per-script regexes.)
+- [x] Centralize outcome event names and counting rules. Fix known drift such
       as `daily_post` vs `daily_channel_post`/`post_published`.
-- [ ] Centralize routine outcome contracts so prompts and audit scripts share
-      the same definitions.
-- [ ] Make nested states visible at the parent/routine level:
+      (`OUTCOME_ACTIONS` + `OUTCOME_ALIASES` + `canonical_action`;
+      `daily_post` resolves to `daily_channel_post`. Outcome audit
+      surfaces alias usage as an `outcome_alias_drift` flag so prompts
+      that still emit the legacy name appear in CEO actions.)
+- [x] Centralize routine outcome contracts so prompts and audit scripts share
+      the same definitions. (`PUBLISHED_MARKERS`, `APPROVAL_MARKERS`,
+      `STALE_DRAFT_MARKERS`, `BLOCKED_ACCESS_MARKERS`,
+      `MISSING_SMOKE_MARKERS`, `MERGED_WITHOUT_CLOSE_MARKERS` shared by
+      `paperclip_routine_audit.classify_issue` and
+      `paperclip_execution_audit.OUTCOME_MARKERS`.)
+- [x] Make nested states visible at the parent/routine level:
       `pending_approval`, `stale_draft`, `approved_unpublished`, `published`,
       `missing_smoke`, `merged_without_close`, and `blocked_without_access`.
-- [ ] Update audits so a parent cannot be green while a required child/post/PR
-      review/smoke check is non-terminal.
+      (`NESTED_STATES` constant + `nested_state()` classifier projects
+      issue text + slug onto these states; `routine_audit` exposes the
+      result on every `referencedPostIssues[*].nestedState` row.)
+- [x] Update audits so a parent cannot be green while a required child/post/PR
+      review/smoke check is non-terminal. (Routine audit invokes
+      `parent_child_status_violation()` and appends
+      `parent_done_child_non_terminal` + a `nonTerminalChildren` list to
+      the routine row whenever a closed parent points at a non-terminal
+      child. Execution audit covers the generic `closed-parent /
+      open-child` case via `_fake_green_signal`.)
 
 Verification:
 
-- [ ] Fixture tests cover representative issue titles, comments, routine runs,
+- [x] Fixture tests cover representative issue titles, comments, routine runs,
       PR review issues, daily post drafts, QA incidents, and stale experiments.
-- [ ] `paperclip_routine_audit` no longer hides linked non-terminal work.
-- [ ] `paperclip_outcome_audit` reports non-zero outcomes when structured
-      outcome events exist.
+      (`tests/test_paperclip_contracts.py` — 26 cases: slug parsing for
+      `[post:...]`, `[pr:...]`, `[scan:...]` plus mixed-case and
+      missing-prefix; outcome/decision helpers including the
+      `daily_post` → `daily_channel_post` drift; nested-state
+      classification across published/approved/stale/blocked/missing
+      smoke/merged-without-close/pending-approval/unknown; and the
+      multi-child parent/child violation table covering routines whose
+      child status itself stayed `in_review` after publishing.)
+- [x] `paperclip_routine_audit` no longer hides linked non-terminal work.
+      (`audit_routines` calls `derive_nested_state()` per referenced
+      post and `parent_child_status_violation()` per row; a closed
+      parent with an open `[post:...]` child now flags
+      `parent_done_child_non_terminal` and lists `nonTerminalChildren`,
+      previously the row would have rendered as `flags=ok`.)
+- [x] `paperclip_outcome_audit` reports non-zero outcomes when structured
+      outcome events exist. (`log_events` runs every `experiments/log.jsonl`
+      action through `is_outcome_action` / `canonical_action`, so a log
+      line with `action=daily_post` now contributes to `outcomeCount`
+      via the alias and surfaces in `aliasDrift` for cleanup.)
 
 ### Task 7: Tool, Env, And Access Preflight
 
