@@ -180,7 +180,7 @@ Workflow:
 1. Run the compact outcome audit first for FFmemes-specific contract flags:
 ```bash
 source ~/.zshrc 2>/dev/null || true
-python scripts/paperclip_routine_audit.py --focus all
+python3 scripts/paperclip_routine_audit.py --focus all
 ```
 If the script is unavailable in the runtime workspace, fall back to
 native Paperclip dashboard/routine tooling, but preserve the same outcome

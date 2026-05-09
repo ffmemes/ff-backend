@@ -12,7 +12,7 @@ are intentionally NOT covered here — those are owned by Paperclip v2026.428+
 productivity review / liveness recovery in the native runtime.
 
 Env:
-  PAPERCLIP_URL
+  PAPERCLIP_API_URL (preferred in Paperclip runtime) or PAPERCLIP_URL
   PAPERCLIP_API_KEY
   PAPERCLIP_COMPANY_ID (optional, defaults to FFmemes prod company)
 """
@@ -90,6 +90,13 @@ class Paperclip:
         except urllib.error.HTTPError as exc:
             body = compact_body(exc.read().decode("utf-8", errors="replace"), limit=500)
             raise RuntimeError(f"HTTP {exc.code} for {path}: {body}") from exc
+
+
+def paperclip_base_url() -> str | None:
+    base_url = os.getenv("PAPERCLIP_API_URL") or os.getenv("PAPERCLIP_URL")
+    if base_url and base_url.rstrip("/").endswith("/api"):
+        return base_url.rstrip("/")[:-4]
+    return base_url
 
 
 def parse_ts(value: str | None) -> datetime | None:
@@ -384,10 +391,10 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     args = parser.parse_args()
 
-    base_url = os.getenv("PAPERCLIP_URL")
+    base_url = paperclip_base_url()
     api_key = os.getenv("PAPERCLIP_API_KEY")
     if not base_url or not api_key:
-        print("Set PAPERCLIP_URL and PAPERCLIP_API_KEY", file=sys.stderr)
+        print("Set PAPERCLIP_API_URL (or PAPERCLIP_URL) and PAPERCLIP_API_KEY", file=sys.stderr)
         return 2
 
     client = Paperclip(base_url, api_key)

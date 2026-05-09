@@ -5,7 +5,7 @@ This separates agent activity from product learning. It is intentionally
 compact enough to paste into a CEO weekly review without dumping raw issue JSON.
 
 Env:
-  PAPERCLIP_API_URL (preferred) or PAPERCLIP_URL (legacy/local)
+  PAPERCLIP_API_URL (preferred in Paperclip runtime) or PAPERCLIP_URL
   PAPERCLIP_API_KEY
   PAPERCLIP_COMPANY_ID (optional, defaults to FFmemes prod company)
 """
@@ -81,6 +81,13 @@ class Paperclip:
         except urllib.error.HTTPError as exc:
             body = compact_body(exc.read().decode("utf-8", errors="replace"), limit=500)
             raise RuntimeError(f"HTTP {exc.code} for {path}: {body}") from exc
+
+
+def paperclip_base_url() -> str | None:
+    base_url = os.getenv("PAPERCLIP_API_URL") or os.getenv("PAPERCLIP_URL")
+    if base_url and base_url.rstrip("/").endswith("/api"):
+        return base_url.rstrip("/")[:-4]
+    return base_url
 
 
 def compact_body(body: str, limit: int = 240) -> str:
@@ -227,11 +234,7 @@ def log_events(since: datetime, limit: int = 12) -> dict[str, Any]:
             "events": [],
             "decisions": [],
             "outcomes": [],
-            "counts": {
-                "events": 0,
-                "decisions": 0,
-                "outcomes": 0,
-            },
+            "counts": {"events": 0, "decisions": 0, "outcomes": 0},
         }
 
     for line in LOG_PATH.read_text().splitlines():
@@ -492,13 +495,10 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     args = parser.parse_args()
 
-    base_url = os.getenv("PAPERCLIP_API_URL") or os.getenv("PAPERCLIP_URL")
+    base_url = paperclip_base_url()
     api_key = os.getenv("PAPERCLIP_API_KEY")
     if not base_url or not api_key:
-        print(
-            "Set PAPERCLIP_API_URL (or legacy PAPERCLIP_URL) and PAPERCLIP_API_KEY",
-            file=sys.stderr,
-        )
+        print("Set PAPERCLIP_API_URL (or PAPERCLIP_URL) and PAPERCLIP_API_KEY", file=sys.stderr)
         return 2
 
     client = Paperclip(base_url, api_key)
