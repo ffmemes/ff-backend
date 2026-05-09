@@ -24,9 +24,31 @@ COMPANY = os.environ["COMPANY_ID"]
 SCRIPT_DIR = os.environ["SCRIPT_DIR"]
 DRY = os.environ.get("DRY_RUN", "0") == "1"
 
+# Mirror the redaction applied by scripts/paperclip_*_audit.py so deploy logs
+# never contain bearer tokens or URL-embedded credentials echoed back by the API.
+SENSITIVE_PATTERNS = (
+    (re.compile(r"(?i)\b(bearer\s+)[a-z0-9._~+/=-]{20,}"), r"\1[REDACTED]"),
+    (re.compile(r"(https?://)[^@\s/:]+:[^@\s@]+@"), r"\1[REDACTED]@"),
+    (
+        re.compile(
+            r"(?i)\b([a-z0-9_]*(?:token|secret|api_key|auth)[a-z0-9_]*\s*[:=]\s*)"
+            r"([^\s,;]+)"
+        ),
+        r"\1[REDACTED]",
+    ),
+)
+
+
+def _redact(body: str, limit: int = 300) -> str:
+    body = " ".join(body.split())
+    for pattern, replacement in SENSITIVE_PATTERNS:
+        body = pattern.sub(replacement, body)
+    return body if len(body) <= limit else body[: limit - 1] + "..."
+
 
 class ConfigError(Exception):
     pass
+
 
 # Skills published under paperclipai/paperclip/ are preserved when present; they
 # are not always listed in frontmatter.
@@ -49,7 +71,8 @@ def api(method: str, path: str, body=None):
         with urllib.request.urlopen(req, data=data) as resp:
             return json.loads(resp.read())
     except urllib.error.HTTPError as e:
-        print(f"  HTTP {e.code} on {method} {path}: {e.read().decode()[:300]}", file=sys.stderr)
+        err_body = _redact(e.read().decode("utf-8", errors="replace"))
+        print(f"  HTTP {e.code} on {method} {path}: {err_body}", file=sys.stderr)
         raise
 
 

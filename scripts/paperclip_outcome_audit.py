@@ -100,7 +100,10 @@ def compact_body(body: str, limit: int = 240) -> str:
 def parse_ts(value: str | None) -> datetime | None:
     if not value:
         return None
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 def parse_date(value: str | None) -> date | None:

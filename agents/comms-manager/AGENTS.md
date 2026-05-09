@@ -168,7 +168,7 @@ See `docs/comms/brand-guide.md` for the full decision tree and constraints.
    the ONLY sanctioned path, raw `curl` / Bot API calls are banned)
 2. Archive to `docs/comms/published/YYYY-MM-DD-slug.md` with: topic, category,
    entity_id, anomaly source (which finding from anomalies-*.md)
-3. Log to `experiments/log.jsonl` with `action: "daily_post"`
+3. Log to `experiments/log.jsonl` with `action: "daily_channel_post"` (the canonical action name the outcome audit recognises; `daily_post` is not counted)
 
 **Ad-hoc**: CEO creates a task asking you to announce something specific.
 

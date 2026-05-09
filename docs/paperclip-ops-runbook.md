@@ -4,7 +4,7 @@
 
 Paperclip manages the autonomous AI agent team for @ffmemesbot.
 Dashboard: `https://org.ffmemes.com` (URL is public, auth required).
-**Version**: 2026.416.0 (deployed from `ohld/paperclip` fork on 2026-04-16).
+**Version**: 2026.428.0 (deployed from `ohld/paperclip` fork on 2026-05-06; see `docs/paperclip-native-migration.md` for the pinned upstream commit).
 
 All secrets (API keys, DB credentials, tokens) live in **environment variables** — never in this repo.
 Required env vars for local management: `PAPERCLIP_URL`, `PAPERCLIP_API_KEY` (set in `~/.zshrc` or `.env`).
@@ -62,6 +62,24 @@ export PAPERCLIP_URL="https://org.ffmemes.com"
 export PAPERCLIP_API_KEY="<your-board-api-key>"  # Get from dashboard Settings
 ```
 
+### Access Scope: Human vs Agent Runtime
+
+SSH, `docker exec`, Coolify UI changes, and interactive auth commands in this
+runbook are human/MacBook operations. Paperclip agents should not try SSH or
+interactive login unless the issue explicitly asks for server maintenance and
+that access is already available in the runtime.
+
+For routine ops from agent runtime, prefer this order:
+
+1. Native Paperclip MCP/skill tools using injected env.
+2. Project helper scripts such as `scripts/paperclip_routine_audit.py --json`.
+3. Coolify API, Sentry CLI/API, and read-only DB env vars already assigned to
+   that agent.
+4. If required env/tooling is missing, mark the current issue degraded/blocked
+   and create or update one `[maintenance:<slug>]` issue with missing env var
+   names. Do not search for secret values, scrape dashboards, or try unrelated
+   access paths.
+
 ### CLI operations (v2026.403.0+)
 
 Run on the server: `ssh root@t.ffmemes.com`, then `docker exec -it $CONT npx paperclipai <command>`.
@@ -114,6 +132,15 @@ paperclipCreateIssue title="..." body="..."
 paperclipApiRequest method="GET" path="/api/companies/<id>/secrets"
 paperclipApiRequest method="POST" path="/api/agents/<id>/wakeup"
 ```
+
+Paperclip API gotchas:
+
+- Issue update endpoints require the issue UUID (`issue.id`), not the display
+  identifier (`FFM-123`), title, slug, URL key, or issue number. Get/list the
+  issue first, then pass that UUID to `paperclipUpdateIssue` or
+  `PATCH /api/issues/<uuid>`.
+- Manual agent wakeups must use source enum `on_demand`. Do not send `manual`,
+  `api`, or free-form values.
 
 Curl fallback (when MCP unavailable):
 ```bash
@@ -279,15 +306,15 @@ Paperclip triggers now support multiple signing modes:
 
 | Source | Path | Auth | Notes |
 |--------|------|------|-------|
-| Sentry | Sentry Internal Integration → Paperclip trigger | none (publicId is the secret) | Internal Integration `paperclip-qa-alert-b86aa3` |
+| Sentry | Sentry Internal Integration → Paperclip trigger | none (publicId is the secret) | Internal Integration name stored in `SENTRY_PAPERCLIP_INTEGRATION_NAME` |
 | GitHub | GH Actions (`notify-staff-engineer`) → Paperclip trigger | Bearer token | Direct call |
 | Prefect | (none) | — | Failures surface via QA Log Scan 3h cron |
 | Coolify | (none) | — | Was never actively used in practice |
 
 **Sentry → Paperclip QA trigger** is fully direct since PR #212. Set up:
-- QA routine `477f452d-06f3-421e-a274-7f09155bb5bb`, webhook trigger `30901464-a100-4cff-9515-9fdbcfc1a797`
+- QA routine and webhook trigger IDs are read from Paperclip UI / API; do not paste them here (public repo). Look up by routine title "QA Log Scan".
 - `signingMode: none` — `server/dist/services/routines.js` short-circuits all auth checks
-- Public URL: `https://org.ffmemes.com/api/routine-triggers/public/18a2f9e439c396e9b21a02fa/fire`
+- Public URL is stored in `SENTRY_PAPERCLIP_TRIGGER_URL` (Sentry Internal Integration secret); the `publicId` in the path acts as the shared secret and must never be committed.
 - Sentry posts the raw payload (`{"action":"created","data":{"issue":{...}}}`); Paperclip stores it in `routine_run.triggerPayload` verbatim
 - Trigger fires only on **issue creation**, not subsequent occurrences. To re-test, send an event with a unique exception class so Sentry creates a new issue group.
 
@@ -307,14 +334,14 @@ sentry_sdk.flush(timeout=10)
 "
 
 # Within ~15-30s, a new routine_execution issue (title 'QA Log Scan') should appear
-# at https://org.ffmemes.com/issues, source='webhook', triggerId=30901464-...
+# at https://org.ffmemes.com/issues with source='webhook'
 ```
 
 ### Reverting if Sentry → Paperclip breaks
 
 ```bash
-# Flip trigger back to bearer mode
-curl -X PATCH "https://org.ffmemes.com/api/routine-triggers/30901464-a100-4cff-9515-9fdbcfc1a797" \
+# Flip trigger back to bearer mode (look up TRIGGER_ID by routine title via API; do not commit it)
+curl -X PATCH "https://org.ffmemes.com/api/routine-triggers/$TRIGGER_ID" \
   -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"signingMode":"bearer"}'
@@ -331,6 +358,18 @@ curl -X PATCH "https://org.ffmemes.com/api/routine-triggers/30901464-a100-4cff-9
 These are encrypted in Paperclip DB and injected as env vars during agent runs:
 
 `agents/_sync_config.py` materializes env from `agents/.paperclip.yaml`: `kind: secret` becomes a Paperclip `secret_ref`, `kind: plain` is written directly, and missing required secrets fail the config sync before any PATCH. Optional missing secrets are omitted. Docs should name env var names and Paperclip secret names only, never secret IDs or values.
+
+### Public Repo Redaction Rule
+
+This repository is public. Markdown docs may name env vars, Paperclip secret
+names, agent names, routine names, and public dashboard domains. Do not add API
+keys, token values, Paperclip secret IDs, trigger public IDs, full
+secret-bearing webhook URLs, private internal hostnames, database URLs, or raw
+auth headers.
+
+For secret-bearing URLs, write the stable lookup path instead. Example: "Sentry
+Internal Integration -> Paperclip QA trigger public URL in Paperclip dashboard",
+not the full URL.
 
 | Secret | Used by | Purpose |
 |--------|---------|---------|
@@ -372,6 +411,7 @@ but runs as non-root `node` user — see Coolify Quirks below.
 2. **Never run `npx paperclipai onboard`** on an existing install — WIPES the database
 3. **Never commit secrets** to this repo — it's PUBLIC
 4. **Never redeploy without verifying named volume** is configured in Coolify Storages
+5. **Never publish secret-bearing operational IDs casually** — company/agent/routine UUIDs are okay only when operationally needed; API keys, secret IDs, trigger public IDs, DB URLs, and raw env dumps do not belong in this public repo
 
 ## Coolify Quirks (battle-tested 2026-03-27)
 
