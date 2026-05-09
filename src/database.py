@@ -723,6 +723,12 @@ experiment_assignment = Table(
     Column("experiment_id", String(100), nullable=False),
     Column("user_id", BigInteger, ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
     Column("variant", String(50), nullable=False),  # 'control', 'treatment', etc.
+    Column(
+        "assignment_metadata",
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+    ),
     Column("assigned_at", DateTime, server_default=func.now(), nullable=False),
     UniqueConstraint("experiment_id", "user_id", name="uq_experiment_assignment"),
 )

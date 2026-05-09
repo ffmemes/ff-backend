@@ -3,6 +3,10 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from src.recommendations.blender_experiments import (
+    MATURE_BLENDER_CONTROL_WEIGHTS,
+    MATURE_BLENDER_TREATMENT_WEIGHTS,
+)
 from src.recommendations.candidates import CandidatesRetriever
 from src.recommendations.meme_queue import generate_recommendations
 
@@ -299,8 +303,11 @@ async def test_generate_above_100():
 
     with (
         patch("src.recommendations.meme_queue.blend", side_effect=capture_blend),
-        patch("src.tgbot.service.get_experiment_variant", new_callable=AsyncMock) as get_variant,
-        patch("src.tgbot.service.assign_experiment", new_callable=AsyncMock) as assign,
+        patch(
+            "src.recommendations.meme_queue.get_recently_liked_blender_v2_weights",
+            new_callable=AsyncMock,
+            return_value=MATURE_BLENDER_CONTROL_WEIGHTS,
+        ) as get_weights,
     ):
         candidates = await generate_recommendations(
             TEST_USER_ID, 10, 200, TestRetriever(), random_seed=102
@@ -309,16 +316,125 @@ async def test_generate_above_100():
     assert len(candidates) == 10
     # lr_smoothed is pinned at position 0
     assert candidates[0]["id"] in [7, 8, 9, 10]
-    assert captured_weights == {
-        "best_uploaded_memes": 0.3,
-        "like_spread_and_recent_memes": 0.3,
-        "lr_smoothed": 0.4,
-        "recently_liked": 0.2,
-        "goat": 0.1,
-        "es_ranked": 0.1,
-    }
-    get_variant.assert_not_awaited()
-    assign.assert_not_awaited()
+    assert captured_weights == MATURE_BLENDER_CONTROL_WEIGHTS
+    get_weights.assert_awaited_once_with(TEST_USER_ID)
+
+
+@pytest.mark.asyncio
+async def test_generate_above_100_treatment_uses_recently_liked_weights():
+    captured_weights = None
+
+    async def one_candidate(self, user_id, limit=10, exclude_meme_ids=[], **kw):
+        return [{"id": 4, "recommended_by": "recently_liked"}]
+
+    class TestRetriever(CandidatesRetriever):
+        engine_map = {
+            "best_uploaded_memes": one_candidate,
+            "like_spread_and_recent_memes": one_candidate,
+            "lr_smoothed": one_candidate,
+            "recently_liked": one_candidate,
+            "goat": one_candidate,
+            "es_ranked": one_candidate,
+        }
+
+    def capture_blend(candidates_dict, weights_dict, fixed_pos=None, limit=0, random_seed=None):
+        nonlocal captured_weights
+        captured_weights = weights_dict
+        return [{"id": 4, "recommended_by": "recently_liked"}]
+
+    with (
+        patch(
+            "src.recommendations.meme_queue.get_recently_liked_blender_v2_weights",
+            new_callable=AsyncMock,
+            return_value=MATURE_BLENDER_TREATMENT_WEIGHTS,
+        ) as get_weights,
+        patch("src.recommendations.meme_queue.blend", side_effect=capture_blend),
+    ):
+        candidates = await generate_recommendations(
+            TEST_USER_ID, 10, 200, TestRetriever(), random_seed=102
+        )
+
+    assert candidates == [{"id": 4, "recommended_by": "recently_liked"}]
+    assert captured_weights == MATURE_BLENDER_TREATMENT_WEIGHTS
+    assert captured_weights["recently_liked"] > MATURE_BLENDER_CONTROL_WEIGHTS["recently_liked"]
+    get_weights.assert_awaited_once_with(TEST_USER_ID)
+
+
+@pytest.mark.asyncio
+async def test_recently_liked_blender_v2_assignment_is_mature_only():
+    async def empty(self, user_id, limit=10, exclude_meme_ids=[], **kw):
+        return []
+
+    class TestRetriever(CandidatesRetriever):
+        engine_map = {
+            "best_uploaded_memes": empty,
+            "like_spread_and_recent_memes": empty,
+            "lr_smoothed": empty,
+            "recently_liked": empty,
+            "goat": empty,
+            "es_ranked": empty,
+            "cold_start_explore": empty,
+            "cold_start_adapt": empty,
+        }
+
+    with patch(
+        "src.recommendations.meme_queue.get_recently_liked_blender_v2_weights",
+        new_callable=AsyncMock,
+        return_value=MATURE_BLENDER_TREATMENT_WEIGHTS,
+    ) as get_weights:
+        await generate_recommendations(TEST_USER_ID, 10, 29, TestRetriever())
+        await generate_recommendations(TEST_USER_ID, 10, 99, TestRetriever())
+
+    get_weights.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_recently_liked_blender_v2_skips_moderator_assignment():
+    async def one_candidate(self, user_id, limit=10, exclude_meme_ids=[], **kw):
+        return [{"id": 4, "recommended_by": "recently_liked"}]
+
+    class TestRetriever(CandidatesRetriever):
+        engine_map = {
+            "best_uploaded_memes": one_candidate,
+            "like_spread_and_recent_memes": one_candidate,
+            "lr_smoothed": one_candidate,
+            "recently_liked": one_candidate,
+            "goat": one_candidate,
+            "es_ranked": one_candidate,
+        }
+
+    captured_weights = None
+
+    def capture_blend(candidates_dict, weights_dict, fixed_pos=None, limit=0, random_seed=None):
+        nonlocal captured_weights
+        captured_weights = weights_dict
+        return [{"id": 4, "recommended_by": "recently_liked"}]
+
+    with (
+        patch(
+            "src.recommendations.meme_queue.get_recently_liked_blender_v2_weights",
+            new_callable=AsyncMock,
+            return_value=MATURE_BLENDER_TREATMENT_WEIGHTS,
+        ) as get_weights,
+        patch(
+            "src.recommendations.meme_queue.get_user_info",
+            new_callable=AsyncMock,
+            return_value={"nmemes_sent": 200, "type": "moderator"},
+        ),
+        patch(
+            "src.recommendations.meme_queue.fetch_all",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+        patch("src.recommendations.meme_queue.blend", side_effect=capture_blend),
+    ):
+        candidates = await generate_recommendations(
+            TEST_USER_ID, 1, 200, TestRetriever(), random_seed=102
+        )
+
+    assert candidates == [{"id": 4, "recommended_by": "recently_liked"}]
+    assert captured_weights == MATURE_BLENDER_CONTROL_WEIGHTS
+    get_weights.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -336,12 +452,17 @@ async def test_generate_empty_above_100():
             "es_ranked": empty,
         }
 
-    # All engines empty → empty result
-    candidates = await generate_recommendations(TEST_USER_ID, 10, 200, TestRetriever())
-    assert len(candidates) == 0
+    with patch(
+        "src.recommendations.meme_queue.get_recently_liked_blender_v2_weights",
+        new_callable=AsyncMock,
+        return_value=MATURE_BLENDER_CONTROL_WEIGHTS,
+    ):
+        # All engines empty → empty result
+        candidates = await generate_recommendations(TEST_USER_ID, 10, 200, TestRetriever())
+        assert len(candidates) == 0
 
-    # Same for high meme count — no fallback engine anymore
-    candidates = await generate_recommendations(TEST_USER_ID, 10, 1200, TestRetriever())
+        # Same for high meme count — no fallback engine anymore
+        candidates = await generate_recommendations(TEST_USER_ID, 10, 1200, TestRetriever())
     assert len(candidates) == 0
 
 
