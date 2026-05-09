@@ -488,21 +488,75 @@ Verification:
 
 ### Task 9: Backlog Hygiene Based On Proven Rules
 
-- [ ] Classify open Paperclip issues into duplicate, superseded, stale report,
+- [x] Classify open Paperclip issues into duplicate, superseded, stale report,
       active implementation, approval waiting, access blocked, merged PR parent,
-      and strategic/product.
-- [ ] Auto-close only safe classes with proof: merged PR parents, completed
+      and strategic/product. (`scripts/paperclip_backlog_hygiene.py` —
+      pure `classify_issue(issue, *, context)` returning a `Classification`
+      whose `backlog_class` is one of `BACKLOG_CLASSES` (the eight named
+      classes plus `unknown` as the fall-through). The classifier reads
+      bracket-slug class via `paperclip_contracts.issue_slug`, then layers
+      proof-bearing checks (merged PR, canonical maintenance slug, newer
+      report in the same family, "superseded by FFM-…" with a known
+      successor) before falling back to text-pattern signals for
+      approval/access/active-implementation.)
+- [x] Auto-close only safe classes with proof: merged PR parents, completed
       child smoke checks, duplicate access issues superseded by a canonical
       maintenance issue, and stale reports replaced by a newer report.
-- [ ] Leave strategic/product/experiment issues open unless an explicit closure
-      rule applies.
-- [ ] Record every closure in the problem ledger with evidence.
+      (`AUTO_CLOSE_CLASSES = {merged_pr_parent, duplicate, superseded,
+      stale_report}`; `closure_decision()` re-validates the proof against
+      the same `BacklogContext` the classifier consumed and downgrades to
+      `needs_human` if the proof is missing or self-referential — covered
+      by `test_pr_proof_must_round_trip_against_context` and
+      `test_duplicate_with_self_referential_canonical_needs_human`. The
+      "completed child smoke checks" case folds into the `[scan:…]`
+      child-tracking already enforced by `paperclip_qa_incident` /
+      `paperclip_routine_audit`, so this script does not duplicate it.)
+- [x] Leave strategic/product/experiment issues open unless an explicit closure
+      rule applies. (`STRATEGIC_BRACKET_CLASSES = {strategy, experiment}`
+      runs first in `classify_issue`, so an `[experiment:cold-start-v3]`
+      issue with an assignee still classifies as `strategic_product`.
+      `NEVER_AUTO_CLOSE_CLASSES` includes `strategic_product`,
+      `active_implementation`, `approval_waiting`, `access_blocked`, and
+      `unknown` — every one returns `leave_open`. Asserted by
+      `test_strategy_slug_is_strategic_product`,
+      `test_experiment_slug_is_strategic_product_even_with_assignee`,
+      and the partition invariant in
+      `test_auto_close_and_never_close_partition_backlog_classes`.)
+- [x] Record every closure in the problem ledger with evidence.
+      (`build_report()` emits a JSON ledger with `generatedAt`, `counts`
+      keyed by every entry in `BACKLOG_CLASSES` (always present, even
+      when zero), `actionCounts` keyed by every entry in `CLOSURE_ACTIONS`,
+      and a sorted `rows` list whose entries carry `identifier`, `status`,
+      `class`, `action`, `reason`, and `proof`. The dry-run CLI
+      (`paperclip_backlog_hygiene.py --issues … --context …`) prints the
+      same shape so a human can review every proposed closure before any
+      Paperclip mutation runs.)
 
 Verification:
 
-- [ ] Open issue count drops only in safe classes.
-- [ ] No strategic/product/experiment issue is closed by accident.
-- [ ] Re-running the classifier is idempotent.
+- [x] Open issue count drops only in safe classes. (Closed (`done` /
+      `cancelled`) issues are filtered out before classification by
+      `_open_subset()`, and `closure_decision()` short-circuits to
+      `leave_open` if it ever sees a terminal status — covered by
+      `test_terminal_issue_never_auto_closes`. Auto-close decisions are
+      gated to the four classes in `AUTO_CLOSE_CLASSES`; the others
+      stay open.)
+- [x] No strategic/product/experiment issue is closed by accident.
+      (Two redundant guards: classifier puts strategic/experiment slugs
+      into `strategic_product` first, and `closure_decision()` then
+      enforces `cls in NEVER_AUTO_CLOSE_CLASSES → leave_open`.
+      Asserted by `test_strategy_slug_is_strategic_product`,
+      `test_experiment_slug_is_strategic_product_even_with_assignee`,
+      and the build-report assertion in
+      `test_build_report_emits_full_counts_keyed_by_backlog_classes`
+      where the strategy row resolves to `leave_open`.)
+- [x] Re-running the classifier is idempotent. (No clock or randomness
+      inside `classify_issue` / `closure_decision`; `build_report`
+      sorts rows by `(identifier, class)` and accepts an injected `now`
+      so the ledger is deterministic for unchanged inputs. Proven by
+      `test_build_report_is_idempotent`, which calls `build_report`
+      twice with a pinned `now` and asserts the two payloads are
+      `==`.)
 
 ### Task 10: Trigger, Wait, Re-Audit
 
