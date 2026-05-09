@@ -189,8 +189,11 @@ Paperclip JSON:
 
 ```bash
 source ~/.zshrc
-python scripts/paperclip_routine_audit.py --focus all
+python3 scripts/paperclip_routine_audit.py --focus all
 ```
+
+Audit helpers read `PAPERCLIP_API_URL` in Paperclip runtime and fall back to
+`PAPERCLIP_URL` for local MacBook runs.
 
 Outcome contracts live in `docs/agents/routine-observability.md`. In particular,
 `@ffnerdbot` is an activity feed only; it is not the source of truth for whether
@@ -200,7 +203,7 @@ For Weekly CEO Review health, also run the outcome-throughput audit:
 
 ```bash
 source ~/.zshrc
-python scripts/paperclip_outcome_audit.py --days 7
+python3 scripts/paperclip_outcome_audit.py --days 7
 ```
 
 This distinguishes issue volume from product decisions, closed experiments,

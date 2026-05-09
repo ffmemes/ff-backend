@@ -8,10 +8,12 @@ learn, what changed in the product, what should stop, and what is the next bet?
 
 ```bash
 source ~/.zshrc 2>/dev/null || true
-python scripts/paperclip_outcome_audit.py --days 7
+python3 scripts/paperclip_outcome_audit.py --days 7
 ```
 
 Use `--json` when another agent needs compact structured input.
+The helper reads `PAPERCLIP_API_URL` in Paperclip runtime and falls back to
+`PAPERCLIP_URL` for local runs.
 
 ## Weekly CEO Contract
 

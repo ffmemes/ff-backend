@@ -19,11 +19,13 @@ Two layers, do not duplicate:
 
 ```bash
 source ~/.zshrc
-python scripts/paperclip_routine_audit.py --focus all
+python3 scripts/paperclip_routine_audit.py --focus all
 ```
 
 Use `--focus comms` for channel posting and `--focus updates` for Paperclip /
 gstack checks. Add `--json` when another agent needs compact structured input.
+The helper reads `PAPERCLIP_API_URL` in Paperclip runtime and falls back to
+`PAPERCLIP_URL` for local runs.
 
 ## Outcome Contracts
 

@@ -51,7 +51,7 @@ Every Monday, run:
 
 ```bash
 source ~/.zshrc 2>/dev/null || true
-python scripts/paperclip_outcome_audit.py --days 7
+python3 scripts/paperclip_outcome_audit.py --days 7
 ```
 
 The point is to catch weeks where the organization completes many issues but
