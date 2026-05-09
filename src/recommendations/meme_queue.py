@@ -14,68 +14,7 @@ from src.recommendations.candidates import (
 from src.recommendations.utils import exclude_meme_ids_sql_filter
 from src.storage.schemas import MemeData
 from src.tgbot.constants import UserType
-from src.tgbot.service import assign_experiment, get_experiment_variant
 from src.tgbot.user_info import get_user_info
-
-RECENTLY_LIKED_BLENDER_EXPERIMENT_ID = "recently_liked_blender_mature_v1"
-RECENTLY_LIKED_BLENDER_CONTROL = "control"
-RECENTLY_LIKED_BLENDER_TREATMENT = "treatment"
-
-MATURE_BLENDER_CONTROL_WEIGHTS = {
-    "best_uploaded_memes": 0.3,
-    "like_spread_and_recent_memes": 0.3,
-    "lr_smoothed": 0.4,
-    "recently_liked": 0.2,
-    "goat": 0.1,
-    "es_ranked": 0.1,
-}
-MATURE_BLENDER_TREATMENT_WEIGHTS = {
-    "best_uploaded_memes": 0.3,
-    "like_spread_and_recent_memes": 0.25,
-    "lr_smoothed": 0.35,
-    "recently_liked": 0.3,
-    "goat": 0.1,
-    "es_ranked": 0.1,
-}
-
-
-async def get_or_assign_recently_liked_blender_variant(user_id: int) -> str:
-    variant = await get_experiment_variant(user_id, RECENTLY_LIKED_BLENDER_EXPERIMENT_ID)
-    if variant is not None:
-        return variant
-
-    proposed = (
-        RECENTLY_LIKED_BLENDER_TREATMENT if user_id % 2 == 0 else RECENTLY_LIKED_BLENDER_CONTROL
-    )
-    inserted = await assign_experiment(
-        user_id,
-        RECENTLY_LIKED_BLENDER_EXPERIMENT_ID,
-        proposed,
-    )
-    if inserted:
-        return proposed
-
-    return (
-        await get_experiment_variant(user_id, RECENTLY_LIKED_BLENDER_EXPERIMENT_ID)
-        or RECENTLY_LIKED_BLENDER_CONTROL
-    )
-
-
-async def get_recently_liked_blender_weights(user_id: int) -> dict[str, float]:
-    try:
-        variant = await get_or_assign_recently_liked_blender_variant(user_id)
-    except Exception:
-        logging.warning(
-            "recently_liked blender assignment failed for user %d",
-            user_id,
-            exc_info=True,
-        )
-        return dict(MATURE_BLENDER_CONTROL_WEIGHTS)
-
-    if variant == RECENTLY_LIKED_BLENDER_TREATMENT:
-        return dict(MATURE_BLENDER_TREATMENT_WEIGHTS)
-
-    return dict(MATURE_BLENDER_CONTROL_WEIGHTS)
 
 
 async def get_next_meme_for_user(user_id: int) -> MemeData | None:
@@ -277,7 +216,14 @@ async def generate_recommendations(
             return blend(candidates_dict, weights, fixed_pos, limit, random_seed)
 
         # >=100
-        weights = await get_recently_liked_blender_weights(user_id)
+        weights = {
+            "best_uploaded_memes": 0.3,
+            "like_spread_and_recent_memes": 0.3,
+            "lr_smoothed": 0.4,
+            "recently_liked": 0.2,
+            "goat": 0.1,
+            "es_ranked": 0.1,
+        }
 
         candidates_dict = await retriever.get_candidates_dict(
             weights.keys(), user_id, limit, exclude_mem_ids=meme_ids_in_queue
