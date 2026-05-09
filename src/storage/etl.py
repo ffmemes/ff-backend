@@ -143,6 +143,11 @@ async def discover_source_candidates_from_telegram_posts(
                     "last_seen_at": text("now()"),
                     "updated_at": text("now()"),
                 },
+                # Only re-count rows still in moderator queue. Without this guard,
+                # forwards bump times_forwarded / updated_at on dismissed/promoted
+                # candidates — corrupting both the score and the moderator-action
+                # timestamp on resolved rows.
+                where=(meme_source_candidate.c.status == "discovered"),
             )
         )
         await execute(stmt)
