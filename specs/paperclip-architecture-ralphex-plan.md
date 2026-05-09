@@ -423,22 +423,68 @@ Verification:
 
 ### Task 8: Move Executable Prompt Workflows Into Tested Helpers
 
-- [ ] For Staff Engineer PR review, create a helper/contract that maps each PR
+- [x] For Staff Engineer PR review, create a helper/contract that maps each PR
       to exactly one Paperclip issue, checks GitHub-visible review artifacts,
-      and handles merge/close state.
-- [ ] For Comms, create a helper/contract for draft creation, structured
+      and handles merge/close state. (`scripts/paperclip_pr_review.py`:
+      `pr_issue_slug` (`[pr:NNN]` — one issue per PR), `cto_followup_title`,
+      `is_internal_pr`, `pr_state_decision` (already_resolved /
+      missing_payload / review), `review_outcome`, `merge_preflight`
+      (3-check preflight: review approved + internal author + CI not red +
+      `allow_auto_merge`), `terminal_checklist` covering review-signal,
+      auto-merge cancellation on changes-requested, and merge-state
+      verification on approve. 34 fixture tests in
+      `tests/test_paperclip_pr_review.py`.)
+- [x] For Comms, create a helper/contract for draft creation, structured
       approval, publish, and close with a stable `[post:...]` key.
-- [ ] For QA, create a runtime probe and incident dedupe contract before test
-      execution starts.
-- [ ] Shrink prompts to role, decision criteria, escalation rules, and helper
-      invocation contracts.
+      (`scripts/paperclip_comms_post.py`: `post_slug(date, topic)`,
+      `confirmation_idempotency_key(slug)` (stable across reruns so one
+      approval card per draft), `archive_path(slug)`, `lifecycle_state`
+      (missing_slug / draft_pending_approval / approved_unpublished /
+      stale_draft / published / blocked / unknown), `next_action(issue,
+      now=...)` and `is_stale_draft` (24h cutoff),
+      `publish_outcome_missing(payload)` verifier blocking
+      `done`-without-publication. 38 fixture tests in
+      `tests/test_paperclip_comms_post.py`.)
+- [x] For QA, create a runtime probe and incident dedupe contract before test
+      execution starts. (`scripts/paperclip_qa_incident.py`:
+      `qa_runtime_probe(env)` returning green / yellow / red against
+      `REQUIRED_ENV_VARS` and `/paperclip/bin` PATH; canonical
+      `MAINTENANCE_ACCESS_SLUG = "[maintenance:qa-runtime-access]"`;
+      `incident_decision(event)` mapping the "do not file"
+      (describe_memes / OpenRouter / 402 / Forbidden / circuit breaker)
+      and "comment on canonical slug" (db-pool, goat-score-column)
+      classes; `scan_summary(events, scan_slug=...)` enforcing the
+      3-issues-per-scan cap with overflow batched into
+      `[scan:YYYY-MM-DD-HHmm]`. 21 fixture tests in
+      `tests/test_paperclip_qa_incident.py`.)
+- [x] Shrink prompts to role, decision criteria, escalation rules, and helper
+      invocation contracts. (Staff Engineer 219 → 112 lines (-49%);
+      Comms Manager 570 → 282 lines (-51%); QA Engineer 231 → 173 lines
+      (-25%). Each prompt now points at the helper module + test file as
+      the contract, keeps role + decision tables + hard rules, and drops
+      the imperative shell snippets that tests cover.)
 
 Verification:
 
-- [ ] Prompt line count drops for the affected agents.
-- [ ] Helper scripts have fixture tests and live dry-run modes.
-- [ ] Triggering a representative PR/post/QA flow creates one clear next-step
-      issue, not duplicate or blocked work.
+- [x] Prompt line count drops for the affected agents. (Total agent
+      prompt lines 1020 → 567, -44%; per-agent drops listed above.)
+- [x] Helper scripts have fixture tests and live dry-run modes.
+      (93 new tests across the three helpers; each helper exposes a
+      `--dry-run`-style CLI that reads JSON fixtures and prints the
+      decision a real wake would make. The CLI tests round-trip through
+      `subprocess.run(...)` to confirm no network access is attempted —
+      no `gh`, no `curl`, no Paperclip API.)
+- [x] Triggering a representative PR/post/QA flow creates one clear next-step
+      issue, not duplicate or blocked work. (Verified by helper contract:
+      `pr_issue_slug` enforces one `[pr:NNN]` per PR;
+      `confirmation_idempotency_key` keeps one approval card per
+      `[post:...]` slug across retries; `MAINTENANCE_ACCESS_SLUG` and
+      `KNOWN_INCIDENT_SLUGS` enforce one canonical issue per access gap
+      and one canonical issue per recurring incident class. The
+      idempotency / dedupe behaviour is covered by
+      `test_confirmation_idempotency_key_is_stable_across_callers`,
+      `test_incident_decision_db_pool_dedupes_to_canonical_slug`, and
+      the `scan_summary` overflow → `[scan:...]` batching tests.)
 
 ### Task 9: Backlog Hygiene Based On Proven Rules
 
