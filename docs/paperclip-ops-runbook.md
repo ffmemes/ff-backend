@@ -200,7 +200,7 @@ For Weekly CEO Review health, also run the outcome-throughput audit:
 
 ```bash
 source ~/.zshrc
-python scripts/paperclip_outcome_audit.py --days 7
+python3 scripts/paperclip_outcome_audit.py --days 7
 ```
 
 This distinguishes issue volume from product decisions, closed experiments,

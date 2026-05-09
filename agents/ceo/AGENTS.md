@@ -141,7 +141,7 @@ First run the outcome audit:
 
 ```bash
 source ~/.zshrc 2>/dev/null || true
-python scripts/paperclip_outcome_audit.py --days 7
+python3 scripts/paperclip_outcome_audit.py --days 7
 ```
 
 Create or update `[strategy:weekly-outcomes-YYYY-MM-DD] Weekly outcome review`

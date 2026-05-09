@@ -5,7 +5,7 @@ This separates agent activity from product learning. It is intentionally
 compact enough to paste into a CEO weekly review without dumping raw issue JSON.
 
 Env:
-  PAPERCLIP_URL
+  PAPERCLIP_API_URL (preferred) or PAPERCLIP_URL (legacy/local)
   PAPERCLIP_API_KEY
   PAPERCLIP_COMPANY_ID (optional, defaults to FFmemes prod company)
 """
@@ -223,7 +223,16 @@ def log_events(since: datetime, limit: int = 12) -> dict[str, Any]:
     decisions: list[dict[str, Any]] = []
     outcomes: list[dict[str, Any]] = []
     if not LOG_PATH.exists():
-        return {"events": [], "decisions": [], "outcomes": []}
+        return {
+            "events": [],
+            "decisions": [],
+            "outcomes": [],
+            "counts": {
+                "events": 0,
+                "decisions": 0,
+                "outcomes": 0,
+            },
+        }
 
     for line in LOG_PATH.read_text().splitlines():
         entry = parse_log_entry(line)
@@ -483,10 +492,13 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     args = parser.parse_args()
 
-    base_url = os.getenv("PAPERCLIP_URL")
+    base_url = os.getenv("PAPERCLIP_API_URL") or os.getenv("PAPERCLIP_URL")
     api_key = os.getenv("PAPERCLIP_API_KEY")
     if not base_url or not api_key:
-        print("Set PAPERCLIP_URL and PAPERCLIP_API_KEY", file=sys.stderr)
+        print(
+            "Set PAPERCLIP_API_URL (or legacy PAPERCLIP_URL) and PAPERCLIP_API_KEY",
+            file=sys.stderr,
+        )
         return 2
 
     client = Paperclip(base_url, api_key)
