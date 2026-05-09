@@ -309,7 +309,9 @@ Paperclip triggers now support multiple signing modes:
 **Sentry → Paperclip QA trigger** is fully direct since PR #212. Set up:
 - QA routine `477f452d-06f3-421e-a274-7f09155bb5bb`, webhook trigger `30901464-a100-4cff-9515-9fdbcfc1a797`
 - `signingMode: none` — `server/dist/services/routines.js` short-circuits all auth checks
-- Public URL: `https://org.ffmemes.com/api/routine-triggers/public/18a2f9e439c396e9b21a02fa/fire`
+- Public trigger URL is configured in Sentry/Paperclip only. Do not commit the
+  `routine-triggers/public/.../fire` path; the publicId is sensitive operational
+  material.
 - Sentry posts the raw payload (`{"action":"created","data":{"issue":{...}}}`); Paperclip stores it in `routine_run.triggerPayload` verbatim
 - Trigger fires only on **issue creation**, not subsequent occurrences. To re-test, send an event with a unique exception class so Sentry creates a new issue group.
 
