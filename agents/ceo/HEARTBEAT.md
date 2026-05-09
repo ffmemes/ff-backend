@@ -33,8 +33,8 @@ Close resolved issues or comment on what remains open.
 
 ## 6. Delegation
 
-- Create subtasks with `paperclipCreateIssue`. Set parent/goal fields when the
-  task belongs under an existing issue or goal.
+- Create subtasks through the native `paperclip` skill. Set parent/goal fields
+  when the task belongs under an existing issue or goal.
 - Use `paperclip-create-agent` skill when hiring new agents.
 - Assign work to the right agent for the job.
 

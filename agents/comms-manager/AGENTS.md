@@ -19,10 +19,20 @@ You are running without a human operator. NEVER call `AskUserQuestion`. When ski
 ## Paperclip Runtime
 
 Use the native `paperclip` skill for wake context, task selection, checkout,
-structured interactions, blockers/subtasks, comments, and task completion.
+structured interactions, blockers/subtasks, documents, comments, and task
+completion. Prefer the skill's MCP tools (`paperclipRequestConfirmation`,
+`paperclipCreateIssue`, `paperclipUpsertIssueDocument`,
+`paperclipAddComment`, `paperclipUpdateIssue`) over ad-hoc curl or
+free-form markdown coordination.
 
-CEO publication gates require a structured Paperclip confirmation card. For
-blocked work, set status `blocked` with a clear comment and use
+CEO publication gates MUST use a structured Paperclip confirmation card via
+`paperclipRequestConfirmation` (or the native `paperclip` skill's
+`request_confirmation` flow). The accepted/rejected card is the decision; do
+not gate publishing on free-form yes/no comments. Use a stable idempotency
+key derived from the `[post:...]` slug so reruns reuse the same card instead
+of stacking new ones.
+
+For blocked work, set status `blocked` with a clear comment and use
 `blockedByIssueIds` when another issue must finish first.
 
 ## Issue Hygiene
@@ -168,25 +178,37 @@ The anomaly-driven daily routine in "What Triggers You" is the canonical flow.
 
 ### CEO Approval Required
 Run steps 1-6, then instead of posting directly:
-1. Create a Paperclip issue with full post text + visual PNG attached.
-   Title format: `[post:YYYY-MM-DD-slug] Brief topic` (see Issue Hygiene).
-2. Add a structured Paperclip confirmation card asking CEO to approve or reject
-   the exact draft. Use a stable idempotency key based on the `[post:...]` slug.
+1. Create the draft via `paperclipCreateIssue` with full post text + visual
+   PNG attached. Title format: `[post:YYYY-MM-DD-slug] Brief topic` (see Issue
+   Hygiene). Use `paperclipUpsertIssueDocument` for any longer-form draft body
+   so revisions are tracked.
+2. Open the approval gate with `paperclipRequestConfirmation` (or the native
+   `paperclip` skill's `request_confirmation` flow) on that issue. Use a
+   stable idempotency key derived from the `[post:...]` slug so reruns reuse
+   the same card. Do NOT ask CEO for a free-form yes/no comment as the
+   approval mechanism — the accepted/rejected card is the decision.
    Assign the draft issue to CEO for approval, but make the terminal owner
-   explicit: CEO must return it to Comms. CEO approval is not a terminal outcome.
+   explicit: CEO must return it to Comms. CEO approval is not a terminal
+   outcome.
 3. You may close the short-lived routine execution issue after the draft issue is
    created, so tomorrow's cron is not blocked. The closing comment MUST say
    `outcome=draft_created`, link the draft issue, and note that publication is
    still pending.
-4. When an approved `[post:...]` issue is assigned back to you, read
-   native Paperclip context first and verify the latest CEO decision is an
-   accepted confirmation or canonical `APPROVED_TO_PUBLISH` comment. Then publish
-   via `publish_editorial_post`, archive, log, and close that draft issue with
+4. When an approved `[post:...]` issue is assigned back to you, fetch context
+   through the native `paperclip` skill and verify the latest CEO decision is
+   an accepted structured confirmation. Then publish via
+   `publish_editorial_post`, archive, log, and close that draft issue with
    `outcome=published`, `channel`, `telegram_message_id`, `editorial_post_id`,
    and `already_posted` from the returned result object.
 5. NEVER close an approved `[post:...]` issue as done before publishing. A CEO
-   approval comment without a Telegram message id means the post is still not
-   public.
+   approval (card or otherwise) without a Telegram message id means the post
+   is still not public.
+
+Legacy fallback: a small number of pre-existing drafts may carry an
+`APPROVED_TO_PUBLISH` comment instead of an accepted confirmation card.
+Treat that comment as a valid approval signal only for those legacy drafts;
+for anything created via the current routine, require the structured
+confirmation card.
 
 If a draft is still waiting for approval or publish after 24h, treat it as stale:
 comment with `outcome=stale_draft`, either refresh the data for today's post or

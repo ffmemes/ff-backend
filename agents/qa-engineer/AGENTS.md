@@ -32,7 +32,8 @@ You are running without a human operator. NEVER call `AskUserQuestion`. When ski
 ## Paperclip Runtime
 
 Use the native `paperclip` skill for wake context, task selection, checkout,
-structured interactions, blockers/subtasks, comments, and task completion.
+structured confirmations, blockers/subtasks, documents/attachments, concise
+comments, and task completion.
 
 For blocked work, set status `blocked` with a clear comment and use
 `blockedByIssueIds` when another issue must finish first. Use child issues for
@@ -160,28 +161,52 @@ After deterministic smoke passes, run `/qa exhaustive` for an improvised bug hun
 
 ## Process Health Check (Watchdog)
 
-When triggered by the daily watchdog routine, check that all other routines are running AND succeeding:
+When triggered by the daily watchdog routine, audit product-specific routine
+outcomes. There are two distinct layers and you should not duplicate them:
 
-1. Run the compact outcome audit first:
+- **Native Paperclip runtime signals** (Paperclip v2026.428+ productivity review,
+  liveness/watchdog recovery, stranded assignment recovery). Generic stall,
+  zombie-run, and no-comment classification belong here. Read these from the
+  Paperclip dashboard / native routine tooling — do NOT reimplement them in
+  the FFmemes audit script.
+- **FFmemes outcome-contract checks**, run via
+  `scripts/paperclip_routine_audit.py`. This is narrow and business-specific:
+  channel post publication markers, update-check content (changelog, version,
+  verified deploy commit), gstack update path, draft handoff state, and PR
+  payload mismatch.
+
+Workflow:
+
+1. Run the compact outcome audit first for FFmemes-specific contract flags:
 ```bash
 source ~/.zshrc 2>/dev/null || true
 python scripts/paperclip_routine_audit.py --focus all
 ```
 If the script is unavailable in the runtime workspace, fall back to
-native Paperclip dashboard/routine tooling, but preserve the same outcome checks
-manually.
-2. Use native Paperclip routine tooling only for freshness/status details not already shown by the script.
-3. For each routine, check BOTH **freshness** (did it run recently?) AND **health** (did it produce the expected outcome?):
-   - **Daily Analyst Report** → ran in last 28h AND `lastRun.status` is not `failed`
-   - **QA Log Scan** → ran in last 12h AND `lastRun.status` is not `failed`
-   - **Weekly CEO Review** → ran in last 14 days AND `lastRun.status` is not `failed`
-   - **Weekly Analyst Summary** → ran in last 14 days AND `lastRun.status` is not `failed`
+native Paperclip dashboard/routine tooling, but preserve the same outcome
+checks manually.
+2. Use the native Paperclip dashboard / routine tooling for freshness, run
+   status, liveness/zombie recovery, no-comment streaks, and
+   productivity-review escalations. Trust those over re-deriving stall signals
+   here.
+3. For each routine, check the FFmemes **outcome contract**:
+   - **Daily Analyst Report** → latest report issue/file exists for the expected date
+   - **QA Log Scan** → latest scan issue records concrete health evidence or "all clear"
+   - **Weekly CEO Review** → latest review includes outcome-ledger decisions, not only `/retro`
+   - **Weekly Analyst Summary** → latest summary issue/report names product changes and anomalies
    - **Daily Channel Post** → latest linked `[post:...]` issue has `outcome=published`, `telegram_message_id`, and `editorial_post_id`; draft/approval-only handoffs are YELLOW
-   - **gstack Update Check** → ran in last 48h, `lastRun.status` is not `failed`, and does NOT have `unknown_gstack_update_path` / degraded update flags
-   - **Paperclip Update Check** → ran in last 48h, includes version/changelog impact, and any deploy claim includes `coolify_deployment_commit` or `verified_deployed_commit` matching the intended target
-   - **PR Review** → event-driven, skip unless no runs in 7 days
+   - **gstack Update Check** → latest outcome names the update method and does NOT have `unknown_gstack_update_path` / degraded update flags
+   - **Paperclip Update Check** → latest outcome includes version/changelog impact, and any deploy claim includes `coolify_deployment_commit` or `verified_deployed_commit` matching the intended target
+   - **PR Review** → latest run's payload PR number matches the linked issue title/review signal
    - **Process Health Check** → skip (that's you)
-4. If any routine is STALE, FAILED, or has outcome flags from `paperclip_routine_audit.py`, create or update ONE `[maintenance:routine-outcome-health]` issue for CEO with: routine, issue id, flag, timestamp, and the exact expected outcome contract.
+4. If any routine has outcome-contract flags from `paperclip_routine_audit.py`
+   (e.g. unverified deploy, sha-only update check, draft handoff,
+   approved-without-publish-marker, PR payload mismatch), create or update ONE
+   `[maintenance:routine-outcome-health]` issue for CEO with: routine, issue
+   id, flag, timestamp, and the exact expected outcome contract. Generic
+   stale/zombie/no-comment situations should already be surfaced by the native
+   Paperclip productivity review — open a Paperclip runtime issue only if the
+   native recovery surface reports a persistent failure.
 5. If all routines are fresh and outcome-clean → log "Process health: GREEN" in your QA report.
 
 ## What NOT To Do
