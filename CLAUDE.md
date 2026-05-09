@@ -294,6 +294,14 @@ Use the `/browse` skill from gstack for all web browsing. Never use `mcp__claude
 
 Available skills: `/plan-ceo-review`, `/plan-eng-review`, `/review`, `/ship`, `/browse`, `/qa`, `/setup-browser-cookies`, `/retro`
 
+For Paperclip agents the live skill catalog is pinned in
+`agents/.paperclip.yaml` (`skills.source` + `skills.ref`); the per-agent
+`skills:` frontmatter in each `agents/<slug>/AGENTS.md` is the assignment
+contract. `agents/README.md` is a generated snapshot — do not treat it as
+authoritative. `agents/deploy.sh --dry-run` prints the upstream ref plus
+checked / updated / removed / failed counts; an apply blocks on unknown
+desired skills.
+
 ## Broadcasts
 
 **IMPORTANT: Read `docs/broadcasts.md` before sending any broadcast.** Use `send_broadcast()` from `src/broadcasts/service.py` with a unique `broadcast_id` for dedup. Never run inline ad-hoc broadcast code. Language detection uses `user_language` table (bot preference), NOT `user_tg.language_code` (Telegram app language).

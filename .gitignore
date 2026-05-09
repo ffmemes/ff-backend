@@ -147,6 +147,8 @@ backup.dump.gz
 # для локальных шалостей
 test.py
 .gstack/
+.codex/
+.agents/
 
 # Per-developer git worktrees (in-progress feature branches)
 .worktrees/
