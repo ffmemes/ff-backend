@@ -1,3 +1,5 @@
+import logging
+
 from telegram import Update
 from telegram.ext import (
     AIORateLimiter,
@@ -91,8 +93,15 @@ from src.tgbot.handlers.treasury.commands import (
     handle_show_leaderbaord,
 )
 from src.tgbot.handlers.upload import moderation, stats, upload_meme
+from src.tgbot.update_lock import acquire_update_user_lock, release_update_user_lock
 
 application: Application = None  # type: ignore
+
+
+def _get_update_user_id(update: Update) -> int | None:
+    if update.effective_user is None:
+        return None
+    return update.effective_user.id
 
 
 def add_handlers(application: Application) -> None:
@@ -504,7 +513,22 @@ async def process_event(payload: dict) -> None:
     # TODO: try await application.update_queue.put(update)
     # https://github.com/python-telegram-bot/python-telegram-bot/wiki/Webhooks#custom-solution
 
+    lock = None
     try:
+        user_id = _get_update_user_id(update)
+        if user_id is not None:
+            try:
+                # FastAPI runs webhook background tasks concurrently across Gunicorn workers.
+                # Keep one user's handler chain serialized so double taps/retries don't overlap
+                # DB-heavy reaction and next-message operations.
+                lock = await acquire_update_user_lock(user_id)
+            except Exception:  # noqa: BLE001
+                logging.warning(
+                    "Failed to acquire Telegram update lock for user %s; processing unlocked",
+                    user_id,
+                    exc_info=True,
+                )
+
         await application.process_update(update)
     except Exception as e:
         import sys
@@ -515,6 +539,11 @@ async def process_event(payload: dict) -> None:
         sys.stderr.write(f"[process_event] UNHANDLED ERROR{cb}: {e}\n")
         sys.stderr.flush()
         raise
+    finally:
+        try:
+            await release_update_user_lock(lock)
+        except Exception:  # noqa: BLE001
+            logging.warning("Failed to release Telegram update lock", exc_info=True)
 
 
 async def setup_webhook(application: Application) -> None:
