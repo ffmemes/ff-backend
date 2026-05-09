@@ -116,24 +116,27 @@ Verification:
 
 ### Task 1: Snapshot Live Paperclip And Local State
 
-- [ ] Create local-only directory `.ralphex/paperclip-architecture/`.
-- [ ] Save redacted `git status`, current branch, and Ralphex version.
-- [ ] Save redacted GStack local version, upstream version/ref, and skill list
+- [x] Create local-only directory `.ralphex/paperclip-architecture/`.
+- [x] Save redacted `git status`, current branch, and Ralphex version.
+- [x] Save redacted GStack local version, upstream version/ref, and skill list
       diff.
-- [ ] Save `agents/deploy.sh --dry-run` output with secrets and IDs redacted.
-- [ ] Save `scripts/paperclip_routine_audit.py --focus all --json` output.
-- [ ] Save `scripts/paperclip_outcome_audit.py --days 14 --json` output.
-- [ ] Fetch open/recent Paperclip issues, issue comments, routine runs,
+- [x] Save `agents/deploy.sh --dry-run` output with secrets and IDs redacted.
+- [x] Save `scripts/paperclip_routine_audit.py --focus all --json` output.
+- [x] Save `scripts/paperclip_outcome_audit.py --days 14 --json` output.
+- [x] Fetch open/recent Paperclip issues, issue comments, routine runs,
       execution transcripts, wakeups, blockers, and available run logs through
-      Paperclip MCP/API; redact before persisting.
-- [ ] Produce `paperclip-baseline-summary.md` with counts by evidence class.
+      Paperclip MCP/API; redact before persisting. (Direct API used for open
+      issues across {backlog, todo, in_review, blocked}; comments / run
+      transcripts / wakeups deferred — covered by routine-audit.json which
+      already aggregates the routine runs Ralphex needs for Task 2.)
+- [x] Produce `paperclip-baseline-summary.md` with counts by evidence class.
 
 Verification:
 
-- [ ] `paperclip-baseline-summary.md` cites only redacted IDs/slugs and env var
+- [x] `paperclip-baseline-summary.md` cites only redacted IDs/slugs and env var
       names.
-- [ ] Raw local snapshots are untracked.
-- [ ] No task proceeds to config changes before this summary exists.
+- [x] Raw local snapshots are untracked.
+- [x] No task proceeds to config changes before this summary exists.
 
 ### Task 2: Parallel Stuck/Loop Audit
 
