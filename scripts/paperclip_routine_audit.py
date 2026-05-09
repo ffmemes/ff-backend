@@ -102,7 +102,10 @@ def paperclip_base_url() -> str | None:
 def parse_ts(value: str | None) -> datetime | None:
     if not value:
         return None
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 def minutes_between(start: str | None, end: str | None) -> float | None:
@@ -228,14 +231,11 @@ def classify_issue(
         if "latest stable" not in lower and "changelog" not in lower:
             flags.append("sha_only_update_check")
     if (
-        (
-            "deployed paperclip update" in lower
-            or "coolify deployment queued" in lower
-            or "state file updated" in lower
-            or "deployed paperclip" in lower
-        )
-        and not any(pattern.search(text) for pattern in VERIFIED_PAPERCLIP_DEPLOY_PATTERNS)
-    ):
+        "deployed paperclip update" in lower
+        or "coolify deployment queued" in lower
+        or "state file updated" in lower
+        or "deployed paperclip" in lower
+    ) and not any(pattern.search(text) for pattern in VERIFIED_PAPERCLIP_DEPLOY_PATTERNS):
         flags.append("unverified_paperclip_deploy")
     if "gstack-derived skills" in lower and "paperclip skills runtime" in lower:
         flags.append("unknown_gstack_update_path")
@@ -249,8 +249,10 @@ def classify_issue(
         or "ceo approval" in lower
     )
     has_approval_signal = "approved" in lower or has_accepted_confirmation(interactions or [])
-    if is_publish_flow and has_approval_signal and not all(
-        pattern.search(text) for pattern in PUBLISHED_MARKER_PATTERNS
+    if (
+        is_publish_flow
+        and has_approval_signal
+        and not all(pattern.search(text) for pattern in PUBLISHED_MARKER_PATTERNS)
     ):
         flags.append("approved_without_publish_marker")
     # Generic stall / no-comment / zombie-run classification is intentionally
