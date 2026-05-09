@@ -94,24 +94,24 @@ verification has run.
 
 ### Task 0: Source-Of-Truth Triage
 
-- [ ] Classify local docs into `current operational`, `agent prompt`,
+- [x] Classify local docs into `current operational`, `agent prompt`,
       `generated snapshot`, `historical research`, `human break-glass`, and
       `deprecated`.
-- [ ] Add or update a local-only triage note that tells Ralphex which files may
+- [x] Add or update a local-only triage note that tells Ralphex which files may
       drive operations and which files are only historical context.
-- [ ] Mark seed findings above as `verified`, `not reproducible`, or
+- [x] Mark seed findings above as `verified`, `not reproducible`, or
       `needs live-log proof`.
-- [ ] Prefer Paperclip MCP for live inspection if available; if Paperclip MCP is
+- [x] Prefer Paperclip MCP for live inspection if available; if Paperclip MCP is
       still being installed, use existing redacted API scripts and record
       `missing Paperclip MCP` as a capability gap, not as a blocker for the
       whole audit.
 
 Verification:
 
-- [ ] No live mutation happens in this task.
-- [ ] Current operational docs are identified before Ralphex follows any
+- [x] No live mutation happens in this task.
+- [x] Current operational docs are identified before Ralphex follows any
       operational command from docs.
-- [ ] Historical docs that contain dangerous commands are not used as current
+- [x] Historical docs that contain dangerous commands are not used as current
       setup instructions.
 
 ### Task 1: Snapshot Live Paperclip And Local State
