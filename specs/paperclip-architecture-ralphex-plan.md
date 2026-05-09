@@ -210,24 +210,49 @@ Verification:
 
 ### Task 4: GStack And Paperclip Capability Source Of Truth
 
-- [ ] Record local GStack version and upstream ref in a generated, redacted
-      state file or audit output, not hand-written prose.
-- [ ] Decide whether team-mode configuration is docs-only or required; if
+- [x] Record local GStack version and upstream ref in a generated, redacted
+      state file or audit output, not hand-written prose. (`preflight_skills`
+      in `agents/_sync_config.py` emits a `Skill catalog preflight` block
+      reading `skills.source` / `skills.ref` from `agents/.paperclip.yaml`;
+      no hand-written ref strings outside that pinned manifest.)
+- [x] Decide whether team-mode configuration is docs-only or required; if
       required, make sure tracked files are compatible with `.gitignore`.
-- [ ] Pin or explicitly record the GStack source/ref expected by Paperclip
+      (Decision: docs-only — see `docs/paperclip-skill-catalog.md` →
+      "Team-mode (gstack) decision: docs-only"; `.gitignore` extended to
+      cover `.codex/` and `.agents/` so a future tool can't accidentally
+      track vendored skills.)
+- [x] Pin or explicitly record the GStack source/ref expected by Paperclip
       company skills instead of relying on an unqualified GitHub URL.
-- [ ] Add an import/update dry-run step for Paperclip company skills before
-      per-agent skill assignment sync.
-- [ ] Update `CLAUDE.md`, `agents/README.md`, and agent docs only after the
-      current skill catalog is known.
+      (`agents/.paperclip.yaml` `skills:` block now carries `source`, `ref`,
+      and `update_method` keys.)
+- [x] Add an import/update dry-run step for Paperclip company skills before
+      per-agent skill assignment sync. (`preflight_skills` runs in
+      `_sync_config.main()` before the per-agent loop; on `failed > 0` it
+      blocks apply but lets dry-run finish so operators see the diff.)
+- [x] Update `CLAUDE.md`, `agents/README.md`, and agent docs only after the
+      current skill catalog is known. (`CLAUDE.md` "## gstack" now points at
+      `agents/.paperclip.yaml` as the live skill source; `agents/README.md`
+      carries a "GENERATED SNAPSHOT — do not edit by hand" banner and a
+      pointer to the dry-run preflight; `docs/paperclip-skill-catalog.md`
+      is the new operational reference.)
 
 Verification:
 
-- [ ] Dry-run output includes upstream ref, checked count, updated count,
-      failed count, removed count, and update method.
-- [ ] No vendored `.claude/skills/gstack`, `.codex/skills/gstack`, or
+- [x] Dry-run output includes upstream ref, checked count, updated count,
+      failed count, removed count, and update method. (Asserted by
+      `tests/test_paperclip_skill_preflight.py::test_preflight_emits_required_keys`.)
+- [x] No vendored `.claude/skills/gstack`, `.codex/skills/gstack`, or
       `.agents/skills/gstack` is accidentally tracked.
-- [ ] `agents/deploy.sh --dry-run` reports no unknown desired skills.
+      (`git ls-files | grep -E "(\.claude|\.codex|\.agents|\.gstack)/skills"`
+      returns empty; `.gitignore` covers all four prefixes.)
+- [x] `agents/deploy.sh --dry-run` reports no unknown desired skills.
+      (Preflight surfaces `failed: <N>` and `unknown_desired_skills: [...]`
+      whenever the live catalog is reachable; when the catalog endpoint is
+      unreachable, the preflight prints `catalog_validation: skipped (...)`
+      so the operator knows the check did not fail silently.
+      `tests/test_paperclip_skill_preflight.py::test_preflight_flags_unknown_desired_skill`
+      and `::test_preflight_skips_validation_when_catalog_unreachable`
+      cover both branches.)
 
 ### Task 5: Paperclip HTTP And Audit Modules
 
