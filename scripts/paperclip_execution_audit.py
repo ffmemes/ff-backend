@@ -38,6 +38,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from paperclip_contracts import (
+    DECISION_ACTIONS,
+    OUTCOME_ACTIONS,
+)
 from paperclip_http import (
     PaperclipClient,
     parse_ts,
@@ -104,13 +108,12 @@ STALE_INSTRUCTION_MARKERS = (
     "ssh path",
 )
 
-OUTCOME_MARKERS = (
-    re.compile(r"\boutcome\s*=\s*[a-z0-9_]+", re.IGNORECASE),
-    re.compile(r"\bpost_published\b", re.IGNORECASE),
-    re.compile(r"\bdaily_channel_post\b", re.IGNORECASE),
-    re.compile(r"\bbug_fixed\b", re.IGNORECASE),
-    re.compile(r"\bexperiment_(?:created|completed|cancelled|archived)\b", re.IGNORECASE),
-    re.compile(r"\bweekly_outcome_review\b", re.IGNORECASE),
+# Built from `paperclip_contracts.OUTCOME_ACTIONS` so this audit and the
+# outcome audit count the same set of structured outcome events. The
+# generic `outcome=...` regex catches free-form comments.
+OUTCOME_MARKERS = (re.compile(r"\boutcome\s*=\s*[a-z0-9_]+", re.IGNORECASE),) + tuple(
+    re.compile(rf"\b{re.escape(action)}\b", re.IGNORECASE)
+    for action in sorted(OUTCOME_ACTIONS | DECISION_ACTIONS)
 )
 
 REFERENCED_FFM_RE = re.compile(r"\bFFM-\d+\b")

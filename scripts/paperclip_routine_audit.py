@@ -27,6 +27,14 @@ import sys
 from datetime import datetime, timezone
 from typing import Any
 
+from paperclip_contracts import (
+    PUBLISHED_MARKERS as PUBLISHED_MARKER_PATTERNS,
+)
+from paperclip_contracts import (
+    issue_slug,
+    nested_state,
+    parent_child_status_violation,
+)
 from paperclip_http import (
     PaperclipAPIError,
     PaperclipClient,
@@ -44,11 +52,6 @@ DEGRADED_PATTERNS = (
     "no local gstack install",
     "0 updated",
     "skills no longer in upstream",
-)
-PUBLISHED_MARKER_PATTERNS = (
-    re.compile(r"\boutcome\s*=\s*published\b", re.IGNORECASE),
-    re.compile(r"\b(?:editorial_post_id|editorial post id)\b", re.IGNORECASE),
-    re.compile(r"\b(?:telegram_message_id|telegram message id)\b", re.IGNORECASE),
 )
 INTERACTION_LIST_KEYS = ("interactions", "items", "data")
 CONFIRMATION_KIND_MARKERS = ("confirmation", "request_confirmation")
@@ -357,6 +360,24 @@ def classify_issue(
     return flags, compact_body(latest or "")
 
 
+def derive_nested_state(
+    ref: dict[str, Any],
+    comments: list[dict[str, Any]],
+) -> str:
+    """Project an issue + its comments onto `paperclip_contracts.NESTED_STATES`.
+
+    Used to surface `published` / `approved_unpublished` / `pending_approval`
+    / `stale_draft` / `blocked_without_access` / `missing_smoke` /
+    `merged_without_close` / `unknown` per referenced child so a routine
+    cannot report green while a child is non-terminal.
+    """
+    text = "\n".join(
+        [ref.get("title") or "", ref.get("description") or ""]
+        + [c.get("body") or "" for c in comments]
+    )
+    return nested_state(text, slug=issue_slug(ref.get("title") or ""))
+
+
 def referenced_post_issues(
     client: Paperclip,
     issue: dict[str, Any],
@@ -379,6 +400,7 @@ def referenced_post_issues(
                         "assigneeAgentId": None,
                         "updatedAt": None,
                         "flags": ["publish_check_degraded"],
+                        "nestedState": "unknown",
                         "latest": "",
                     }
                 )
@@ -401,6 +423,7 @@ def referenced_post_issues(
                 "assigneeAgentId": ref.get("assigneeAgentId"),
                 "updatedAt": ref.get("updatedAt"),
                 "flags": flags,
+                "nestedState": derive_nested_state(ref, ref_comments),
                 "latest": latest,
             }
         )
@@ -458,6 +481,7 @@ def audit_routines(client: Paperclip, company_id: str, focus: str) -> list[dict[
         )
         if payload_pr and f"[pr:{payload_pr}]" not in issue_title:
             flags.append("coalesced_pr_review_mismatch")
+        parent_status = linked.get("status") or (issue or {}).get("status")
         row = {
             "routine": name,
             "routineId": routine.get("id"),
@@ -466,13 +490,20 @@ def audit_routines(client: Paperclip, company_id: str, focus: str) -> list[dict[
             "completedAt": run.get("completedAt"),
             "durationMin": minutes_between(run.get("triggeredAt"), run.get("completedAt")),
             "issue": linked.get("identifier") or (issue or {}).get("identifier"),
-            "issueStatus": linked.get("status") or (issue or {}).get("status"),
+            "issueStatus": parent_status,
             "flags": flags,
             "latest": latest,
         }
         refs = referenced_post_issues(client, issue or {}, comments)
         if refs:
             row["referencedPostIssues"] = refs
+            # Parent cannot be reported green while a referenced child is
+            # non-terminal. Surface the child identifiers explicitly so
+            # downstream consumers can route them.
+            non_terminal = parent_child_status_violation(parent_status, refs)
+            if non_terminal:
+                row["flags"].append("parent_done_child_non_terminal")
+                row["nonTerminalChildren"] = non_terminal
         rows.append(row)
     return rows
 
@@ -517,7 +548,11 @@ def print_text(report: dict[str, Any]) -> None:
             print(f"  latest: {row['latest']}")
         for ref in row.get("referencedPostIssues", []):
             ref_flags = ",".join(ref["flags"]) if ref["flags"] else "ok"
-            print(f"  ref {ref['identifier']} {ref['status']} flags={ref_flags}: {ref['title']}")
+            nested = ref.get("nestedState") or "unknown"
+            print(
+                f"  ref {ref['identifier']} {ref['status']} nested={nested} "
+                f"flags={ref_flags}: {ref['title']}"
+            )
             if ref["latest"]:
                 print(f"    latest: {ref['latest']}")
     if report.get("postDraftsTruncated"):

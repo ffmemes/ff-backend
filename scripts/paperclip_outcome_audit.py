@@ -22,6 +22,15 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from paperclip_contracts import (
+    EXECUTION_CATEGORIES,
+    ISSUE_CLASSES,
+    OUTCOME_ALIASES,
+    canonical_action,
+    is_decision_action,
+    is_outcome_action,
+    issue_slug,
+)
 from paperclip_http import (
     PaperclipAPIError,
     PaperclipClient,
@@ -37,18 +46,6 @@ ACTIVE_EXPERIMENTS_DIR = ROOT / "experiments" / "active"
 
 OPEN_STATUSES = {"backlog", "todo", "in_progress", "in_review", "blocked"}
 ALL_STATUSES = "backlog,todo,in_progress,in_review,blocked,done,cancelled"
-DECISION_ACTIONS = {
-    "experiment_created",
-    "experiment_completed",
-    "experiment_cancelled",
-    "experiment_archived",
-    "weekly_outcome_review",
-}
-OUTCOME_ACTIONS = DECISION_ACTIONS | {
-    "daily_channel_post",
-    "post_published",
-    "bug_fixed",
-}
 
 
 class Paperclip:
@@ -127,36 +124,29 @@ def list_issues(
     )
 
 
-def bracket_slug(title: str) -> str | None:
-    match = re.match(r"\[([a-z0-9_-]+):([^\]]+)\]", title.lower())
-    return match.group(1) if match else None
-
-
 def classify_issue(issue: dict[str, Any], agents: dict[str, str]) -> str:
+    """Map an issue to one of `paperclip_contracts.ALLOWED_ISSUE_CLASSES`.
+
+    The slug → class mapping comes from `ISSUE_CLASSES`; creator/title
+    fallbacks (Analyst report, QA scan, CEO routing, untyped experiment)
+    stay here because they depend on per-company agent names.
+    """
     title = issue.get("title") or ""
     lower = title.lower()
-    slug = bracket_slug(title)
+    slug = issue_slug(title)
     creator = agents.get(issue.get("createdByAgentId"), "")
     assignee = agents.get(issue.get("assigneeAgentId"), "")
 
-    if slug == "pr" or lower == "pr review" or "pr review" in lower:
+    if slug and slug in ISSUE_CLASSES:
+        return ISSUE_CLASSES[slug]
+    if lower == "pr review" or "pr review" in lower:
         return "pr_review"
-    if slug == "post":
-        return "comms_post"
-    if slug == "deploy":
-        return "deploy"
-    if slug == "incident":
-        return "incident"
-    if slug == "maintenance":
-        return "maintenance"
-    if slug == "report" or "analyst report" in lower or creator == "Analyst":
+    if "analyst report" in lower or creator == "Analyst":
         return "analyst_report"
-    if slug == "experiment" or "experiment" in lower:
+    if "experiment" in lower:
         return "experiment"
-    if slug == "scan" or creator == "QA Engineer" or assignee == "QA Engineer":
+    if creator == "QA Engineer" or assignee == "QA Engineer":
         return "qa_scan"
-    if slug == "strategy":
-        return "strategy"
     if creator == "CEO":
         return "ceo_routing"
     return "other"
@@ -191,8 +181,7 @@ def parse_log_entry(line: str) -> dict[str, Any] | None:
 
 
 def entry_contains_product_decision(entry: dict[str, Any]) -> bool:
-    action = entry.get("action")
-    if action in DECISION_ACTIONS:
+    if is_decision_action(entry.get("action")):
         return True
     text = json.dumps(entry.get("details") or {}, ensure_ascii=True).lower()
     return any(
@@ -212,11 +201,13 @@ def log_events(since: datetime, limit: int = 12) -> dict[str, Any]:
     events: list[dict[str, Any]] = []
     decisions: list[dict[str, Any]] = []
     outcomes: list[dict[str, Any]] = []
+    alias_drift: Counter[str] = Counter()
     if not LOG_PATH.exists():
         return {
             "events": [],
             "decisions": [],
             "outcomes": [],
+            "aliasDrift": {},
             "counts": {"events": 0, "decisions": 0, "outcomes": 0},
         }
 
@@ -228,16 +219,25 @@ def log_events(since: datetime, limit: int = 12) -> dict[str, Any]:
         if not ts or ts < since:
             continue
         events.append(entry)
+        action = entry.get("action")
+        # Surface log entries still using the legacy `daily_post` alias so a
+        # prompt or routine description can be cleaned up; the outcome still
+        # counts toward `daily_channel_post` via `canonical_action`.
+        if isinstance(action, str) and action in OUTCOME_ALIASES:
+            alias_drift[action] += 1
         if entry_contains_product_decision(entry):
             decisions.append(entry)
-        if entry.get("action") in OUTCOME_ACTIONS or entry_contains_product_decision(entry):
+        if is_outcome_action(action) or entry_contains_product_decision(entry):
             outcomes.append(entry)
 
     def compact(entry: dict[str, Any]) -> dict[str, Any]:
+        action = entry.get("action")
+        canonical = canonical_action(action) if isinstance(action, str) else None
         return {
             "timestamp": entry.get("timestamp"),
             "agent": entry.get("agent"),
-            "action": entry.get("action"),
+            "action": action,
+            "canonicalAction": canonical if canonical and canonical != action else None,
             "summary": compact_body(entry.get("summary") or "", limit=180),
         }
 
@@ -245,6 +245,7 @@ def log_events(since: datetime, limit: int = 12) -> dict[str, Any]:
         "events": [compact(e) for e in events[-limit:]],
         "decisions": [compact(e) for e in decisions[-limit:]],
         "outcomes": [compact(e) for e in outcomes[-limit:]],
+        "aliasDrift": dict(alias_drift),
         "counts": {
             "events": len(events),
             "decisions": len(decisions),
@@ -334,15 +335,7 @@ def build_report(client: Paperclip, company_id: str, days: int, limit: int) -> d
     outcome_count = log["counts"]["outcomes"]
     decision_yield = round(decision_count / completed_count, 3) if completed_count else None
     outcome_yield = round(outcome_count / completed_count, 3) if completed_count else None
-    execution_categories = {
-        "pr_review",
-        "incident",
-        "deploy",
-        "qa_scan",
-        "maintenance",
-        "analyst_report",
-    }
-    execution_count = sum(category_counts[name] for name in execution_categories)
+    execution_count = sum(category_counts[name] for name in EXECUTION_CATEGORIES)
     execution_share = round(execution_count / len(touched), 3) if touched else None
 
     flags: list[str] = []
@@ -360,6 +353,8 @@ def build_report(client: Paperclip, company_id: str, days: int, limit: int) -> d
         flags.append("issue_list_truncated")
         if issues_truncation.get("reason") == "unexpected_response_shape":
             flags.append("issue_list_shape_degraded")
+    if log["aliasDrift"]:
+        flags.append("outcome_alias_drift")
 
     return {
         "generatedAt": generated.isoformat(),
@@ -388,6 +383,7 @@ def build_report(client: Paperclip, company_id: str, days: int, limit: int) -> d
             "outcomeYield": outcome_yield,
             "recentDecisions": log["decisions"],
             "recentOutcomes": log["outcomes"],
+            "aliasDrift": log["aliasDrift"],
         },
         "activeExperiments": experiments,
         "flags": flags,
@@ -422,6 +418,11 @@ def recommended_actions(flags: list[str]) -> list[str]:
         actions.append(
             "Issue list is truncated; raise --limit or fix API offset handling before "
             "trusting completion/decision counts."
+        )
+    if "outcome_alias_drift" in flags:
+        actions.append(
+            "experiments/log.jsonl still uses a legacy outcome alias; rename it "
+            "to the canonical action so the contract stays single-sourced."
         )
     if not actions:
         actions.append(
