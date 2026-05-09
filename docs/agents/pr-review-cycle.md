@@ -52,7 +52,10 @@ review unless it left a comment.
 ## Manual fire (if the GitHub workflow misses)
 
 ```bash
-curl -s -X POST \
+# --fail makes curl exit non-zero on HTTP >=400 (rotated secret / outage).
+# -o /dev/null discards the response body so 4xx pages echoing the trigger
+# path and 5xx bodies leaking Paperclip internals don't reach the terminal.
+curl -sS --fail -o /dev/null -X POST \
   "$PAPERCLIP_PR_REVIEW_TRIGGER_URL" \
   -H "Authorization: Bearer $PAPERCLIP_TRIGGER_SECRET" \
   -H "Content-Type: application/json" \

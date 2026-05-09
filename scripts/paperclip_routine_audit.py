@@ -106,7 +106,13 @@ def paperclip_base_url() -> str | None:
 def parse_ts(value: str | None) -> datetime | None:
     if not value:
         return None
-    dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    # A single garbage timestamp from the API used to crash the whole audit
+    # via uncaught ValueError. Treat unparseable as "no signal" + stderr warn.
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        print(f"warning: parse_ts unparseable value {value!r}", file=sys.stderr)
+        return None
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt
@@ -227,12 +233,33 @@ def get_issue(client: Paperclip, issue_id: str) -> tuple[dict[str, Any] | None, 
     return None, True
 
 
-def list_issues(client: Paperclip, company_id: str, status: str, limit: int = 100) -> list[dict]:
+def list_issues(
+    client: Paperclip, company_id: str, status: str, limit: int = 200
+) -> tuple[list[dict], bool]:
+    # Returns (issues, truncated). Warn on shape drift instead of silently
+    # returning [] — a wrapped 200 response would otherwise hide every
+    # `[post:...]` draft with no signal to the caller. Also surface a
+    # truncation flag when the page is full so consumers know there may be
+    # more issues beyond what we read (the route does not paginate, so a
+    # full page == "we don't know what we missed").
     issues = client.get(
         f"/api/companies/{company_id}/issues",
         {"status": status, "limit": str(limit)},
     )
-    return issues if isinstance(issues, list) else []
+    if not isinstance(issues, list):
+        print(
+            f"warning: list_issues got unexpected response shape "
+            f"{type(issues).__name__}; treating as degraded",
+            file=sys.stderr,
+        )
+        return [], True
+    truncated = len(issues) >= limit
+    if truncated:
+        print(
+            f"warning: list_issues hit limit={limit}; results may be truncated",
+            file=sys.stderr,
+        )
+    return issues, truncated
 
 
 def routine_matches(name: str, focus: str) -> bool:
@@ -391,7 +418,16 @@ def referenced_post_issues(
 def audit_routines(client: Paperclip, company_id: str, focus: str) -> list[dict[str, Any]]:
     routines = client.get(f"/api/companies/{company_id}/routines")
     if not isinstance(routines, list):
-        raise RuntimeError("Unexpected routines response")
+        # Mirror list_issues: warn instead of raising. A wrapped/shape-drifted
+        # 200 from /api/companies/<id>/routines used to crash the whole audit,
+        # which means a single API drift wiped all routine signal from the
+        # JSON report — a strictly worse failure mode than "no routines found".
+        print(
+            f"warning: audit_routines got unexpected response shape "
+            f"{type(routines).__name__}; treating as degraded",
+            file=sys.stderr,
+        )
+        return []
 
     rows: list[dict[str, Any]] = []
     for routine in routines:
@@ -448,10 +484,11 @@ def audit_routines(client: Paperclip, company_id: str, focus: str) -> list[dict[
     return rows
 
 
-def stale_post_drafts(client: Paperclip, company_id: str) -> list[dict[str, Any]]:
+def stale_post_drafts(client: Paperclip, company_id: str) -> tuple[list[dict[str, Any]], bool]:
     statuses = "todo,in_progress,in_review,blocked,done"
     rows: list[dict[str, Any]] = []
-    for issue in list_issues(client, company_id, statuses):
+    issues, truncated = list_issues(client, company_id, statuses)
+    for issue in issues:
         title = issue.get("title") or ""
         if not title.startswith("[post:"):
             continue
@@ -469,7 +506,7 @@ def stale_post_drafts(client: Paperclip, company_id: str) -> list[dict[str, Any]
                     "latest": latest,
                 }
             )
-    return rows
+    return rows, truncated
 
 
 def print_text(report: dict[str, Any]) -> None:
@@ -488,6 +525,9 @@ def print_text(report: dict[str, Any]) -> None:
             print(f"  ref {ref['identifier']} {ref['status']} flags={ref_flags}: {ref['title']}")
             if ref["latest"]:
                 print(f"    latest: {ref['latest']}")
+    if report.get("postDraftsTruncated"):
+        print()
+        print("warning: post draft list truncated; raise --limit or paginate")
     if report["postDrafts"]:
         print()
         print("post_drafts:")
@@ -515,15 +555,17 @@ def main() -> int:
         return 2
 
     client = Paperclip(base_url, api_key)
-    post_drafts = (
-        stale_post_drafts(client, args.company_id) if args.focus in {"all", "comms"} else []
-    )
+    if args.focus in {"all", "comms"}:
+        post_drafts, post_drafts_truncated = stale_post_drafts(client, args.company_id)
+    else:
+        post_drafts, post_drafts_truncated = [], False
     report = {
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "companyId": args.company_id,
         "focus": args.focus,
         "routines": audit_routines(client, args.company_id, args.focus),
         "postDrafts": post_drafts,
+        "postDraftsTruncated": post_drafts_truncated,
     }
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))

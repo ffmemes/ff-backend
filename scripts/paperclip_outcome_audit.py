@@ -104,7 +104,14 @@ def compact_body(body: str, limit: int = 240) -> str:
 def parse_ts(value: str | None) -> datetime | None:
     if not value:
         return None
-    dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    # A single garbage timestamp (API drift, truncated value, hand-edited
+    # experiments/log.jsonl) used to crash the whole audit via uncaught
+    # ValueError. Treat unparseable as "no signal" and warn once on stderr.
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        print(f"warning: parse_ts unparseable value {value!r}", file=sys.stderr)
+        return None
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt
