@@ -1,10 +1,14 @@
 import hashlib
 import logging
+import uuid
+from asyncio import sleep
 from typing import Any
 
+import orjson
 from sqlalchemy import text
 
 from src.database import fetch_one
+from src.redis import redis_client
 from src.tgbot.service import (
     assign_experiment,
     get_experiment_assignment,
@@ -21,6 +25,15 @@ RECENTLY_LIKED_BLENDER_V2_SAMPLE_GATE_PER_VARIANT = 1000
 RECENTLY_LIKED_BLENDER_V2_MATURE_MIN_MEMES_SENT = 100
 RECENTLY_LIKED_BLENDER_V2_SKIPPER_MIN_REACTIONS_7D = 50
 RECENTLY_LIKED_BLENDER_V2_SKIPPER_MAX_LR_7D = 0.20
+RECENTLY_LIKED_BLENDER_V2_QUARTILE_BOUNDARIES_CACHE_KEY = (
+    "recently_liked_blender_v2:lr_quartile_boundaries"
+)
+RECENTLY_LIKED_BLENDER_V2_QUARTILE_BOUNDARIES_LOCK_KEY = (
+    "recently_liked_blender_v2:lr_quartile_boundaries:lock"
+)
+RECENTLY_LIKED_BLENDER_V2_QUARTILE_BOUNDARIES_TTL_SECONDS = 15 * 60
+RECENTLY_LIKED_BLENDER_V2_QUARTILE_BOUNDARIES_LOCK_SECONDS = 30
+RECENTLY_LIKED_BLENDER_V2_DEFAULT_QUARTILE_BOUNDARIES = (0.25, 0.5, 0.75)
 
 MATURE_BLENDER_CONTROL_WEIGHTS = {
     "best_uploaded_memes": 0.3,
@@ -54,61 +67,197 @@ def _weights_for_variant(variant: str) -> dict[str, float]:
     return dict(MATURE_BLENDER_CONTROL_WEIGHTS)
 
 
-async def get_recent_7d_lr_assignment_metrics(user_id: int) -> dict[str, Any]:
-    """Return enrollment-time 7d LR metrics and mature-user LR quartile."""
+def _coerce_lr_quartile_boundaries(raw_boundaries: Any) -> tuple[float, float, float]:
+    if raw_boundaries is None:
+        return RECENTLY_LIKED_BLENDER_V2_DEFAULT_QUARTILE_BOUNDARIES
+
+    if isinstance(raw_boundaries, str):
+        raw_boundaries = raw_boundaries.strip("{}").split(",")
+
+    try:
+        boundaries = tuple(float(value) for value in raw_boundaries)
+    except (TypeError, ValueError):
+        logger.warning(
+            "invalid recently_liked blender v2 LR quartile boundaries: %r",
+            raw_boundaries,
+        )
+        return RECENTLY_LIKED_BLENDER_V2_DEFAULT_QUARTILE_BOUNDARIES
+
+    if len(boundaries) != 3 or any(value != value for value in boundaries):
+        logger.warning(
+            "invalid recently_liked blender v2 LR quartile boundaries: %r",
+            raw_boundaries,
+        )
+        return RECENTLY_LIKED_BLENDER_V2_DEFAULT_QUARTILE_BOUNDARIES
+
+    return tuple(max(0.0, min(1.0, value)) for value in boundaries)
+
+
+def _lr_quartile_from_boundaries(lr_7d: float, boundaries: tuple[float, float, float]) -> int:
+    if lr_7d <= boundaries[0]:
+        return 1
+    if lr_7d <= boundaries[1]:
+        return 2
+    if lr_7d <= boundaries[2]:
+        return 3
+    return 4
+
+
+async def _get_cached_lr_quartile_boundaries() -> tuple[float, float, float] | None:
+    try:
+        cached = await redis_client.get(RECENTLY_LIKED_BLENDER_V2_QUARTILE_BOUNDARIES_CACHE_KEY)
+    except Exception:
+        logger.warning(
+            "recently_liked blender v2 LR quartile boundary cache read failed",
+            exc_info=True,
+        )
+        return None
+
+    if not cached:
+        return None
+
+    try:
+        return _coerce_lr_quartile_boundaries(orjson.loads(cached))
+    except orjson.JSONDecodeError:
+        logger.warning(
+            "recently_liked blender v2 LR quartile boundary cache payload is invalid",
+            exc_info=True,
+        )
+        return None
+
+
+async def _cache_lr_quartile_boundaries(boundaries: tuple[float, float, float]) -> None:
+    try:
+        await redis_client.set(
+            RECENTLY_LIKED_BLENDER_V2_QUARTILE_BOUNDARIES_CACHE_KEY,
+            orjson.dumps(boundaries),
+            ex=RECENTLY_LIKED_BLENDER_V2_QUARTILE_BOUNDARIES_TTL_SECONDS,
+        )
+    except Exception:
+        logger.warning(
+            "recently_liked blender v2 LR quartile boundary cache write failed",
+            exc_info=True,
+        )
+
+
+async def _release_lr_quartile_boundaries_lock(token: str) -> None:
+    try:
+        current = await redis_client.get(RECENTLY_LIKED_BLENDER_V2_QUARTILE_BOUNDARIES_LOCK_KEY)
+        if current == token:
+            await redis_client.delete(RECENTLY_LIKED_BLENDER_V2_QUARTILE_BOUNDARIES_LOCK_KEY)
+    except Exception:
+        logger.warning(
+            "recently_liked blender v2 LR quartile boundary lock release failed",
+            exc_info=True,
+        )
+
+
+async def _calculate_recent_7d_lr_quartile_boundaries() -> tuple[float, float, float]:
     query = text(
         """
-        WITH recent_reactions AS MATERIALIZED (
+        WITH recent_user_lr AS (
             SELECT
-                umr.user_id,
-                COUNT(*) FILTER (WHERE umr.reaction_id IN (1, 2)) AS reactions_7d,
-                COUNT(*) FILTER (WHERE umr.reaction_id = 1) AS likes_7d
+                COUNT(*) FILTER (WHERE umr.reaction_id = 1)::float
+                    / NULLIF(COUNT(*), 0) AS lr_7d
             FROM user_meme_reaction umr
             INNER JOIN user_stats us ON us.user_id = umr.user_id
             WHERE umr.reacted_at >= NOW() - INTERVAL '7 days'
                 AND umr.reaction_id IN (1, 2)
                 AND us.nmemes_sent >= :mature_min_memes_sent
             GROUP BY umr.user_id
-        ),
-        ranked AS (
-            SELECT
-                user_id,
-                reactions_7d,
-                likes_7d,
-                likes_7d::float / NULLIF(reactions_7d, 0) AS lr_7d,
-                NTILE(4) OVER (
-                    ORDER BY likes_7d::float / NULLIF(reactions_7d, 0)
-                ) AS lr_quartile
-            FROM recent_reactions
+            HAVING COUNT(*) > 0
         )
         SELECT
-            COALESCE(r.likes_7d, 0) AS likes_7d,
-            COALESCE(r.reactions_7d, 0) AS reactions_7d,
-            COALESCE(r.lr_7d, 0.0) AS lr_7d,
-            COALESCE(r.lr_quartile, 1) AS lr_quartile
-        FROM (SELECT CAST(:user_id AS bigint) AS user_id) target
-        LEFT JOIN ranked r ON r.user_id = target.user_id
+            PERCENTILE_CONT(ARRAY[0.25, 0.5, 0.75])
+                WITHIN GROUP (ORDER BY lr_7d) AS lr_boundaries
+        FROM recent_user_lr
         """
     )
     row = await fetch_one(
         query,
-        {
-            "user_id": user_id,
-            "mature_min_memes_sent": RECENTLY_LIKED_BLENDER_V2_MATURE_MIN_MEMES_SENT,
-        },
+        {"mature_min_memes_sent": RECENTLY_LIKED_BLENDER_V2_MATURE_MIN_MEMES_SENT},
     )
+    return _coerce_lr_quartile_boundaries(row["lr_boundaries"] if row else None)
+
+
+async def get_recent_7d_lr_quartile_boundaries() -> tuple[float, float, float]:
+    """Return cached mature-user 7d LR quartile cut points.
+
+    Assignment is on the user-facing queue path, so only the lock holder performs
+    the global mature-user aggregate. Other workers wait briefly for the cache,
+    then use deterministic default cut points rather than stampeding the DB.
+    """
+    cached = await _get_cached_lr_quartile_boundaries()
+    if cached is not None:
+        return cached
+
+    token = str(uuid.uuid4())
+    try:
+        acquired = await redis_client.set(
+            RECENTLY_LIKED_BLENDER_V2_QUARTILE_BOUNDARIES_LOCK_KEY,
+            token,
+            nx=True,
+            ex=RECENTLY_LIKED_BLENDER_V2_QUARTILE_BOUNDARIES_LOCK_SECONDS,
+        )
+    except Exception:
+        logger.warning(
+            "recently_liked blender v2 LR quartile boundary lock failed",
+            exc_info=True,
+        )
+        return RECENTLY_LIKED_BLENDER_V2_DEFAULT_QUARTILE_BOUNDARIES
+
+    if acquired:
+        try:
+            boundaries = await _calculate_recent_7d_lr_quartile_boundaries()
+            await _cache_lr_quartile_boundaries(boundaries)
+            return boundaries
+        finally:
+            await _release_lr_quartile_boundaries_lock(token)
+
+    for _ in range(10):
+        await sleep(0.1)
+        cached = await _get_cached_lr_quartile_boundaries()
+        if cached is not None:
+            return cached
+
+    logger.warning("recently_liked blender v2 LR quartile boundaries still uncached after waiting")
+    return RECENTLY_LIKED_BLENDER_V2_DEFAULT_QUARTILE_BOUNDARIES
+
+
+async def get_recent_7d_lr_assignment_metrics(user_id: int) -> dict[str, Any]:
+    """Return enrollment-time 7d LR metrics and mature-user LR quartile."""
+    boundaries = await get_recent_7d_lr_quartile_boundaries()
+    query = text(
+        """
+        SELECT
+            COUNT(*) FILTER (WHERE umr.reaction_id = 1) AS likes_7d,
+            COUNT(*) AS reactions_7d,
+            COALESCE(
+                COUNT(*) FILTER (WHERE umr.reaction_id = 1)::float / NULLIF(COUNT(*), 0),
+                0.0
+            ) AS lr_7d
+        FROM user_meme_reaction umr
+        WHERE umr.user_id = :user_id
+            AND umr.reacted_at >= NOW() - INTERVAL '7 days'
+            AND umr.reaction_id IN (1, 2)
+        """
+    )
+    row = await fetch_one(query, {"user_id": user_id})
     if row is None:
         return {
             "likes_7d": 0,
             "reactions_7d": 0,
             "lr_7d": 0.0,
             "lr_quartile": 1,
+            "lr_quartile_boundaries": list(boundaries),
         }
+    lr_7d = float(row["lr_7d"] or 0.0)
     return {
         "likes_7d": int(row["likes_7d"] or 0),
         "reactions_7d": int(row["reactions_7d"] or 0),
-        "lr_7d": float(row["lr_7d"] or 0.0),
-        "lr_quartile": int(row["lr_quartile"] or 1),
+        "lr_7d": lr_7d,
+        "lr_quartile": _lr_quartile_from_boundaries(lr_7d, boundaries),
+        "lr_quartile_boundaries": list(boundaries),
     }
 
 
@@ -147,6 +296,10 @@ def build_recently_liked_blender_v2_assignment(
         },
         "assigned_weights": _weights_for_variant(variant),
     }
+    if "lr_quartile_boundaries" in metrics:
+        assignment_metadata["lr_quartile_boundaries"] = [
+            round(float(boundary), 6) for boundary in metrics["lr_quartile_boundaries"]
+        ]
     return variant, assignment_metadata
 
 
