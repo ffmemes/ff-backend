@@ -133,11 +133,40 @@ def compact_body(body: str, limit: int = 240) -> str:
     return body if len(body) <= limit else body[: limit - 1] + "…"
 
 
-def issue_comments(client: Paperclip, issue_id: str) -> list[dict[str, Any]]:
-    comments = client.get(f"/api/issues/{issue_id}/comments", {"limit": "100"})
+def issue_comments(client: Paperclip, issue_id: str) -> tuple[list[dict[str, Any]], bool]:
+    # Mirror `issue_interactions` / `get_issue`: 404 = no comments yet
+    # (expected, not degraded). Anything else (401, 5xx, transport, decode) is
+    # audit-degraded — without comments we can lose approval signals
+    # (`outcome=...`, `APPROVED_TO_PUBLISH`) and the publish-flow classifier
+    # would silently pass instead of flagging `publish_check_degraded`. A
+    # single failed comments fetch must not crash the whole audit.
+    try:
+        comments = client.get(f"/api/issues/{issue_id}/comments", {"limit": "100"})
+    except RuntimeError as exc:
+        message = str(exc)
+        if message.startswith("HTTP 404 for "):
+            return [], False
+        print(
+            f"warning: comments fetch degraded for {issue_id}: {message}",
+            file=sys.stderr,
+        )
+        return [], True
     if not isinstance(comments, list):
-        return []
-    return sorted(comments, key=lambda item: item.get("createdAt") or "")
+        print(
+            f"warning: comments response shape unrecognized for {issue_id}; treating as degraded",
+            file=sys.stderr,
+        )
+        return [], True
+    dict_items = [item for item in comments if isinstance(item, dict)]
+    degraded = len(dict_items) != len(comments)
+    if degraded:
+        print(
+            f"warning: comments list for {issue_id} contained "
+            f"{len(comments) - len(dict_items)} non-dict element(s); "
+            f"treating as degraded",
+            file=sys.stderr,
+        )
+    return sorted(dict_items, key=lambda item: item.get("createdAt") or ""), degraded
 
 
 def issue_interactions(client: Paperclip, issue_id: str) -> tuple[list[dict[str, Any]], bool]:
@@ -393,13 +422,13 @@ def referenced_post_issues(
             continue
         if not (ref.get("title") or "").startswith("[post:"):
             continue
-        ref_comments = issue_comments(client, ref["id"])
+        ref_comments, ref_comments_degraded = issue_comments(client, ref["id"])
         ref_interactions, ref_degraded = issue_interactions(client, ref["id"])
         flags, latest = classify_issue(
             ref,
             ref_comments,
             ref_interactions,
-            ref_degraded or ref_issue_degraded,
+            ref_degraded or ref_issue_degraded or ref_comments_degraded,
         )
         found.append(
             {
@@ -443,10 +472,11 @@ def audit_routines(client: Paperclip, company_id: str, focus: str) -> list[dict[
             issue, issue_degraded = get_issue(client, issue_id)
         else:
             issue, issue_degraded = None, False
-        comments = issue_comments(client, issue_id) if issue_id else []
         if issue_id:
+            comments, comments_degraded = issue_comments(client, issue_id)
             interactions, interactions_degraded = issue_interactions(client, issue_id)
         else:
+            comments, comments_degraded = [], False
             interactions, interactions_degraded = [], False
         # When the issue fetch is degraded, fall back to the routine's embedded
         # `linkedIssue` so publish-flow detection (driven by title prefix) still
@@ -457,7 +487,7 @@ def audit_routines(client: Paperclip, company_id: str, focus: str) -> list[dict[
             issue_for_classify,
             comments,
             interactions,
-            interactions_degraded or issue_degraded,
+            interactions_degraded or issue_degraded or comments_degraded,
         )
         payload_pr = str(((run.get("triggerPayload") or {}).get("pr_number")) or "")
         issue_title = (
@@ -492,9 +522,11 @@ def stale_post_drafts(client: Paperclip, company_id: str) -> tuple[list[dict[str
         title = issue.get("title") or ""
         if not title.startswith("[post:"):
             continue
-        comments = issue_comments(client, issue["id"])
+        comments, comments_degraded = issue_comments(client, issue["id"])
         interactions, interactions_degraded = issue_interactions(client, issue["id"])
-        flags, latest = classify_issue(issue, comments, interactions, interactions_degraded)
+        flags, latest = classify_issue(
+            issue, comments, interactions, interactions_degraded or comments_degraded
+        )
         if flags or issue.get("status") != "done":
             rows.append(
                 {

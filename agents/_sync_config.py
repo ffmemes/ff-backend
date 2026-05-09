@@ -297,6 +297,12 @@ def main() -> int:
         manifest = yaml.safe_load(f)
 
     agents_list = api("GET", f"/api/companies/{COMPANY}/agents")
+    if not isinstance(agents_list, list):
+        print(
+            f"  ERROR unexpected agents response shape {type(agents_list).__name__}",
+            file=sys.stderr,
+        )
+        return 1
     by_slug = {a["urlKey"]: a for a in agents_list}
     try:
         secret_ids = load_secret_ids()
