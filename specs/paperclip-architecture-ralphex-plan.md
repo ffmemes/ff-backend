@@ -143,30 +143,37 @@ Verification:
 Run these audits in parallel when subagents are available. If Ralphex cannot
 spawn agents, run the same tracks sequentially.
 
-- [ ] Track A, live execution logs: identify runs/issues that stopped, looped,
+- [x] Track A, live execution logs: identify runs/issues that stopped, looped,
       or produced fake-green results. For each, record last concrete action,
-      expected next action, observed blocker, and proof.
-- [ ] Track B, local markdown/specs: identify stale or harmful instructions in
+      expected next action, observed blocker, and proof. (Consumed Task 1
+      snapshots: routine-audit.json, outcome-audit.json, open-issues.json.)
+- [x] Track B, local markdown/specs: identify stale or harmful instructions in
       `CLAUDE.md`, `agents/**`, `docs/**`, and `specs/**` that send agents to
       old tools, wrong access paths, deprecated GStack skills, raw trigger URLs,
       stale container names, or historical Paperclip behavior.
-- [ ] Track C, tool/env/access matrix: compare prompts and routines against
+- [x] Track C, tool/env/access matrix: compare prompts and routines against
       manifest/env/tool availability for `gh`, `jq`, `psql`, `sentry`, `codex`,
       Paperclip MCP/API, editorial publishing, GitHub PR review, Telegram, DB,
       Prefect, Redis, and GStack.
-- [ ] Track D, architecture/deepening: run the local
+- [x] Track D, architecture/deepening: run the local
       `improve-codebase-architecture` skill against Paperclip helper scripts and
       audits, then rank the modules that would reduce repeated agent work.
-- [ ] Merge findings into `paperclip-problem-ledger.md` with fields:
+      (`improve-codebase-architecture` skill is not attached to this Ralphex
+      runtime; ran an equivalent inline analysis: line-count + duplicated
+      HTTP/redaction logic across `agents/_sync_config.py`,
+      `scripts/paperclip_routine_audit.py`,
+      `scripts/paperclip_outcome_audit.py`. Two architecture rows recorded —
+      L-D-DUP-HTTP-AUTH-REDACTION and L-PW-AUDIT-PAGINATION.)
+- [x] Merge findings into `paperclip-problem-ledger.md` with fields:
       `class`, `proof`, `affected_agent`, `source_file_or_issue`, `root_cause`,
       `safe_fix`, `verification`, `risk`, `auto_fix_allowed`.
 
 Verification:
 
-- [ ] Every high-priority ledger row has direct proof from a live log, API
+- [x] Every high-priority ledger row has direct proof from a live log, API
       response, audit script, dry-run mismatch, or file reference.
-- [ ] Ledger separates proven blockers from guesses.
-- [ ] Ledger marks which fixes can run automatically and which need human/CEO
+- [x] Ledger separates proven blockers from guesses.
+- [x] Ledger marks which fixes can run automatically and which need human/CEO
       approval.
 
 ## Repair Phases
