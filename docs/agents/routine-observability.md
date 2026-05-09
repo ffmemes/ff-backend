@@ -119,8 +119,34 @@ or stopped tasks; it does not prove that a useful product outcome happened.
 Routine health should come from the outcome contracts above and from Paperclip
 issues/comments, not from Telegram notifications.
 
+## Blocked Work Contract
+
+Do not stop at "blocked". Before setting `blocked`, create or link the issue
+that can unblock it, set `blockedByIssueIds`, assign the unblocker to the owning
+role, and leave one comment with: blocker, owner, retry condition, and next
+automatic wake path.
+
+Routine execution issues should not remain blocked just because the run was
+partial. Close the routine issue with `outcome=partial` or `outcome=error` and
+link the durable follow-up issue. Use `blocked` only for durable work items that
+are waiting on another issue, deploy, approval, or external system.
+
+For time-gated analysis (for example, "measure after 7 full days of data"), do
+not leave the issue `blocked` on an already-completed implementation issue. Move
+it to `backlog` with an absolute due timestamp in the comment, then move it to
+`todo` only when the data window is actually ready.
+
 ## Context Discipline For Agents
 
+- Stop after the compact audit unless a flagged outcome contract requires
+  deeper evidence. Do not dump full Paperclip issue lists, agent configs,
+  server logs, dashboard pages, or Telegram activity feeds into context when
+  `scripts/paperclip_routine_audit.py --json` already identifies the routine,
+  issue id, flag, and expected contract.
+- For Paperclip runtime failures, trust native productivity/liveness surfaces
+  first. File one Paperclip runtime issue only when the native surface reports a
+  persistent failure; do not independently search for stalled runs across raw
+  logs unless the native surface is unavailable.
 - Spawn subagents only with bounded questions and required output fields.
 - Prefer `scripts/paperclip_routine_audit.py --json` over dumping full agent
   configs, issue lists, or server logs into context.

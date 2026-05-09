@@ -178,9 +178,8 @@ agents:
           default: "k4w804sco4s8kc88kwcw0ow4-131756368009"
           requirement: "optional"
         PREFECT_API_URL:
-          kind: "plain"
-          default: "http://65.108.127.32:4200/api"
-          requirement: "optional"
+          kind: "secret"
+          requirement: "required"
         ANALYST_DATABASE_URL:
           kind: "secret"
           requirement: "required"

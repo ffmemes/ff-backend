@@ -205,6 +205,14 @@ Required in `.env`: `DATABASE_URL`, `REDIS_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM
 
 Optional: `VK_TOKEN`, `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, `SENTRY_DSN`
 
+### Production DB Operations
+
+For production DB writes, run code from the production server/app container,
+not from a local shell. Local `DATABASE_URL` / `REDIS_URL` may be
+Docker-internal (`app_db`, `redis`) and unusable from the host. If a write must
+touch prod state, SSH to the server and execute inside the deployed app
+container with the deployed env.
+
 ### Credential Safety
 
 **IMPORTANT**: Always reference credentials via `$ENV_VAR_NAME` in bash commands. Never expand, paste, or hardcode actual secret values inline. Use `source .env` to load variables, then reference by name:
@@ -222,6 +230,11 @@ psql "host=... user=... password=ACTUAL_PASSWORD dbname=..."
 ```
 
 This applies to all secrets: database URLs, API tokens, bot tokens, etc.
+
+This repo is public. Never paste real tokens, DB URLs, secret IDs, private
+webhook URLs, `.env` contents, or production output containing credentials into
+docs, issues, PRs, or agent prompts. Use env var names and redacted examples
+only.
 
 ## Product Context
 
@@ -246,6 +259,12 @@ This applies to all secrets: database URLs, API tokens, bot tokens, etc.
   - Resume paused deployments: `prefect deployment resume "<name>"`
 
 ### Production Health Checklist
+
+Paperclip agents should treat SSH-based production checks as human/MacBook-only.
+In agent runtime, use the assigned observability surfaces first: Sentry CLI/API,
+Coolify API with `$COOLIFY_BASE_URL` + `$COOLIFY_ACCESS_TOKEN`, and read-only DB
+via `$ANALYST_DATABASE_URL`. If those env vars are missing, report degraded
+access instead of attempting SSH or looking for credentials.
 
 After every deploy or when checking system health, verify:
 

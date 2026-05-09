@@ -10,8 +10,7 @@ agent infrastructure, see `paperclip-ops-runbook.md`.
 2. Workflow `POST`s the Paperclip PR Review routine trigger with
    `{pr_number, pr_url}`. URL and bearer secret live in GitHub Actions secrets
    / workflow config; do not paste trigger IDs into public docs.
-3. Paperclip routes to the **Staff Engineer** agent (id
-   `1a323bb6-2b4d-46bf-9c33-7971fa1673d5`). Its status flips
+3. Paperclip routes to the **Staff Engineer** agent. Its status flips
    `idle → running` and `lastHeartbeatAt` ticks.
 4. Staff Engineer reads CI state, checks out the PR, runs `/review` plus
    `/codex review`, posts a GitHub-visible review signal, then either:

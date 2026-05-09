@@ -29,6 +29,17 @@ You are running without a human operator. NEVER call `AskUserQuestion`. When ski
 2. **Coolify app logs** — `curl -s "$COOLIFY_BASE_URL/api/v1/applications/v0kkssccwoswgwwscws4kscc/logs?lines=200" -H "Authorization: Bearer $COOLIFY_ACCESS_TOKEN"`.
 3. **DB health** — `psql $ANALYST_DATABASE_URL` (read-only). Query `user_meme_reaction`, `user_stats.updated_at`, `meme_stats.updated_at`, and new `meme` rows in the last hour.
 
+## Access Unblock Rule
+
+Before a scan, verify required observability env vars by name only:
+`ANALYST_DATABASE_URL`, `COOLIFY_BASE_URL`, `COOLIFY_ACCESS_TOKEN`,
+`SENTRY_AUTH_TOKEN`, `PREFECT_API_URL`, `PREFECT_AUTH_STRING`, and `PATH`
+containing `/paperclip/bin`.
+
+If one is missing, do not try SSH, dashboard scraping, local `.env` discovery,
+or secret recovery. Create or update one `[maintenance:qa-runtime-access]`
+issue with the missing env var names and mark the current run YELLOW/degraded.
+
 ## Paperclip Runtime
 
 Use the native `paperclip` skill for wake context, task selection, checkout,
@@ -113,14 +124,15 @@ even when the run is partial or errored.
 ## Post-Deploy Verification
 
 When reviewing after a deploy, whether from scheduled heartbeat, Sentry trigger, or handoff:
-1. **Run `/canary`** — MANDATORY. Handles console errors, performance regressions, page failures, baseline comparison.
+1. **Run `/canary` only for deploys that touch a web/API surface where browser checks are meaningful.** For Telegram-bot-only incidents, use Sentry, Coolify logs, DB health, and E2E smoke when credentials are already configured.
 2. **Sentry scan** — run `sentry issue list --query "is:unresolved" --limit 20 --json --fields shortId,title,level,firstSeen`; if only legacy `sentry-cli` exists, run `sentry-cli issues list --org "$SENTRY_ORG" --project "$SENTRY_PROJECT" --status unresolved --max-rows 20`. Cross-reference against the deploy timestamp.
 3. Run E2E smoke tests if credentials are configured (see below).
 4. Report results to **CTO** — GREEN (all clear) or RED (issues found).
 
 ## Post-Deploy E2E Smoke Tests
 
-After running /canary, Sentry scan, and DB health checks, run the E2E smoke tests to verify the bot works as a real user would experience it:
+After the applicable post-deploy checks, Sentry scan, and DB health checks, run
+the E2E smoke tests to verify the bot works as a real user would experience it:
 
 ```bash
 pip install -r requirements-e2e.txt  # if not already installed
@@ -135,12 +147,16 @@ Requires env vars: `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION_STR
 - `FAIL` — CRITICAL RED, bot is not responding to users. Escalate to CTO immediately.
 - `SKIP` — E2E credentials not configured. Rely on other checks (Sentry, logs, DB health).
 
+If E2E smoke credentials are missing, record `SKIP` and continue with
+Sentry/log/DB evidence. Do not regenerate Telegram session strings or request
+credentials from inside an autonomous Paperclip run.
+
 **If FAIL post-deploy:**
 1. Check if it's a transient Telegram API issue (retry once after 30s)
 2. If still failing, escalate to CTO with full script output
 3. The specific failure message maps directly to the broken feature
 
-**Session string exclusivity:** The Telegram session string can only be used by one process at a time. Do not run E2E smoke tests concurrently with any other Telethon client using the same session. If the session is invalidated, regenerate with `python scripts/generate_session_string.py`.
+**Session string exclusivity:** The Telegram session string can only be used by one process at a time. Do not run E2E smoke tests concurrently with any other Telethon client using the same session. If the session is invalidated inside an autonomous Paperclip run, record `SKIP` and escalate to CTO — do not attempt to regenerate it (`scripts/generate_session_string.py` is interactive and human-only; it prompts for API ID/Hash and a Telegram verification code).
 
 ### Fresh-User Onboarding Test
 

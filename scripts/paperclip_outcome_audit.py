@@ -81,6 +81,10 @@ class Paperclip:
         except urllib.error.HTTPError as exc:
             body = compact_body(exc.read().decode("utf-8", errors="replace"), limit=500)
             raise RuntimeError(f"HTTP {exc.code} for {path}: {body}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"transport error for {path}: {exc.reason}") from exc
+        except (TimeoutError, OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"transport/decode failure for {path}: {exc}") from exc
 
 
 def paperclip_base_url() -> str | None:
@@ -139,12 +143,136 @@ def list_agents(client: Paperclip, company_id: str) -> dict[str, str]:
     }
 
 
-def list_issues(client: Paperclip, company_id: str, limit: int) -> list[dict[str, Any]]:
-    issues = client.get(
-        f"/api/companies/{company_id}/issues",
-        {"status": ALL_STATUSES, "limit": str(limit)},
-    )
-    return issues if isinstance(issues, list) else []
+def list_issues(
+    client: Paperclip, company_id: str, limit: int
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    # Paginate so the audit doesn't silently undercount once the company crosses
+    # the API's per-request cap. We dedupe by issue id and stop only on an empty
+    # page (end of data) or on a full duplicate page (API ignored `offset`).
+    # We deliberately do NOT short-circuit on a "short" page: if the server
+    # enforces a hidden per-request cap below our requested page_size, that
+    # short page would otherwise look like end-of-data and silently truncate.
+    # Instead, we keep advancing `offset` by what the server actually returned
+    # and let the empty-page or duplicate-page check terminate.
+    PAGE_SIZE = 200
+    collected: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    offset = 0
+    truncation: dict[str, Any] = {"truncated": False, "reason": None, "atOffset": None}
+    while len(collected) < limit:
+        page_size = min(PAGE_SIZE, limit - len(collected))
+        page = client.get(
+            f"/api/companies/{company_id}/issues",
+            {
+                "status": ALL_STATUSES,
+                "limit": str(page_size),
+                "offset": str(offset),
+            },
+        )
+        if not isinstance(page, list):
+            # Shape drift (e.g., wrapped object instead of bare list). Without
+            # this, the pagination silently breaks at offset 0 and returns 0
+            # issues with no degradation flag, which `--json` consumers would
+            # read as a healthy zero-activity week.
+            print(
+                f"warning: list_issues got unexpected response shape "
+                f"{type(page).__name__} at offset={offset}; treating as degraded",
+                file=sys.stderr,
+            )
+            truncation = {
+                "truncated": True,
+                "reason": "unexpected_response_shape",
+                "atOffset": offset,
+            }
+            break
+        if not page:
+            break
+        dict_page = [item for item in page if isinstance(item, dict)]
+        if len(dict_page) != len(page):
+            print(
+                f"warning: list_issues page at offset={offset} contained "
+                f"{len(page) - len(dict_page)} non-dict element(s); treating as degraded",
+                file=sys.stderr,
+            )
+            truncation = {
+                "truncated": True,
+                "reason": "unexpected_response_shape",
+                "atOffset": offset,
+            }
+            break
+        items_with_id = [item for item in dict_page if item.get("id")]
+        if len(items_with_id) != len(dict_page):
+            print(
+                f"warning: list_issues page at offset={offset} contained "
+                f"{len(dict_page) - len(items_with_id)} dict element(s) missing `id`; "
+                f"treating as degraded",
+                file=sys.stderr,
+            )
+            truncation = {
+                "truncated": True,
+                "reason": "unexpected_response_shape",
+                "atOffset": offset,
+            }
+            break
+        new_items = [item for item in items_with_id if item["id"] not in seen]
+        if not new_items:
+            print(
+                f"warning: list_issues paginate stalled at offset={offset} "
+                f"(page of duplicates); API likely ignores `offset` or has "
+                f"a server-side cap; results may be truncated",
+                file=sys.stderr,
+            )
+            truncation = {
+                "truncated": True,
+                "reason": "duplicate_page_offset_ignored",
+                "atOffset": offset,
+            }
+            break
+        for item in new_items:
+            seen.add(item["id"])
+            collected.append(item)
+        offset += len(page)
+    if not truncation["truncated"] and len(collected) >= limit:
+        # Probe one extra item so a dataset that happens to be exactly `limit`
+        # rows isn't falsely reported as truncated. If the probe is non-empty
+        # (or shape-degraded), we really did hit the ceiling. If the probe
+        # itself fails (HTTP/transport), don't abort the whole audit — we
+        # already collected a full result set; degrade to a truncation flag
+        # instead so callers still get a JSON report.
+        try:
+            probe = client.get(
+                f"/api/companies/{company_id}/issues",
+                {
+                    "status": ALL_STATUSES,
+                    "limit": "1",
+                    "offset": str(len(collected)),
+                },
+            )
+        except RuntimeError as exc:
+            print(
+                f"warning: list_issues ceiling probe failed at limit={limit}: {exc}; "
+                f"treating as truncated",
+                file=sys.stderr,
+            )
+            truncation = {
+                "truncated": True,
+                "reason": "hit_limit_ceiling_probe_failed",
+                "atOffset": len(collected),
+            }
+        else:
+            if isinstance(probe, list) and not probe:
+                pass  # exactly `limit` rows existed; not truncated
+            else:
+                print(
+                    f"warning: list_issues hit ceiling limit={limit}; results may be truncated",
+                    file=sys.stderr,
+                )
+                truncation = {
+                    "truncated": True,
+                    "reason": "hit_limit_ceiling",
+                    "atOffset": len(collected),
+                }
+    return collected, truncation
 
 
 def bracket_slug(title: str) -> str | None:
@@ -327,7 +455,7 @@ def build_report(client: Paperclip, company_id: str, days: int, limit: int) -> d
     generated = datetime.now(timezone.utc)
     since = generated - timedelta(days=days)
     agents = list_agents(client, company_id)
-    issues = list_issues(client, company_id, limit)
+    issues, issues_truncation = list_issues(client, company_id, limit)
 
     touched = [
         issue
@@ -376,6 +504,10 @@ def build_report(client: Paperclip, company_id: str, days: int, limit: int) -> d
         flags.append("stale_active_experiments")
     if len(experiments) > 2:
         flags.append("too_many_active_experiments")
+    if issues_truncation["truncated"]:
+        flags.append("issue_list_truncated")
+        if issues_truncation.get("reason") == "unexpected_response_shape":
+            flags.append("issue_list_shape_degraded")
 
     return {
         "generatedAt": generated.isoformat(),
@@ -386,6 +518,7 @@ def build_report(client: Paperclip, company_id: str, days: int, limit: int) -> d
             "until": generated.isoformat(),
         },
         "issueLimit": limit,
+        "issueListTruncation": issues_truncation,
         "issues": {
             "touched": len(touched),
             "created": len(created),
@@ -428,6 +561,16 @@ def recommended_actions(flags: list[str]) -> list[str]:
         )
     if "too_many_active_experiments" in flags:
         actions.append("Reduce to at most two active experiments so attribution stays readable.")
+    if "issue_list_shape_degraded" in flags:
+        actions.append(
+            "Issue list response shape changed; counts are unreliable until the "
+            "audit pagination is updated to the new schema."
+        )
+    elif "issue_list_truncated" in flags:
+        actions.append(
+            "Issue list is truncated; raise --limit or fix API offset handling before "
+            "trusting completion/decision counts."
+        )
     if not actions:
         actions.append(
             "Record the top decision, shipped outcome, stopped work, and next bet "

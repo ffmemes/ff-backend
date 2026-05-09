@@ -18,7 +18,13 @@ jobs:
           PAPERCLIP_PR_REVIEW_TRIGGER_URL: ${{ secrets.PAPERCLIP_PR_REVIEW_TRIGGER_URL }}
           PAPERCLIP_TRIGGER_SECRET: ${{ secrets.PAPERCLIP_TRIGGER_SECRET }}
         run: |
-          curl -s -X POST \
+          # --fail makes curl exit non-zero on HTTP >=400 so a rotated secret,
+          # bad URL, or Paperclip outage fails the workflow instead of silently
+          # leaving a fake-green PR with no Staff Engineer wake queued.
+          # -o /dev/null discards the response body: Paperclip 4xx pages can
+          # echo the requested trigger path and 5xx bodies can leak internals,
+          # both forbidden by the architecture plan.
+          curl -sS --fail -o /dev/null -X POST \
             "$PAPERCLIP_PR_REVIEW_TRIGGER_URL" \
             -H "Authorization: Bearer $PAPERCLIP_TRIGGER_SECRET" \
             -H "Content-Type: application/json" \

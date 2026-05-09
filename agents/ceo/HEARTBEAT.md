@@ -19,7 +19,10 @@ context, scoped tasks, inbox state, checkout, and structured approvals.
 ## 3. Approval Follow-Up
 
 Handle pending structured approvals surfaced by the native `paperclip` skill.
-Close resolved issues or comment on what remains open.
+Close resolved issues or comment on what remains open. Exception: CEO approval
+for `[post:...]` Comms drafts is intermediate; return the issue to Comms with
+status `todo` and the selected approval/revision/skip decision. CEO must not
+close the `[post:...]` issue.
 
 ## 4. Get Assignments
 
