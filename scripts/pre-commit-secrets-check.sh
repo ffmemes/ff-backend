@@ -13,8 +13,12 @@
 
 set -e
 
-# Only check staged changes (what's about to be committed)
-DIFF=$(git diff --cached --diff-filter=ACM)
+# Only check staged changes (what's about to be committed). Exclude paths
+# that are intentionally about secret patterns (the audit script, its
+# tests, and the public-repo rule doc that documents the patterns).
+ALLOWLIST=':!scripts/redaction_audit.py :!scripts/pre-commit-secrets-check.sh :!tests/test_redaction_audit.py :!docs/public-repo-rule.md'
+# shellcheck disable=SC2086
+DIFF=$(git diff --cached --diff-filter=ACM -- . $ALLOWLIST)
 
 if [ -z "$DIFF" ]; then
     exit 0

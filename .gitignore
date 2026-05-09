@@ -147,6 +147,8 @@ backup.dump.gz
 # для локальных шалостей
 test.py
 .gstack/
+.codex/
+.agents/
 
 # Per-developer git worktrees (in-progress feature branches)
 .worktrees/
@@ -157,3 +159,6 @@ experiments/log.jsonl
 experiments/reports/
 # Paperclip state snapshots (may contain sensitive config)
 agents/backup/*.json
+
+# Ralphex local audit snapshots (redacted summaries committed elsewhere)
+.ralphex/

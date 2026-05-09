@@ -1,5 +1,8 @@
 # Autoresearch Research
 
+> Historical research note (March-April 2026 PoC). Not the live system.
+> Reference only — do not run setup commands from this file.
+
 By Andrej Karpathy. Released March 6, 2026. MIT license. 44K GitHub stars.
 Repo: github.com/karpathy/autoresearch
 

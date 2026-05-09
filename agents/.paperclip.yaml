@@ -1,8 +1,12 @@
 schema: "paperclip/v1"
 
-# gstack skills source — Paperclip pulls latest skills from this repo. Updated via routine.
+# gstack skills source — Paperclip pulls skills from this repo at the recorded ref.
+# Bump `ref` only after `agents/deploy.sh --dry-run` shows the new catalog with
+# zero unknown-desired-skills failures.
 skills:
   source: "https://github.com/garrytan/gstack"
+  ref: "main"
+  update_method: "paperclip_skill_sync"  # POST /api/agents/<id>/skills/sync (per-agent)
 
 agents:
   analyst:

@@ -1,3 +1,13 @@
+<!--
+GENERATED SNAPSHOT — do not edit by hand and do not treat as live source of truth.
+The live source of truth for FFmemes Paperclip agents is:
+  - agents/.paperclip.yaml          (skills source/ref, adapter config, env contract)
+  - agents/<slug>/AGENTS.md         (per-agent prompt + frontmatter `skills:` list)
+  - agents/<slug>/routines/*.yaml   (routine descriptions)
+The skill table below is informational and may lag the live Paperclip catalog.
+Run `agents/deploy.sh --dry-run` to see the current upstream ref + catalog state.
+-->
+
 # FFmemes
 
 ![Org Chart](images/org-chart.png)
@@ -86,6 +96,11 @@ This export is informational. For live FFmemes agents, update
 `agents/<slug>/routines/*.description.md` files, then run `./agents/deploy.sh`.
 Do not use `company import` to update existing prod agents; the safe import
 route does not replace existing agents.
+
+The deploy dry-run prints a `Skill catalog preflight` block with the upstream
+gstack `source`/`ref`, `checked` / `updated` / `removed` / `failed` counts, and
+the `update_method`. A non-zero `failed` (unknown desired skills) blocks an
+apply pass — pin the right `ref` in `agents/.paperclip.yaml` before re-running.
 
 See [Paperclip](https://paperclip.ing) for more information.
 

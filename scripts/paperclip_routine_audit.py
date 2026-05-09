@@ -24,11 +24,41 @@ import json
 import os
 import re
 import sys
-import urllib.error
-import urllib.parse
-import urllib.request
 from datetime import datetime, timezone
 from typing import Any
+
+try:
+    from paperclip_contracts import (
+        PUBLISHED_MARKERS as PUBLISHED_MARKER_PATTERNS,
+    )
+    from paperclip_contracts import (
+        issue_slug,
+        nested_state,
+        parent_child_status_violation,
+    )
+    from paperclip_http import (
+        PaperclipAPIError,
+        PaperclipClient,
+        paperclip_base_url,
+        parse_ts,
+        redact,
+    )
+except ModuleNotFoundError:
+    from scripts.paperclip_contracts import (
+        PUBLISHED_MARKERS as PUBLISHED_MARKER_PATTERNS,
+    )
+    from scripts.paperclip_contracts import (
+        issue_slug,
+        nested_state,
+        parent_child_status_violation,
+    )
+    from scripts.paperclip_http import (
+        PaperclipAPIError,
+        PaperclipClient,
+        paperclip_base_url,
+        parse_ts,
+        redact,
+    )
 
 DEFAULT_COMPANY_ID = "96ee7b2e-6df2-43c8-bbe3-53e19297308a"
 POST_RE = re.compile(r"FFM-\d+")
@@ -40,11 +70,6 @@ DEGRADED_PATTERNS = (
     "0 updated",
     "skills no longer in upstream",
 )
-PUBLISHED_MARKER_PATTERNS = (
-    re.compile(r"\boutcome\s*=\s*published\b", re.IGNORECASE),
-    re.compile(r"\b(?:editorial_post_id|editorial post id)\b", re.IGNORECASE),
-    re.compile(r"\b(?:telegram_message_id|telegram message id)\b", re.IGNORECASE),
-)
 INTERACTION_LIST_KEYS = ("interactions", "items", "data")
 CONFIRMATION_KIND_MARKERS = ("confirmation", "request_confirmation")
 ACCEPTED_MARKERS = {"accepted", "approved", "confirmed", "yes"}
@@ -53,56 +78,30 @@ VERIFIED_PAPERCLIP_DEPLOY_PATTERNS = (
     re.compile(r"\bcoolify_deployment_commit\b", re.IGNORECASE),
     re.compile(r"\bactual_deployed_commit\b", re.IGNORECASE),
 )
-SENSITIVE_PATTERNS = (
-    (
-        re.compile(r"(?i)\b(bearer\s+)[a-z0-9._~+/=-]{20,}"),
-        r"\1[REDACTED]",
-    ),
-    (
-        re.compile(r"(https?://)[^@\s/:]+:[^@\s@]+@"),
-        r"\1[REDACTED]@",
-    ),
-    (
-        re.compile(
-            r"(?i)\b([a-z0-9_]*(?:token|secret|api_key|auth)[a-z0-9_]*\s*[:=]\s*)"
-            r"([^\s,;]+)"
-        ),
-        r"\1[REDACTED]",
-    ),
-)
 
 
 class Paperclip:
+    """Backwards-compatible facade over the shared `PaperclipClient`.
+
+    Preserves the `RuntimeError("HTTP {code} for {path}: ...")` shape so
+    the audit's `message.startswith("HTTP 404 for ")` branches stay
+    untouched.
+    """
+
     def __init__(self, base_url: str, api_key: str) -> None:
-        self.base_url = base_url.rstrip("/")
+        self._client = PaperclipClient(
+            base_url,
+            api_key,
+            user_agent="ffmemes-paperclip-routine-audit/1.0",
+        )
+        self.base_url = self._client.base_url
         self.api_key = api_key
 
     def get(self, path: str, query: dict[str, str] | None = None) -> Any:
-        url = self.base_url + path
-        if query:
-            url += "?" + urllib.parse.urlencode(query)
-        req = urllib.request.Request(url)
-        req.add_header("Authorization", f"Bearer {self.api_key}")
-        req.add_header("User-Agent", "ffmemes-paperclip-routine-audit/1.0")
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                return json.loads(resp.read())
-        except urllib.error.HTTPError as exc:
-            body = compact_body(exc.read().decode("utf-8", errors="replace"), limit=500)
-            raise RuntimeError(f"HTTP {exc.code} for {path}: {body}") from exc
-
-
-def paperclip_base_url() -> str | None:
-    base_url = os.getenv("PAPERCLIP_API_URL") or os.getenv("PAPERCLIP_URL")
-    if base_url and base_url.rstrip("/").endswith("/api"):
-        return base_url.rstrip("/")[:-4]
-    return base_url
-
-
-def parse_ts(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return self._client.get(path, query=query)
+        except PaperclipAPIError as exc:
+            raise RuntimeError(str(exc)) from exc
 
 
 def minutes_between(start: str | None, end: str | None) -> float | None:
@@ -114,48 +113,165 @@ def minutes_between(start: str | None, end: str | None) -> float | None:
 
 
 def compact_body(body: str, limit: int = 240) -> str:
-    body = " ".join(body.split())
-    for pattern, replacement in SENSITIVE_PATTERNS:
-        body = pattern.sub(replacement, body)
-    return body if len(body) <= limit else body[: limit - 1] + "…"
+    return redact(body, limit=limit)
 
 
-def issue_comments(client: Paperclip, issue_id: str) -> list[dict[str, Any]]:
-    comments = client.get(f"/api/issues/{issue_id}/comments", {"limit": "100"})
+def issue_comments(client: Paperclip, issue_id: str) -> tuple[list[dict[str, Any]], bool]:
+    # Mirror `issue_interactions` / `get_issue`: 404 = no comments yet
+    # (expected, not degraded). Anything else (401, 5xx, transport, decode) is
+    # audit-degraded — without comments we can lose approval signals
+    # (`outcome=...`, `APPROVED_TO_PUBLISH`) and the publish-flow classifier
+    # would silently pass instead of flagging `publish_check_degraded`. A
+    # single failed comments fetch must not crash the whole audit.
+    try:
+        comments = client.get(f"/api/issues/{issue_id}/comments", {"limit": "100"})
+    except RuntimeError as exc:
+        message = str(exc)
+        if message.startswith("HTTP 404 for "):
+            return [], False
+        print(
+            f"warning: comments fetch degraded for {issue_id}: {message}",
+            file=sys.stderr,
+        )
+        return [], True
     if not isinstance(comments, list):
-        return []
-    return sorted(comments, key=lambda item: item.get("createdAt") or "")
+        print(
+            f"warning: comments response shape unrecognized for {issue_id}; treating as degraded",
+            file=sys.stderr,
+        )
+        return [], True
+    dict_items = [item for item in comments if isinstance(item, dict)]
+    degraded = len(dict_items) != len(comments)
+    if degraded:
+        print(
+            f"warning: comments list for {issue_id} contained "
+            f"{len(comments) - len(dict_items)} non-dict element(s); "
+            f"treating as degraded",
+            file=sys.stderr,
+        )
+    return sorted(dict_items, key=lambda item: item.get("createdAt") or ""), degraded
 
 
-def issue_interactions(client: Paperclip, issue_id: str) -> list[dict[str, Any]]:
+def issue_interactions(client: Paperclip, issue_id: str) -> tuple[list[dict[str, Any]], bool]:
+    # 404 = no interactions for this issue (expected, not degraded). Anything
+    # else (401, 5xx, transport error, decode error) is audit-degraded: we
+    # surface it on stderr AND return degraded=True so callers can flag the
+    # issue in the JSON report. Without this, an approval-only publish flow
+    # could lose its sole approval signal and silently skip
+    # `approved_without_publish_marker`.
     try:
         interactions = client.get(f"/api/issues/{issue_id}/interactions", {"limit": "100"})
-    except RuntimeError:
-        return []
+    except RuntimeError as exc:
+        message = str(exc)
+        # Anchor to the prefix `Paperclip.get` produces (`HTTP {code} for `) so a
+        # 5xx whose response body happens to mention "HTTP 404" doesn't get
+        # silently swallowed as "no interactions for this issue".
+        if message.startswith("HTTP 404 for "):
+            return [], False
+        print(
+            f"warning: interactions fetch degraded for {issue_id}: {message}",
+            file=sys.stderr,
+        )
+        return [], True
     if isinstance(interactions, list):
-        return interactions
+        # Filter to dicts so downstream `.get()` calls can't crash on shape
+        # drift (mixed-type lists). If anything was filtered out, surface it
+        # as degraded rather than silently dropping interactions and risking
+        # a missed approval signal.
+        dict_items = [item for item in interactions if isinstance(item, dict)]
+        if len(dict_items) != len(interactions):
+            print(
+                f"warning: interactions list for {issue_id} contained "
+                f"{len(interactions) - len(dict_items)} non-dict element(s); "
+                f"treating as degraded",
+                file=sys.stderr,
+            )
+            return dict_items, True
+        return dict_items, False
     if isinstance(interactions, dict):
         for key in INTERACTION_LIST_KEYS:
             value = interactions.get(key)
             if isinstance(value, list):
-                return [item for item in value if isinstance(item, dict)]
-    return []
+                dict_items = [item for item in value if isinstance(item, dict)]
+                if len(dict_items) != len(value):
+                    # Mirror the top-level-list branch: filtering non-dicts can
+                    # silently drop an approval signal, so flag as degraded
+                    # rather than returning a clean list.
+                    print(
+                        f"warning: interactions[{key}] for {issue_id} contained "
+                        f"{len(value) - len(dict_items)} non-dict element(s); "
+                        f"treating as degraded",
+                        file=sys.stderr,
+                    )
+                    return dict_items, True
+                return dict_items, False
+    # Unexpected response shape (200 OK but neither a list nor a dict whose
+    # known keys hold a list). Treat as degraded so approval-only `[post:...]`
+    # issues surface `publish_check_degraded` instead of silently passing.
+    print(
+        f"warning: interactions response shape unrecognized for {issue_id}; treating as degraded",
+        file=sys.stderr,
+    )
+    return [], True
 
 
-def get_issue(client: Paperclip, issue_id: str) -> dict[str, Any] | None:
+def get_issue(client: Paperclip, issue_id: str) -> tuple[dict[str, Any] | None, bool]:
+    # 404 = the issue id genuinely doesn't exist (expected in
+    # `referenced_post_issues` where we probe FFM-XXX strings extracted from
+    # text). Anything else (401, 5xx, transport, decode) is audit-degraded:
+    # without the issue body we can't read the title and would silently lose
+    # publish-flow detection (`title.startswith("[post:")`), masking
+    # `approved_without_publish_marker` / `publish_check_degraded`.
     try:
         issue = client.get(f"/api/issues/{issue_id}")
-    except RuntimeError:
-        return None
-    return issue if isinstance(issue, dict) else None
+    except RuntimeError as exc:
+        message = str(exc)
+        if message.startswith("HTTP 404 for "):
+            return None, False
+        print(
+            f"warning: issue fetch degraded for {issue_id}: {message}",
+            file=sys.stderr,
+        )
+        return None, True
+    if isinstance(issue, dict):
+        return issue, False
+    # 200 OK but unexpected shape (list, string, None, etc). Treat as degraded
+    # so we don't silently skip referenced [post:...] issues and lose
+    # `publish_check_degraded` / `approved_without_publish_marker` signals.
+    print(
+        f"warning: issue response shape unrecognized for {issue_id}; treating as degraded",
+        file=sys.stderr,
+    )
+    return None, True
 
 
-def list_issues(client: Paperclip, company_id: str, status: str, limit: int = 100) -> list[dict]:
+def list_issues(
+    client: Paperclip, company_id: str, status: str, limit: int = 200
+) -> tuple[list[dict], bool]:
+    # Returns (issues, truncated). Warn on shape drift instead of silently
+    # returning [] — a wrapped 200 response would otherwise hide every
+    # `[post:...]` draft with no signal to the caller. Also surface a
+    # truncation flag when the page is full so consumers know there may be
+    # more issues beyond what we read (the route does not paginate, so a
+    # full page == "we don't know what we missed").
     issues = client.get(
         f"/api/companies/{company_id}/issues",
         {"status": status, "limit": str(limit)},
     )
-    return issues if isinstance(issues, list) else []
+    if not isinstance(issues, list):
+        print(
+            f"warning: list_issues got unexpected response shape "
+            f"{type(issues).__name__}; treating as degraded",
+            file=sys.stderr,
+        )
+        return [], True
+    truncated = len(issues) >= limit
+    if truncated:
+        print(
+            f"warning: list_issues hit limit={limit}; results may be truncated",
+            file=sys.stderr,
+        )
+    return issues, truncated
 
 
 def routine_matches(name: str, focus: str) -> bool:
@@ -217,6 +333,7 @@ def classify_issue(
     issue: dict[str, Any],
     comments: list[dict[str, Any]],
     interactions: list[dict[str, Any]] | None = None,
+    interactions_degraded: bool = False,
 ) -> tuple[list[str], str]:
     text = "\n".join([issue.get("description") or ""] + [c.get("body") or "" for c in comments])
     lower = text.lower()
@@ -243,17 +360,36 @@ def classify_issue(
     # their work; those must not inherit the channel-publication contract.
     is_publish_flow = title.startswith("[post:") or "daily channel post" in title
     has_approval_signal = "approved" in lower or has_accepted_confirmation(interactions or [])
-    if (
-        is_publish_flow
-        and has_approval_signal
-        and not all(pattern.search(text) for pattern in PUBLISHED_MARKER_PATTERNS)
-    ):
+    has_publish_marker = all(pattern.search(text) for pattern in PUBLISHED_MARKER_PATTERNS)
+    if is_publish_flow and has_approval_signal and not has_publish_marker:
         flags.append("approved_without_publish_marker")
+    elif is_publish_flow and interactions_degraded and not has_publish_marker:
+        # We couldn't read interactions, so we can't tell if approval happened.
+        # Surface that uncertainty rather than silently passing the issue.
+        flags.append("publish_check_degraded")
     # Generic stall / no-comment / zombie-run classification is intentionally
     # delegated to Paperclip v2026.428+ productivity review and liveness
     # recovery; this audit only flags FFmemes business-outcome mismatches.
     latest = comments[-1].get("body", "") if comments else issue.get("description", "")
     return flags, compact_body(latest or "")
+
+
+def derive_nested_state(
+    ref: dict[str, Any],
+    comments: list[dict[str, Any]],
+) -> str:
+    """Project an issue + its comments onto `paperclip_contracts.NESTED_STATES`.
+
+    Used to surface `published` / `approved_unpublished` / `pending_approval`
+    / `stale_draft` / `blocked_without_access` / `missing_smoke` /
+    `merged_without_close` / `unknown` per referenced child so a routine
+    cannot report green while a child is non-terminal.
+    """
+    text = "\n".join(
+        [ref.get("title") or "", ref.get("description") or ""]
+        + [c.get("body") or "" for c in comments]
+    )
+    return nested_state(text, slug=issue_slug(ref.get("title") or ""))
 
 
 def referenced_post_issues(
@@ -264,29 +400,63 @@ def referenced_post_issues(
     text = "\n".join([issue.get("description") or ""] + [c.get("body") or "" for c in comments])
     found: list[dict] = []
     for ident in sorted(set(POST_RE.findall(text))):
-        ref = get_issue(client, ident)
-        if ref and (ref.get("title") or "").startswith("[post:"):
-            ref_comments = issue_comments(client, ref["id"])
-            ref_interactions = issue_interactions(client, ref["id"])
-            flags, latest = classify_issue(ref, ref_comments, ref_interactions)
-            found.append(
-                {
-                    "identifier": ref.get("identifier"),
-                    "title": ref.get("title"),
-                    "status": ref.get("status"),
-                    "assigneeAgentId": ref.get("assigneeAgentId"),
-                    "updatedAt": ref.get("updatedAt"),
-                    "flags": flags,
-                    "latest": latest,
-                }
-            )
+        ref, ref_issue_degraded = get_issue(client, ident)
+        if not ref:
+            if ref_issue_degraded:
+                # Issue fetch failed (5xx, transport, or shape drift). We can't
+                # tell if this is a [post:...] issue or read its publish state,
+                # so surface a degraded entry instead of silently dropping it.
+                found.append(
+                    {
+                        "identifier": ident,
+                        "title": None,
+                        "status": None,
+                        "assigneeAgentId": None,
+                        "updatedAt": None,
+                        "flags": ["publish_check_degraded"],
+                        "nestedState": "unknown",
+                        "latest": "",
+                    }
+                )
+            continue
+        if not (ref.get("title") or "").startswith("[post:"):
+            continue
+        ref_comments, ref_comments_degraded = issue_comments(client, ref["id"])
+        ref_interactions, ref_degraded = issue_interactions(client, ref["id"])
+        flags, latest = classify_issue(
+            ref,
+            ref_comments,
+            ref_interactions,
+            ref_degraded or ref_issue_degraded or ref_comments_degraded,
+        )
+        found.append(
+            {
+                "identifier": ref.get("identifier"),
+                "title": ref.get("title"),
+                "status": ref.get("status"),
+                "assigneeAgentId": ref.get("assigneeAgentId"),
+                "updatedAt": ref.get("updatedAt"),
+                "flags": flags,
+                "nestedState": derive_nested_state(ref, ref_comments),
+                "latest": latest,
+            }
+        )
     return found
 
 
 def audit_routines(client: Paperclip, company_id: str, focus: str) -> list[dict[str, Any]]:
     routines = client.get(f"/api/companies/{company_id}/routines")
     if not isinstance(routines, list):
-        raise RuntimeError("Unexpected routines response")
+        # Mirror list_issues: warn instead of raising. A wrapped/shape-drifted
+        # 200 from /api/companies/<id>/routines used to crash the whole audit,
+        # which means a single API drift wiped all routine signal from the
+        # JSON report — a strictly worse failure mode than "no routines found".
+        print(
+            f"warning: audit_routines got unexpected response shape "
+            f"{type(routines).__name__}; treating as degraded",
+            file=sys.stderr,
+        )
+        return []
 
     rows: list[dict[str, Any]] = []
     for routine in routines:
@@ -298,16 +468,34 @@ def audit_routines(client: Paperclip, company_id: str, focus: str) -> list[dict[
         run = routine.get("lastRun") or {}
         linked = run.get("linkedIssue") or {}
         issue_id = run.get("linkedIssueId")
-        issue = get_issue(client, issue_id) if issue_id else None
-        comments = issue_comments(client, issue_id) if issue_id else []
-        interactions = issue_interactions(client, issue_id) if issue_id else []
-        flags, latest = classify_issue(issue or {}, comments, interactions)
+        if issue_id:
+            issue, issue_degraded = get_issue(client, issue_id)
+        else:
+            issue, issue_degraded = None, False
+        if issue_id:
+            comments, comments_degraded = issue_comments(client, issue_id)
+            interactions, interactions_degraded = issue_interactions(client, issue_id)
+        else:
+            comments, comments_degraded = [], False
+            interactions, interactions_degraded = [], False
+        # When the issue fetch is degraded, fall back to the routine's embedded
+        # `linkedIssue` so publish-flow detection (driven by title prefix) still
+        # fires, and propagate the degradation so we surface
+        # `publish_check_degraded` instead of silently passing.
+        issue_for_classify = issue or (linked if issue_degraded else {})
+        flags, latest = classify_issue(
+            issue_for_classify,
+            comments,
+            interactions,
+            interactions_degraded or issue_degraded or comments_degraded,
+        )
         payload_pr = str(((run.get("triggerPayload") or {}).get("pr_number")) or "")
         issue_title = (
             ((run.get("linkedIssue") or {}).get("title")) or (issue or {}).get("title") or ""
         )
         if payload_pr and f"[pr:{payload_pr}]" not in issue_title:
             flags.append("coalesced_pr_review_mismatch")
+        parent_status = linked.get("status") or (issue or {}).get("status")
         row = {
             "routine": name,
             "routineId": routine.get("id"),
@@ -316,27 +504,37 @@ def audit_routines(client: Paperclip, company_id: str, focus: str) -> list[dict[
             "completedAt": run.get("completedAt"),
             "durationMin": minutes_between(run.get("triggeredAt"), run.get("completedAt")),
             "issue": linked.get("identifier") or (issue or {}).get("identifier"),
-            "issueStatus": linked.get("status") or (issue or {}).get("status"),
+            "issueStatus": parent_status,
             "flags": flags,
             "latest": latest,
         }
         refs = referenced_post_issues(client, issue or {}, comments)
         if refs:
             row["referencedPostIssues"] = refs
+            # Parent cannot be reported green while a referenced child is
+            # non-terminal. Surface the child identifiers explicitly so
+            # downstream consumers can route them.
+            non_terminal = parent_child_status_violation(parent_status, refs)
+            if non_terminal:
+                row["flags"].append("parent_done_child_non_terminal")
+                row["nonTerminalChildren"] = non_terminal
         rows.append(row)
     return rows
 
 
-def stale_post_drafts(client: Paperclip, company_id: str) -> list[dict[str, Any]]:
+def stale_post_drafts(client: Paperclip, company_id: str) -> tuple[list[dict[str, Any]], bool]:
     statuses = "todo,in_progress,in_review,blocked,done"
     rows: list[dict[str, Any]] = []
-    for issue in list_issues(client, company_id, statuses):
+    issues, truncated = list_issues(client, company_id, statuses)
+    for issue in issues:
         title = issue.get("title") or ""
         if not title.startswith("[post:"):
             continue
-        comments = issue_comments(client, issue["id"])
-        interactions = issue_interactions(client, issue["id"])
-        flags, latest = classify_issue(issue, comments, interactions)
+        comments, comments_degraded = issue_comments(client, issue["id"])
+        interactions, interactions_degraded = issue_interactions(client, issue["id"])
+        flags, latest = classify_issue(
+            issue, comments, interactions, interactions_degraded or comments_degraded
+        )
         if flags or issue.get("status") != "done":
             rows.append(
                 {
@@ -348,7 +546,7 @@ def stale_post_drafts(client: Paperclip, company_id: str) -> list[dict[str, Any]
                     "latest": latest,
                 }
             )
-    return rows
+    return rows, truncated
 
 
 def print_text(report: dict[str, Any]) -> None:
@@ -364,9 +562,16 @@ def print_text(report: dict[str, Any]) -> None:
             print(f"  latest: {row['latest']}")
         for ref in row.get("referencedPostIssues", []):
             ref_flags = ",".join(ref["flags"]) if ref["flags"] else "ok"
-            print(f"  ref {ref['identifier']} {ref['status']} flags={ref_flags}: {ref['title']}")
+            nested = ref.get("nestedState") or "unknown"
+            print(
+                f"  ref {ref['identifier']} {ref['status']} nested={nested} "
+                f"flags={ref_flags}: {ref['title']}"
+            )
             if ref["latest"]:
                 print(f"    latest: {ref['latest']}")
+    if report.get("postDraftsTruncated"):
+        print()
+        print("warning: post draft list truncated; raise --limit or paginate")
     if report["postDrafts"]:
         print()
         print("post_drafts:")
@@ -394,15 +599,17 @@ def main() -> int:
         return 2
 
     client = Paperclip(base_url, api_key)
-    post_drafts = (
-        stale_post_drafts(client, args.company_id) if args.focus in {"all", "comms"} else []
-    )
+    if args.focus in {"all", "comms"}:
+        post_drafts, post_drafts_truncated = stale_post_drafts(client, args.company_id)
+    else:
+        post_drafts, post_drafts_truncated = [], False
     report = {
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "companyId": args.company_id,
         "focus": args.focus,
         "routines": audit_routines(client, args.company_id, args.focus),
         "postDrafts": post_drafts,
+        "postDraftsTruncated": post_drafts_truncated,
     }
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))

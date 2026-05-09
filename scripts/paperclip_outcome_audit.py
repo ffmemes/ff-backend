@@ -17,13 +17,45 @@ import json
 import os
 import re
 import sys
-import urllib.error
-import urllib.parse
-import urllib.request
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+
+try:
+    from paperclip_contracts import (
+        EXECUTION_CATEGORIES,
+        ISSUE_CLASSES,
+        OUTCOME_ALIASES,
+        canonical_action,
+        is_decision_action,
+        is_outcome_action,
+        issue_slug,
+    )
+    from paperclip_http import (
+        PaperclipAPIError,
+        PaperclipClient,
+        paperclip_base_url,
+        parse_ts,
+        redact,
+    )
+except ModuleNotFoundError:
+    from scripts.paperclip_contracts import (
+        EXECUTION_CATEGORIES,
+        ISSUE_CLASSES,
+        OUTCOME_ALIASES,
+        canonical_action,
+        is_decision_action,
+        is_outcome_action,
+        issue_slug,
+    )
+    from scripts.paperclip_http import (
+        PaperclipAPIError,
+        PaperclipClient,
+        paperclip_base_url,
+        parse_ts,
+        redact,
+    )
 
 DEFAULT_COMPANY_ID = "96ee7b2e-6df2-43c8-bbe3-53e19297308a"
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,75 +64,32 @@ ACTIVE_EXPERIMENTS_DIR = ROOT / "experiments" / "active"
 
 OPEN_STATUSES = {"backlog", "todo", "in_progress", "in_review", "blocked"}
 ALL_STATUSES = "backlog,todo,in_progress,in_review,blocked,done,cancelled"
-DECISION_ACTIONS = {
-    "experiment_created",
-    "experiment_completed",
-    "experiment_cancelled",
-    "experiment_archived",
-    "weekly_outcome_review",
-}
-OUTCOME_ACTIONS = DECISION_ACTIONS | {
-    "daily_channel_post",
-    "post_published",
-    "bug_fixed",
-}
-SENSITIVE_PATTERNS = (
-    (
-        re.compile(r"(?i)\b(bearer\s+)[a-z0-9._~+/=-]{20,}"),
-        r"\1[REDACTED]",
-    ),
-    (
-        re.compile(r"(https?://)[^@\s/:]+:[^@\s@]+@"),
-        r"\1[REDACTED]@",
-    ),
-    (
-        re.compile(
-            r"(?i)\b([a-z0-9_]*(?:token|secret|api_key|auth)[a-z0-9_]*\s*[:=]\s*)"
-            r"([^\s,;]+)"
-        ),
-        r"\1[REDACTED]",
-    ),
-)
 
 
 class Paperclip:
+    """Backwards-compatible facade over the shared `PaperclipClient`."""
+
     def __init__(self, base_url: str, api_key: str) -> None:
-        self.base_url = base_url.rstrip("/")
+        self._client = PaperclipClient(
+            base_url,
+            api_key,
+            user_agent="ffmemes-paperclip-outcome-audit/1.0",
+        )
+        self.base_url = self._client.base_url
         self.api_key = api_key
 
     def get(self, path: str, query: dict[str, str] | None = None) -> Any:
-        url = self.base_url + path
-        if query:
-            url += "?" + urllib.parse.urlencode(query)
-        req = urllib.request.Request(url)
-        req.add_header("Authorization", f"Bearer {self.api_key}")
-        req.add_header("User-Agent", "ffmemes-paperclip-outcome-audit/1.0")
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                return json.loads(resp.read())
-        except urllib.error.HTTPError as exc:
-            body = compact_body(exc.read().decode("utf-8", errors="replace"), limit=500)
-            raise RuntimeError(f"HTTP {exc.code} for {path}: {body}") from exc
+            return self._client.get(path, query=query)
+        except PaperclipAPIError as exc:
+            raise RuntimeError(str(exc)) from exc
 
-
-def paperclip_base_url() -> str | None:
-    base_url = os.getenv("PAPERCLIP_API_URL") or os.getenv("PAPERCLIP_URL")
-    if base_url and base_url.rstrip("/").endswith("/api"):
-        return base_url.rstrip("/")[:-4]
-    return base_url
+    def paginate(self, path: str, **kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        return self._client.paginate(path, **kwargs)
 
 
 def compact_body(body: str, limit: int = 240) -> str:
-    body = " ".join(body.split())
-    for pattern, replacement in SENSITIVE_PATTERNS:
-        body = pattern.sub(replacement, body)
-    return body if len(body) <= limit else body[: limit - 1] + "..."
-
-
-def parse_ts(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return redact(body, limit=limit)
 
 
 def parse_date(value: str | None) -> date | None:
@@ -136,44 +125,46 @@ def list_agents(client: Paperclip, company_id: str) -> dict[str, str]:
     }
 
 
-def list_issues(client: Paperclip, company_id: str, limit: int) -> list[dict[str, Any]]:
-    issues = client.get(
+def list_issues(
+    client: Paperclip, company_id: str, limit: int
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Paginate every status so the audit doesn't silently undercount once the
+    company crosses the API's per-request cap.
+
+    Deduplication, shape-drift detection, duplicate-page bail, and the
+    ceiling probe live in `PaperclipClient.paginate`; this wrapper just
+    binds the FFmemes-specific path and status filter.
+    """
+    return client.paginate(
         f"/api/companies/{company_id}/issues",
-        {"status": ALL_STATUSES, "limit": str(limit)},
+        query={"status": ALL_STATUSES},
+        limit=limit,
     )
-    return issues if isinstance(issues, list) else []
-
-
-def bracket_slug(title: str) -> str | None:
-    match = re.match(r"\[([a-z0-9_-]+):([^\]]+)\]", title.lower())
-    return match.group(1) if match else None
 
 
 def classify_issue(issue: dict[str, Any], agents: dict[str, str]) -> str:
+    """Map an issue to one of `paperclip_contracts.ALLOWED_ISSUE_CLASSES`.
+
+    The slug → class mapping comes from `ISSUE_CLASSES`; creator/title
+    fallbacks (Analyst report, QA scan, CEO routing, untyped experiment)
+    stay here because they depend on per-company agent names.
+    """
     title = issue.get("title") or ""
     lower = title.lower()
-    slug = bracket_slug(title)
+    slug = issue_slug(title)
     creator = agents.get(issue.get("createdByAgentId"), "")
     assignee = agents.get(issue.get("assigneeAgentId"), "")
 
-    if slug == "pr" or lower == "pr review" or "pr review" in lower:
+    if slug and slug in ISSUE_CLASSES:
+        return ISSUE_CLASSES[slug]
+    if lower == "pr review" or "pr review" in lower:
         return "pr_review"
-    if slug == "post":
-        return "comms_post"
-    if slug == "deploy":
-        return "deploy"
-    if slug == "incident":
-        return "incident"
-    if slug == "maintenance":
-        return "maintenance"
-    if slug == "report" or "analyst report" in lower or creator == "Analyst":
+    if "analyst report" in lower or creator == "Analyst":
         return "analyst_report"
-    if slug == "experiment" or "experiment" in lower:
+    if "experiment" in lower:
         return "experiment"
-    if slug == "scan" or creator == "QA Engineer" or assignee == "QA Engineer":
+    if creator == "QA Engineer" or assignee == "QA Engineer":
         return "qa_scan"
-    if slug == "strategy":
-        return "strategy"
     if creator == "CEO":
         return "ceo_routing"
     return "other"
@@ -208,8 +199,7 @@ def parse_log_entry(line: str) -> dict[str, Any] | None:
 
 
 def entry_contains_product_decision(entry: dict[str, Any]) -> bool:
-    action = entry.get("action")
-    if action in DECISION_ACTIONS:
+    if is_decision_action(entry.get("action")):
         return True
     text = json.dumps(entry.get("details") or {}, ensure_ascii=True).lower()
     return any(
@@ -229,15 +219,17 @@ def log_events(since: datetime, limit: int = 12) -> dict[str, Any]:
     events: list[dict[str, Any]] = []
     decisions: list[dict[str, Any]] = []
     outcomes: list[dict[str, Any]] = []
+    alias_drift: Counter[str] = Counter()
     if not LOG_PATH.exists():
         return {
             "events": [],
             "decisions": [],
             "outcomes": [],
+            "aliasDrift": {},
             "counts": {"events": 0, "decisions": 0, "outcomes": 0},
         }
 
-    for line in LOG_PATH.read_text().splitlines():
+    for line in LOG_PATH.read_text(encoding="utf-8", errors="replace").splitlines():
         entry = parse_log_entry(line)
         if not entry:
             continue
@@ -245,16 +237,25 @@ def log_events(since: datetime, limit: int = 12) -> dict[str, Any]:
         if not ts or ts < since:
             continue
         events.append(entry)
+        action = entry.get("action")
+        # Surface log entries still using the legacy `daily_post` alias so a
+        # prompt or routine description can be cleaned up; the outcome still
+        # counts toward `daily_channel_post` via `canonical_action`.
+        if isinstance(action, str) and action in OUTCOME_ALIASES:
+            alias_drift[action] += 1
         if entry_contains_product_decision(entry):
             decisions.append(entry)
-        if entry.get("action") in OUTCOME_ACTIONS or entry_contains_product_decision(entry):
+        if is_outcome_action(action) or entry_contains_product_decision(entry):
             outcomes.append(entry)
 
     def compact(entry: dict[str, Any]) -> dict[str, Any]:
+        action = entry.get("action")
+        canonical = canonical_action(action) if isinstance(action, str) else None
         return {
             "timestamp": entry.get("timestamp"),
             "agent": entry.get("agent"),
-            "action": entry.get("action"),
+            "action": action,
+            "canonicalAction": canonical if canonical and canonical != action else None,
             "summary": compact_body(entry.get("summary") or "", limit=180),
         }
 
@@ -262,6 +263,7 @@ def log_events(since: datetime, limit: int = 12) -> dict[str, Any]:
         "events": [compact(e) for e in events[-limit:]],
         "decisions": [compact(e) for e in decisions[-limit:]],
         "outcomes": [compact(e) for e in outcomes[-limit:]],
+        "aliasDrift": dict(alias_drift),
         "counts": {
             "events": len(events),
             "decisions": len(decisions),
@@ -288,7 +290,7 @@ def active_experiments(today: date) -> list[dict[str, Any]]:
         return rows
 
     for path in sorted(ACTIVE_EXPERIMENTS_DIR.glob("*.md")):
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8", errors="replace")
         created_raw = read_field(text, "Created")
         deployed_raw = read_field(text, "Deployed")
         measure_raw = read_field(text, "Measure after")
@@ -324,7 +326,7 @@ def build_report(client: Paperclip, company_id: str, days: int, limit: int) -> d
     generated = datetime.now(timezone.utc)
     since = generated - timedelta(days=days)
     agents = list_agents(client, company_id)
-    issues = list_issues(client, company_id, limit)
+    issues, issues_truncation = list_issues(client, company_id, limit)
 
     touched = [
         issue
@@ -351,15 +353,7 @@ def build_report(client: Paperclip, company_id: str, days: int, limit: int) -> d
     outcome_count = log["counts"]["outcomes"]
     decision_yield = round(decision_count / completed_count, 3) if completed_count else None
     outcome_yield = round(outcome_count / completed_count, 3) if completed_count else None
-    execution_categories = {
-        "pr_review",
-        "incident",
-        "deploy",
-        "qa_scan",
-        "maintenance",
-        "analyst_report",
-    }
-    execution_count = sum(category_counts[name] for name in execution_categories)
+    execution_count = sum(category_counts[name] for name in EXECUTION_CATEGORIES)
     execution_share = round(execution_count / len(touched), 3) if touched else None
 
     flags: list[str] = []
@@ -373,6 +367,12 @@ def build_report(client: Paperclip, company_id: str, days: int, limit: int) -> d
         flags.append("stale_active_experiments")
     if len(experiments) > 2:
         flags.append("too_many_active_experiments")
+    if issues_truncation["truncated"]:
+        flags.append("issue_list_truncated")
+        if issues_truncation.get("reason") == "unexpected_response_shape":
+            flags.append("issue_list_shape_degraded")
+    if log["aliasDrift"]:
+        flags.append("outcome_alias_drift")
 
     return {
         "generatedAt": generated.isoformat(),
@@ -383,6 +383,7 @@ def build_report(client: Paperclip, company_id: str, days: int, limit: int) -> d
             "until": generated.isoformat(),
         },
         "issueLimit": limit,
+        "issueListTruncation": issues_truncation,
         "issues": {
             "touched": len(touched),
             "created": len(created),
@@ -400,6 +401,7 @@ def build_report(client: Paperclip, company_id: str, days: int, limit: int) -> d
             "outcomeYield": outcome_yield,
             "recentDecisions": log["decisions"],
             "recentOutcomes": log["outcomes"],
+            "aliasDrift": log["aliasDrift"],
         },
         "activeExperiments": experiments,
         "flags": flags,
@@ -425,6 +427,21 @@ def recommended_actions(flags: list[str]) -> list[str]:
         )
     if "too_many_active_experiments" in flags:
         actions.append("Reduce to at most two active experiments so attribution stays readable.")
+    if "issue_list_shape_degraded" in flags:
+        actions.append(
+            "Issue list response shape changed; counts are unreliable until the "
+            "audit pagination is updated to the new schema."
+        )
+    elif "issue_list_truncated" in flags:
+        actions.append(
+            "Issue list is truncated; raise --limit or fix API offset handling before "
+            "trusting completion/decision counts."
+        )
+    if "outcome_alias_drift" in flags:
+        actions.append(
+            "experiments/log.jsonl still uses a legacy outcome alias; rename it "
+            "to the canonical action so the contract stays single-sourced."
+        )
     if not actions:
         actions.append(
             "Record the top decision, shipped outcome, stopped work, and next bet "

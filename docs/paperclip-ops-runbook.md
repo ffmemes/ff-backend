@@ -1,5 +1,17 @@
 # Paperclip Operations Runbook
 
+> **Audience fencing.** This file mixes _human/MacBook break-glass_ (SSH,
+> `docker exec`, Coolify UI, interactive auth, manual recovery) with
+> _agent runtime_ guidance. Agents must stop reading at "Access Scope:
+> Human vs Agent Runtime" unless a later subsection is explicitly tagged
+> `agent-runtime: ok`. Untagged blocks are human-only — do not execute
+> them from a Paperclip agent.
+>
+> The redaction rule for this whole repo lives in
+> `docs/public-repo-rule.md` and is enforced by
+> `scripts/redaction_audit.py`. Add env var names and lookup paths, not
+> secret values.
+
 ## Overview
 
 Paperclip manages the autonomous AI agent team for @ffmemesbot.
@@ -64,6 +76,8 @@ export PAPERCLIP_API_KEY="<your-board-api-key>"  # Get from dashboard Settings
 
 ### CLI operations (v2026.403.0+)
 
+<!-- agent-runtime: human-only — SSH/docker exec — agents must NOT run these -->
+
 Run on the server: `ssh root@t.ffmemes.com`, then `docker exec -it $CONT npx paperclipai <command>`.
 Or locally with `--api-base` and `--api-key` flags.
 
@@ -96,6 +110,9 @@ npx paperclipai auth whoami
 ```
 
 ### API operations (MCP preferred, curl fallback)
+
+<!-- agent-runtime: ok — agents use Paperclip MCP / paperclipApiRequest;
+     curl fallback only when MCP unavailable in the runtime -->
 
 With MCP server configured, use MCP tools from Claude Code for most operations:
 
@@ -150,6 +167,8 @@ curl -s -X POST "$PAPERCLIP_URL/api/agents/<agent-id>/wakeup" \
 
 ### SSH operations
 
+<!-- agent-runtime: human-only — SSH/docker exec — agents must NOT run these -->
+
 ```bash
 ssh root@t.ffmemes.com
 CONT=$(docker ps --format '{{.Names}}' | grep k4w804 | head -1)
@@ -183,6 +202,9 @@ Agent instructions: `agents/<name>/AGENTS.md` in this repo.
 Deploy after editing: `./agents/deploy.sh`
 
 ## Routines
+
+<!-- agent-runtime: ok — audit helpers run from agent runtime when
+     PAPERCLIP_URL/PAPERCLIP_API_KEY are present in the agent's env -->
 
 Start routine debugging with the compact audit helper instead of dumping raw
 Paperclip JSON:
@@ -287,7 +309,9 @@ Paperclip triggers now support multiple signing modes:
 **Sentry → Paperclip QA trigger** is fully direct since PR #212. Set up:
 - QA routine `477f452d-06f3-421e-a274-7f09155bb5bb`, webhook trigger `30901464-a100-4cff-9515-9fdbcfc1a797`
 - `signingMode: none` — `server/dist/services/routines.js` short-circuits all auth checks
-- Public URL: `https://org.ffmemes.com/api/routine-triggers/public/18a2f9e439c396e9b21a02fa/fire`
+- Public trigger URL is configured in Sentry/Paperclip only. Do not commit the
+  `routine-triggers/public/.../fire` path; the publicId is sensitive operational
+  material.
 - Sentry posts the raw payload (`{"action":"created","data":{"issue":{...}}}`); Paperclip stores it in `routine_run.triggerPayload` verbatim
 - Trigger fires only on **issue creation**, not subsequent occurrences. To re-test, send an event with a unique exception class so Sentry creates a new issue group.
 
@@ -375,6 +399,9 @@ but runs as non-root `node` user — see Coolify Quirks below.
 
 ## Coolify Quirks (battle-tested 2026-03-27)
 
+<!-- agent-runtime: human-only — Coolify UI / docker exec — agents must NOT run these -->
+
+
 ### Named volume is REQUIRED
 - Coolify's Dockerfile `VOLUME /paperclip` creates anonymous volumes by default
 - Anonymous volumes are NOT reused across redeploys — each deploy gets a fresh one
@@ -420,6 +447,9 @@ docker restart $CONT
 ```
 
 ## Incidents
+
+<!-- agent-runtime: read-only — historical incident notes; do NOT execute the recovery commands.
+     Live recovery procedures are in `docs/paperclip-native-migration.md`. -->
 
 ### 2026-03-27: Full data wipe + rebuild
 
