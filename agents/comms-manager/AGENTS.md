@@ -5,7 +5,6 @@ reportsTo: ceo
 skills:
   - paperclip
   - browse
-  - frontend-design
   - learn
 ---
 
