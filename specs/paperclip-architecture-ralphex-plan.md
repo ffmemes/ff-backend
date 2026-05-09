@@ -367,23 +367,59 @@ Verification:
 
 ### Task 7: Tool, Env, And Access Preflight
 
-- [ ] Build a per-agent runtime probe from `agents/.paperclip.yaml`, prompts,
-      and routine descriptions.
-- [ ] Check required tools and permissions before waking or assigning work:
+- [x] Build a per-agent runtime probe from `agents/.paperclip.yaml`, prompts,
+      and routine descriptions. (`scripts/paperclip_runtime_probe.py` —
+      pure `classify_agent()` + `build_report()`; reads
+      `agents/<slug>/AGENTS.md` and any
+      `agents/<slug>/routines/*.yaml(+description_file)`. CLI default text
+      mode + `--json`. Exit code is non-zero when any agent is `blocked`
+      so wake-up wrappers can short-circuit.)
+- [x] Check required tools and permissions before waking or assigning work:
       GitHub, Paperclip MCP/API, `gh`, `jq`, `psql`, Sentry, Prefect, Redis,
       editorial publishing, Telegram moderator role, and DB read/write role.
-- [ ] When access is missing, create or update one canonical
-      `[maintenance:access-*]` issue with env var names and the blocked agents.
-- [ ] Remove stale plain defaults such as old container names or outdated
-      Prefect URLs from agent runtime config when dynamic lookup or secret names
-      are the right interface.
+      (`KNOWN_TOOLS` covers `gh/jq/psql/sentry/sentry-cli/codex/prefect/curl/
+      python3/ruff/alembic/docker`; `HARD_TOOLS` flips missing-tool to
+      `blocked` for the agent that invokes it; manifest `requirement: required`
+      envs cover Paperclip MCP/API + DB + Telegram + Sentry + Prefect tokens.)
+- [x] When access is missing, create or update one canonical
+      `[maintenance:access-*]` issue with env var names and the blocked
+      agents. (`maintenance_slug(slug) == "[maintenance:access-<slug>]"`;
+      `build_report` aggregates each agent's missing envs/tools under one
+      canonical key in `canonical_issues`. Re-running the probe is
+      idempotent — covered by
+      `tests/test_paperclip_runtime_probe.py::test_build_report_is_idempotent`
+      and `::test_build_report_aggregates_canonical_issues`.)
+- [x] Remove stale plain defaults such as old container names or outdated
+      Prefect URLs from agent runtime config when dynamic lookup or secret
+      names are the right interface. (`agents/.paperclip.yaml`:
+      `qa-engineer.inputs.env.COOLIFY_RESOURCE_UUID` and
+      `COOLIFY_CONTAINER_NAME` removed; comment notes that the resource
+      UUID and container name are documented in `agents/qa-engineer/
+      AGENTS.md` and resolved dynamically from the Coolify API. Probe
+      `manifest_env_requirements()` flags any future UUID-shaped plain
+      default; `tests/test_paperclip_runtime_probe.py
+      ::test_real_manifest_does_not_carry_uuid_plain_defaults` blocks
+      regression.)
 
 Verification:
 
-- [ ] Probe output is redacted and machine-readable.
-- [ ] Each agent has a clear `ready`, `degraded`, or `blocked` status with a
-      next action.
-- [ ] Missing access does not cause duplicate QA/ops issues.
+- [x] Probe output is redacted and machine-readable. (Output references
+      env-var names only — never values; covered by
+      `tests/test_paperclip_runtime_probe.py
+      ::test_classify_agent_redacts_only_names`. `--json` produces a
+      stable JSON document with `counts`, per-agent rows, and
+      `canonical_issues`.)
+- [x] Each agent has a clear `ready`, `degraded`, or `blocked` status with
+      a next action. (Status enum is enforced in
+      `::test_build_report_against_real_repo_runs_without_error`; every
+      non-`ready` agent carries a `next_action` with a `maintenance_issue`
+      type, a canonical slug, and a redacted summary line.)
+- [x] Missing access does not cause duplicate QA/ops issues. (One
+      canonical `[maintenance:access-<agent-slug>]` slug per agent, even
+      when the same env is missing across multiple gaps. The slug stays
+      stable across runs — `test_build_report_is_idempotent` proves the
+      probe re-emits the same canonical-issues mapping for unchanged
+      input.)
 
 ### Task 8: Move Executable Prompt Workflows Into Tested Helpers
 

@@ -173,14 +173,11 @@ agents:
         COOLIFY_BASE_URL:
           kind: "secret"
           requirement: "required"
-        COOLIFY_RESOURCE_UUID:
-          kind: "plain"
-          default: "k4w804sco4s8kc88kwcw0ow4"
-          requirement: "optional"
-        COOLIFY_CONTAINER_NAME:
-          kind: "plain"
-          default: "k4w804sco4s8kc88kwcw0ow4-131756368009"
-          requirement: "optional"
+        # Coolify resource UUID + container name are intentionally NOT pinned
+        # as plain defaults here. They are documented in agents/qa-engineer/
+        # AGENTS.md (the "Key Coolify UUIDs" table) and resolved dynamically
+        # from the Coolify API when needed. Hand-written UUID defaults rot
+        # the moment Coolify rebuilds the container.
         PREFECT_API_URL:
           kind: "secret"
           requirement: "required"
