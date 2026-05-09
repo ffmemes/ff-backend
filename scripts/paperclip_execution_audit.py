@@ -38,16 +38,28 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-from paperclip_contracts import (
-    DECISION_ACTIONS,
-    OUTCOME_ACTIONS,
-)
-from paperclip_http import (
-    PaperclipClient,
-    parse_ts,
-    redact,
-    require_credentials,
-)
+try:
+    from paperclip_contracts import (
+        DECISION_ACTIONS,
+        OUTCOME_ACTIONS,
+    )
+    from paperclip_http import (
+        PaperclipClient,
+        parse_ts,
+        redact,
+        require_credentials,
+    )
+except ModuleNotFoundError:
+    from scripts.paperclip_contracts import (
+        DECISION_ACTIONS,
+        OUTCOME_ACTIONS,
+    )
+    from scripts.paperclip_http import (
+        PaperclipClient,
+        parse_ts,
+        redact,
+        require_credentials,
+    )
 
 DEFAULT_COMPANY_ID = "96ee7b2e-6df2-43c8-bbe3-53e19297308a"
 ROOT = Path(__file__).resolve().parents[1]

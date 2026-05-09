@@ -27,21 +27,38 @@ import sys
 from datetime import datetime, timezone
 from typing import Any
 
-from paperclip_contracts import (
-    PUBLISHED_MARKERS as PUBLISHED_MARKER_PATTERNS,
-)
-from paperclip_contracts import (
-    issue_slug,
-    nested_state,
-    parent_child_status_violation,
-)
-from paperclip_http import (
-    PaperclipAPIError,
-    PaperclipClient,
-    paperclip_base_url,
-    parse_ts,
-    redact,
-)
+try:
+    from paperclip_contracts import (
+        PUBLISHED_MARKERS as PUBLISHED_MARKER_PATTERNS,
+    )
+    from paperclip_contracts import (
+        issue_slug,
+        nested_state,
+        parent_child_status_violation,
+    )
+    from paperclip_http import (
+        PaperclipAPIError,
+        PaperclipClient,
+        paperclip_base_url,
+        parse_ts,
+        redact,
+    )
+except ModuleNotFoundError:
+    from scripts.paperclip_contracts import (
+        PUBLISHED_MARKERS as PUBLISHED_MARKER_PATTERNS,
+    )
+    from scripts.paperclip_contracts import (
+        issue_slug,
+        nested_state,
+        parent_child_status_violation,
+    )
+    from scripts.paperclip_http import (
+        PaperclipAPIError,
+        PaperclipClient,
+        paperclip_base_url,
+        parse_ts,
+        redact,
+    )
 
 DEFAULT_COMPANY_ID = "96ee7b2e-6df2-43c8-bbe3-53e19297308a"
 POST_RE = re.compile(r"FFM-\d+")

@@ -22,22 +22,40 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from paperclip_contracts import (
-    EXECUTION_CATEGORIES,
-    ISSUE_CLASSES,
-    OUTCOME_ALIASES,
-    canonical_action,
-    is_decision_action,
-    is_outcome_action,
-    issue_slug,
-)
-from paperclip_http import (
-    PaperclipAPIError,
-    PaperclipClient,
-    paperclip_base_url,
-    parse_ts,
-    redact,
-)
+try:
+    from paperclip_contracts import (
+        EXECUTION_CATEGORIES,
+        ISSUE_CLASSES,
+        OUTCOME_ALIASES,
+        canonical_action,
+        is_decision_action,
+        is_outcome_action,
+        issue_slug,
+    )
+    from paperclip_http import (
+        PaperclipAPIError,
+        PaperclipClient,
+        paperclip_base_url,
+        parse_ts,
+        redact,
+    )
+except ModuleNotFoundError:
+    from scripts.paperclip_contracts import (
+        EXECUTION_CATEGORIES,
+        ISSUE_CLASSES,
+        OUTCOME_ALIASES,
+        canonical_action,
+        is_decision_action,
+        is_outcome_action,
+        issue_slug,
+    )
+    from scripts.paperclip_http import (
+        PaperclipAPIError,
+        PaperclipClient,
+        paperclip_base_url,
+        parse_ts,
+        redact,
+    )
 
 DEFAULT_COMPANY_ID = "96ee7b2e-6df2-43c8-bbe3-53e19297308a"
 ROOT = Path(__file__).resolve().parents[1]
