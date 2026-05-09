@@ -6,7 +6,6 @@ from src.recommendations.blender_experiments import (
     MATURE_BLENDER_CONTROL_WEIGHTS,
     MATURE_BLENDER_TREATMENT_WEIGHTS,
     RECENTLY_LIKED_BLENDER_V2_CONTROL,
-    RECENTLY_LIKED_BLENDER_V2_DEFAULT_QUARTILE_BOUNDARIES,
     RECENTLY_LIKED_BLENDER_V2_EXCLUDED,
     RECENTLY_LIKED_BLENDER_V2_EXPERIMENT_ID,
     RECENTLY_LIKED_BLENDER_V2_SAMPLE_GATE_PER_VARIANT,
@@ -134,7 +133,7 @@ async def test_lr_quartile_boundaries_do_not_recompute_without_cache_lock():
     ):
         boundaries = await get_recent_7d_lr_quartile_boundaries()
 
-    assert boundaries == RECENTLY_LIKED_BLENDER_V2_DEFAULT_QUARTILE_BOUNDARIES
+    assert boundaries is None
     calculate_boundaries.assert_not_awaited()
 
 
@@ -183,6 +182,35 @@ async def test_recently_liked_blender_v2_race_rereads_winning_assignment():
         variant = await get_or_assign_recently_liked_blender_v2_variant(202)
 
     assert variant == RECENTLY_LIKED_BLENDER_V2_CONTROL
+
+
+@pytest.mark.asyncio
+async def test_recently_liked_blender_v2_defers_assignment_without_real_boundaries():
+    with (
+        patch(
+            "src.recommendations.blender_experiments.get_experiment_assignment",
+            new_callable=AsyncMock,
+            return_value=None,
+        ),
+        patch(
+            "src.recommendations.blender_experiments.get_recent_7d_lr_assignment_metrics",
+            new_callable=AsyncMock,
+            return_value=None,
+        ),
+        patch(
+            "src.recommendations.blender_experiments.assign_experiment",
+            new_callable=AsyncMock,
+        ) as assign,
+        patch(
+            "src.recommendations.blender_experiments.get_experiment_variant",
+            new_callable=AsyncMock,
+        ) as get_variant,
+    ):
+        variant = await get_or_assign_recently_liked_blender_v2_variant(202)
+
+    assert variant == RECENTLY_LIKED_BLENDER_V2_CONTROL
+    assign.assert_not_awaited()
+    get_variant.assert_not_awaited()
 
 
 @pytest.mark.asyncio
