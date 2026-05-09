@@ -454,8 +454,8 @@ def main() -> int:
     print("\nSyncing routine descriptions...")
     try:
         routine_patched, routine_skipped, routine_failed = sync_routine_descriptions(by_slug)
-    except ConfigError as exc:
-        print(f"  ERROR {exc}", file=sys.stderr)
+    except (ConfigError, urllib.error.HTTPError, urllib.error.URLError) as exc:
+        print(f"  ERROR routine sync aborted: {exc}", file=sys.stderr)
         routine_patched = 0
         routine_skipped = 0
         routine_failed = 1

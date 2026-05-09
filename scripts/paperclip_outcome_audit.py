@@ -375,7 +375,7 @@ def log_events(since: datetime, limit: int = 12) -> dict[str, Any]:
             "counts": {"events": 0, "decisions": 0, "outcomes": 0},
         }
 
-    for line in LOG_PATH.read_text().splitlines():
+    for line in LOG_PATH.read_text(encoding="utf-8", errors="replace").splitlines():
         entry = parse_log_entry(line)
         if not entry:
             continue
@@ -426,7 +426,7 @@ def active_experiments(today: date) -> list[dict[str, Any]]:
         return rows
 
     for path in sorted(ACTIVE_EXPERIMENTS_DIR.glob("*.md")):
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8", errors="replace")
         created_raw = read_field(text, "Created")
         deployed_raw = read_field(text, "Deployed")
         measure_raw = read_field(text, "Measure after")
