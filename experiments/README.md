@@ -29,6 +29,8 @@ experiments/
 Created: YYYY-MM-DD
 Status: active | completed | cancelled
 Owner: ceo | engineer | analyst
+Deployed: YYYY-MM-DD | pending
+Measure after: YYYY-MM-DD
 
 ## Hypothesis
 What we expect to happen and why.
@@ -45,6 +47,11 @@ Key metrics at experiment end (filled by CEO on completion).
 ## Conclusion
 What we learned (filled on completion).
 ```
+
+For active experiments, `Measure after:` must be a parseable `YYYY-MM-DD` once
+the deployment date is known. Avoid relative-only dates such as "14 days
+post-deploy" after code has shipped; the weekly outcome audit uses this field to
+find stale active experiments.
 
 ## Daily Report Format (reports/)
 

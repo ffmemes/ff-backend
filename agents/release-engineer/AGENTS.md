@@ -20,7 +20,8 @@ You are running without a human operator. NEVER call `AskUserQuestion`. When ski
 ## Paperclip Runtime
 
 Use the native `paperclip` skill for wake context, task selection, checkout,
-structured interactions, blockers/subtasks, comments, and task completion.
+structured confirmations, blockers/subtasks, documents/attachments, concise
+comments, and task completion.
 
 For blocked work, set status `blocked` with a clear comment and use
 `blockedByIssueIds` when another issue must finish first. Use child issues for

@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
-"""Compact read-only audit for Paperclip routine outcomes.
+"""Compact read-only audit for FFmemes-specific Paperclip routine outcomes.
 
-This is intentionally narrow: it turns routine issues/comments into a small
-outcome report so agents do not spend context manually spelunking Paperclip JSON.
+This is intentionally narrow and business-focused: it turns routine
+issues/comments into a small report of FFmemes outcome-contract mismatches
+(post publication markers, update-check content, deploy verification,
+gstack update path, draft handoff state, PR payload mismatch) so agents
+do not spend context manually spelunking Paperclip JSON.
+
+Generic liveness, stall / zombie-run detection, and no-comment classification
+are intentionally NOT covered here — those are owned by Paperclip v2026.428+
+productivity review / liveness recovery in the native runtime.
 
 Env:
-  PAPERCLIP_URL
+  PAPERCLIP_API_URL (preferred in Paperclip runtime) or PAPERCLIP_URL
   PAPERCLIP_API_KEY
   PAPERCLIP_COMPANY_ID (optional, defaults to FFmemes prod company)
 """
@@ -38,6 +45,9 @@ PUBLISHED_MARKER_PATTERNS = (
     re.compile(r"\b(?:editorial_post_id|editorial post id)\b", re.IGNORECASE),
     re.compile(r"\b(?:telegram_message_id|telegram message id)\b", re.IGNORECASE),
 )
+INTERACTION_LIST_KEYS = ("interactions", "items", "data")
+CONFIRMATION_KIND_MARKERS = ("confirmation", "request_confirmation")
+ACCEPTED_MARKERS = {"accepted", "approved", "confirmed", "yes"}
 VERIFIED_PAPERCLIP_DEPLOY_PATTERNS = (
     re.compile(r"\bverified_deployed_commit\b", re.IGNORECASE),
     re.compile(r"\bcoolify_deployment_commit\b", re.IGNORECASE),
@@ -82,6 +92,13 @@ class Paperclip:
             raise RuntimeError(f"HTTP {exc.code} for {path}: {body}") from exc
 
 
+def paperclip_base_url() -> str | None:
+    base_url = os.getenv("PAPERCLIP_API_URL") or os.getenv("PAPERCLIP_URL")
+    if base_url and base_url.rstrip("/").endswith("/api"):
+        return base_url.rstrip("/")[:-4]
+    return base_url
+
+
 def parse_ts(value: str | None) -> datetime | None:
     if not value:
         return None
@@ -108,6 +125,21 @@ def issue_comments(client: Paperclip, issue_id: str) -> list[dict[str, Any]]:
     if not isinstance(comments, list):
         return []
     return sorted(comments, key=lambda item: item.get("createdAt") or "")
+
+
+def issue_interactions(client: Paperclip, issue_id: str) -> list[dict[str, Any]]:
+    try:
+        interactions = client.get(f"/api/issues/{issue_id}/interactions", {"limit": "100"})
+    except RuntimeError:
+        return []
+    if isinstance(interactions, list):
+        return interactions
+    if isinstance(interactions, dict):
+        for key in INTERACTION_LIST_KEYS:
+            value = interactions.get(key)
+            if isinstance(value, list):
+                return [item for item in value if isinstance(item, dict)]
+    return []
 
 
 def get_issue(client: Paperclip, issue_id: str) -> dict[str, Any] | None:
@@ -137,7 +169,55 @@ def routine_matches(name: str, focus: str) -> bool:
     return focus.lower() in lower
 
 
-def classify_issue(issue: dict[str, Any], comments: list[dict[str, Any]]) -> tuple[list[str], str]:
+def interaction_value(interaction: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        value = interaction.get(key)
+        if value is not None:
+            return str(value).lower()
+    return ""
+
+
+def has_accepted_confirmation(interactions: list[dict[str, Any]]) -> bool:
+    for interaction in interactions:
+        kind = interaction_value(interaction, "kind", "type", "interactionType", "name")
+        if not any(marker in kind for marker in CONFIRMATION_KIND_MARKERS):
+            continue
+        state = interaction_value(
+            interaction,
+            "status",
+            "state",
+            "outcome",
+            "decision",
+            "response",
+            "answer",
+            "value",
+        )
+        if state in ACCEPTED_MARKERS:
+            return True
+        if interaction.get("acceptedAt") or interaction.get("confirmedAt"):
+            return True
+        result = interaction.get("result")
+        if isinstance(result, dict):
+            result_state = interaction_value(
+                result,
+                "status",
+                "state",
+                "outcome",
+                "decision",
+                "response",
+                "answer",
+                "value",
+            )
+            if result_state in ACCEPTED_MARKERS:
+                return True
+    return False
+
+
+def classify_issue(
+    issue: dict[str, Any],
+    comments: list[dict[str, Any]],
+    interactions: list[dict[str, Any]] | None = None,
+) -> tuple[list[str], str]:
     text = "\n".join([issue.get("description") or ""] + [c.get("body") or "" for c in comments])
     lower = text.lower()
     title = (issue.get("title") or "").lower()
@@ -168,14 +248,14 @@ def classify_issue(issue: dict[str, Any], comments: list[dict[str, Any]]) -> tup
         or "outcome=published" in lower
         or "ceo approval" in lower
     )
-    if (
-        is_publish_flow
-        and "approved" in lower
-        and not all(pattern.search(text) for pattern in PUBLISHED_MARKER_PATTERNS)
+    has_approval_signal = "approved" in lower or has_accepted_confirmation(interactions or [])
+    if is_publish_flow and has_approval_signal and not all(
+        pattern.search(text) for pattern in PUBLISHED_MARKER_PATTERNS
     ):
         flags.append("approved_without_publish_marker")
-    if not comments and issue.get("status") == "done":
-        flags.append("no_comments")
+    # Generic stall / no-comment / zombie-run classification is intentionally
+    # delegated to Paperclip v2026.428+ productivity review and liveness
+    # recovery; this audit only flags FFmemes business-outcome mismatches.
     latest = comments[-1].get("body", "") if comments else issue.get("description", "")
     return flags, compact_body(latest or "")
 
@@ -191,7 +271,8 @@ def referenced_post_issues(
         ref = get_issue(client, ident)
         if ref and (ref.get("title") or "").startswith("[post:"):
             ref_comments = issue_comments(client, ref["id"])
-            flags, latest = classify_issue(ref, ref_comments)
+            ref_interactions = issue_interactions(client, ref["id"])
+            flags, latest = classify_issue(ref, ref_comments, ref_interactions)
             found.append(
                 {
                     "identifier": ref.get("identifier"),
@@ -223,7 +304,8 @@ def audit_routines(client: Paperclip, company_id: str, focus: str) -> list[dict[
         issue_id = run.get("linkedIssueId")
         issue = get_issue(client, issue_id) if issue_id else None
         comments = issue_comments(client, issue_id) if issue_id else []
-        flags, latest = classify_issue(issue or {}, comments)
+        interactions = issue_interactions(client, issue_id) if issue_id else []
+        flags, latest = classify_issue(issue or {}, comments, interactions)
         payload_pr = str(((run.get("triggerPayload") or {}).get("pr_number")) or "")
         issue_title = (
             ((run.get("linkedIssue") or {}).get("title")) or (issue or {}).get("title") or ""
@@ -257,7 +339,8 @@ def stale_post_drafts(client: Paperclip, company_id: str) -> list[dict[str, Any]
         if not title.startswith("[post:"):
             continue
         comments = issue_comments(client, issue["id"])
-        flags, latest = classify_issue(issue, comments)
+        interactions = issue_interactions(client, issue["id"])
+        flags, latest = classify_issue(issue, comments, interactions)
         if flags or issue.get("status") != "done":
             rows.append(
                 {
@@ -308,10 +391,10 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     args = parser.parse_args()
 
-    base_url = os.getenv("PAPERCLIP_URL")
+    base_url = paperclip_base_url()
     api_key = os.getenv("PAPERCLIP_API_KEY")
     if not base_url or not api_key:
-        print("Set PAPERCLIP_URL and PAPERCLIP_API_KEY", file=sys.stderr)
+        print("Set PAPERCLIP_API_URL (or PAPERCLIP_URL) and PAPERCLIP_API_KEY", file=sys.stderr)
         return 2
 
     client = Paperclip(base_url, api_key)

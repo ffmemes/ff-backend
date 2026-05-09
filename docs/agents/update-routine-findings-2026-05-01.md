@@ -27,7 +27,9 @@ release note from scratch. Follow-up simplification notes from May 4 live in
   explicitly fixed stale execution-run locks, which maps directly to the
   `activeRun=null` zombie PR-review pattern observed here. After prod upgrade
   verification, remove prompt-side race/recovery prose that duplicates runtime
-  behavior.
+  behavior. Historical note after the v2026.428 cleanup: local FFmemes audits
+  should not re-detect these runtime states; use the native Paperclip recovery
+  and productivity-review surfaces.
 - Productivity review service. This is the right surface for "agents are busy
   but did anything useful happen?" It should open issues for no-comment streaks,
   long-active runs, and high-churn loops.
@@ -70,11 +72,13 @@ release note from scratch. Follow-up simplification notes from May 4 live in
   before closing as useful.
 - `@ffnerdbot` is only an activity feed. It is useful to see work starting and
   stopping, but not to judge value delivered.
-- PR Review can currently misqueue work: PR #215 was coalesced into active
+- Historical PR Review finding: PR #215 was coalesced into active
   `FFM-860 [pr:214] Review`, then both `FFM-860` and the re-triggered
   `FFM-862 [pr:215] Review` showed `in_progress` + running run +
   `activeRun=null` with no review comments. Treat this as Paperclip runtime
-  zombie execution, not as a real review in progress.
+  zombie execution, not as a real review in progress. Do not add new local
+  zombie/no-comment checks for this; rely on native Paperclip recovery, and keep
+  the local routine audit limited to PR payload/output mismatches.
 
 ## Repo Changes Made
 

@@ -19,8 +19,9 @@ agent infrastructure, see `paperclip-ops-runbook.md`.
      `STAFF ENGINEER REVIEW: APPROVED` comment fallback for self-review-blocked
      PRs; internal PRs are queued with `gh pr merge --squash --auto`.
    - **Hold** — real request-changes review when allowed, or a
-     `STAFF ENGINEER REVIEW: CHANGES REQUESTED` comment fallback. A CTO issue
-     is created for required fixes.
+     `STAFF ENGINEER REVIEW: CHANGES REQUESTED` comment fallback. A CTO child
+     issue/subtask is created through native Paperclip tooling for required
+     fixes.
 
 ## What "running" means
 

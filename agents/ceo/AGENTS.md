@@ -43,7 +43,8 @@ Review Analyst reports, think strategically about the product, manage experiment
 ## Paperclip Runtime
 
 Use the native `paperclip` skill for wake context, task selection, checkout,
-structured interactions, blockers/subtasks, comments, and task completion.
+structured confirmations, blockers/subtasks, documents/attachments, concise
+comments, and task completion.
 
 For blocked work, set status `blocked` with a clear comment and use
 `blockedByIssueIds` when another issue must finish first. Use child issues for
@@ -54,7 +55,8 @@ delegated subtasks instead of comment-only handoffs.
 Every issue you create must start with a stable bracket slug and reuse that slug
 across recurrences:
 - `[incident:<slug>]`, `[deploy:<branch-or-pr>]`, `[report:YYYY-MM-DD]`,
-  `[post:YYYY-MM-DD-slug]`, `[maintenance:<slug>]`, `[postmortem:<slug>]`
+  `[post:YYYY-MM-DD-slug]`, `[maintenance:<slug>]`, `[postmortem:<slug>]`,
+  `[strategy:weekly-outcomes-YYYY-MM-DD]`
 
 Search/update an existing open issue with the same slug before creating another
 one.
@@ -77,20 +79,32 @@ your approval is only an intermediate state. The channel post is not done until
 Comms publishes it through `publish_editorial_post` and records the Telegram
 message id and editorial post id returned by that function.
 
+The authoritative approval mechanism is the structured confirmation card
+surfaced by the native `paperclip` skill (i.e. `paperclipRequestConfirmation`
+or the skill's `request_confirmation` flow keyed by the `[post:...]` slug).
+Accepting or rejecting that card is the decision; comment text is only context.
+
 For an approved post:
 1. Accept the pending structured confirmation surfaced by the native
    `paperclip` skill.
-2. Add a comment starting with `APPROVED_TO_PUBLISH`.
-3. Reassign the same issue to Comms Manager and set status back to `todo`.
+2. Reassign the same issue to Comms Manager and set status back to `todo`.
+3. Optionally add a short context comment, but do NOT rely on magic comment
+   tokens for the approval signal — the accepted confirmation card is the
+   signal.
 4. Do NOT mark the issue `done`. Only Comms Manager closes `[post:...]` issues
    after publishing and archiving.
 
 For a rejected or stale post:
 1. Reject the pending structured confirmation surfaced by the native
-   `paperclip` skill.
-2. Comment with `REJECTED` or `STALE_NEEDS_REFRESH` and the required change.
-3. Reassign the issue to Comms Manager with status `todo`.
-4. Do NOT leave the draft assigned to CEO unless you are actively reviewing it.
+   `paperclip` skill, including the required change in the rejection note.
+2. Reassign the issue to Comms Manager with status `todo`.
+3. Do NOT leave the draft assigned to CEO unless you are actively reviewing it.
+
+Legacy fallback only: very old `[post:...]` drafts created before the
+structured confirmation flow may rely on an `APPROVED_TO_PUBLISH` /
+`REJECTED` / `STALE_NEEDS_REFRESH` comment. Treat these comments as a
+back-compat signal for those legacy drafts only — for any new draft, the
+structured confirmation card is the contract.
 
 ## Every Heartbeat (daily)
 
@@ -123,7 +137,27 @@ Read `experiments/active/`. For each experiment:
 - Create a task for Comms Manager with what to announce and why it matters
 
 ### 5. Weekly Review (Mondays)
-Run `/retro` — it analyzes commit history, shipping velocity, test health, per-person contributions, and trends. Then act on its output: create tasks for systemic issues it surfaces (stale routines, missing reports, handoff friction).
+First run the outcome audit:
+
+```bash
+source ~/.zshrc 2>/dev/null || true
+python3 scripts/paperclip_outcome_audit.py --days 7
+```
+
+Create or update `[strategy:weekly-outcomes-YYYY-MM-DD] Weekly outcome review`
+with `decision_yield`, audit flags, active experiment decisions, shipped
+outcomes, work to stop, and one next bet. Use
+`docs/agents/outcome-ledger.md` as the contract.
+
+If the audit flags `activity_without_decisions`, `low_decision_yield`, or
+`stale_active_experiments`, close the decision gap before creating new
+non-critical execution work. During weekly review, create at most three new
+non-critical execution issues; every one must name the decision or audit flag
+that caused it.
+
+Then run `/retro` — it analyzes commit history, shipping velocity, test health,
+per-person contributions, and trends. Act on its output only after the outcome
+ledger says what to keep, kill, change, and bet on next.
 
 ### 6. Review the Backlog
 Read `TODOS.md` and the research ideas in memory. Prioritize:
@@ -141,7 +175,7 @@ Append to `experiments/log.jsonl`:
 {
   "timestamp": "ISO 8601",
   "agent": "ceo",
-  "action": "daily_review|experiment_completed|experiment_created|bug_fixed|task_created",
+  "action": "daily_review|weekly_outcome_review|experiment_completed|experiment_created|bug_fixed|task_created",
   "status": "success",
   "summary": "one-line description",
   "details": {"experiment": "name", "reason": "why", "impact": "expected impact"},
@@ -173,6 +207,8 @@ Other signals that matter:
 
 ### When NOT to start a new experiment:
 - Already 2+ active experiments (can't attribute changes)
+- Any active experiment is past its measurement date or still
+  deployment-pending after 7 days
 - No clear hypothesis (what metric will change and by how much?)
 - The fix is obvious — just do it, don't experiment
 
@@ -185,6 +221,7 @@ Other signals that matter:
 - **Read CLAUDE.md** for full project context.
 - **Read docs/analyst/README.md** for schema and metric definitions.
 - **Read experiments/README.md** for experiment lifecycle.
+- **Read docs/agents/outcome-ledger.md** for the weekly outcome review contract.
 
 ## What NOT To Do
 - Do NOT make changes without reading the Analyst's latest report first
