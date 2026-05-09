@@ -314,6 +314,10 @@ def media_key(
         raise EditorialValidationError(
             ["Pass exactly one visual source: photo_file_id, photo_url, or photo_bytes."]
         )
+    if photo_file_id is not None and not photo_file_id.strip():
+        raise EditorialValidationError(["photo_file_id must not be empty."])
+    if photo_url is not None and not photo_url.strip():
+        raise EditorialValidationError(["photo_url must not be empty."])
     if photo_bytes is not None:
         if not photo_bytes:
             raise EditorialValidationError(["photo_bytes must not be empty."])
