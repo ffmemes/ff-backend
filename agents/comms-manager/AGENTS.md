@@ -47,8 +47,8 @@ You may create only execution tickets from the comms workflow. Strategic or
 planning tickets belong to CEO.
 
 Do NOT file Paperclip issues titled `test`, `debug`, or `v2`. Test notification
-rendering by sending to yourself or to the moderator chat, not by creating
-backlog clutter.
+rendering locally or as a Paperclip attachment, not by posting stray images
+into the moderator chat.
 
 ## Target Cadence
 
@@ -154,12 +154,18 @@ about our infra find this exciting to read?" If the answer is "maybe" or
 requires context, regenerate.
 
 ### Step 6 — Visual
-Use `src/comms/visuals.py` primitives ONLY. Do not write raw matplotlib.
+For exact data, use `src/comms/visuals.py` primitives ONLY. Do not write raw matplotlib.
 - 1 number → `stat_slide(title, value, subtitle)`
 - 2-20 time-series points → `line_chart(x, y, title, accent_x=...)`
 - 2-10 categorical bars → `bar_chart(labels, values, title, highlight_idx=...)`
 - > 20 points → bucket or sample down first
 - Pie charts, 3D, dual-axis → banned
+
+These primitives return PNG bytes. Pass them directly as `photo_bytes=png` to
+`publish_editorial_post`. For illustrative/editorial art, use
+`src.comms.image_generation.generate_editorial_image()` with a precise prompt
+built by `build_editorial_image_prompt(...)`, then pass
+`photo_bytes=image.image_bytes`.
 
 See `docs/comms/brand-guide.md` for the full decision tree and constraints.
 
@@ -274,12 +280,15 @@ See full brand guide: `docs/comms/brand-guide.md`
 5. **Stat cards** — for daily pulse (big number + context)
 
 When generating charts/images, verify the result looks good by feeding it back through the browse skill.
+Never send editorial visuals to the moderator chat just to get a Telegram `file_id`.
 
 ### Image Review Before Posting (MANDATORY)
 
 Before attaching ANY image to a channel post, you MUST:
 
-1. **Download and visually inspect** the image — use the Telegram Bot API to get the file, then view it:
+1. **Visually inspect** the image. For Telegram `file_id` memes, download via
+   the Telegram Bot API first; for local/generated images, inspect the local
+   PNG directly.
 ```bash
 # Get file path
 FILE_PATH=$(curl -s "https://api.telegram.org/bot${FFMEMES_PROD_TELEGRAM_BOT_TOKEN}/getFile?file_id=<file_id>" | python3 -c "import json,sys; print(json.load(sys.stdin)['result']['file_path'])")
@@ -291,6 +300,8 @@ curl -s "https://api.telegram.org/file/bot${FFMEMES_PROD_TELEGRAM_BOT_TOKEN}/${F
 2. **Check against content policy** (see below) — reject if it violates any rule
 3. **Always caption the image** in the post text — explain what the image is and why it's there (e.g., "вот этот мем собрал больше всего лайков от новичков"). Never attach an image without context.
 4. **If the image fails review** — pick the next candidate or use a chart/stat card instead
+5. **Do not stage editorial images in the moderator chat** for testing or
+   `file_id` extraction. Use `photo_bytes` for local/generated visuals.
 
 ### Content Policy for Public Posts
 
@@ -386,7 +397,7 @@ try:
         channel="ffmemes",               # "ffmemes" build-in-public, "ru" @fastfoodmemes, "en" @fast_food_memes
         category="C",                    # A/B/C/D/E/F — see "Content Categories"
         entity_id="dau_delta_2026_04_24",# stable slug for the specific anomaly/topic
-        photo_file_id=telegram_file_id,  # OR photo_url — always include a visual
+        photo_bytes=png,                 # OR photo_file_id / photo_url — always include a visual
         topic_slug="dau-delta-anomaly",
         button_text=None, button_url=None,  # optional inline button
     )
@@ -558,7 +569,9 @@ curl -s -X POST "https://api.telegram.org/bot${FFMEMES_PROD_TELEGRAM_BOT_TOKEN}/
 - Do NOT bold more than 2-3 spans per post — it stops being emphasis
 - Do NOT write raw matplotlib — use `src/comms/visuals.py` primitives only
 - Do NOT post without CEO approval
-- Do NOT post images without downloading and visually inspecting them first
+- Do NOT post images without visually inspecting them first
+- Do NOT send editorial visuals to the moderator chat for staging, testing, or
+  `file_id` extraction
 - Do NOT post political, NSFW, or controversial memes — EVER
 - Do NOT attach images without explaining what they are in the post text
 - Do NOT share internal metrics that could be embarrassing (exact revenue, costs)

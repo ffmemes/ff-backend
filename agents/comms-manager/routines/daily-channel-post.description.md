@@ -7,6 +7,7 @@ Run the workflow in `agents/comms-manager/AGENTS.md` ("What Triggers You", steps
 Things that trip people up:
 
 - Post via `src.comms.publishing.publish_editorial_post()`. Single sanctioned path. Raw curl, sendPhoto, or sendMessage to the channel splits the post into photo-without-caption + text — we shipped that once.
+- For generated/local visuals, pass `photo_bytes=png` directly. Do not post the image to the moderator chat for staging or `file_id` extraction.
 - Step 0 — read `experiments/reports/channel-stats-YYYY-MM-DD.md` for yesterday's performance.
 - Step 1 — pick the strongest `Chart-worthy: yes` finding from `experiments/reports/anomalies-YYYY-MM-DD.md`.
 - Step 7 — archive to `docs/comms/published/YYYY-MM-DD-slug.md` and close this issue with a one-liner pointing at the archive.

@@ -118,6 +118,12 @@ png = line_chart(dates, values, title="DAU 7d", accent_x=today)
 png = bar_chart(labels, values, title="Top sources", highlight_idx=0, horizontal=True)
 ```
 
+Publish generated chart bytes directly:
+
+```python
+await publish_editorial_post(..., photo_bytes=png)
+```
+
 **Design constraints (hard rules, violated = reject the image):**
 
 - **Max 3 numbers per image.** If you can't fit the story in 3 numbers, the story is too complicated for one post.
@@ -132,7 +138,12 @@ png = bar_chart(labels, values, title="Top sources", highlight_idx=0, horizontal
 - **Text density.** Titles ≤ 6 words. Axis labels only when the unit isn't obvious.
 - **Background.** Dark (`#1A1A2E`) for stat_slide; light (`#F5F5F5`) for charts. Don't mix.
 
-If an idea needs something beyond these primitives, flag it to CTO — don't improvise raw matplotlib.
+If an idea needs exact numbers beyond these primitives, flag it to CTO — don't improvise raw matplotlib.
+
+For non-data editorial art, use `src.comms.image_generation.build_editorial_image_prompt(...)`
+and `generate_editorial_image(...)` with a precise visual brief, then publish via
+`photo_bytes=image.image_bytes`. Do not stage generated visuals in the moderator
+chat to obtain Telegram `file_id`.
 
 ### 4. Diagrams
 For engineering/architecture posts.
