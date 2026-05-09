@@ -274,7 +274,19 @@ def sync_routine_descriptions(by_slug: dict[str, dict]) -> tuple[int, int, int]:
             print(f"  WOULD PATCH routine {spec['name']}: description")
             patched += 1
             continue
-        api("PATCH", f"/api/routines/{routine['id']}", {"description": spec["description"]})
+        try:
+            api(
+                "PATCH",
+                f"/api/routines/{routine['id']}",
+                {"description": spec["description"]},
+            )
+        except Exception as e:
+            print(
+                f"  ERROR PATCH routine {spec['name']}: {e}",
+                file=sys.stderr,
+            )
+            failed += 1
+            continue
         print(f"  PATCHED routine {spec['name']}: description")
         patched += 1
     return patched, skipped, failed
