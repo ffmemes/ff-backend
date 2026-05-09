@@ -8,6 +8,10 @@ from sqlalchemy import text
 from src import redis
 from src.database import fetch_all
 from src.recommendations.blender import blend
+from src.recommendations.blender_experiments import (
+    MATURE_BLENDER_CONTROL_WEIGHTS,
+    get_recently_liked_blender_v2_weights,
+)
 from src.recommendations.candidates import (
     CandidatesRetriever,
 )
@@ -135,7 +139,7 @@ async def generate_recommendations(
 
         return await fetch_all(text(query), params)
 
-    async def get_candidates(user_id, limit):
+    async def get_candidates(user_id, limit, use_recently_liked_blender_v2: bool = True):
         """Route to the right engine mix based on user maturity.
 
         Cold start (<30 memes) uses 3-phase adaptive approach:
@@ -215,15 +219,13 @@ async def generate_recommendations(
             fixed_pos = {0: "lr_smoothed"}
             return blend(candidates_dict, weights, fixed_pos, limit, random_seed)
 
-        # >=100
-        weights = {
-            "best_uploaded_memes": 0.3,
-            "like_spread_and_recent_memes": 0.3,
-            "lr_smoothed": 0.4,
-            "recently_liked": 0.2,
-            "goat": 0.1,
-            "es_ranked": 0.1,
-        }
+        # >=100. Regular mature users enter the LR-stratified recently_liked
+        # blender v2 A/B. Moderator/admin traffic keeps baseline weights because
+        # their low_sent_pool quota would confound the experiment read.
+        if use_recently_liked_blender_v2:
+            weights = await get_recently_liked_blender_v2_weights(user_id)
+        else:
+            weights = dict(MATURE_BLENDER_CONTROL_WEIGHTS)
 
         candidates_dict = await retriever.get_candidates_dict(
             weights.keys(), user_id, limit, exclude_mem_ids=meme_ids_in_queue
@@ -260,7 +262,11 @@ async def generate_recommendations(
 
         remaining_limit = max(0, limit - len(candidates))
         if remaining_limit > 0:
-            extra_candidates = await get_candidates(user_id, remaining_limit)
+            extra_candidates = await get_candidates(
+                user_id,
+                remaining_limit,
+                use_recently_liked_blender_v2=False,
+            )
             candidates.extend(extra_candidates)
 
         # Last resort: if both pools are empty, fetch ANY unseen meme
