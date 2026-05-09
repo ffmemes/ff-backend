@@ -9,14 +9,19 @@ skills sync endpoint for desired skill assignment.
 Env: PAPERCLIP_URL, PAPERCLIP_API_KEY, COMPANY_ID, SCRIPT_DIR, DRY_RUN.
 """
 
-import json
 import os
 import re
 import sys
 import urllib.error
-import urllib.request
+from pathlib import Path
 
 import yaml
+
+# scripts/ is a sibling of agents/; add it to sys.path so the shared
+# Paperclip HTTP client can be imported when deploy.sh runs this file
+# directly via `python3 agents/_sync_config.py`.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+from paperclip_http import PaperclipAPIError, PaperclipClient  # noqa: E402
 
 URL = os.environ["PAPERCLIP_URL"]
 KEY = os.environ["PAPERCLIP_API_KEY"]
@@ -24,9 +29,12 @@ COMPANY = os.environ["COMPANY_ID"]
 SCRIPT_DIR = os.environ["SCRIPT_DIR"]
 DRY = os.environ.get("DRY_RUN", "0") == "1"
 
+_client = PaperclipClient(URL, KEY, user_agent="ffmemes-deploy.sh/1.0")
+
 
 class ConfigError(Exception):
     pass
+
 
 # Skills published under paperclipai/paperclip/ are preserved when present; they
 # are not always listed in frontmatter.
@@ -39,17 +47,21 @@ PAPERCLIP_NS_SKILLS = {
 
 
 def api(method: str, path: str, body=None):
-    req = urllib.request.Request(URL + path, method=method)
-    req.add_header("Authorization", f"Bearer {KEY}")
-    req.add_header("Content-Type", "application/json")
-    # Cloudflare in front of org.ffmemes.com blocks default Python-urllib UA (error 1010).
-    req.add_header("User-Agent", "ffmemes-deploy.sh/1.0")
-    data = json.dumps(body).encode() if body is not None else None
+    """Adapter that preserves the legacy `urllib.error.HTTPError` contract.
+
+    Tests and existing call-sites catch `urllib.error.HTTPError` and inspect
+    `.code`; converting to `PaperclipAPIError` everywhere would force a
+    cross-cutting change. Translate at the boundary instead.
+    """
     try:
-        with urllib.request.urlopen(req, data=data) as resp:
-            return json.loads(resp.read())
-    except urllib.error.HTTPError as e:
-        print(f"  HTTP {e.code} on {method} {path}: {e.read().decode()[:300]}", file=sys.stderr)
+        return _client.request(method, path, body=body)
+    except PaperclipAPIError as exc:
+        if exc.kind == "http" and exc.code is not None:
+            print(
+                f"  HTTP {exc.code} on {method} {path}: {exc.body}",
+                file=sys.stderr,
+            )
+            raise urllib.error.HTTPError(URL + path, exc.code, exc.body, {}, None) from exc
         raise
 
 
@@ -365,7 +377,19 @@ def sync_routine_descriptions(by_slug: dict[str, dict]) -> tuple[int, int, int]:
             print(f"  WOULD PATCH routine {spec['name']}: description")
             patched += 1
             continue
-        api("PATCH", f"/api/routines/{routine['id']}", {"description": spec["description"]})
+        try:
+            api(
+                "PATCH",
+                f"/api/routines/{routine['id']}",
+                {"description": spec["description"]},
+            )
+        except Exception as e:
+            print(
+                f"  ERROR PATCH routine {spec['name']}: {e}",
+                file=sys.stderr,
+            )
+            failed += 1
+            continue
         print(f"  PATCHED routine {spec['name']}: description")
         patched += 1
     return patched, skipped, failed
@@ -376,6 +400,12 @@ def main() -> int:
         manifest = yaml.safe_load(f)
 
     agents_list = api("GET", f"/api/companies/{COMPANY}/agents")
+    if not isinstance(agents_list, list):
+        print(
+            f"  ERROR unexpected agents response shape {type(agents_list).__name__}",
+            file=sys.stderr,
+        )
+        return 1
     by_slug = {a["urlKey"]: a for a in agents_list}
     try:
         secret_ids = load_secret_ids()
@@ -539,8 +569,8 @@ def main() -> int:
     print("\nSyncing routine descriptions...")
     try:
         routine_patched, routine_skipped, routine_failed = sync_routine_descriptions(by_slug)
-    except ConfigError as exc:
-        print(f"  ERROR {exc}", file=sys.stderr)
+    except (ConfigError, urllib.error.HTTPError, urllib.error.URLError) as exc:
+        print(f"  ERROR routine sync aborted: {exc}", file=sys.stderr)
         routine_patched = 0
         routine_skipped = 0
         routine_failed = 1

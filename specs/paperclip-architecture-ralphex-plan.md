@@ -256,21 +256,57 @@ Verification:
 
 ### Task 5: Paperclip HTTP And Audit Modules
 
-- [ ] Extract a shared Paperclip HTTP client module for URL handling, auth,
+- [x] Extract a shared Paperclip HTTP client module for URL handling, auth,
       JSON, pagination, timeout, redaction, and error reporting.
-- [ ] Update `agents/_sync_config.py`, `scripts/paperclip_routine_audit.py`,
+      (`scripts/paperclip_http.py`: `PaperclipClient` (bearer auth +
+      User-Agent + JSON + injectable opener), `PaperclipAPIError` preserving
+      the legacy `"HTTP {code} for {path}: ..."` message shape, `paginate()`
+      with dedup / shape-drift / duplicate-page / ceiling-probe handling,
+      `redact()` / `SENSITIVE_PATTERNS`, `paperclip_base_url()`,
+      `require_credentials()`, `parse_ts()`.)
+- [x] Update `agents/_sync_config.py`, `scripts/paperclip_routine_audit.py`,
       and `scripts/paperclip_outcome_audit.py` to use the shared module.
-- [ ] Add fixture tests for auth redaction, pagination, API errors, and dry-run
-      behavior without live Paperclip.
-- [ ] Add a new execution-log audit if no current script can classify stopped,
+      (`_sync_config.api()` now delegates to `_client.request()` and
+      re-raises as `urllib.error.HTTPError` only at the boundary so
+      existing tests keep working; the routine and outcome audits expose
+      a thin `Paperclip` facade that wraps `PaperclipClient`; the inline
+      `list_issues` paginator in outcome_audit collapses to one
+      `client.paginate(...)` call.)
+- [x] Add fixture tests for auth redaction, pagination, API errors, and dry-run
+      behavior without live Paperclip. (`tests/test_paperclip_http.py` —
+      17 cases covering bearer/UA headers, JSON body framing, redaction of
+      bearer + URL credentials + token=secret forms, `urllib.error.HTTPError`
+      → `PaperclipAPIError`, transport-error translation, decode failures,
+      base URL `/api` strip, paginate happy path / duplicate-page bail /
+      shape drift / ceiling probe / page failure / exact-fit, and the
+      legacy-format `__str__` contract.)
+- [x] Add a new execution-log audit if no current script can classify stopped,
       looping, fake-green, missing-access, stale-instruction, and outcome-gap
-      cases.
+      cases. (`scripts/paperclip_execution_audit.py` — pure
+      `classify_issue()` + `build_report()`, populated from the same
+      `experiments/log.jsonl` outcome IDs the outcome audit uses, with
+      `tests/test_paperclip_execution_audit.py` exercising every evidence
+      class plus the cross-issue duplicate-creation detector and a
+      title-redaction guard.)
 
 Verification:
 
-- [ ] Unit tests pass without network access.
-- [ ] Existing routine/outcome audit commands still run.
-- [ ] Execution-log audit produces a stable JSON ledger with evidence classes.
+- [x] Unit tests pass without network access. (`python3 -m pytest
+      tests/test_paperclip_http.py tests/test_paperclip_skill_preflight.py
+      tests/test_paperclip_execution_audit.py tests/test_redaction_audit.py`
+      → 53 passed; the execution-audit + http-client tests inject a fake
+      opener so urlopen is never called.)
+- [x] Existing routine/outcome audit commands still run. (`python3
+      scripts/paperclip_routine_audit.py --help`, `python3
+      scripts/paperclip_outcome_audit.py --help`, and `python3
+      scripts/paperclip_execution_audit.py --help` all print usage; the
+      `Paperclip` facade preserves the previous `RuntimeError("HTTP {code}
+      for {path}: ...")` message shape that the audit's
+      `message.startswith("HTTP 404 for ")` branches rely on.)
+- [x] Execution-log audit produces a stable JSON ledger with evidence classes.
+      (`build_report()` always emits a `counts` block keyed by the six
+      `EVIDENCE_CLASSES`, even when zero, so `--json` consumers can diff
+      the ledger across runs without missing-key handling.)
 
 ### Task 6: Issue, Routine, And Outcome Contracts
 

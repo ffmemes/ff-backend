@@ -24,11 +24,16 @@ import json
 import os
 import re
 import sys
-import urllib.error
-import urllib.parse
-import urllib.request
 from datetime import datetime, timezone
 from typing import Any
+
+from paperclip_http import (
+    PaperclipAPIError,
+    PaperclipClient,
+    paperclip_base_url,
+    parse_ts,
+    redact,
+)
 
 DEFAULT_COMPANY_ID = "96ee7b2e-6df2-43c8-bbe3-53e19297308a"
 POST_RE = re.compile(r"FFM-\d+")
@@ -53,56 +58,28 @@ VERIFIED_PAPERCLIP_DEPLOY_PATTERNS = (
     re.compile(r"\bcoolify_deployment_commit\b", re.IGNORECASE),
     re.compile(r"\bactual_deployed_commit\b", re.IGNORECASE),
 )
-SENSITIVE_PATTERNS = (
-    (
-        re.compile(r"(?i)\b(bearer\s+)[a-z0-9._~+/=-]{20,}"),
-        r"\1[REDACTED]",
-    ),
-    (
-        re.compile(r"(https?://)[^@\s/:]+:[^@\s@]+@"),
-        r"\1[REDACTED]@",
-    ),
-    (
-        re.compile(
-            r"(?i)\b([a-z0-9_]*(?:token|secret|api_key|auth)[a-z0-9_]*\s*[:=]\s*)"
-            r"([^\s,;]+)"
-        ),
-        r"\1[REDACTED]",
-    ),
-)
-
-
 class Paperclip:
+    """Backwards-compatible facade over the shared `PaperclipClient`.
+
+    Preserves the `RuntimeError("HTTP {code} for {path}: ...")` shape so
+    the audit's `message.startswith("HTTP 404 for ")` branches stay
+    untouched.
+    """
+
     def __init__(self, base_url: str, api_key: str) -> None:
-        self.base_url = base_url.rstrip("/")
+        self._client = PaperclipClient(
+            base_url,
+            api_key,
+            user_agent="ffmemes-paperclip-routine-audit/1.0",
+        )
+        self.base_url = self._client.base_url
         self.api_key = api_key
 
     def get(self, path: str, query: dict[str, str] | None = None) -> Any:
-        url = self.base_url + path
-        if query:
-            url += "?" + urllib.parse.urlencode(query)
-        req = urllib.request.Request(url)
-        req.add_header("Authorization", f"Bearer {self.api_key}")
-        req.add_header("User-Agent", "ffmemes-paperclip-routine-audit/1.0")
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                return json.loads(resp.read())
-        except urllib.error.HTTPError as exc:
-            body = compact_body(exc.read().decode("utf-8", errors="replace"), limit=500)
-            raise RuntimeError(f"HTTP {exc.code} for {path}: {body}") from exc
-
-
-def paperclip_base_url() -> str | None:
-    base_url = os.getenv("PAPERCLIP_API_URL") or os.getenv("PAPERCLIP_URL")
-    if base_url and base_url.rstrip("/").endswith("/api"):
-        return base_url.rstrip("/")[:-4]
-    return base_url
-
-
-def parse_ts(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return self._client.get(path, query=query)
+        except PaperclipAPIError as exc:
+            raise RuntimeError(str(exc)) from exc
 
 
 def minutes_between(start: str | None, end: str | None) -> float | None:
@@ -114,10 +91,7 @@ def minutes_between(start: str | None, end: str | None) -> float | None:
 
 
 def compact_body(body: str, limit: int = 240) -> str:
-    body = " ".join(body.split())
-    for pattern, replacement in SENSITIVE_PATTERNS:
-        body = pattern.sub(replacement, body)
-    return body if len(body) <= limit else body[: limit - 1] + "…"
+    return redact(body, limit=limit)
 
 
 def issue_comments(client: Paperclip, issue_id: str) -> list[dict[str, Any]]:

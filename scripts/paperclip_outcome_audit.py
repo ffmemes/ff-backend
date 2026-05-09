@@ -17,13 +17,18 @@ import json
 import os
 import re
 import sys
-import urllib.error
-import urllib.parse
-import urllib.request
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+
+from paperclip_http import (
+    PaperclipAPIError,
+    PaperclipClient,
+    paperclip_base_url,
+    parse_ts,
+    redact,
+)
 
 DEFAULT_COMPANY_ID = "96ee7b2e-6df2-43c8-bbe3-53e19297308a"
 ROOT = Path(__file__).resolve().parents[1]
@@ -44,63 +49,32 @@ OUTCOME_ACTIONS = DECISION_ACTIONS | {
     "post_published",
     "bug_fixed",
 }
-SENSITIVE_PATTERNS = (
-    (
-        re.compile(r"(?i)\b(bearer\s+)[a-z0-9._~+/=-]{20,}"),
-        r"\1[REDACTED]",
-    ),
-    (
-        re.compile(r"(https?://)[^@\s/:]+:[^@\s@]+@"),
-        r"\1[REDACTED]@",
-    ),
-    (
-        re.compile(
-            r"(?i)\b([a-z0-9_]*(?:token|secret|api_key|auth)[a-z0-9_]*\s*[:=]\s*)"
-            r"([^\s,;]+)"
-        ),
-        r"\1[REDACTED]",
-    ),
-)
 
 
 class Paperclip:
+    """Backwards-compatible facade over the shared `PaperclipClient`."""
+
     def __init__(self, base_url: str, api_key: str) -> None:
-        self.base_url = base_url.rstrip("/")
+        self._client = PaperclipClient(
+            base_url,
+            api_key,
+            user_agent="ffmemes-paperclip-outcome-audit/1.0",
+        )
+        self.base_url = self._client.base_url
         self.api_key = api_key
 
     def get(self, path: str, query: dict[str, str] | None = None) -> Any:
-        url = self.base_url + path
-        if query:
-            url += "?" + urllib.parse.urlencode(query)
-        req = urllib.request.Request(url)
-        req.add_header("Authorization", f"Bearer {self.api_key}")
-        req.add_header("User-Agent", "ffmemes-paperclip-outcome-audit/1.0")
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                return json.loads(resp.read())
-        except urllib.error.HTTPError as exc:
-            body = compact_body(exc.read().decode("utf-8", errors="replace"), limit=500)
-            raise RuntimeError(f"HTTP {exc.code} for {path}: {body}") from exc
+            return self._client.get(path, query=query)
+        except PaperclipAPIError as exc:
+            raise RuntimeError(str(exc)) from exc
 
-
-def paperclip_base_url() -> str | None:
-    base_url = os.getenv("PAPERCLIP_API_URL") or os.getenv("PAPERCLIP_URL")
-    if base_url and base_url.rstrip("/").endswith("/api"):
-        return base_url.rstrip("/")[:-4]
-    return base_url
+    def paginate(self, path: str, **kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        return self._client.paginate(path, **kwargs)
 
 
 def compact_body(body: str, limit: int = 240) -> str:
-    body = " ".join(body.split())
-    for pattern, replacement in SENSITIVE_PATTERNS:
-        body = pattern.sub(replacement, body)
-    return body if len(body) <= limit else body[: limit - 1] + "..."
-
-
-def parse_ts(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return redact(body, limit=limit)
 
 
 def parse_date(value: str | None) -> date | None:
@@ -136,12 +110,21 @@ def list_agents(client: Paperclip, company_id: str) -> dict[str, str]:
     }
 
 
-def list_issues(client: Paperclip, company_id: str, limit: int) -> list[dict[str, Any]]:
-    issues = client.get(
+def list_issues(
+    client: Paperclip, company_id: str, limit: int
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Paginate every status so the audit doesn't silently undercount once the
+    company crosses the API's per-request cap.
+
+    Deduplication, shape-drift detection, duplicate-page bail, and the
+    ceiling probe live in `PaperclipClient.paginate`; this wrapper just
+    binds the FFmemes-specific path and status filter.
+    """
+    return client.paginate(
         f"/api/companies/{company_id}/issues",
-        {"status": ALL_STATUSES, "limit": str(limit)},
+        query={"status": ALL_STATUSES},
+        limit=limit,
     )
-    return issues if isinstance(issues, list) else []
 
 
 def bracket_slug(title: str) -> str | None:
@@ -237,7 +220,7 @@ def log_events(since: datetime, limit: int = 12) -> dict[str, Any]:
             "counts": {"events": 0, "decisions": 0, "outcomes": 0},
         }
 
-    for line in LOG_PATH.read_text().splitlines():
+    for line in LOG_PATH.read_text(encoding="utf-8", errors="replace").splitlines():
         entry = parse_log_entry(line)
         if not entry:
             continue
@@ -288,7 +271,7 @@ def active_experiments(today: date) -> list[dict[str, Any]]:
         return rows
 
     for path in sorted(ACTIVE_EXPERIMENTS_DIR.glob("*.md")):
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8", errors="replace")
         created_raw = read_field(text, "Created")
         deployed_raw = read_field(text, "Deployed")
         measure_raw = read_field(text, "Measure after")
@@ -324,7 +307,7 @@ def build_report(client: Paperclip, company_id: str, days: int, limit: int) -> d
     generated = datetime.now(timezone.utc)
     since = generated - timedelta(days=days)
     agents = list_agents(client, company_id)
-    issues = list_issues(client, company_id, limit)
+    issues, issues_truncation = list_issues(client, company_id, limit)
 
     touched = [
         issue
@@ -373,6 +356,10 @@ def build_report(client: Paperclip, company_id: str, days: int, limit: int) -> d
         flags.append("stale_active_experiments")
     if len(experiments) > 2:
         flags.append("too_many_active_experiments")
+    if issues_truncation["truncated"]:
+        flags.append("issue_list_truncated")
+        if issues_truncation.get("reason") == "unexpected_response_shape":
+            flags.append("issue_list_shape_degraded")
 
     return {
         "generatedAt": generated.isoformat(),
@@ -383,6 +370,7 @@ def build_report(client: Paperclip, company_id: str, days: int, limit: int) -> d
             "until": generated.isoformat(),
         },
         "issueLimit": limit,
+        "issueListTruncation": issues_truncation,
         "issues": {
             "touched": len(touched),
             "created": len(created),
@@ -425,6 +413,16 @@ def recommended_actions(flags: list[str]) -> list[str]:
         )
     if "too_many_active_experiments" in flags:
         actions.append("Reduce to at most two active experiments so attribution stays readable.")
+    if "issue_list_shape_degraded" in flags:
+        actions.append(
+            "Issue list response shape changed; counts are unreliable until the "
+            "audit pagination is updated to the new schema."
+        )
+    elif "issue_list_truncated" in flags:
+        actions.append(
+            "Issue list is truncated; raise --limit or fix API offset handling before "
+            "trusting completion/decision counts."
+        )
     if not actions:
         actions.append(
             "Record the top decision, shipped outcome, stopped work, and next bet "
