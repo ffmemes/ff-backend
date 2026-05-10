@@ -7,6 +7,10 @@ from src.flows.parsers.tg import parse_telegram_source
 from src.flows.parsers.vk import parse_vk_source
 from src.storage.constants import MemeSourceStatus, MemeSourceType
 from src.storage.etl import normalize_telegram_channel_url
+from src.storage.moderation import (
+    MemeSourceNotFoundError,
+    advance_meme_source,
+)
 from src.tgbot.constants import UserType
 from src.tgbot.logs import log
 from src.tgbot.senders.keyboards import (
@@ -15,12 +19,8 @@ from src.tgbot.senders.keyboards import (
 )
 from src.tgbot.senders.utils import send_or_edit
 from src.tgbot.service import (
-    get_meme_source_by_id,
     get_meme_source_stats_by_id,
     get_or_create_meme_source,
-    snooze_memes_of_meme_source,
-    unsnooze_memes_of_meme_source,
-    update_meme_source,
 )
 from src.tgbot.user_info import get_user_info
 
@@ -75,8 +75,14 @@ async def handle_meme_source_language_selection(
     args = update.callback_query.data.split(":")
     meme_source_id, lang_code = int(args[1]), args[3]
 
-    meme_source = await update_meme_source(meme_source_id, language_code=lang_code)
-    if meme_source is None:
+    try:
+        result = await advance_meme_source(
+            meme_source_id,
+            moderator_id=str(user_id),
+            language_code=lang_code,
+            trigger_parse=False,
+        )
+    except MemeSourceNotFoundError:
         await update.callback_query.answer("Meme source not found")
         return
 
@@ -86,7 +92,7 @@ async def handle_meme_source_language_selection(
     )
 
     await update.callback_query.answer(f"Meme source lang is {lang_code} now")
-    await meme_source_admin_pipeline(meme_source, update)
+    await meme_source_admin_pipeline(result["source"], update)
 
 
 async def handle_meme_source_change_status(
@@ -101,21 +107,26 @@ async def handle_meme_source_change_status(
     args = update.callback_query.data.split(":")
     meme_source_id, status = int(args[1]), args[3]
 
-    meme_source = await get_meme_source_by_id(meme_source_id)
-    if (
-        meme_source["status"] == MemeSourceStatus.SNOOZED
-        and status == MemeSourceStatus.PARSING_ENABLED
-    ):
-        # unsnooze memes
-        nmemes_updated = await unsnooze_memes_of_meme_source(meme_source_id)
-        await update.effective_chat.send_message(
-            f"Unsnoozed {nmemes_updated} memes of {meme_source_id}"
+    try:
+        # `trigger_parse=False` keeps parse-after-UI ordering: we want the
+        # moderator to see the keyboard refresh before we await the parser.
+        result = await advance_meme_source(
+            meme_source_id,
+            moderator_id=str(user_id),
+            status=status,
+            trigger_parse=False,
         )
-
-    meme_source = await update_meme_source(meme_source_id, status=status)
-    if meme_source is None:
+    except MemeSourceNotFoundError:
         await update.callback_query.answer(f"Meme source {meme_source_id} not found")
         return
+    except ValueError as e:
+        await update.callback_query.answer(str(e)[:180])
+        return
+
+    if result["unsnoozed_count"]:
+        await update.effective_chat.send_message(
+            f"Unsnoozed {result['unsnoozed_count']} memes of {meme_source_id}"
+        )
 
     await log(
         f"ℹ️ MemeSource ${meme_source_id}: set_status={status} (by {user_id})",
@@ -123,8 +134,9 @@ async def handle_meme_source_change_status(
     )
 
     await update.callback_query.answer(f"Meme source status is {status} now")
-    await meme_source_admin_pipeline(meme_source, update)
+    await meme_source_admin_pipeline(result["source"], update)
 
+    meme_source = result["source"]
     if status == MemeSourceStatus.PARSING_ENABLED:  # trigger parsing
         # TODO: async
         if meme_source["type"] == MemeSourceType.VK:
@@ -132,11 +144,9 @@ async def handle_meme_source_change_status(
         elif meme_source["type"] == MemeSourceType.TELEGRAM:
             await parse_telegram_source(meme_source_id, meme_source["url"])
 
-    if status == MemeSourceStatus.SNOOZED:
-        # set memes of a source status to snoozed
-        nmemes_updated = await snooze_memes_of_meme_source(meme_source["id"])
+    if result["snoozed_count"]:
         await update.effective_chat.send_message(
-            f"Snoozed {nmemes_updated} memes of {meme_source_id}"
+            f"Snoozed {result['snoozed_count']} memes of {meme_source_id}"
         )
 
 
