@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 
 
@@ -9,7 +10,13 @@ def load_audit_module():
     spec = importlib.util.spec_from_file_location("paperclip_routine_audit", path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    original_sys_path = list(sys.path)
+    blocked_paths = {path.parent, path.parents[1]}
+    sys.path[:] = [item for item in sys.path if Path(item or ".").resolve() not in blocked_paths]
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.path[:] = original_sys_path
     return module
 
 
