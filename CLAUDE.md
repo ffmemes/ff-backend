@@ -287,6 +287,17 @@ desired skills.
 
 **IMPORTANT: Read `docs/broadcasts.md` before sending any broadcast.** Use `send_broadcast()` from `src/broadcasts/service.py` with a unique `broadcast_id` for dedup. Never run inline ad-hoc broadcast code. Language detection uses `user_language` table (bot preference), NOT `user_tg.language_code` (Telegram app language).
 
+## Source moderation (agent-driven)
+
+`scripts/admin/advance_source.py` is the non-interactive CLI for
+advancing `meme_source` rows through moderation states. Use it from a
+CTO/QA heartbeat instead of waiting for Daniil to drive the Telegram
+bot UI. Shares business logic with the bot moderator handler via
+`src/storage/moderation.py::advance_meme_source` — same snooze/unsnooze
+cascades, same audit trail under `meme_source.data.moderation_log`.
+
+See `docs/source-moderation-cli.md` for usage and verification queries.
+
 ## Known Issues
 
 - SQL string interpolation in `candidates.py` -- needs parameterization (injection risk)
