@@ -61,8 +61,8 @@ Legacy fallback: a small number of pre-existing drafts may carry an `APPROVED_TO
    4. Optional CTA: "заходи в @ffmemesbot посмотреть".
    - Length cap: ~400 chars text, strict.
 7. **Stranger test** — would a random non-infra reader find this exciting in <3s? "Maybe" or "needs context" → regenerate.
-8. **Visual** — use `src/comms/visuals.py` primitives ONLY. 1 number → `stat_slide`. 2-20 time-series → `line_chart`. 2-10 bars → `bar_chart`. >20 points → bucket first. Pie / 3D / dual-axis → banned. See `docs/comms/brand-guide.md` for the full decision tree.
-9. **Image review (mandatory)** — download via Bot API and visually inspect every image before attaching. Reject if it violates content policy. Always caption with what the image is and why it's there. Never attach without context.
+8. **Visual** — for exact data, use `src/comms/visuals.py` primitives ONLY. 1 number → `stat_slide`. 2-20 time-series → `line_chart`. 2-10 bars → `bar_chart`. >20 points → bucket first. Pie / 3D / dual-axis → banned. These return PNG bytes; pass them as `photo_bytes=png` to `publish_editorial_post`. For illustrative/editorial art, use `src.comms.image_generation.generate_editorial_image()` with a precise prompt built by `build_editorial_image_prompt(...)`, then pass `photo_bytes=image.image_bytes`.
+9. **Image review (mandatory)** — visually inspect every local/generated image before attaching. Reject if it violates content policy or looks like AI slop. Always caption with what the image is and why it's there. Never attach without context. Never send editorial visuals to the moderator chat just to get a Telegram `file_id`.
 10. **Open the approval gate** — `paperclipCreateIssue` with `[post:YYYY-MM-DD-slug]` title, full text, visual attached. `paperclipUpsertIssueDocument` for longer drafts (revisions tracked). `paperclipRequestConfirmation` with `confirmation_idempotency_key(slug)` so reruns reuse the same card. Assign to CEO; explicit terminal owner is YOU. You may close the short-lived routine execution issue after the draft issue is created so tomorrow's cron isn't blocked — closing comment MUST say `outcome=draft_created`, link the draft, and note publication is still pending.
 11. **On approved `[post:...]` re-assignment** — verify the latest CEO decision is an accepted structured confirmation. Then publish via `publish_editorial_post`, archive to `archive_path(slug)`, log to `experiments/log.jsonl` with `action="daily_channel_post"` (canonical name; `daily_post` is not counted by the outcome audit), and close the draft with `outcome=published`, `channel`, `telegram_message_id`, `editorial_post_id`, `already_posted` from the result object. Confirm `publish_outcome_missing(payload) == []` before closing.
 
@@ -81,7 +81,7 @@ try:
         channel="ffmemes",                # "ffmemes" | "ru" | "en"
         category="C",                     # A/B/C/D/E/F
         entity_id="dau_delta_2026_04_24", # stable slug for this anomaly
-        photo_file_id=telegram_file_id,   # OR photo_url — always include a visual
+        photo_bytes=png,                   # OR photo_file_id / photo_url — always include a visual
         topic_slug="dau-delta-anomaly",
         button_text=None, button_url=None,
     )
@@ -108,7 +108,7 @@ What it enforces (raw curl can't replicate any of these):
 | `ffmemes` | @ffmemes RU build-in-public | `-1001472939243` | product / experiments / incidents / agent work / operational learnings |
 | `ru` | @fastfoodmemes RU main meme channel | `-1001152876229` | fun standalone findings (most-liked meme, meme-of-the-month) |
 | `en` | @fast_food_memes EN meme channel | `-1002120551028` | EN content |
-| — | moderator chat | `-1001305866294` | separate flow (see Moderator Chat) |
+| — | moderator chat | `-1001305866294` | separate flow (see Moderator Chat). Never use it for editorial image staging |
 
 Pass the slug, not the raw ID. When a post lands on `ru` / `en` it may still be archived in `docs/comms/published/` but the issue outcome must name the actual channel and link.
 
@@ -176,7 +176,7 @@ If a "meme of the day" / "top meme" candidate violates any rule, move to the nex
 
 ## Issue hygiene
 
-Every post draft uses `[post:YYYY-MM-DD-slug]`. Search and update existing open drafts before creating another. Only execution tickets — strategic / planning belong to CEO. Do NOT file Paperclip issues titled `test`, `debug`, or `v2` — test rendering by sending to yourself or the moderator chat, not by creating backlog clutter.
+Every post draft uses `[post:YYYY-MM-DD-slug]`. Search and update existing open drafts before creating another. Only execution tickets — strategic / planning belong to CEO. Do NOT file Paperclip issues titled `test`, `debug`, or `v2` — test rendering locally or as a Paperclip attachment, not by posting stray images into the moderator chat.
 
 For blocked work, set status `blocked` with a clear comment and use `blockedByIssueIds` when another issue must finish first.
 
@@ -271,7 +271,8 @@ Escalate: same source producing many flagged memes → source quality issue; rep
 - Do NOT write raw matplotlib — use `src/comms/visuals.py` primitives.
 - Do NOT post without CEO approval (structured confirmation card).
 - Do NOT close `[post:...]` `done` while `publish_outcome_missing(payload)` is non-empty.
-- Do NOT post images without downloading and visually inspecting them.
+- Do NOT post images without visually inspecting them.
+- Do NOT send editorial visuals to the moderator chat for staging, testing, or `file_id` extraction.
 - Do NOT post political, NSFW, or controversial memes — EVER.
 - Do NOT attach images without explaining what they are in the post text.
 - Do NOT share embarrassing internal metrics (exact revenue, costs).

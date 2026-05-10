@@ -38,6 +38,7 @@ async def post_editorial_to_channel(
     channel: str = "ru",
     photo_url: str | None = None,
     photo_file_id: str | None = None,
+    photo_bytes: bytes | None = None,
     button_text: str | None = None,
     button_url: str | None = None,
 ):
@@ -50,6 +51,7 @@ async def post_editorial_to_channel(
             "ffmemes" (@ffmemes — RU build-in-public / product / process).
         photo_url: URL to a photo to attach.
         photo_file_id: Telegram file_id of a photo to attach.
+        photo_bytes: Raw image bytes for generated/local visuals.
         button_text: Optional inline button label.
         button_url: Optional inline button URL.
     """
@@ -68,15 +70,28 @@ async def post_editorial_to_channel(
             [[InlineKeyboardButton(text=button_text, url=button_url)]]
         )
 
-    photo = photo_file_id or photo_url
+    media_sources = [photo_file_id is not None, photo_url is not None, photo_bytes is not None]
+    if sum(media_sources) > 1:
+        raise ValueError("Pass exactly one of photo_file_id, photo_url, or photo_bytes")
 
-    if photo:
+    if photo_file_id is not None:
+        photo = photo_file_id
+    elif photo_url is not None:
+        photo = photo_url
+    else:
+        photo = photo_bytes
+
+    if photo is not None:
+        send_kwargs = {}
+        if photo_bytes is not None and photo is photo_bytes:
+            send_kwargs["filename"] = "editorial.png"
         msg = await bot.send_photo(
             chat_id=chat_id,
             photo=photo,
             caption=text,
             parse_mode=ParseMode.HTML,
             reply_markup=reply_markup,
+            **send_kwargs,
         )
         logger.info(f"Posted editorial photo to {channel} channel: msg_id={msg.message_id}")
     else:

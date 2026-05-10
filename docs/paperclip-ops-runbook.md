@@ -282,6 +282,15 @@ Bidirectional Telegram integration for managing Paperclip via @ffnerdbot (separa
 **Bot**: @ffnerdbot (user_id `49820636` only)
 **Features**: push notifications, bot commands, voice transcription (Whisper), agent escalation, daily digest
 
+**Run lifecycle notification caveat**: the plugin subscribes to
+`agent.run.started` and `agent.run.finished` unconditionally. The installed
+v0.2.1 formatter renders `payload.agentName` as the subject, so Paperclip core
+must send a human-readable run subject there (for example
+`FFM-1105: QA Log Scan`) instead of leaving the plugin to fall back to raw run
+UUIDs. Upgrading the plugin alone is not enough: npm latest v0.6.1 adds a
+settings UI and "View Run" buttons, but still has no toggle for run lifecycle
+notifications.
+
 **Configuration** (stored in `plugin_config` table, survives redeploys):
 - `defaultChatId`: `49820636` — all notifications go to the owner
 - `escalationChatId`: `49820636` — escalations also go to the owner
@@ -401,7 +410,7 @@ not the full URL.
 | `SENTRY_AUTH_TOKEN` | CTO, QA | Sentry CLI authentication (read-only project scope) |
 | `PREFECT_API_URL` | CTO, QA | Prefect API endpoint (`https://prefect.swanrate.com/api`) |
 | `PREFECT_AUTH_STRING` | CTO, QA | Prefect API Basic auth credentials |
-| `OPENAI_API_KEY` | All (Codex), Telegram plugin (Whisper) | OpenAI API for Codex + voice transcription |
+| `OPENAI_API_KEY` | All (Codex), Comms optional image generation, Telegram plugin (Whisper) | OpenAI API for Codex, GPT Image visuals, and voice transcription |
 | `TEST_DATABASE_URL` | CTO | Test/staging DB for safe experiments |
 | `TELEGRAM_BOT_TOKEN` | Telegram plugin | @ffnerdbot token (NOT @ffmemesbot!) |
 
