@@ -49,6 +49,11 @@ class Config(BaseSettings):
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
     CHAT_AGENT_ENABLED: bool = False
 
+    # FFM-1161: gate cold_start engines so they only serve genuinely-new users
+    # (nsessions <= 1). Dormant returners with nmemes_sent < 30 but multiple
+    # sessions fall through to the growing-user blender instead.
+    COLD_START_NSESSIONS_GATE_ENABLED: bool = False
+
     PREFECT_API_URL: str | None = None
     PREFECT_AUTH_STRING: str | None = None
 

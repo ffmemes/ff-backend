@@ -358,6 +358,7 @@ async def get_user_info(
         SELECT
             type,
             COALESCE(nmemes_sent, 0) nmemes_sent,
+            COALESCE(nsessions, 0) nsessions,
             COALESCE(memes_watched_today, 0) memes_watched_today,
             UIL.interface_lang
         FROM "user" AS U

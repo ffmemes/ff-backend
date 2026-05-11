@@ -6,6 +6,7 @@ from typing import Any, Optional
 from sqlalchemy import text
 
 from src import redis
+from src.config import settings
 from src.database import fetch_all
 from src.recommendations.blender import blend
 from src.recommendations.blender_experiments import (
@@ -95,6 +96,11 @@ async def generate_recommendations(
     if nmemes_sent is None:
         nmemes_sent = user_info["nmemes_sent"]
 
+    # FFM-1161: nsessions gate. cold_start engines were designed for first-session
+    # users; the cached user_info may predate the gate (1h TTL) — treat missing as 0
+    # so we don't accidentally route dormant returners into cold_start.
+    nsessions = user_info.get("nsessions") or 0
+
     queue_key = redis.get_meme_queue_key(user_id)
 
     meme_ids_in_queue = []
@@ -149,10 +155,19 @@ async def generate_recommendations(
           Phase 3 (16-30): Transition — blend adapt + growing engines
 
         Fallback chain: phase engine -> lr_smoothed -> best_uploaded_memes
+
+        FFM-1161: when COLD_START_NSESSIONS_GATE_ENABLED, cold_start is only
+        used for first-session users (nsessions <= 1). Dormant returners
+        (nsessions >= 2, nmemes_sent < 30) fall through to the growing-user
+        blender below — they have stale signal, not zero signal.
         """
 
+        in_cold_start_window = nmemes_sent < 30
+        if settings.COLD_START_NSESSIONS_GATE_ENABLED:
+            in_cold_start_window = in_cold_start_window and nsessions <= 1
+
         # Cold start: 3-phase adaptive
-        if nmemes_sent < 30:
+        if in_cold_start_window:
             if nmemes_sent < 6:
                 # Phase 1: diverse exploration from top sources
                 engine = "cold_start_explore"

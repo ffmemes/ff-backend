@@ -13,6 +13,15 @@ from src.recommendations.meme_queue import generate_recommendations
 TEST_USER_ID = 99999
 
 
+def _patch_user_info(nsessions: int = 0, nmemes_sent: int = 0, **extra):
+    user_info = defaultdict(int, {"nmemes_sent": nmemes_sent, "nsessions": nsessions, **extra})
+    return patch(
+        "src.recommendations.meme_queue.get_user_info",
+        new_callable=AsyncMock,
+        return_value=user_info,
+    )
+
+
 @pytest.fixture(autouse=True)
 def mock_redis():
     """Mock Redis and user_info calls — these tests validate blending logic, not Redis."""
@@ -488,3 +497,151 @@ async def test_cold_start_all_empty():
     for nmemes in [0, 3, 8, 12, 20, 25]:
         candidates = await generate_recommendations(TEST_USER_ID, 10, nmemes, TestRetriever())
         assert len(candidates) == 0, f"Expected empty at nmemes_sent={nmemes}"
+
+
+# ── FFM-1161: nsessions gate ──
+
+
+def _growing_retriever_class():
+    """Retriever covering both cold_start engines and the growing-user blender."""
+
+    async def cold_start_explore(self, user_id, limit=10, exclude_meme_ids=[], **kw):
+        return [{"id": 101, "recommended_by": "cold_start_explore"}]
+
+    async def cold_start_adapt(self, user_id, limit=10, exclude_meme_ids=[], **kw):
+        return [{"id": 201, "recommended_by": "cold_start_adapt"}]
+
+    async def lr_smoothed(self, user_id, limit=10, exclude_meme_ids=[], **kw):
+        return [{"id": 301, "recommended_by": "lr_smoothed"}]
+
+    async def best_uploaded_memes(self, user_id, limit=10, exclude_meme_ids=[], **kw):
+        return [{"id": 401, "recommended_by": "best_uploaded_memes"}]
+
+    async def like_spread_and_recent_memes(self, user_id, limit=10, exclude_meme_ids=[], **kw):
+        return [{"id": 501, "recommended_by": "like_spread_and_recent_memes"}]
+
+    async def recently_liked(self, user_id, limit=10, exclude_meme_ids=[], **kw):
+        return [{"id": 601, "recommended_by": "recently_liked"}]
+
+    async def goat(self, user_id, limit=10, exclude_meme_ids=[], **kw):
+        return [{"id": 701, "recommended_by": "goat"}]
+
+    async def es_ranked(self, user_id, limit=10, exclude_meme_ids=[], **kw):
+        return [{"id": 801, "recommended_by": "es_ranked"}]
+
+    class TestRetriever(CandidatesRetriever):
+        engine_map = {
+            "cold_start_explore": cold_start_explore,
+            "cold_start_adapt": cold_start_adapt,
+            "lr_smoothed": lr_smoothed,
+            "best_uploaded_memes": best_uploaded_memes,
+            "like_spread_and_recent_memes": like_spread_and_recent_memes,
+            "recently_liked": recently_liked,
+            "goat": goat,
+            "es_ranked": es_ranked,
+        }
+
+    return TestRetriever
+
+
+@pytest.mark.asyncio
+async def test_gate_off_dormant_returner_still_uses_cold_start():
+    """Default (gate disabled): nsessions is ignored — cold_start still routes by nmemes_sent."""
+    retriever = _growing_retriever_class()()
+    with (
+        _patch_user_info(nsessions=5, nmemes_sent=8),
+        patch("src.config.settings.COLD_START_NSESSIONS_GATE_ENABLED", False),
+    ):
+        candidates = await generate_recommendations(
+            TEST_USER_ID, 10, nmemes_sent=8, retriever=retriever
+        )
+    assert any(c["recommended_by"] == "cold_start_adapt" for c in candidates)
+
+
+@pytest.mark.asyncio
+async def test_gate_on_first_session_routes_to_cold_start_explore():
+    """Gate on + nsessions<=1 + nmemes_sent<6 → cold_start_explore (Phase 1)."""
+    retriever = _growing_retriever_class()()
+    with (
+        _patch_user_info(nsessions=0, nmemes_sent=0),
+        patch("src.config.settings.COLD_START_NSESSIONS_GATE_ENABLED", True),
+    ):
+        candidates = await generate_recommendations(
+            TEST_USER_ID, 10, nmemes_sent=0, retriever=retriever
+        )
+    assert len(candidates) == 1
+    assert candidates[0]["recommended_by"] == "cold_start_explore"
+
+
+@pytest.mark.asyncio
+async def test_gate_on_first_session_phase2_routes_to_cold_start_adapt():
+    """Gate on + nsessions<=1 + 6<=nmemes_sent<16 → cold_start_adapt (Phase 2)."""
+    retriever = _growing_retriever_class()()
+    with (
+        _patch_user_info(nsessions=1, nmemes_sent=8),
+        patch("src.config.settings.COLD_START_NSESSIONS_GATE_ENABLED", True),
+    ):
+        candidates = await generate_recommendations(
+            TEST_USER_ID, 10, nmemes_sent=8, retriever=retriever
+        )
+    assert any(c["recommended_by"] == "cold_start_adapt" for c in candidates)
+
+
+@pytest.mark.asyncio
+async def test_gate_on_dormant_returner_falls_through_to_growing_blender():
+    """Gate on + nsessions>=2 + nmemes_sent<30 → growing-user blender, NO cold_start engines."""
+    retriever = _growing_retriever_class()()
+    with (
+        _patch_user_info(nsessions=3, nmemes_sent=12),
+        patch("src.config.settings.COLD_START_NSESSIONS_GATE_ENABLED", True),
+    ):
+        candidates = await generate_recommendations(
+            TEST_USER_ID, 10, nmemes_sent=12, retriever=retriever, random_seed=42
+        )
+    sources = {c["recommended_by"] for c in candidates}
+    assert "cold_start_explore" not in sources
+    assert "cold_start_adapt" not in sources
+    # Growing blender is pinned at lr_smoothed in position 0
+    assert candidates[0]["recommended_by"] == "lr_smoothed"
+
+
+@pytest.mark.asyncio
+async def test_gate_on_mature_user_unchanged():
+    """Gate on + mature user (nmemes_sent>=100) → blender_v2 path, untouched by gate."""
+    retriever = _growing_retriever_class()()
+    with (
+        _patch_user_info(nsessions=5, nmemes_sent=120),
+        patch("src.config.settings.COLD_START_NSESSIONS_GATE_ENABLED", True),
+        patch(
+            "src.recommendations.meme_queue.get_recently_liked_blender_v2_weights",
+            new_callable=AsyncMock,
+            return_value=MATURE_BLENDER_TREATMENT_WEIGHTS,
+        ) as get_weights,
+    ):
+        candidates = await generate_recommendations(
+            TEST_USER_ID, 10, nmemes_sent=120, retriever=retriever, random_seed=42
+        )
+    sources = {c["recommended_by"] for c in candidates}
+    assert "cold_start_explore" not in sources
+    assert "cold_start_adapt" not in sources
+    get_weights.assert_awaited_once_with(TEST_USER_ID)
+
+
+@pytest.mark.asyncio
+async def test_gate_on_missing_nsessions_treated_as_zero():
+    """Stale cache without nsessions key → treated as 0, cold_start still applies."""
+    retriever = _growing_retriever_class()()
+    # user_info lacks 'nsessions' (defaultdict(int) returns 0)
+    stale_info = defaultdict(int, {"nmemes_sent": 4})
+    with (
+        patch(
+            "src.recommendations.meme_queue.get_user_info",
+            new_callable=AsyncMock,
+            return_value=stale_info,
+        ),
+        patch("src.config.settings.COLD_START_NSESSIONS_GATE_ENABLED", True),
+    ):
+        candidates = await generate_recommendations(
+            TEST_USER_ID, 10, nmemes_sent=4, retriever=retriever
+        )
+    assert candidates[0]["recommended_by"] == "cold_start_explore"
