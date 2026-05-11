@@ -86,11 +86,14 @@ agents:
         ANALYST_DATABASE_URL:
           kind: "secret"
           requirement: "optional"
-        # Bound to the existing Analyst read-only DB secret by CEO decision.
-        # This is for Comms data reads; do not map to FFMEMES_DATABASE_URL.
+        # Narrow-privilege writer role for editorial_posts (SELECT/INSERT/UPDATE
+        # on that one table, plus USAGE/SELECT on its identity sequence).
+        # Required so publish_editorial_post can persist the row and the stats
+        # collector picks it up. See docs/comms/comms-writer-role-setup.sql for
+        # the role bootstrap and FFM-919 / FFM-1178 for the rationale. Do NOT
+        # bind to FFMEMES_DATABASE_URL or any full-write app DB secret.
         DATABASE_URL:
           kind: "secret"
-          secretName: "ANALYST_DATABASE_URL"
           requirement: "required"
         FFMEMES_PROD_TELEGRAM_BOT_TOKEN:
           kind: "secret"
