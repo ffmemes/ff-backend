@@ -44,7 +44,7 @@ from src.flows.rewards.uploaded_memes import (
     reward_en_users_for_weekly_top_uploaded_memes,
     reward_ru_users_for_weekly_top_uploaded_memes,
 )
-from src.flows.stats.meme import calculate_meme_stats
+from src.flows.stats.meme import alert_low_sent_pool_skip_rate, calculate_meme_stats
 from src.flows.stats.meme_heavy import calculate_meme_stats_heavy
 from src.flows.stats.meme_source import calculate_meme_source_stats
 
@@ -91,6 +91,10 @@ if __name__ == "__main__":
                     timezone=LON,
                 )
             ],
+        ),
+        alert_low_sent_pool_skip_rate.to_deployment(
+            name="Alert low_sent_pool skip rate",
+            schedules=[CronSchedule(cron="25 7 * * *", timezone=LON)],
         ),
         # ── Parsers (hourly) ──
         parse_telegram_sources.to_deployment(
