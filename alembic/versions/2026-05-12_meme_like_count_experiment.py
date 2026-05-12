@@ -1,7 +1,7 @@
 """meme like count experiment measurement views
 
 Revision ID: 3d9b4f6a2c10
-Revises: 1a2b3c4d5e6f
+Revises: 9f0a1b2c3d4e
 Create Date: 2026-05-12 18:00:00.000000
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "3d9b4f6a2c10"
-down_revision = "1a2b3c4d5e6f"
+down_revision = "9f0a1b2c3d4e"
 branch_labels = None
 depends_on = None
 
