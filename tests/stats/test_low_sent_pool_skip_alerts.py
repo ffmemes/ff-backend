@@ -12,7 +12,10 @@ from tests.factories import (
 )
 
 from src.database import engine
-from src.flows.stats.meme import _format_low_sent_pool_skip_rate_alert
+from src.flows.stats.meme import (
+    TELEGRAM_LOG_HTML_MESSAGE_LIMIT,
+    _format_low_sent_pool_skip_rate_alert,
+)
 from src.stats.meme import get_low_sent_pool_skip_rate_alerts
 
 
@@ -153,3 +156,40 @@ def test_low_sent_alert_message_points_moderators_to_manual_review() -> None:
     assert "<code>/meme 10001</code>" in message
     assert "action=needs_review" in message
     assert "No recommendation traffic changed" in message
+
+
+def test_low_sent_alert_message_stays_valid_html_under_log_truncation_limit() -> None:
+    long_url = "https://example.com/" + '&<>"' * 1000
+    rows = [
+        {
+            "meme_id": 10000 + idx,
+            "meme_source_id": 20000 + idx,
+            "source_type": "telegram",
+            "meme_status": "ok",
+            "source_status": "parsing_enabled",
+            "already_rejected_or_snoozed": False,
+            "sends": 10 + idx,
+            "explicit_reactions": 10 + idx,
+            "likes": 1,
+            "skips": 9 + idx,
+            "like_rate": 0.1,
+            "skip_rate": 0.9,
+            "published_age_days": 3.5,
+            "last_sent_at": "2026-05-12 07:00:00",
+            "source_url": long_url,
+        }
+        for idx in range(20)
+    ]
+
+    message = _format_low_sent_pool_skip_rate_alert(
+        rows,
+        skip_rate_threshold=0.5,
+        min_sends=10,
+        lookback_days=7,
+    )
+
+    assert len(message) < TELEGRAM_LOG_HTML_MESSAGE_LIMIT
+    assert message.count("<code>") == message.count("</code>")
+    assert "<code>https://example.com/" in message
+    assert "&amp;" in message
+    assert "...and " in message
