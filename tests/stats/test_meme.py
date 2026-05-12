@@ -12,16 +12,24 @@ from src.database import (
     meme_source,
     meme_stats,
     user,
+    user_deep_link_log,
     user_language,
     user_meme_reaction,
 )
-from src.stats.meme import calculate_meme_reactions_and_engagement
+from src.stats.meme import calculate_meme_invited_count, calculate_meme_reactions_and_engagement
 
 
 @pytest_asyncio.fixture()
 async def conn():
     async with engine.connect() as conn:
-        await conn.execute(insert(user), [{"id": 1, "type": "user"}, {"id": 2, "type": "user"}])
+        await conn.execute(
+            insert(user),
+            [
+                {"id": 1, "type": "user"},
+                {"id": 2, "type": "user"},
+                {"id": 3, "type": "user"},
+            ],
+        )
         await conn.execute(
             insert(meme_source),
             {
@@ -54,6 +62,7 @@ async def conn():
             [
                 {"user_id": 1, **u_common},
                 {"user_id": 2, **u_common},
+                {"user_id": 3, **u_common},
             ],
         )
         umr_common = {
@@ -83,6 +92,7 @@ async def conn():
         yield conn
 
         await conn.execute(delete(meme_stats))
+        await conn.execute(delete(user_deep_link_log))
         await conn.execute(delete(user_meme_reaction))
         await conn.execute(delete(user_language))
         await conn.execute(delete(meme))
@@ -108,3 +118,34 @@ async def test_calculate_meme_reactions_stats(conn: AsyncConnection):
             assert abs(row["lr_smoothed"] - 1) < eps
         if row["meme_id"] == 2:
             assert abs(row["lr_smoothed"]) < eps
+
+
+@pytest.mark.asyncio
+async def test_calculate_meme_invited_count_excludes_self_clicks(conn: AsyncConnection):
+    await conn.execute(
+        insert(meme_stats),
+        {"meme_id": 2, "invited_count": 7},
+    )
+    await conn.execute(
+        insert(user_deep_link_log),
+        [
+            {"user_id": 1, "deep_link": "s_1_1"},
+            {"user_id": 2, "deep_link": "s_1_1"},
+            {"user_id": 2, "deep_link": "s_1_1"},
+            {"user_id": 3, "deep_link": "s_1_1"},
+            {"user_id": 1, "deep_link": "s_1_2"},
+        ],
+    )
+    await conn.commit()
+
+    await calculate_meme_invited_count()
+
+    rows = await fetch_all(
+        select(meme_stats.c.meme_id, meme_stats.c.invited_count).where(
+            meme_stats.c.meme_id.in_([1, 2])
+        )
+    )
+    invited_count_by_meme_id = {row["meme_id"]: row["invited_count"] for row in rows}
+
+    assert invited_count_by_meme_id[1] == 2
+    assert invited_count_by_meme_id[2] == 0

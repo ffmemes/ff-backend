@@ -310,17 +310,40 @@ async def calculate_meme_raw_impressions_stats() -> None:
 
 async def calculate_meme_invited_count():
     # ruff: noqa: W605
-    # Counts bot starts from in-bot share links (s_{user_id}_{meme_id})
+    # Counts non-self bot starts from in-bot share links (s_{user_id}_{meme_id})
     insert_query = """
-        WITH MEME_IDS_IN_DEEP_LINKS AS (
+        WITH PARSED_SHARE_CLICKS AS (
             SELECT
+                CAST(SPLIT_PART(deep_link, '_', 2) AS BIGINT) AS sharer_user_id,
                 CAST(SPLIT_PART(deep_link, '_', 3) AS INTEGER) AS meme_id,
-                user_id
-            FROM
-                user_deep_link_log
+                user_id AS clicked_user_id
+            FROM user_deep_link_log
             WHERE
                 deep_link IS NOT NULL
                 AND deep_link LIKE 's\\_%\\_%'
+                AND deep_link ~ '^s_[0-9]+_[0-9]+$'
+        ),
+        AFFECTED_MEMES AS (
+            SELECT M.id AS meme_id
+            FROM meme M
+            INNER JOIN (
+                SELECT DISTINCT meme_id
+                FROM PARSED_SHARE_CLICKS
+
+                UNION
+
+                SELECT meme_id
+                FROM meme_stats
+                WHERE invited_count > 0
+            ) AFFECTED_MEME_IDS
+                ON AFFECTED_MEME_IDS.meme_id = M.id
+        ),
+        NON_SELF_SHARE_CLICKS AS (
+            SELECT
+                meme_id,
+                clicked_user_id
+            FROM PARSED_SHARE_CLICKS
+            WHERE clicked_user_id <> sharer_user_id
         )
 
         INSERT INTO meme_stats (
@@ -328,12 +351,12 @@ async def calculate_meme_invited_count():
             invited_count
         )
         SELECT
-            meme_id,
-            COUNT(DISTINCT user_id) AS invited_count
-        FROM MEME_IDS_IN_DEEP_LINKS
-        INNER JOIN meme M
-            ON M.id = MEME_IDS_IN_DEEP_LINKS.meme_id
-        GROUP BY meme_id
+            AFFECTED_MEMES.meme_id,
+            COUNT(DISTINCT NON_SELF_SHARE_CLICKS.clicked_user_id) AS invited_count
+        FROM AFFECTED_MEMES
+        LEFT JOIN NON_SELF_SHARE_CLICKS
+            ON NON_SELF_SHARE_CLICKS.meme_id = AFFECTED_MEMES.meme_id
+        GROUP BY AFFECTED_MEMES.meme_id
         ON CONFLICT (meme_id) DO
         UPDATE SET
             invited_count = EXCLUDED.invited_count
