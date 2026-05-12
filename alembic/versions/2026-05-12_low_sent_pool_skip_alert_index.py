@@ -16,23 +16,20 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # CREATE INDEX CONCURRENTLY cannot run inside a transaction.
-    op.execute("COMMIT")
-
     # Supports the daily low_sent_pool skip-rate alert, which scans recent
     # deliveries for one recommendation engine on a production-sized table.
-    op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS "
-        "ix_user_meme_reaction_low_sent_pool_sent_at_meme_id "
-        "ON user_meme_reaction (sent_at, meme_id) "
-        "INCLUDE (reaction_id) "
-        "WHERE recommended_by = 'low_sent_pool'"
-    )
+    with op.get_context().autocommit_block():
+        op.execute(
+            "CREATE INDEX CONCURRENTLY IF NOT EXISTS "
+            "ix_user_meme_reaction_low_sent_pool_sent_at_meme_id "
+            "ON user_meme_reaction (sent_at, meme_id) "
+            "INCLUDE (reaction_id) "
+            "WHERE recommended_by = 'low_sent_pool'"
+        )
 
 
 def downgrade() -> None:
-    op.execute("COMMIT")
-
-    op.execute(
-        "DROP INDEX CONCURRENTLY IF EXISTS ix_user_meme_reaction_low_sent_pool_sent_at_meme_id"
-    )
+    with op.get_context().autocommit_block():
+        op.execute(
+            "DROP INDEX CONCURRENTLY IF EXISTS ix_user_meme_reaction_low_sent_pool_sent_at_meme_id"
+        )
