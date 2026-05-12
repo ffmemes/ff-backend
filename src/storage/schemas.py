@@ -12,6 +12,7 @@ class MemeData(CustomModel):
     telegram_file_id: str
     caption: str | None
     recommended_by: str | None = None
+    nlikes: int = 0
 
     @model_validator(mode="before")
     @classmethod
@@ -19,4 +20,5 @@ class MemeData(CustomModel):
         caption = values.get("caption")
         if caption is not None:
             values["caption"] = caption[:1000]
+        values["nlikes"] = int(values.get("nlikes") or 0)
         return values

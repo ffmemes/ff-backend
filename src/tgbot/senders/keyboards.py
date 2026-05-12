@@ -53,9 +53,11 @@ def meme_reaction_keyboard(
     meme_id: int,
     user_id: int,
     referral_button_text: str,
+    visible_like_count: int | None = None,
 ):
     heart = random.choice(HEART_EMOJI)
-    like, dislike = heart, "⏬"
+    like = f"{heart} {visible_like_count}" if visible_like_count is not None else heart
+    dislike = "⏬"
     # like, dislike = "👍", "👎"
 
     return InlineKeyboardMarkup(
