@@ -9,6 +9,7 @@ class UserType(str, Enum):
 
     # GHOSTED = "ghosted"  # ignoring the bot
     BLOCKED_BOT = "blocked_bot"
+    UPLOAD_BANNED = "upload_banned"
 
     MODERATOR = "moderator"
     ADMIN = "admin"
