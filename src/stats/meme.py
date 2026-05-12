@@ -6,6 +6,11 @@ from src.database import execute, fetch_all
 
 logger = logging.getLogger(__name__)
 
+LOW_SENT_POOL_SKIP_RATE_ALERT_THRESHOLD = 0.5
+LOW_SENT_POOL_SKIP_RATE_ALERT_MIN_SENDS = 10
+LOW_SENT_POOL_SKIP_RATE_ALERT_LOOKBACK_DAYS = 7
+LOW_SENT_POOL_SKIP_RATE_ALERT_LIMIT = 20
+
 
 async def calculate_meme_reactions_and_engagement(
     min_user_reactions: int = 10,
@@ -174,6 +179,94 @@ async def calculate_meme_reactions_and_engagement(
             "min_user_reactions": min_user_reactions,
             "min_meme_reactions": min_meme_reactions,
             "lookback_hours": lookback_hours,
+        },
+    )
+
+
+async def get_low_sent_pool_skip_rate_alerts(
+    skip_rate_threshold: float = LOW_SENT_POOL_SKIP_RATE_ALERT_THRESHOLD,
+    min_sends: int = LOW_SENT_POOL_SKIP_RATE_ALERT_MIN_SENDS,
+    lookback_days: int = LOW_SENT_POOL_SKIP_RATE_ALERT_LOOKBACK_DAYS,
+    limit: int = LOW_SENT_POOL_SKIP_RATE_ALERT_LIMIT,
+) -> list[dict]:
+    """Return low_sent_pool memes whose explicit down/skip rate is above threshold.
+
+    This is a shadow guardrail only. It reads historical delivery/reaction rows
+    and intentionally does not update meme status or recommendation eligibility.
+    """
+
+    query = """
+        WITH LOW_SENT_REACTIONS AS (
+            SELECT
+                R.meme_id,
+                COUNT(*) AS sends,
+                COUNT(*) FILTER (WHERE R.reaction_id = 1) AS likes,
+                COUNT(*) FILTER (WHERE R.reaction_id = 2) AS skips,
+                COUNT(*) FILTER (WHERE R.reaction_id IS NOT NULL) AS explicit_reactions,
+                MIN(R.sent_at) AS first_sent_at,
+                MAX(R.sent_at) AS last_sent_at
+            FROM user_meme_reaction R
+            WHERE R.recommended_by = 'low_sent_pool'
+                AND R.sent_at >= NOW() - (:lookback_days * INTERVAL '1 day')
+            GROUP BY R.meme_id
+        )
+        SELECT
+            M.id AS meme_id,
+            M.status AS meme_status,
+            M.meme_source_id,
+            M.published_at,
+            MS.type AS source_type,
+            MS.status AS source_status,
+            CASE
+                WHEN MS.type = 'telegram' AND MRT.post_id IS NOT NULL
+                    THEN MS.url || '/' || MRT.post_id
+                WHEN MS.type = 'vk' AND MRV.url IS NOT NULL
+                    THEN MRV.url
+                WHEN MS.type = 'instagram' AND MRI.url IS NOT NULL
+                    THEN MRI.url
+                ELSE MS.url
+            END AS source_url,
+            LSR.sends,
+            LSR.likes,
+            LSR.skips,
+            LSR.explicit_reactions,
+            LSR.first_sent_at,
+            LSR.last_sent_at,
+            EXTRACT(EPOCH FROM (NOW() - M.published_at)) / 86400.0 AS published_age_days,
+            (LSR.likes::float / NULLIF(LSR.explicit_reactions, 0)) AS like_rate,
+            (LSR.skips::float / NULLIF(LSR.explicit_reactions, 0)) AS skip_rate,
+            (
+                M.status IN ('rejected', 'snoozed')
+                OR MS.status = 'snoozed'
+            ) AS already_rejected_or_snoozed
+        FROM LOW_SENT_REACTIONS LSR
+        INNER JOIN meme M
+            ON M.id = LSR.meme_id
+        INNER JOIN meme_source MS
+            ON MS.id = M.meme_source_id
+        LEFT JOIN meme_raw_telegram MRT
+            ON MS.type = 'telegram' AND MRT.id = M.raw_meme_id
+        LEFT JOIN meme_raw_vk MRV
+            ON MS.type = 'vk' AND MRV.id = M.raw_meme_id
+        LEFT JOIN meme_raw_ig MRI
+            ON MS.type = 'instagram' AND MRI.id = M.raw_meme_id
+        WHERE LSR.sends >= :min_sends
+            AND LSR.explicit_reactions > 0
+            AND (LSR.skips::float / NULLIF(LSR.explicit_reactions, 0)) > :skip_rate_threshold
+        ORDER BY
+            already_rejected_or_snoozed ASC,
+            skip_rate DESC,
+            sends DESC,
+            meme_id ASC
+        LIMIT :limit
+    """
+    return await fetch_all(
+        text(query),
+        {
+            "skip_rate_threshold": skip_rate_threshold,
+            "min_sends": min_sends,
+            "lookback_days": lookback_days,
+            "limit": limit,
         },
     )
 
