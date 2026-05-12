@@ -49,9 +49,9 @@ into this public repo.** Justification:
   `# Per-developer git worktrees` block; we extend the rule by convention to
   any `.codex/skills/gstack` or `.agents/skills/gstack` paths if a tool
   introduces them).
-- Each runtime (Claude Code, Codex, Paperclip) loads gstack from its own
-  install. Paperclip pulls from `skills.source`/`skills.ref`; Claude Code and
-  Codex install gstack into per-user dot-directories that are gitignored.
+- Each runtime (Codex, Paperclip, and any legacy local tools) loads gstack from
+  its own install. Paperclip pulls from `skills.source`/`skills.ref`; Codex
+  installs gstack into per-user dot-directories that are gitignored.
 - Sharing a tracked team-mode file would mean either committing per-user
   paths (privacy leak) or pinning a config that is unlikely to be valid
   across all three runtimes.

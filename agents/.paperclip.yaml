@@ -1,5 +1,10 @@
 schema: "paperclip/v1"
 
+# Codex agents use ChatGPT/Codex subscription OAuth from the persistent
+# /paperclip/.codex auth volume. Do not bind OPENAI_API_KEY to codex_local
+# agents, and do not set it globally in the Paperclip host env: Codex CLI
+# 0.122+ treats that as API-key billing instead of subscription billing.
+
 # gstack skills source — Paperclip pulls skills from this repo at the recorded ref.
 # Bump `ref` only after `agents/deploy.sh --dry-run` shows the new catalog with
 # zero unknown-desired-skills failures.
@@ -12,11 +17,12 @@ agents:
   analyst:
     role: "researcher"
     adapter:
-      type: "claude_local"
+      type: "codex_local"
       config:
-        dangerouslySkipPermissions: true
+        dangerouslyBypassApprovalsAndSandbox: true
         maxTurnsPerRun: 200
-        model: "claude-sonnet-4-6"
+        model: "gpt-5.5"
+        modelReasoningEffort: "high"
     runtime:
       heartbeat:
         enabled: true
@@ -57,9 +63,6 @@ agents:
           kind: "plain"
           default: "/paperclip/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
           requirement: "optional"
-        OPENAI_API_KEY:
-          kind: "secret"
-          requirement: "optional"
         ANALYST_DATABASE_URL:
           kind: "secret"
           requirement: "optional"
@@ -67,11 +70,12 @@ agents:
   comms-manager:
     role: "cmo"
     adapter:
-      type: "claude_local"
+      type: "codex_local"
       config:
-        dangerouslySkipPermissions: true
+        dangerouslyBypassApprovalsAndSandbox: true
         maxTurnsPerRun: 100
-        model: "claude-sonnet-4-6"
+        model: "gpt-5.5"
+        modelReasoningEffort: "medium"
     runtime:
       heartbeat:
         enabled: true
@@ -95,9 +99,6 @@ agents:
         FFMEMES_PROD_TELEGRAM_BOT_TOKEN:
           kind: "secret"
           requirement: "required"
-        OPENAI_API_KEY:
-          kind: "secret"
-          requirement: "optional"
 
   cto:
     role: "cto"
@@ -120,9 +121,6 @@ agents:
         PATH:
           kind: "plain"
           default: "/paperclip/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          requirement: "optional"
-        OPENAI_API_KEY:
-          kind: "secret"
           requirement: "optional"
         ANALYST_DATABASE_URL:
           kind: "secret"
@@ -154,11 +152,12 @@ agents:
   qa-engineer:
     role: "qa"
     adapter:
-      type: "claude_local"
+      type: "codex_local"
       config:
-        dangerouslySkipPermissions: true
+        dangerouslyBypassApprovalsAndSandbox: true
         maxTurnsPerRun: 200
-        model: "claude-sonnet-4-6"
+        model: "gpt-5.5"
+        modelReasoningEffort: "high"
     runtime:
       heartbeat:
         intervalSec: 21600
@@ -176,18 +175,14 @@ agents:
         COOLIFY_BASE_URL:
           kind: "secret"
           requirement: "required"
-        COOLIFY_RESOURCE_UUID:
-          kind: "plain"
-          default: "k4w804sco4s8kc88kwcw0ow4"
-          requirement: "optional"
-        COOLIFY_CONTAINER_NAME:
-          kind: "plain"
-          default: "k4w804sco4s8kc88kwcw0ow4-131756368009"
-          requirement: "optional"
+        # Coolify resource UUID + container name are intentionally NOT pinned
+        # as plain defaults here. They are documented in agents/qa-engineer/
+        # AGENTS.md (the "Key Coolify UUIDs" table) and resolved dynamically
+        # from the Coolify API when needed. Hand-written UUID defaults rot
+        # the moment Coolify rebuilds the container.
         PREFECT_API_URL:
-          kind: "plain"
-          default: "http://65.108.127.32:4200/api"
-          requirement: "optional"
+          kind: "secret"
+          requirement: "required"
         ANALYST_DATABASE_URL:
           kind: "secret"
           requirement: "required"
@@ -227,11 +222,12 @@ agents:
   release-engineer:
     role: "devops"
     adapter:
-      type: "claude_local"
+      type: "codex_local"
       config:
-        dangerouslySkipPermissions: true
+        dangerouslyBypassApprovalsAndSandbox: true
         maxTurnsPerRun: 150
-        model: "claude-sonnet-4-6"
+        model: "gpt-5.5"
+        modelReasoningEffort: "medium"
     runtime:
       heartbeat:
         maxConcurrentRuns: 1
@@ -272,9 +268,6 @@ agents:
         PATH:
           kind: "plain"
           default: "/paperclip/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          requirement: "optional"
-        OPENAI_API_KEY:
-          kind: "secret"
           requirement: "optional"
         ANALYST_DATABASE_URL:
           kind: "secret"

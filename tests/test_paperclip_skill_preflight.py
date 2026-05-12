@@ -185,3 +185,27 @@ def test_preflight_unpinned_ref_label(
     state = sync_module.preflight_skills(by_slug, manifest)
     capsys.readouterr()
     assert state["upstream_ref"] == "unpinned"
+
+
+def test_routine_patch_payload_includes_latest_revision_id(sync_module) -> None:
+    payload = sync_module.routine_patch_payload(
+        {"latestRevisionId": "rev-123"},
+        "new description\n",
+    )
+    assert payload == {
+        "description": "new description\n",
+        "baseRevisionId": "rev-123",
+    }
+
+
+def test_routine_patch_payload_accepts_nested_revision_id(sync_module) -> None:
+    payload = sync_module.routine_patch_payload(
+        {"latestRevision": {"id": "rev-456"}},
+        "new description\n",
+    )
+    assert payload["baseRevisionId"] == "rev-456"
+
+
+def test_routine_patch_payload_omits_revision_for_older_server(sync_module) -> None:
+    payload = sync_module.routine_patch_payload({}, "new description\n")
+    assert payload == {"description": "new description\n"}

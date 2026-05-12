@@ -16,7 +16,11 @@
 
 Paperclip manages the autonomous AI agent team for @ffmemesbot.
 Dashboard: `https://org.ffmemes.com` (URL is public, auth required).
-**Version**: 2026.416.0 (deployed from `ohld/paperclip` fork on 2026-04-16).
+**Version**: current verified deployment is 2026.512.0 (deployed from
+`ohld/paperclip:ffmemes/v2026.512.0` on 2026-05-12; Coolify deployment
+`q12xc4c1q6m4smzk1zfkog02`, commit
+`c445e5925628d11bf59d52604b8aa63a6e9aa800`). See
+`docs/paperclip-native-migration.md`.
 
 All secrets (API keys, DB credentials, tokens) live in **environment variables** — never in this repo.
 Required env vars for local management: `PAPERCLIP_URL`, `PAPERCLIP_API_KEY` (set in `~/.zshrc` or `.env`).
@@ -25,21 +29,21 @@ Required env vars for local management: `PAPERCLIP_URL`, `PAPERCLIP_API_KEY` (se
 
 Paperclip API is available as an MCP tool server via `@paperclipai/mcp-server`. Configured in two places:
 
-**Local (MacBook, Claude Code hosts)**: register via `claude mcp add` CLI (writes to `~/.claude.json` under the project entry). **Do NOT put `mcpServers` in `.claude/settings.local.json` — Claude Code does not read that key there.** Codex sessions can use the same Paperclip HTTP API with `PAPERCLIP_URL` + `PAPERCLIP_API_KEY` when MCP is unavailable.
+**Local (MacBook / Codex hosts)**: use the Paperclip MCP server or the same
+Paperclip HTTP API with `PAPERCLIP_URL` + `PAPERCLIP_API_KEY`. Legacy Claude
+MCP registration may still exist on developer machines, but production agents
+are moving to Codex subscription auth.
 
 ```bash
 source ~/.zshrc   # loads PAPERCLIP_URL + PAPERCLIP_API_KEY
-claude mcp add paperclip -s local \
-  -e PAPERCLIP_API_URL="$PAPERCLIP_URL" \
-  -e PAPERCLIP_API_KEY="$PAPERCLIP_API_KEY" \
-  -e PAPERCLIP_COMPANY_ID=96ee7b2e-6df2-43c8-bbe3-53e19297308a \
-  -- npx -y @paperclipai/mcp-server
-
-claude mcp list               # verify paperclip ✓ Connected
-claude mcp get paperclip      # note: prints API key in plaintext — do not screen-share
+PAPERCLIP_API_URL="$PAPERCLIP_URL" \
+PAPERCLIP_API_KEY="$PAPERCLIP_API_KEY" \
+PAPERCLIP_COMPANY_ID=<company-id> \
+  npx -y @paperclipai/mcp-server
 ```
 
-**Server (agents)**: `/paperclip/.claude/settings.json` — uses `http://localhost:3100` (internal) and inherits `$PAPERCLIP_API_KEY` from Paperclip agent runtime.
+**Server (agents)**: Codex agents use Paperclip skill/MCP/HTTP access exposed
+by the Paperclip runtime and the env bindings in `agents/.paperclip.yaml`.
 
 34 MCP tools available (issues, agents, comments, documents, approvals, projects, goals) + `paperclipApiRequest` escape hatch for anything not covered.
 
@@ -50,21 +54,33 @@ Agent prompts reference MCP tools instead of curl. See agent `AGENTS.md` files f
 ```
 org.ffmemes.com (Paperclip dashboard)
   ├── Coolify app: k4w804sco4s8kc88kwcw0ow4
-  ├── Git source: ohld/paperclip fork (master branch)
-  │   └── Fork needed: upstream Dockerfile has hardcoded sha256 for GH CLI GPG key
+  ├── Git source: ohld/paperclip fork (pinned ffmemes/v2026.512.0 branch)
+  │   └── Keep production on pinned stable refs, not upstream/fork master
   ├── External PostgreSQL (shared Coolify DB service)
   │   └── Database: paperclip
   ├── Named volume: paperclip-data → /paperclip
-  │   ├── .claude/         # Claude CLI auth (survives redeploy)
-  │   ├── .codex/          # Codex auth (survives redeploy)
+  │   ├── .claude/         # Legacy Claude CLI auth, not used by agents
+  │   ├── .codex/          # Codex subscription OAuth auth (survives redeploy)
   │   ├── .config/gh/      # GitHub CLI auth (survives redeploy)
   │   ├── bin/             # Persistent tool binaries (gh, sentry)
   │   └── instances/default/
   │       ├── config.json  # Paperclip server config
   │       ├── companies/   # Agent instructions, workspaces
   │       └── logs/        # Runtime logs
-  └── Agents run Claude CLI or Codex as subprocesses
+  └── Agents run Codex as subprocesses
 ```
+
+### Codex auth policy
+
+Codex must use ChatGPT/Codex subscription OAuth from `/paperclip/.codex/auth.json`.
+Do not set `OPENAI_API_KEY` in the Paperclip host env and do not bind it to any
+`codex_local` agent. With Codex CLI 0.122+, the presence of `OPENAI_API_KEY`
+switches Codex toward API-key billing, which is not the approved path for this
+system.
+
+If Codex auth is lost after volume loss or redeploy, run an interactive
+`codex login --device-auth` on the server container and verify `.codex/auth.json`
+is on the named volume.
 
 ## Managing from MacBook
 
@@ -114,7 +130,8 @@ npx paperclipai auth whoami
 <!-- agent-runtime: ok — agents use Paperclip MCP / paperclipApiRequest;
      curl fallback only when MCP unavailable in the runtime -->
 
-With MCP server configured, use MCP tools from Claude Code for most operations:
+With MCP server configured, use MCP tools from the active agent runtime for most
+operations:
 
 ```
 # List issues (MCP)
@@ -174,12 +191,11 @@ ssh root@t.ffmemes.com
 CONT=$(docker ps --format '{{.Names}}' | grep k4w804 | head -1)
 
 # Re-auth tools (interactive — needed after volume loss only)
-docker exec -it $CONT claude login
 docker exec -it $CONT codex login --device-auth
 docker exec -it $CONT gh auth login
 
 # Upload agent instructions after editing locally
-# Preferred: use the deploy script (syncs all agents + runs backup)
+# Preferred: use the deploy script (syncs all agent instructions + config)
 ./agents/deploy.sh
 # Manual (single agent):
 # scp agents/<name>/AGENTS.md root@t.ffmemes.com:/tmp/agent.md
@@ -191,12 +207,12 @@ docker exec -it $CONT gh auth login
 | Agent | Role | Reports To | Activation | Adapter / model |
 |-------|------|-----------|------------|-----------------|
 | CEO | Strategic decisions, experiments | — | Weekly routine + daily heartbeat | `codex_local` / `gpt-5.5`, effort `xhigh` |
-| Analyst | Metrics, anomaly detection | CEO | Routines only | `claude_local` / `claude-sonnet-4-6` |
+| Analyst | Metrics, anomaly detection | CEO | Routines only | `codex_local` / `gpt-5.5`, effort `high` |
 | CTO | Engineering, PRs | CEO | On-demand | `codex_local` / `gpt-5.5`, effort `high` |
 | Staff Engineer | PR review + merge for internal PRs | CTO | PR webhook routine | `codex_local` / `gpt-5.5`, effort `high` |
-| QA Engineer | Log monitoring, bug reports | CTO | Schedule + Sentry webhook + API | `claude_local` / `claude-sonnet-4-6` |
-| Release Engineer | Post-merge deploy verification | CTO | On-demand | `claude_local` / `claude-sonnet-4-6` |
-| Comms Manager | Public TG channel updates | CEO | Daily heartbeat | `claude_local` / `claude-sonnet-4-6` |
+| QA Engineer | Log monitoring, bug reports | CTO | Schedule + Sentry webhook + API | `codex_local` / `gpt-5.5`, effort `high` |
+| Release Engineer | Post-merge deploy verification | CTO | On-demand | `codex_local` / `gpt-5.5`, effort `medium` |
+| Comms Manager | Public TG channel updates | CEO | Daily heartbeat | `codex_local` / `gpt-5.5`, effort `medium` |
 
 Agent instructions: `agents/<name>/AGENTS.md` in this repo.
 Deploy after editing: `./agents/deploy.sh`
@@ -301,17 +317,16 @@ Paperclip triggers now support multiple signing modes:
 
 | Source | Path | Auth | Notes |
 |--------|------|------|-------|
-| Sentry | Sentry Internal Integration → Paperclip trigger | none (publicId is the secret) | Internal Integration `paperclip-qa-alert-b86aa3` |
+| Sentry | Sentry Internal Integration → Paperclip trigger | none (publicId is the secret) | Integration name is stored in Sentry, not this public repo |
 | GitHub | GH Actions (`notify-staff-engineer`) → Paperclip trigger | Bearer token | Direct call |
 | Prefect | (none) | — | Failures surface via QA Log Scan 3h cron |
 | Coolify | (none) | — | Was never actively used in practice |
 
 **Sentry → Paperclip QA trigger** is fully direct since PR #212. Set up:
-- QA routine `477f452d-06f3-421e-a274-7f09155bb5bb`, webhook trigger `30901464-a100-4cff-9515-9fdbcfc1a797`
+- QA routine and webhook trigger IDs are read from Paperclip UI / API; do not paste them here. Look up by routine title "QA Log Scan".
 - `signingMode: none` — `server/dist/services/routines.js` short-circuits all auth checks
 - Public trigger URL is configured in Sentry/Paperclip only. Do not commit the
-  `routine-triggers/public/.../fire` path; the publicId is sensitive operational
-  material.
+  full public trigger path; the publicId is sensitive operational material.
 - Sentry posts the raw payload (`{"action":"created","data":{"issue":{...}}}`); Paperclip stores it in `routine_run.triggerPayload` verbatim
 - Trigger fires only on **issue creation**, not subsequent occurrences. To re-test, send an event with a unique exception class so Sentry creates a new issue group.
 
@@ -331,14 +346,14 @@ sentry_sdk.flush(timeout=10)
 "
 
 # Within ~15-30s, a new routine_execution issue (title 'QA Log Scan') should appear
-# at https://org.ffmemes.com/issues, source='webhook', triggerId=30901464-...
+# at https://org.ffmemes.com/issues with source='webhook'
 ```
 
 ### Reverting if Sentry → Paperclip breaks
 
 ```bash
-# Flip trigger back to bearer mode
-curl -X PATCH "https://org.ffmemes.com/api/routine-triggers/30901464-a100-4cff-9515-9fdbcfc1a797" \
+# Flip trigger back to bearer mode (look up TRIGGER_ID by routine title via API; do not commit it)
+curl -X PATCH "https://org.ffmemes.com/api/routine-triggers/$TRIGGER_ID" \
   -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"signingMode":"bearer"}'
@@ -356,6 +371,11 @@ These are encrypted in Paperclip DB and injected as env vars during agent runs:
 
 `agents/_sync_config.py` materializes env from `agents/.paperclip.yaml`: `kind: secret` becomes a Paperclip `secret_ref`, `kind: plain` is written directly, and missing required secrets fail the config sync before any PATCH. Optional missing secrets are omitted. Docs should name env var names and Paperclip secret names only, never secret IDs or values.
 
+For v2026.512.0 provider vaults, the default remains Paperclip company secrets.
+Do not import AWS Secrets Manager for this setup. Coolify envs are acceptable
+for Paperclip service-level config, but not for Codex auth or per-agent
+`OPENAI_API_KEY` injection.
+
 | Secret | Used by | Purpose |
 |--------|---------|---------|
 | `ANALYST_DATABASE_URL` | Analyst, QA, Comms | Read-only prod DB access. Comms also receives this as env `DATABASE_URL` by explicit CEO decision; this supports data reads, not `editorial_posts` writes. |
@@ -364,13 +384,13 @@ These are encrypted in Paperclip DB and injected as env vars during agent runs:
 | `SENTRY_AUTH_TOKEN` | CTO, QA | Sentry CLI authentication (read-only project scope) |
 | `PREFECT_API_URL` | CTO, QA | Prefect API endpoint (`https://prefect.swanrate.com/api`) |
 | `PREFECT_AUTH_STRING` | CTO, QA | Prefect API Basic auth credentials |
-| `OPENAI_API_KEY` | All (Codex), Comms optional image generation, Telegram plugin (Whisper) | OpenAI API for Codex, GPT Image visuals, and voice transcription |
+| `OPENAI_API_KEY` | Telegram plugin (Whisper) only, and any explicitly approved non-Codex service | Do **not** bind to Codex agents. Do **not** set globally in the Paperclip host env unless accepting API-key billing for Codex. Comms GPT image generation is disabled under subscription-only Codex. |
 | `TEST_DATABASE_URL` | CTO | Test/staging DB for safe experiments |
 | `TELEGRAM_BOT_TOKEN` | Telegram plugin | @ffnerdbot token (NOT @ffmemesbot!) |
 
 The least-privilege `comms_writer` role in `docs/comms/comms-writer-role-setup.sql` remains available as a future upgrade if Comms needs to persist `editorial_posts` rows from the agent runtime. Do not bind Comms to `FFMEMES_DATABASE_URL` or any full-write app DB secret.
 
-QA runtime access is considered degraded unless all of these are present in the live QA `adapterConfig.env`: `PATH` with `/paperclip/bin`, `ANALYST_DATABASE_URL`, `COOLIFY_BASE_URL`, `COOLIFY_ACCESS_TOKEN`, `SENTRY_AUTH_TOKEN`, `PREFECT_AUTH_STRING`.
+QA runtime access is considered degraded unless all of these are present in the live QA `adapterConfig.env`: `PATH` with `/paperclip/bin`, `ANALYST_DATABASE_URL`, `COOLIFY_BASE_URL`, `COOLIFY_ACCESS_TOKEN`, `SENTRY_AUTH_TOKEN`, `PREFECT_API_URL`, `PREFECT_AUTH_STRING`.
 
 ## Persistent Tool Binaries
 
@@ -470,6 +490,10 @@ docker restart $CONT
 1. Verify named volume `paperclip-data` is in Coolify Storages
 2. `docker exec $CONT cat /paperclip/instances/default/config.json` — should exist
 3. Do NOT change deployment exposure/mode env vars
+4. Verify `/paperclip/.codex/auth.json` exists on the named volume after
+   interactive `codex login --device-auth`
+5. Verify `OPENAI_API_KEY` is not present in the Paperclip host env or any
+   `codex_local` agent env binding
 
 ### Post-redeploy checklist (MANUAL — Coolify post-deploy is broken, bug #9076)
 
@@ -483,7 +507,7 @@ CONT=$(docker ps --format '{{.Names}}' | grep k4w804 | head -1)
 docker exec -u root $CONT sh -c "apt-get update -qq && apt-get install -y -qq gh && npm install --prefix /paperclip/.npm-global @openai/codex@latest @sentry/cli sentry && ln -sf /paperclip/.npm-global/node_modules/.bin/codex /paperclip/bin/codex && ln -sf /paperclip/.npm-global/node_modules/.bin/sentry /paperclip/bin/sentry && ln -sf /paperclip/.npm-global/node_modules/.bin/sentry-cli /paperclip/bin/sentry-cli"
 
 # Verify
-docker exec $CONT sh -c "PATH=/paperclip/bin:\$PATH; gh --version; codex --version; (sentry --version || sentry-cli --version); claude --version; codex login status"
+docker exec $CONT sh -c "PATH=/paperclip/bin:\$PATH; gh --version; codex --version; (sentry --version || sentry-cli --version); codex login status"
 ```
 
 Tools on `/paperclip/bin/` (named volume) survive redeploys. Agents that need them must have `PATH=/paperclip/bin:...` in `.paperclip.yaml`.
@@ -495,7 +519,6 @@ System-wide installs via `apt-get` and `npm install -g` do NOT survive redeploys
 CONT=$(docker ps --format '{{.Names}}' | grep k4w804 | head -1)
 
 # Auth survived?
-docker exec $CONT sh -c "test -f /paperclip/.claude/.credentials.json && echo claude:OK"
 docker exec $CONT sh -c "test -f /paperclip/.codex/auth.json && echo codex:OK"
 docker exec $CONT sh -c "test -f /paperclip/.config/gh/hosts.yml && echo gh:OK"
 
@@ -516,17 +539,22 @@ Paperclip is deployed from the fork `ohld/paperclip` (not upstream `paperclipai/
 Use pinned stable refs. Do not sync the fork to upstream `master`; upstream
 master may be ahead of the latest stable release.
 
-Current production deployment (verified 2026-05-06): Coolify app
+Current production deployment (verified 2026-05-12): Coolify app
 `k4w804sco4s8kc88kwcw0ow4` tracks
-`ohld/paperclip:ffmemes/v2026.428.0` at
-`3494e84a2920f3e2bc5f627f916da29e224086dc`. State file
+`ohld/paperclip:ffmemes/v2026.512.0` at
+`c445e5925628d11bf59d52604b8aa63a6e9aa800`. Coolify deployment
+`q12xc4c1q6m4smzk1zfkog02` completed successfully. State file
 `/paperclip/.last-deployed-paperclip-sha` must match that verified deployed
 commit.
 
+Last pre-deploy backups on `t.ffmemes.com:/root/paperclip-backups/`:
+`paperclip-20260512T145333Z.sql.gz` and
+`paperclip-volume-20260512T145333Z.tgz`.
+
 ```bash
 # 1. Pick the approved stable release.
-TARGET_VERSION=2026.428.0
-TARGET_SHA=3494e84a2920f3e2bc5f627f916da29e224086dc
+TARGET_VERSION=2026.512.0
+TARGET_SHA=c445e5925628d11bf59d52604b8aa63a6e9aa800
 FORK_BRANCH=ffmemes/v${TARGET_VERSION}
 
 # 2. Create/update a pinned fork branch at the stable upstream tag.
@@ -538,20 +566,21 @@ gh api -X POST repos/ohld/paperclip/git/refs \
 # 3. Check migration prerequisites.
 ssh root@t.ffmemes.com "docker exec \$(docker ps --format '{{.Names}}' | grep tkg4c0 | head -1) psql -U paperclip -d paperclip -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm;'"
 
-# 4. Take a fresh db + volume backup before deploy.
+# 4. Take a fresh db + volume backup before deploy and verify both archives.
 
 # 5. Point Coolify app k4w804sco4s8kc88kwcw0ow4 at the pinned fork branch,
 #    then force deploy. Hard gate: the finished deployment commit must equal
 #    TARGET_SHA. Queueing a deploy is not success.
 
 # 6. Run post-redeploy checklist above and verify migrations are up to date.
-ssh root@t.ffmemes.com "CONT=\$(docker ps --format '{{.Names}}' | grep k4w804 | head -1) && docker exec \$CONT cat /paperclip/.claude/settings.json"
+#    Confirm Codex auth is OAuth/subscription-backed and OPENAI_API_KEY is absent.
 ```
 
 ### Notable version changes
 
 | Version | Key changes |
 |---------|-------------|
+| v2026.512.0 | Codex auth.json generation support (not used for API-key billing here), planning-mode issues, full company search, routine revision history, issue monitors / retry-now, provider vaults |
 | v2026.428.0 | Stable target for v416 upgrade: productivity review, stranded assignment recovery, routine variables UI, attachment size limits, issue tree pause/resume fixes |
 | v2026.427.0 | Multi-user control plane, structured issue interactions, liveness/watchdog recovery, blocker-aware scheduling, issue subtree pause/cancel/restore, beta Environments |
 | v2026.416.0 | MCP server, chat threads, execution policies, blocker deps, `none`/`github_hmac` webhook signing, security fix GHSA-68qg-g8mg-6pr7 |

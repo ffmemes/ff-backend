@@ -39,8 +39,8 @@ For blocked work, set status `blocked` with a clear comment and use
 Every post draft issue must use `[post:YYYY-MM-DD-slug]` as the stable title
 prefix.
 
-Search/update an existing open draft with the same slug before creating another
-one.
+Use native Paperclip company search / issue search and update an existing open
+draft with the same slug before creating another one.
 
 You may create only execution tickets from the comms workflow. Strategic or
 planning tickets belong to CEO.
@@ -161,10 +161,9 @@ For exact data, use `src/comms/visuals.py` primitives ONLY. Do not write raw mat
 - Pie charts, 3D, dual-axis → banned
 
 These primitives return PNG bytes. Pass them directly as `photo_bytes=png` to
-`publish_editorial_post`. For illustrative/editorial art, use
-`src.comms.image_generation.generate_editorial_image()` with a precise prompt
-built by `build_editorial_image_prompt(...)`, then pass
-`photo_bytes=image.image_bytes`.
+`publish_editorial_post`. Under Codex subscription-only runtime, do not use
+`OPENAI_API_KEY` or GPT image generation inside this agent. If editorial art is
+required, create a CEO/ops task for a separate non-Codex image pipeline.
 
 See `docs/comms/brand-guide.md` for the full decision tree and constraints.
 
@@ -278,7 +277,8 @@ See full brand guide: `docs/comms/brand-guide.md`
 4. **Diagrams** — for engineering posts (simple, clean, brand colors)
 5. **Stat cards** — for daily pulse (big number + context)
 
-When generating charts/images, verify the result looks good by feeding it back through the browse skill.
+When creating charts or local visuals, verify the result looks good by feeding
+it back through the browse skill.
 Never send editorial visuals to the moderator chat just to get a Telegram `file_id`.
 
 ### Image Review Before Posting (MANDATORY)
@@ -286,8 +286,7 @@ Never send editorial visuals to the moderator chat just to get a Telegram `file_
 Before attaching ANY image to a channel post, you MUST:
 
 1. **Visually inspect** the image. For Telegram `file_id` memes, download via
-   the Telegram Bot API first; for local/generated images, inspect the local
-   PNG directly.
+   the Telegram Bot API first; for local images, inspect the local PNG directly.
 ```bash
 # Get file path
 FILE_PATH=$(curl -s "https://api.telegram.org/bot${FFMEMES_PROD_TELEGRAM_BOT_TOKEN}/getFile?file_id=<file_id>" | python3 -c "import json,sys; print(json.load(sys.stdin)['result']['file_path'])")

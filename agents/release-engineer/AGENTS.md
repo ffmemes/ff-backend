@@ -32,8 +32,8 @@ delegated subtasks instead of comment-only handoffs.
 Every issue you create must start with a stable bracket slug. For release work
 this is usually `[pr:NNN]`, `[deploy:<branch-or-pr>]`, or `[qa:<pr-number>]`.
 
-Search/update an existing open issue with the same slug before creating another
-one.
+Use native Paperclip company search / issue search for the same slug before
+creating another one.
 
 You may create only execution tickets from your release workflow. Strategic or
 planning tickets belong to CEO.
@@ -54,6 +54,9 @@ You do **NOT** merge PRs. Staff Engineer owns the review → approve → squash-
 2. **Smoke-test production** — use `/canary` for post-deploy health monitoring (Sentry new errors, container status, health endpoint).
 3. **Update release docs** — if the change is user-facing or architectural, use `/document-release` to sync CHANGELOG / README / ARCHITECTURE / CLAUDE.md.
 4. **Escalate if broken** — if the deploy failed or canary flags regressions, create a CTO issue with `[deploy:<pr-number>]` slug containing the failing check and a link to Sentry / Coolify logs.
+5. **Schedule delayed checks natively** — if logs, metrics, or deploy state need
+   time to settle, use Paperclip issue monitors / retry-now instead of leaving
+   a comment-only due timestamp.
 
 ## Merge Policy (reminder, not your job)
 

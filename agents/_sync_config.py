@@ -335,6 +335,34 @@ def stale_adapter_keys(adapter_type: str | None) -> set[str]:
     return set()
 
 
+def routine_latest_revision_id(routine: dict) -> str | None:
+    """Return the live routine revision id when the Paperclip API exposes one.
+
+    v2026.512.0 introduced routine revision history. Older servers simply omit
+    these fields, so callers can stay compatible by omitting baseRevisionId.
+    """
+    for key in ("latestRevisionId", "latest_revision_id", "currentRevisionId"):
+        value = routine.get(key)
+        if isinstance(value, str) and value:
+            return value
+
+    for key in ("latestRevision", "currentRevision", "revision"):
+        value = routine.get(key)
+        if isinstance(value, dict):
+            revision_id = value.get("id")
+            if isinstance(revision_id, str) and revision_id:
+                return revision_id
+    return None
+
+
+def routine_patch_payload(routine: dict, description: str) -> dict:
+    payload = {"description": description}
+    revision_id = routine_latest_revision_id(routine)
+    if revision_id:
+        payload["baseRevisionId"] = revision_id
+    return payload
+
+
 def sync_routine_descriptions(by_slug: dict[str, dict]) -> tuple[int, int, int]:
     specs = load_routine_description_specs()
     if not specs:
@@ -373,15 +401,19 @@ def sync_routine_descriptions(by_slug: dict[str, dict]) -> tuple[int, int, int]:
             print(f"  skip routine {spec['name']} (no description drift)")
             skipped += 1
             continue
+        payload = routine_patch_payload(routine, spec["description"])
         if DRY:
-            print(f"  WOULD PATCH routine {spec['name']}: description")
+            change = "description"
+            if "baseRevisionId" in payload:
+                change += " with baseRevisionId"
+            print(f"  WOULD PATCH routine {spec['name']}: {change}")
             patched += 1
             continue
         try:
             api(
                 "PATCH",
                 f"/api/routines/{routine['id']}",
-                {"description": spec["description"]},
+                payload,
             )
         except Exception as e:
             print(
