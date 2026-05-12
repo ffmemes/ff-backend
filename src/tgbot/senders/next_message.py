@@ -24,6 +24,7 @@ from src.tgbot.senders.meme import (
     send_new_message_with_meme,
 )
 from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
+from src.tgbot.senders.meme_like_count_experiment import get_visible_meme_like_count
 from src.tgbot.senders.popups import (
     get_or_assign_first_meme_nudge_variant,
     get_popup_to_send,
@@ -109,6 +110,7 @@ async def next_message(
             meme.id,
             user_id,
             referral_button_text,
+            visible_like_count=await get_visible_meme_like_count(user_id, meme.nlikes),
         )
         meme.caption = await get_meme_caption_for_user_id(meme, user_id, user_info)
 

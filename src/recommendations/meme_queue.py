@@ -122,7 +122,8 @@ async def generate_recommendations(
                 M.type,
                 M.telegram_file_id,
                 M.caption,
-                'low_sent_pool' AS recommended_by
+                'low_sent_pool' AS recommended_by,
+                COALESCE(MS.nlikes, 0) AS nlikes
             FROM meme M
             LEFT JOIN meme_stats MS
                 ON MS.meme_id = M.id
@@ -293,8 +294,11 @@ async def generate_recommendations(
                     M.type,
                     M.telegram_file_id,
                     M.caption,
-                    'last_resort' AS recommended_by
+                    'last_resort' AS recommended_by,
+                    COALESCE(MS.nlikes, 0) AS nlikes
                 FROM meme M
+                LEFT JOIN meme_stats MS
+                    ON MS.meme_id = M.id
                 LEFT JOIN user_meme_reaction R
                     ON R.user_id = :user_id
                     AND R.meme_id = M.id

@@ -21,6 +21,7 @@ from src.tgbot.senders.keyboards import (
     select_referral_button_text,
 )
 from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
+from src.tgbot.senders.meme_like_count_experiment import get_visible_meme_like_count
 from src.tgbot.senders.utils import collect_user_languages, has_russian_language
 from src.tgbot.service import mark_user_blocked
 from src.tgbot.user_info import get_user_info
@@ -44,6 +45,7 @@ async def send_meme_to_user(bot: Bot, user_id: int, meme: MemeData):
         meme.id,
         user_id,
         referral_button_text,
+        visible_like_count=await get_visible_meme_like_count(user_id, meme.nlikes),
     )
     meme.caption = await get_meme_caption_for_user_id(meme, user_id, user_info)
 
