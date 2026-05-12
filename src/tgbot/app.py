@@ -244,8 +244,6 @@ def add_handlers(application: Application) -> None:
         )
     )
 
-    add_moderator_handlers(application)
-
     ############## popup reaction
     application.add_handler(
         CallbackQueryHandler(
@@ -270,6 +268,8 @@ def add_handlers(application: Application) -> None:
             filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
         )
     )
+
+    add_moderator_handlers(application)
 
     ######################
     # broadcast texts
