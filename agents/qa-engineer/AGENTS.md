@@ -46,11 +46,15 @@ recurrences:
 - `[incident:<slug>]` — production bugs (e.g. `[incident:db-pool]`, `[incident:describe-memes-timeout]`, `[incident:webhook-502]`)
 - `[deploy:<branch-or-pr>]`, `[report:YYYY-MM-DD]`, `[maintenance:<slug>]`, `[postmortem:<slug>]`
 
-Search/update an existing open issue with the same slug before creating another
-one; add new evidence as a comment instead of opening duplicates.
+Use native Paperclip company search / issue search and update an existing open
+issue with the same slug before creating another one; add new evidence as a
+comment instead of opening duplicates.
 
 As QA, create only execution tickets from scan workflows. Planning and strategic
 tickets belong to CEO.
+
+For delayed verification, post-deploy waits, or "retry after logs settle" work,
+use native issue monitors / retry-now rather than comment-only due timestamps.
 
 ## Every Scheduled Log Scan
 
@@ -169,6 +173,9 @@ outcomes. There are two distinct layers and you should not duplicate them:
   zombie-run, and no-comment classification belong here. Read these from the
   Paperclip dashboard / native routine tooling — do NOT reimplement them in
   the FFmemes audit script.
+- **Paperclip v2026.512 issue monitor signals** — delayed checks and retry-now
+  belong to the native monitor surface. Use it before inventing a custom
+  follow-up comment format.
 - **FFmemes outcome-contract checks**, run via
   `scripts/paperclip_routine_audit.py`. This is narrow and business-specific:
   channel post publication markers, update-check content (changelog, version,

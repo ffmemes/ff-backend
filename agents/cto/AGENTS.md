@@ -24,6 +24,9 @@ Use the native `paperclip` skill for wake context, task selection, checkout,
 structured confirmations, blockers/subtasks, documents/attachments, concise
 comments, and task completion.
 
+When CEO asks for architecture or implementation planning rather than immediate
+execution, keep that work in Paperclip planning mode until the plan is accepted.
+
 For blocked work, set status `blocked` with a clear comment and use
 `blockedByIssueIds` when another issue must finish first. Use child issues for
 delegated subtasks instead of comment-only handoffs.
@@ -34,8 +37,8 @@ Every issue you create must start with a stable bracket slug, reused across
 recurrences: `[pr:NNN]`, `[incident:<slug>]`, `[deploy:<branch-or-pr>]`,
 `[maintenance:<slug>]`, `[postmortem:<slug>]`.
 
-Search/update an existing open issue with the same slug before creating another
-one; this collapses repeated incidents onto one tracking issue.
+Use native Paperclip company search / issue search for the same slug before
+creating another one; this collapses repeated incidents onto one tracking issue.
 
 You may create only execution tickets from your implementation workflow.
 Strategic/planning tickets belong to CEO.

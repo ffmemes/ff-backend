@@ -34,6 +34,15 @@ code. It avoids rereading the full upstream repo and the long ops runbook.
 - Keep the local slug/dedupe discipline for now. Upstream tools reduce race
   handling and recovery code, but the issue API still does not provide a
   general idempotency key for "create one issue for this business object".
+- On Paperclip v2026.512.0, use native company search before creating recurrent
+  bracket-slug issues. This keeps our stable slug discipline while removing
+  broad custom issue scans from prompts.
+- Use native planning work mode for strategy, experiment, architecture, and
+  proposal issues. Execution issues stay standard.
+- Use issue monitors / retry-now for delayed verification, post-deploy waits,
+  and "measure after N days" follow-ups instead of comment-only due dates.
+- Let routine revision history carry routine-description restore/audit needs.
+  The repo sync includes `baseRevisionId` when the server exposes it.
 
 ## Sync Code Guidance
 
@@ -61,13 +70,20 @@ code. It avoids rereading the full upstream repo and the long ops runbook.
 - Do not add secrets, API keys, Paperclip secret IDs, trigger public IDs, or
   private internal hostnames to public docs. Env var names and Paperclip secret
   names are OK; never include values.
+- Codex agents are subscription/OAuth-only. Do not add `OPENAI_API_KEY` to
+  `codex_local` agent env or the Paperclip host env; Codex CLI 0.122+ treats it
+  as API-key billing. Remaining Claude agents should be replaced with Codex
+  rather than maintained as a second subscription runtime.
+- Do not adopt AWS Secrets Manager provider vaults for this setup. Keep
+  Paperclip company secrets for agent env bindings; use Coolify envs only for
+  Paperclip service-level config.
 
 ## Keep Custom For Now
 
-- The GitHub PR review workflow is still reasonable if it posts a narrow
-  `{pr_number, pr_url}` payload to a Paperclip routine trigger. A direct GitHub
-  webhook with `github_hmac` can remove the workflow later, but then the agent
-  prompt must parse the full GitHub webhook payload.
+- The GitHub PR review workflow is still reasonable if it sends a narrow
+  `{pr_number, pr_url}` payload through Paperclip's native routine API trigger.
+  A direct GitHub webhook with `github_hmac` can remove the workflow later, but
+  then the agent prompt must parse the full GitHub webhook payload.
 - Comms publishing and routine outcome checks are product-specific. Paperclip
   can know a Telegram post is complete only when the agent records the concrete
   `result.message_id` and `result.editorial_post_id` returned by

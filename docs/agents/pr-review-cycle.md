@@ -7,9 +7,11 @@ agent infrastructure, see `paperclip-ops-runbook.md`.
 
 1. PR `opened`, `reopened`, or `synchronize` (push to PR branch) →
    `.github/workflows/staff-engineer-trigger.yml` fires.
-2. Workflow `POST`s the Paperclip PR Review routine trigger with
-   `{pr_number, pr_url}`. URL and bearer secret live in GitHub Actions secrets
-   / workflow config; do not paste trigger IDs into public docs.
+2. Workflow calls Paperclip's native routine API run endpoint. It looks up the
+   `[pr:{{pr_number}}] Review` routine and enabled API trigger, then sends
+   `{pr_number, pr_url}` as explicit routine variables. Auth uses the existing
+   `PAPERCLIP_URL` + `PAPERCLIP_API_KEY` GitHub Actions secrets; do not paste
+   routine or trigger IDs into public docs.
 3. Paperclip routes to the **Staff Engineer** agent (id
    `1a323bb6-2b4d-46bf-9c33-7971fa1673d5`). Its status flips
    `idle → running` and `lastHeartbeatAt` ticks.
@@ -53,11 +55,25 @@ review unless it left a comment.
 ## Manual fire (if the GitHub workflow misses)
 
 ```bash
-curl -s -X POST \
-  "$PAPERCLIP_PR_REVIEW_TRIGGER_URL" \
-  -H "Authorization: Bearer $PAPERCLIP_TRIGGER_SECRET" \
-  -H "Content-Type: application/json" \
-  -d '{"pr_number": 183, "pr_url": "https://github.com/ffmemes/ff-backend/pull/183"}'
+ROUTINES_JSON="$(curl -sSf \
+  -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
+  "$PAPERCLIP_URL/api/companies/$PAPERCLIP_COMPANY_ID/routines")"
+ROUTINE_ID="$(printf '%s' "$ROUTINES_JSON" | jq -r '.[] | select(.title == "[pr:{{pr_number}}] Review") | .id' | head -1)"
+API_TRIGGER_ID="$(printf '%s' "$ROUTINES_JSON" | jq -r --arg id "$ROUTINE_ID" '.[] | select(.id == $id) | (.triggers // [])[] | select(.kind == "api" and (.enabled != false)) | .id' | head -1)"
+jq -n \
+  --arg trigger "$API_TRIGGER_ID" \
+  --arg pr "183" \
+  --arg url "https://github.com/ffmemes/ff-backend/pull/183" \
+  '{
+    source: "api",
+    triggerId: $trigger,
+    payload: {pr_number: $pr, pr_url: $url, variables: {pr_number: $pr, pr_url: $url}},
+    variables: {pr_number: $pr, pr_url: $url}
+  }' | curl -sSf -X POST \
+    "$PAPERCLIP_URL/api/routines/$ROUTINE_ID/run" \
+    -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
+    -H "Content-Type: application/json" \
+    --data @-
 ```
 
 ## Why the agent did not merge PR #183 on first push

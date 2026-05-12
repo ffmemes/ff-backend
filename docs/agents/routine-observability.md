@@ -5,7 +5,8 @@ Use this before broad manual audits. The goal is to measure useful FFmemes
 
 Two layers, do not duplicate:
 
-- **Native Paperclip runtime** (v2026.428+) owns generic liveness, stall /
+- **Native Paperclip runtime** (v2026.428+, with v2026.512 issue monitors)
+  owns generic liveness, stall /
   zombie-run detection, stranded assignment recovery, and productivity-review
   escalation. Read those from the Paperclip dashboard / native routine
   tooling.
@@ -89,7 +90,8 @@ blocked with `unverified_paperclip_deploy`. Channel publication markers such as
 
 ### PR Review
 
-Each PR webhook must create or resume the matching `[pr:<number>] Review` issue.
+Each PR event must create or resume the matching `[pr:<number>] Review` issue
+through the Staff Engineer routine API trigger.
 If trigger payload `pr_number=215` links to `[pr:214] Review`, that is
 `coalesced_pr_review_mismatch`, not healthy queueing.
 
@@ -122,8 +124,38 @@ or stopped tasks; it does not prove that a useful product outcome happened.
 Routine health should come from the outcome contracts above and from Paperclip
 issues/comments, not from Telegram notifications.
 
+## Blocked Work Contract
+
+Do not stop at "blocked". Before setting `blocked`, create or link the issue
+that can unblock it, set `blockedByIssueIds`, assign the unblocker to the owning
+role, and leave one comment with: blocker, owner, retry condition, and next
+automatic wake path.
+
+Routine execution issues should not remain blocked just because the run was
+partial. Close the routine issue with `outcome=partial` or `outcome=error` and
+link the durable follow-up issue. Use `blocked` only for durable work items that
+are waiting on another issue, deploy, approval, or external system.
+
+For time-gated analysis (for example, "measure after 7 full days of data"), do
+not leave the issue `blocked` on an already-completed implementation issue. Use
+Paperclip's native issue monitor / retry-now surface for the due date, then move
+it to `todo` only when the monitor says the data window is actually ready. Keep
+an absolute due timestamp in the comment as human context, not as the scheduling
+mechanism.
+
 ## Context Discipline For Agents
 
+- Stop after the compact audit unless a flagged outcome contract requires
+  deeper evidence. Do not dump full Paperclip issue lists, agent configs,
+  server logs, dashboard pages, or Telegram activity feeds into context when
+  `scripts/paperclip_routine_audit.py --json` already identifies the routine,
+  issue id, flag, and expected contract.
+- For Paperclip runtime failures, trust native productivity/liveness surfaces
+  first. File one Paperclip runtime issue only when the native surface reports a
+  persistent failure; do not independently search for stalled runs across raw
+  logs unless the native surface is unavailable.
+- Use native company search before creating recurrent bracket-slug issues; do
+  not dump broad issue lists into context just to dedupe.
 - Spawn subagents only with bounded questions and required output fields.
 - Prefer `scripts/paperclip_routine_audit.py --json` over dumping full agent
   configs, issue lists, or server logs into context.

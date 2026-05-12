@@ -35,7 +35,8 @@ delegated subtasks instead of comment-only handoffs.
 
 Every issue you create must start with a stable bracket slug. Use
 `[report:YYYY-MM-DD]` for scheduled reports and update/comment on an existing
-open issue with that slug instead of creating duplicates.
+open issue with that slug instead of creating duplicates. Use native Paperclip
+company search / issue search before creating a recurrent slug.
 
 Only the CEO may open strategic issues. As Analyst, create only execution
 tickets from your explicit workflow; put strategic findings in your report for

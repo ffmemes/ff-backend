@@ -4,6 +4,9 @@ This is the compact handoff from the May 1 update routine audit. Use it as
 input for the next Paperclip/gstack update check instead of re-reading every
 release note from scratch. Follow-up simplification notes from May 4 live in
 [`paperclip-simplification-2026-05-04.md`](paperclip-simplification-2026-05-04.md).
+The May 12 follow-up target is Paperclip `v2026.512.0`; see
+[`../paperclip-native-migration.md`](../paperclip-native-migration.md) before
+using the older "next safe improvements" section below.
 
 ## Sources Checked
 

@@ -1,17 +1,59 @@
 # Paperclip-native migration
 
-Prod is on **Paperclip v2026.428.0** as of 2026-05-06. Verified deployment:
-Coolify deployment `v8s5shyjid9n9c7l2gtghig9`, fork branch
-`ohld/paperclip:ffmemes/v2026.428.0`, commit
-`3494e84a2920f3e2bc5f627f916da29e224086dc`, health check green.
+Prod is on **Paperclip v2026.512.0** as of 2026-05-12. Verified deployment:
+Coolify deployment `q12xc4c1q6m4smzk1zfkog02`, fork branch
+`ohld/paperclip:ffmemes/v2026.512.0`, commit
+`c445e5925628d11bf59d52604b8aa63a6e9aa800`, health check green. Codex
+OAuth auth is present at `/paperclip/.codex/auth.json`, and `OPENAI_API_KEY`
+is absent from the Paperclip host env and all managed Codex agent env bindings.
 
 Goal: stop maintaining custom scaffolding for things Paperclip ships natively, so upstream fixes apply to us for free.
 
-## 2026-05-06 stable deployment
+## 2026-05-12 adopted: v2026.512.0
 
-Paperclip latest stable is **v2026.428.0** ([release notes](https://github.com/paperclipai/paperclip/releases/tag/v2026.428.0); mirror: [newreleases](https://newreleases.io/project/github/paperclipai/paperclip/release/v2026.428.0)). Canary builds exist, but production should stay on stable unless a specific blocker requires a canary and the rollback path is explicit.
+Upstream `v2026.512.0` adds several native surfaces we adopted after fresh DB
+and volume backups, Coolify deploy verification, and live agent config sync.
+The important constraint is Codex auth: upstream can write Codex auth from
+`OPENAI_API_KEY`, but our production path must stay subscription/OAuth-only.
 
-The deployed target is upstream tag `v2026.428.0` at commit
+Adopted:
+
+- **Codex subscription-only agents.** Replace remaining `claude_local` agents
+  with `codex_local`, but keep Codex authenticated through the persistent
+  `/paperclip/.codex/auth.json` OAuth volume. Do not bind `OPENAI_API_KEY` to
+  `codex_local` agents and do not set it in the Paperclip host env. Codex CLI
+  0.122+ treats `OPENAI_API_KEY` as API-key billing, not subscription billing.
+- **Planning mode.** Strategic, experiment, architecture, and proposal issues
+  should use Paperclip's native planning work mode instead of pretending every
+  issue is execution work. Execution tickets stay in standard mode.
+- **Full company search.** Before creating recurrent issues, agents should use
+  native company search / issue search to find existing bracket slugs across
+  open work and historical context. Keep bracket slugs, but let Paperclip search
+  do more of the dedupe work.
+- **Routine revision history.** Continue syncing routine descriptions from this
+  repo, but include `baseRevisionId` when the API exposes a latest revision so
+  Paperclip's built-in revision history and restore flow remain useful.
+- **Issue monitors and retry-now.** Time-gated follow-ups, post-deploy waits,
+  and delayed verification should use native issue monitors / retry-now instead
+  of comment-only due timestamps and custom wake prose.
+- **System notices and monitor liveness.** Prefer the dashboard/native runtime
+  surfaces for generic "agent alive, monitor stale, retry queued" checks. Keep
+  local audits focused on FFmemes-specific outcome contracts.
+
+Do not adopt yet:
+
+- **AWS Secrets Manager provider vaults.** We are not using AWS as the source of
+  truth. Keep Paperclip company secrets (`secret_ref`) for agent-level secrets.
+  Coolify envs are acceptable for Paperclip service-level configuration, but not
+  as a way to expose `OPENAI_API_KEY` to Codex.
+- **OPENAI_API_KEY-backed Codex auth.** This is useful upstream for users who
+  want API billing. It is explicitly not our desired path.
+
+## Previous 2026-05-06 stable deployment
+
+Previous verified production was **v2026.428.0** ([release notes](https://github.com/paperclipai/paperclip/releases/tag/v2026.428.0); mirror: [newreleases](https://newreleases.io/project/github/paperclipai/paperclip/release/v2026.428.0)). Production now runs **v2026.512.0** from a pinned stable ref. Canary builds may exist, but production should stay on a pinned stable release unless a specific blocker requires a canary and the rollback path is explicit.
+
+The previous deployed target was upstream tag `v2026.428.0` at commit
 `3494e84a2920f3e2bc5f627f916da29e224086dc`. Coolify deploys
 `ohld/paperclip`, so create/use a pinned fork branch such as
 `ffmemes/v2026.428.0` pointing to that exact commit. Do **not** sync
@@ -30,7 +72,15 @@ Safe company import still rejects `replace` for existing companies, so the repo'
 
 ## Pre-flight backups
 
-Fresh upgrade backups taken 2026-05-06 on `t.ffmemes.com:/root/paperclip-backups/`:
+Fresh v2026.512.0 upgrade backups taken 2026-05-12 on
+`t.ffmemes.com:/root/paperclip-backups/`:
+
+- `paperclip-20260512T145333Z.sql.gz` — DB dump, gzip verified.
+- `paperclip-volume-20260512T145333Z.tgz` — Paperclip named-volume archive,
+  tar verified.
+
+Earlier v2026.428.0 upgrade backups taken 2026-05-06 on
+`t.ffmemes.com:/root/paperclip-backups/`:
 
 - `paperclip-20260506T160310Z.sql.gz` — DB dump, gzip verified.
 - `paperclip-volume-clean-20260506T160914Z.tgz` — Paperclip named-volume archive, tar verified.
@@ -46,13 +96,17 @@ Restore (only if needed):
 gunzip -c preexport-20260424-092754.sql.gz | docker exec -i <paperclip-container> psql "$DATABASE_URL"
 ```
 
-## What Paperclip-native looks like (v2026.428)
+## What Paperclip-native looks like (v2026.512+)
 
 CLI commands we now rely on:
 - `paperclipai db:backup` — native DB dump.
 - `paperclipai company export <id> --include company,agents,skills` — git-syncable export of the entire company definition.
 - `paperclipai dashboard get --json` — replaces custom health-summary scripts.
 - `paperclipai heartbeat run --agent-id <id>` — wake an agent on demand.
+- Native issue monitors / retry-now — replace comment-only delayed wakeups.
+- Native company search — replace broad custom issue scans for slug dedupe.
+- Native routine revision history and restore — replace manual description
+  history outside git for routine text.
 
 API endpoints we now use directly (no SSH, no `docker cp`):
 - `GET  /api/companies/<id>/agents` — slug → agent ID resolution.
@@ -61,7 +115,7 @@ API endpoints we now use directly (no SSH, no `docker cp`):
 - `PATCH /api/agents/<id>` — adapter type, adapter config, env bindings, and runtime heartbeat.
 - `POST  /api/agents/<id>/skills/sync?companyId=<id>` — desired skills parsed from AGENTS.md frontmatter.
 - `PATCH /api/agents/<id>/permissions` — create-agent and related permission drift.
-- `PATCH /api/routines/<id>` — routine descriptions declared under `agents/<slug>/routines/*.yaml`.
+- `PATCH /api/routines/<id>` — routine descriptions declared under `agents/<slug>/routines/*.yaml`; on v2026.512.0 include `baseRevisionId` when available.
 
 ## Why `company import` is **not** the deploy path
 
@@ -121,11 +175,15 @@ Concurrency group `paperclip-deploy-agents` prevents overlapping runs; `cancel-i
 ## Phase 3 — Follow-ups
 
 **3a. Adapter config sync from `.paperclip.yaml`.** ✅ Done 2026-05-06.
-`agents/_sync_config.py` reads each agent block from the manifest, resolves Paperclip company secrets by name, preflights every required env binding before any agent config PATCH, applies `adapterType`, `adapterConfig` with `replaceAdapterConfig: true`, env bindings, `runtimeConfig.heartbeat`, permissions, and syncs desired skills through the native skills endpoint. It also syncs routine description files declared under `agents/<slug>/routines/*.yaml`. Current Codex split: CEO/CTO/Staff Engineer use `codex_local` + `gpt-5.5`; CEO runs effort `xhigh`, CTO/Staff run effort `high`.
+`agents/_sync_config.py` reads each agent block from the manifest, resolves Paperclip company secrets by name, preflights every required env binding before any agent config PATCH, applies `adapterType`, `adapterConfig` with `replaceAdapterConfig: true`, env bindings, `runtimeConfig.heartbeat`, permissions, and syncs desired skills through the native skills endpoint. It also syncs routine description files declared under `agents/<slug>/routines/*.yaml`. Current Codex config: all managed agents use `codex_local` + `gpt-5.5`; CEO runs effort `xhigh`, Analyst/CTO/QA/Staff run effort `high`, and Comms/Release run effort `medium`.
 
-**3b. Retire the webhook proxy.** ✅ Done 2026-04-29. QA trigger `30901464-...` flipped to `signingMode: none`, Sentry Internal Integration `paperclip-qa-alert-b86aa3` now POSTs directly to the Paperclip QA trigger URL stored in Sentry/Paperclip configuration. Do not commit the `routine-triggers/public/.../fire` path; treat the publicId as sensitive operational material. Deleted: `src/integrations/paperclip.py`, `notify_qa_sync` callsite in `src/flows/hooks.py`, env vars `WEBHOOK_PROXY_SECRET` / `SENTRY_CLIENT_SECRET` / `PAPERCLIP_QA_TRIGGER_URL` / `PAPERCLIP_QA_TRIGGER_SECRET`. Coolify webhook path was unused (no hits in 24h prior to removal). Prefect failures now surface via the QA Log Scan 3h cron instead of an instant push — accepted tradeoff for less code. Trigger publicId leakage = at most noisy QA scans (no user input or commands accepted).
+**2026-05-12 update:** all agents are now configured for `codex_local` in the
+manifest. Codex auth is subscription/OAuth-only; `OPENAI_API_KEY` is deliberately
+absent from Codex env bindings.
 
-**3c. CLI-native agent skills.** In each AGENTS.md, replace raw `curl https://org.ffmemes.com/api/...` with `paperclipai issue list --json`, `paperclipai approval create`, `paperclipai dashboard get`, `paperclipai heartbeat run --agent-id`. Reduces per-wake context.
+**3b. Retire the webhook proxy.** ✅ Done 2026-04-29. QA trigger signing mode flipped to `none`; Sentry Internal Integration now POSTs directly to the Paperclip QA trigger URL stored in Sentry/Paperclip configuration. Do not commit routine trigger IDs or full public trigger paths; treat publicIds as sensitive operational material. Deleted: `src/integrations/paperclip.py`, `notify_qa_sync` callsite in `src/flows/hooks.py`, env vars `WEBHOOK_PROXY_SECRET` / `SENTRY_CLIENT_SECRET` / `PAPERCLIP_QA_TRIGGER_URL` / `PAPERCLIP_QA_TRIGGER_SECRET`. Coolify webhook path was unused (no hits in 24h prior to removal). Prefect failures now surface via the QA Log Scan 3h cron instead of an instant push — accepted tradeoff for less code. Trigger publicId leakage = at most noisy QA scans (no user input or commands accepted).
+
+**3c. CLI-native agent skills and v512 built-ins.** In each AGENTS.md, replace raw `curl https://org.ffmemes.com/api/...` with native Paperclip skill/MCP/CLI operations: issue search, company search, planning-mode issue creation, monitor/retry-now, approvals, `paperclipai dashboard get`, and `paperclipai heartbeat run --agent-id`. Reduces per-wake context and avoids custom liveness logic.
 
 **3d. gstack skill update routine.** Codex flagged: Paperclip already shipped "pinned GitHub skills with update checks" in v2026.325.0. Build a daily Paperclip routine that:
 - compares pinned `skills.source` ref against `garrytan/gstack` HEAD,
@@ -137,9 +195,11 @@ Prefer Paperclip's native skill-update mechanism over a custom-rolled routine if
 
 ## What stays custom
 
-- `.github/workflows/staff-engineer-trigger.yml` — no native Paperclip↔GitHub PR integration yet; HTTP POST to a routine trigger is the right shape.
+- `.github/workflows/staff-engineer-trigger.yml` — no native Paperclip↔GitHub PR integration yet; the workflow now uses Paperclip's native routine API trigger with a narrow PR payload.
 - `agents/<slug>/AGENTS.md` content — our IP, not Paperclip's job.
 - Telegram plugin — already native (Paperclip plugin system).
+- Paperclip deploy/sync from git — still custom because existing-company
+  `replace` import is blocked by the safe import route.
 
 ## Risks acknowledged
 
@@ -148,3 +208,7 @@ Prefer Paperclip's native skill-update mechanism over a custom-rolled routine if
 - **No drift monitoring yet.** Auto-deploy reduces drift; UI edits between deploys still possible. Codex recommended a nightly `company export` artifact job; deferred per CEO call. Revisit if drift bites.
 - **CI auth uses a single API key.** No first-class service-account exists in Paperclip. The key must be scoped to this company and rotated if leaked.
 - **Env sync replaces live `adapterConfig.env` from the manifest.** Required missing secrets now abort before PATCH; optional missing secrets are omitted. Comms `DATABASE_URL` intentionally maps to the read-only `ANALYST_DATABASE_URL` secret, so `editorial_posts` writes from agent runtime are not guaranteed until a dedicated writer secret is created.
+- **Codex API-key billing regression.** If `OPENAI_API_KEY` is added to the
+  Paperclip host env or to any `codex_local` agent env, Codex CLI 0.122+ can
+  switch from subscription OAuth to API-key billing. Treat that as a deploy
+  blocker unless explicitly approved.

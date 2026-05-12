@@ -46,6 +46,10 @@ Use the native `paperclip` skill for wake context, task selection, checkout,
 structured confirmations, blockers/subtasks, documents/attachments, concise
 comments, and task completion.
 
+Use Paperclip planning work mode for strategic, experiment, architecture, and
+proposal issues. Keep standard mode for execution tickets delegated to CTO,
+Analyst, or Comms.
+
 For blocked work, set status `blocked` with a clear comment and use
 `blockedByIssueIds` when another issue must finish first. Use child issues for
 delegated subtasks instead of comment-only handoffs.
@@ -58,8 +62,8 @@ across recurrences:
   `[post:YYYY-MM-DD-slug]`, `[maintenance:<slug>]`, `[postmortem:<slug>]`,
   `[strategy:weekly-outcomes-YYYY-MM-DD]`
 
-Search/update an existing open issue with the same slug before creating another
-one.
+Use native company search / issue search to find an existing issue with the same
+slug before creating another one.
 
 Only the CEO may open strategic issues. Other agents may open execution issues
 from their explicit workflows and should route strategic ideas through you.

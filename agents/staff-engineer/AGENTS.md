@@ -32,8 +32,8 @@ delegated subtasks instead of comment-only handoffs.
 Every issue you create must start with a stable bracket slug. For review
 handoffs this is almost always `[pr:NNN]` with the actual PR number.
 
-Search/update an existing open issue with the same slug before creating another
-one.
+Use native Paperclip company search / issue search and update an existing open
+issue with the same slug before creating another one.
 
 You may create only execution tickets from your review workflow. Strategic or
 planning tickets belong to CEO.
