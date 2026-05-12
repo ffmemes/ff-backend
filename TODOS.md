@@ -1,6 +1,6 @@
 # TODOS
 
-> Last updated: 2026-04-20. Items marked ~~strikethrough~~ with "DONE" are completed.
+> Last updated: 2026-05-12. Items marked ~~strikethrough~~ with "DONE" are completed.
 
 ## P1 — High Priority
 
@@ -37,6 +37,12 @@
 **What:** Replace shell script `.git/hooks/pre-commit` with Yelp's `detect-secrets` framework.
 **Why:** Better coverage for public repo, especially when AI agents push code. Current hook has false positives on doc text.
 **Depends on:** Phase 2 (Engineer agent pushing code).
+
+### Audit python-telegram-bot 22.7 best practices and handler layout
+**What:** Review official PTB 22.7 docs/changelog for handler groups, callback query patterns, lifecycle hooks, rate limiting, webhook/polling setup, and any new recommended syntax. Turn the result into a concrete module layout for `src/tgbot/handlers/`.
+**Why:** Source voting and moderator-community features need clearer Telegram handler boundaries without confusing FastAPI routers with Telegram handler registrars.
+**Files:** `src/tgbot/app.py`, `src/tgbot/handlers/`, `src/tgbot/handlers/moderator/registry.py`
+**Depends on:** Moderator community source-voting prototype design.
 
 ### Per-engine session continuation rate
 **What:** SQL query that computes, for each engine: % of times user continued scrolling after seeing that engine's meme.

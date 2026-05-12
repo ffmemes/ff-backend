@@ -21,10 +21,7 @@ from src.tgbot.constants import (
     LANG_SETTINGS_LANG_CHANGE_CALLBACK_PATTERN,
     MEME_BUTTON_CALLBACK_DATA_REGEXP,
     MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA,
-    MEME_SOURCE_SET_LANG_REGEXP,
-    MEME_SOURCE_SET_STATUS_REGEXP,
     POPUP_BUTTON_CALLBACK_DATA_REGEXP,
-    SOURCE_CANDIDATE_ACTION_REGEXP,
     TELEGRAM_CHANNEL_RU_CHAT_ID,
     TELEGRAM_FEEDBACK_CHAT_ID,
     TELEGRAM_MODERATOR_CHAT_ID,
@@ -68,15 +65,7 @@ from src.tgbot.handlers.chat.send_tokens import (
     reward_active_chat_users,
     send_tokens_to_reply,
 )
-from src.tgbot.handlers.moderator import get_meme, meme_source
-from src.tgbot.handlers.moderator.invite import (
-    MODERATOR_INVITE_CALLBACK_DATA,
-    handle_moderator_invite_callback,
-)
-from src.tgbot.handlers.moderator.source_candidates import (
-    handle_discovered_sources_command,
-    handle_source_candidate_action,
-)
+from src.tgbot.handlers.moderator.registry import add_moderator_handlers
 from src.tgbot.handlers.payments.purchase import (
     PURCHASE_TOKEN_CALLBACK_DATA_REGEXP,
     handle_new_token_purchase_request_callback,
@@ -255,13 +244,6 @@ def add_handlers(application: Application) -> None:
         )
     )
 
-    application.add_handler(
-        CallbackQueryHandler(
-            handle_moderator_invite_callback,
-            pattern=rf"^{MODERATOR_INVITE_CALLBACK_DATA}$",
-        )
-    )
-
     ############## popup reaction
     application.add_handler(
         CallbackQueryHandler(
@@ -286,6 +268,8 @@ def add_handlers(application: Application) -> None:
             filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
         )
     )
+
+    add_moderator_handlers(application)
 
     ######################
     # broadcast texts
@@ -406,34 +390,6 @@ def add_handlers(application: Application) -> None:
         )
     )
 
-    # meme source management
-    application.add_handlers(
-        [
-            MessageHandler(
-                filters=filters.ChatType.PRIVATE
-                & filters.Regex("^(https://t.me|https://vk.com|https://www.instagram.com)"),
-                callback=meme_source.handle_meme_source_link,
-            ),
-            CallbackQueryHandler(
-                meme_source.handle_meme_source_language_selection,
-                pattern=MEME_SOURCE_SET_LANG_REGEXP,
-            ),
-            CallbackQueryHandler(
-                meme_source.handle_meme_source_change_status,
-                pattern=MEME_SOURCE_SET_STATUS_REGEXP,
-            ),
-            CommandHandler(
-                "discoveredsources",
-                handle_discovered_sources_command,
-                filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
-            ),
-            CallbackQueryHandler(
-                handle_source_candidate_action,
-                pattern=SOURCE_CANDIDATE_ACTION_REGEXP,
-            ),
-        ]
-    )
-
     application.add_handler(
         CallbackQueryHandler(
             alerts.handle_empty_meme_queue_alert,
@@ -455,22 +411,6 @@ def add_handlers(application: Application) -> None:
     )
 
     application.add_error_handler(error.send_stacktrace_to_tg_chat, block=False)
-
-    # show meme / memes by ids
-    application.add_handlers(
-        [
-            CommandHandler(
-                "meme",
-                get_meme.handle_get_meme,
-                filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
-            ),
-            CommandHandler(
-                "show",
-                get_meme.handle_show_memes,
-                filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
-            ),
-        ]
-    )
 
     # show user info
     application.add_handler(
