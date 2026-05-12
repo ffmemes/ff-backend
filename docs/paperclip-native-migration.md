@@ -195,7 +195,7 @@ Prefer Paperclip's native skill-update mechanism over a custom-rolled routine if
 
 ## What stays custom
 
-- `.github/workflows/staff-engineer-trigger.yml` — no native Paperclip↔GitHub PR integration yet; HTTP POST to a routine trigger is the right shape.
+- `.github/workflows/staff-engineer-trigger.yml` — no native Paperclip↔GitHub PR integration yet; the workflow now uses Paperclip's native routine API trigger with a narrow PR payload.
 - `agents/<slug>/AGENTS.md` content — our IP, not Paperclip's job.
 - Telegram plugin — already native (Paperclip plugin system).
 - Paperclip deploy/sync from git — still custom because existing-company

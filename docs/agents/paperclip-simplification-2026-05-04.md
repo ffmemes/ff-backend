@@ -80,10 +80,10 @@ code. It avoids rereading the full upstream repo and the long ops runbook.
 
 ## Keep Custom For Now
 
-- The GitHub PR review workflow is still reasonable if it posts a narrow
-  `{pr_number, pr_url}` payload to a Paperclip routine trigger. A direct GitHub
-  webhook with `github_hmac` can remove the workflow later, but then the agent
-  prompt must parse the full GitHub webhook payload.
+- The GitHub PR review workflow is still reasonable if it sends a narrow
+  `{pr_number, pr_url}` payload through Paperclip's native routine API trigger.
+  A direct GitHub webhook with `github_hmac` can remove the workflow later, but
+  then the agent prompt must parse the full GitHub webhook payload.
 - Comms publishing and routine outcome checks are product-specific. Paperclip
   can know a Telegram post is complete only when the agent records the concrete
   `result.message_id` and `result.editorial_post_id` returned by

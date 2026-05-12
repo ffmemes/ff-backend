@@ -259,7 +259,7 @@ stopped work, and next bets. The weekly source of truth is the
 | gstack Update Check | CEO | `17 3 * * *` | schedule | Update skills, review changelog |
 | Paperclip Update Check | CTO | `0 4 * * *` | schedule | Check for Paperclip updates |
 | Daily Channel Post | Comms | `0 7 * * *` | schedule | Daily @ffmemes TG channel post; success means published, not only draft approved |
-| PR Review | Staff Engineer | on PR event | 2 webhooks + API | Review PRs via GitHub Actions trigger |
+| PR Review | Staff Engineer | on PR event | API trigger | Review PRs via GitHub Actions trigger |
 
 ## Plugins
 
@@ -313,12 +313,12 @@ Paperclip triggers now support multiple signing modes:
 - **`github_hmac`** (NEW) — reads `X-Hub-Signature-256` header. Compatible with GitHub webhooks.
 - **`none`** (NEW) — no auth, publicId in URL acts as shared secret.
 
-### Current webhook setup (post PR #212, 2026-04-29)
+### Current trigger setup
 
 | Source | Path | Auth | Notes |
 |--------|------|------|-------|
 | Sentry | Sentry Internal Integration → Paperclip trigger | none (publicId is the secret) | Integration name is stored in Sentry, not this public repo |
-| GitHub | GH Actions (`notify-staff-engineer`) → Paperclip trigger | Bearer token | Direct call |
+| GitHub | GH Actions (`notify-staff-engineer`) → Paperclip routine API trigger | Board API key | Sends narrow `{pr_number, pr_url}` variables |
 | Prefect | (none) | — | Failures surface via QA Log Scan 3h cron |
 | Coolify | (none) | — | Was never actively used in practice |
 

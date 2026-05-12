@@ -90,7 +90,8 @@ blocked with `unverified_paperclip_deploy`. Channel publication markers such as
 
 ### PR Review
 
-Each PR webhook must create or resume the matching `[pr:<number>] Review` issue.
+Each PR event must create or resume the matching `[pr:<number>] Review` issue
+through the Staff Engineer routine API trigger.
 If trigger payload `pr_number=215` links to `[pr:214] Review`, that is
 `coalesced_pr_review_mismatch`, not healthy queueing.
 
