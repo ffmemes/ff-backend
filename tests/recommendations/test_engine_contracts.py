@@ -172,7 +172,7 @@ async def test_returns_required_fields(base_data, engine_name):
     results = await retriever.get_candidates(engine_name, USER_ID, limit=50)
     if len(results) == 0:
         pytest.skip(f"{engine_name} returned no results")
-    required = {"id", "type", "telegram_file_id", "recommended_by"}
+    required = {"id", "type", "telegram_file_id", "recommended_by", "nlikes"}
     for r in results:
         missing = required - set(r.keys())
         assert not missing, f"{engine_name} missing fields: {missing}"

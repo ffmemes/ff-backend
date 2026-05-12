@@ -140,3 +140,24 @@ async def test_recently_liked_blender_v2_measurement_views_exist():
         assert "recommended_by" in engine_columns
         assert "allocation_pct" in engine_columns
         assert "continuation_rate_pct" in engine_columns
+
+
+@pytest.mark.asyncio
+async def test_meme_like_count_measurement_views_exist():
+    """The like-count experiment has direct result and sample-gate views."""
+    async with engine.begin() as conn:
+        results = await conn.execute(
+            text("SELECT * FROM v_meme_like_count_experiment_results LIMIT 1")
+        )
+        result_columns = list(results.keys())
+        assert "assigned_users" in result_columns
+        assert "current_threshold_eligible_events" in result_columns
+        assert "explicit_reaction_rate_pct" in result_columns
+        assert "continuation_rate_pct" in result_columns
+
+        sample_gate = await conn.execute(
+            text("SELECT * FROM v_meme_like_count_experiment_sample_gate LIMIT 1")
+        )
+        sample_gate_columns = list(sample_gate.keys())
+        assert "assigned_users" in sample_gate_columns
+        assert "sample_gate_met" in sample_gate_columns

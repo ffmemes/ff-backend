@@ -63,6 +63,7 @@ def _meme(id: int, recommended_by: str = "test") -> dict:
         "telegram_file_id": f"file_{id}",
         "caption": None,
         "recommended_by": recommended_by,
+        "nlikes": 10,
     }
 
 
@@ -206,7 +207,7 @@ async def test_moderator_gets_low_sent_pool(queue_user):
 
 @pytest.mark.asyncio
 async def test_queue_memes_have_required_fields(queue_user):
-    """Memes in queue should have id, type, telegram_file_id, recommended_by."""
+    """Memes in queue should have fields needed to send and render buttons."""
     stub = _make_stub_retriever(
         {
             "lr_smoothed": [_meme(20001, "lr_smoothed")],
@@ -218,6 +219,7 @@ async def test_queue_memes_have_required_fields(queue_user):
         assert "id" in c
         assert "type" in c or True  # stub has type
         assert "recommended_by" in c
+        assert "nlikes" in c
 
 
 @pytest.mark.asyncio

@@ -39,6 +39,7 @@ async def best_uploaded_memes(
             M.id
             , M.type, M.telegram_file_id, M.caption
             , 'best_uploaded_memes' AS recommended_by
+            , COALESCE(MS.nlikes, 0) AS nlikes
 
         FROM meme M
         INNER JOIN meme_stats MS
@@ -84,6 +85,7 @@ async def like_spread_and_recent_memes(
             M.id
             , M.type, M.telegram_file_id, M.caption
             , 'like_spread_and_recent' AS recommended_by
+            , COALESCE(MS.nlikes, 0) AS nlikes
 
         FROM meme M
         INNER JOIN meme_stats MS
@@ -134,6 +136,7 @@ async def get_lr_smoothed(
             M.id
             , M.type, M.telegram_file_id, M.caption
             , 'lr_smoothed' AS recommended_by
+            , COALESCE(MS.nlikes, 0) AS nlikes
 
         FROM meme M
         INNER JOIN meme_stats MS
@@ -186,6 +189,7 @@ async def get_es_ranked(
             M.id
             , M.type, M.telegram_file_id, M.caption
             , 'es_ranked' AS recommended_by
+            , COALESCE(MS.nlikes, 0) AS nlikes
 
         FROM meme M
         INNER JOIN meme_stats MS
@@ -244,6 +248,7 @@ async def goat(
         WITH SCORES AS MATERIALIZED (
             SELECT
                 MS.meme_id,
+                MS.nlikes,
                 (
                     1.0
                     * (MS.nlikes - MS.ndislikes)::float / (MS.nmemes_sent + 1)
@@ -279,6 +284,7 @@ async def goat(
             M.id
            , M.type, M.telegram_file_id, M.caption
            , 'goat' AS recommended_by
+           , COALESCE(SCORES.nlikes, 0) AS nlikes
         FROM meme M
         INNER JOIN SCORES
             ON SCORES.meme_id = M.id
@@ -320,10 +326,13 @@ async def get_recently_liked(
             M.id
             , M.type, M.telegram_file_id, M.caption
             , 'recently_liked' AS recommended_by
+            , COALESCE(MS.nlikes, 0) AS nlikes
 
         FROM CANDIDATES C
         INNER JOIN meme M
             ON M.id = C.id
+        LEFT JOIN meme_stats MS
+            ON MS.meme_id = M.id
 
         INNER JOIN user_language L
             ON L.language_code = M.language_code
@@ -370,6 +379,7 @@ async def cold_start_explore(
             M.id
             , M.type, M.telegram_file_id, M.caption
             , 'cold_start_explore' AS recommended_by
+            , COALESCE(MS.nlikes, 0) AS nlikes
 
         FROM meme M
         INNER JOIN meme_stats MS
@@ -430,6 +440,7 @@ async def cold_start_adapt(
             M.id
             , M.type, M.telegram_file_id, M.caption
             , 'cold_start_adapt' AS recommended_by
+            , COALESCE(MS.nlikes, 0) AS nlikes
 
         FROM meme M
         INNER JOIN meme_stats MS
