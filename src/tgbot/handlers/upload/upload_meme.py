@@ -26,6 +26,7 @@ from src.tgbot.handlers.upload.service import (
     count_24h_uploaded_not_approved_memes,
     create_meme_from_meme_raw_upload,
     create_meme_raw_upload,
+    get_user_upload_ban_status,
     update_meme_raw_upload,
 )
 from src.tgbot.logs import log
@@ -50,6 +51,18 @@ LANGUAGE_SELECTED_CALLBACK_DATA_REGEXP = r"upload:(\d+):lang:(\w+)"
 
 LANGUAGE_SELECTED_OTHER_CALLBACK_DATA_PATTERN = "upload:{upload_id}:lang:other"
 LANGUAGE_SELECTED_OTHER_CALLBACK_DATA_REGEXP = r"upload:(\d+):lang:other"
+
+UPLOAD_BAN_INVITES_TO_UNLOCK = 20
+
+
+def get_upload_banned_message(invited_users: int) -> str:
+    remaining_invites = max(0, UPLOAD_BAN_INVITES_TO_UNLOCK - invited_users)
+    return f"""ты часто нарушал правила загрузки мемов,
+поэтому мы запретили тебе загружать новые мемы
+
+чтобы разблокировать доступ, отправляй мемы друзьям и пригласи 20 новых человек в бота.
+
+Осталось пригласить: {remaining_invites}."""
 
 
 async def _reply_with_forwarded_meme_stats(
@@ -186,6 +199,12 @@ async def handle_message_with_meme(update: Update, context: ContextTypes.DEFAULT
         return
 
     user = await get_user_info(update.effective_user.id)
+    upload_ban_status = await get_user_upload_ban_status(update.effective_user.id)
+    if upload_ban_status and upload_ban_status["type"] == UserType.UPLOAD_BANNED.value:
+        invited_users = upload_ban_status["invited_users"]
+        if invited_users < UPLOAD_BAN_INVITES_TO_UNLOCK:
+            return await message.reply_text(get_upload_banned_message(invited_users))
+
     if not UserType(user["type"]).is_moderator:
         if user["nmemes_sent"] < 10:
             return await message.reply_text(

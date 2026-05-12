@@ -56,6 +56,22 @@ async def get_meme_raw_upload_by_id(upload_id: int) -> dict[str, Any]:
     return await fetch_one(query)
 
 
+async def get_user_upload_ban_status(user_id: int) -> dict[str, Any] | None:
+    query = text(
+        """
+        SELECT
+            u.type,
+            COUNT(invited.id)::INT AS invited_users
+        FROM "user" u
+        LEFT JOIN "user" invited
+            ON invited.inviter_id = u.id
+        WHERE u.id = :user_id
+        GROUP BY u.id, u.type
+        """
+    )
+    return await fetch_one(query, {"user_id": user_id})
+
+
 async def get_or_create_meme_source_for_meme_upload(
     meme_upload: dict[str, Any],
 ) -> dict[str, Any]:
