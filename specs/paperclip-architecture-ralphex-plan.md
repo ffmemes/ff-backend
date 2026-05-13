@@ -319,8 +319,8 @@ Verification:
       as `daily_post` vs `daily_channel_post`/`post_published`.
       (`OUTCOME_ACTIONS` + `OUTCOME_ALIASES` + `canonical_action`;
       `daily_post` resolves to `daily_channel_post`. Outcome audit
-      surfaces alias usage as an `outcome_alias_drift` flag so prompts
-      that still emit the legacy name appear in CEO actions.)
+      surfaces known legacy usage in `mappedAliases`; only unmapped legacy
+      names should become `outcome_alias_drift`.)
 - [x] Centralize routine outcome contracts so prompts and audit scripts share
       the same definitions. (`PUBLISHED_MARKERS`, `APPROVAL_MARKERS`,
       `STALE_DRAFT_MARKERS`, `BLOCKED_ACCESS_MARKERS`,
@@ -363,7 +363,7 @@ Verification:
       outcome events exist. (`log_events` runs every `experiments/log.jsonl`
       action through `is_outcome_action` / `canonical_action`, so a log
       line with `action=daily_post` now contributes to `outcomeCount`
-      via the alias and surfaces in `aliasDrift` for cleanup.)
+      via the alias and surfaces in `mappedAliases` for transparency.)
 
 ### Task 7: Tool, Env, And Access Preflight
 

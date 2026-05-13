@@ -94,10 +94,9 @@ OUTCOME_ACTIONS: frozenset[str] = DECISION_ACTIONS | frozenset(
     }
 )
 
-# Legacy / typo aliases. Audits resolve these to the canonical name and
-# also flag `outcome_alias_drift` so prompts that still emit the old
-# name surface for cleanup. Keep this map small — every entry is a
-# named gap a prompt or routine description still has to fix.
+# Legacy / typo aliases. Audits resolve these to the canonical name so
+# historical rows continue to count without rewriting old ledger entries.
+# Keep this map small: every entry should preserve a known historical meaning.
 OUTCOME_ALIASES: Mapping[str, str] = {
     "daily_post": "daily_channel_post",
 }

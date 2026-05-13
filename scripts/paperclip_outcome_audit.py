@@ -26,7 +26,6 @@ try:
     from paperclip_contracts import (
         EXECUTION_CATEGORIES,
         ISSUE_CLASSES,
-        OUTCOME_ALIASES,
         canonical_action,
         is_decision_action,
         is_outcome_action,
@@ -43,7 +42,6 @@ except ModuleNotFoundError:
     from scripts.paperclip_contracts import (
         EXECUTION_CATEGORIES,
         ISSUE_CLASSES,
-        OUTCOME_ALIASES,
         canonical_action,
         is_decision_action,
         is_outcome_action,
@@ -126,7 +124,7 @@ def list_agents(client: Paperclip, company_id: str) -> dict[str, str]:
 
 
 def list_issues(
-    client: Paperclip, company_id: str, limit: int
+    client: Paperclip, company_id: str, limit: int | None
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Paginate every status so the audit doesn't silently undercount once the
     company crosses the API's per-request cap.
@@ -135,11 +133,19 @@ def list_issues(
     ceiling probe live in `PaperclipClient.paginate`; this wrapper just
     binds the FFmemes-specific path and status filter.
     """
-    return client.paginate(
-        f"/api/companies/{company_id}/issues",
-        query={"status": ALL_STATUSES},
+    path = f"/api/companies/{company_id}/issues"
+    query = {"status": ALL_STATUSES}
+    issues, truncation = client.paginate(
+        path,
+        query=query,
         limit=limit,
     )
+    return issues, {
+        **truncation,
+        "path": path,
+        "query": query,
+        "requestedLimit": limit,
+    }
 
 
 def classify_issue(issue: dict[str, Any], agents: dict[str, str]) -> str:
@@ -220,12 +226,14 @@ def log_events(since: datetime, limit: int = 12) -> dict[str, Any]:
     decisions: list[dict[str, Any]] = []
     outcomes: list[dict[str, Any]] = []
     alias_drift: Counter[str] = Counter()
+    mapped_aliases: Counter[str] = Counter()
     if not LOG_PATH.exists():
         return {
             "events": [],
             "decisions": [],
             "outcomes": [],
             "aliasDrift": {},
+            "mappedAliases": {},
             "counts": {"events": 0, "decisions": 0, "outcomes": 0},
         }
 
@@ -238,11 +246,10 @@ def log_events(since: datetime, limit: int = 12) -> dict[str, Any]:
             continue
         events.append(entry)
         action = entry.get("action")
-        # Surface log entries still using the legacy `daily_post` alias so a
-        # prompt or routine description can be cleaned up; the outcome still
-        # counts toward `daily_channel_post` via `canonical_action`.
-        if isinstance(action, str) and action in OUTCOME_ALIASES:
-            alias_drift[action] += 1
+        if isinstance(action, str):
+            canonical = canonical_action(action)
+            if canonical and canonical != action:
+                mapped_aliases[f"{action}->{canonical}"] += 1
         if entry_contains_product_decision(entry):
             decisions.append(entry)
         if is_outcome_action(action) or entry_contains_product_decision(entry):
@@ -264,6 +271,7 @@ def log_events(since: datetime, limit: int = 12) -> dict[str, Any]:
         "decisions": [compact(e) for e in decisions[-limit:]],
         "outcomes": [compact(e) for e in outcomes[-limit:]],
         "aliasDrift": dict(alias_drift),
+        "mappedAliases": dict(mapped_aliases),
         "counts": {
             "events": len(events),
             "decisions": len(decisions),
@@ -322,7 +330,9 @@ def active_experiments(today: date) -> list[dict[str, Any]]:
     return rows
 
 
-def build_report(client: Paperclip, company_id: str, days: int, limit: int) -> dict[str, Any]:
+def build_report(
+    client: Paperclip, company_id: str, days: int, limit: int | None
+) -> dict[str, Any]:
     generated = datetime.now(timezone.utc)
     since = generated - timedelta(days=days)
     agents = list_agents(client, company_id)
@@ -402,6 +412,7 @@ def build_report(client: Paperclip, company_id: str, days: int, limit: int) -> d
             "recentDecisions": log["decisions"],
             "recentOutcomes": log["outcomes"],
             "aliasDrift": log["aliasDrift"],
+            "mappedAliases": log["mappedAliases"],
         },
         "activeExperiments": experiments,
         "flags": flags,
@@ -439,8 +450,8 @@ def recommended_actions(flags: list[str]) -> list[str]:
         )
     if "outcome_alias_drift" in flags:
         actions.append(
-            "experiments/log.jsonl still uses a legacy outcome alias; rename it "
-            "to the canonical action so the contract stays single-sourced."
+            "experiments/log.jsonl contains unmapped legacy outcome aliases; add "
+            "an explicit contract mapping or rename them to canonical actions."
         )
     if not actions:
         actions.append(
@@ -508,7 +519,15 @@ def main() -> int:
         default=os.getenv("PAPERCLIP_COMPANY_ID", DEFAULT_COMPANY_ID),
     )
     parser.add_argument("--days", type=int, default=7)
-    parser.add_argument("--limit", type=int, default=500)
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help=(
+            "optional maximum issues to scan; by default the audit follows "
+            "pagination until the API returns a clean end-of-list"
+        ),
+    )
     parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     args = parser.parse_args()
 
@@ -524,6 +543,16 @@ def main() -> int:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
         print_text(report)
+    if report["issueListTruncation"]["truncated"]:
+        truncation = report["issueListTruncation"]
+        print(
+            "error: issue pagination incomplete "
+            f"path={truncation.get('path')} query={truncation.get('query')} "
+            f"requested_limit={truncation.get('requestedLimit')} "
+            f"reason={truncation.get('reason')} at_offset={truncation.get('atOffset')}",
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 

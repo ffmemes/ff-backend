@@ -240,6 +240,21 @@ def test_paginate_collects_pages_and_dedupes():
     assert trunc["truncated"] is False
 
 
+def test_paginate_without_limit_walks_until_empty_page():
+    captured: list[dict] = []
+    pages = [
+        [{"id": f"i-{n}"} for n in range(200)],
+        [{"id": f"i-{n}"} for n in range(200, 400)],
+        [{"id": "i-400"}],
+        [],
+    ]
+    client = PaperclipClient("https://x.example", "k", opener=_paginate_opener(pages, captured))
+    items, trunc = client.paginate("/api/issues")
+    assert len(items) == 401
+    assert trunc["truncated"] is False
+    assert captured[-1]["url"].endswith("limit=200&offset=401")
+
+
 def test_paginate_flags_duplicate_page_offset_ignored():
     captured: list[dict] = []
     # Server hands back the same first page twice — classic "offset ignored".
