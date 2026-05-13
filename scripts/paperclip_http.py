@@ -203,7 +203,7 @@ class PaperclipClient:
         path: str,
         *,
         query: dict[str, str] | None = None,
-        limit: int,
+        limit: int | None = None,
         page_size: int = 200,
         dedupe_key: str = "id",
         offset_param: str = "offset",
@@ -215,8 +215,8 @@ class PaperclipClient:
         - Empty page (clean end of data).
         - Duplicate-only page (server ignores `offset` or has a hidden cap).
         - Non-list / non-dict / missing-id responses (shape drift).
-        - Hitting `limit` rows; on the boundary we probe one extra row so an
-          exact-fit dataset isn't reported as truncated.
+        - Hitting an explicit `limit`; on the boundary we probe one extra row
+          so an exact-fit dataset isn't reported as truncated.
 
         `truncation` keys: `truncated` (bool), `reason` (str | None),
         `atOffset` (int | None).
@@ -226,8 +226,11 @@ class PaperclipClient:
         offset = 0
         truncation: dict[str, Any] = {"truncated": False, "reason": None, "atOffset": None}
         base_query = dict(query or {})
-        while len(collected) < limit:
-            page_request_size = min(page_size, limit - len(collected))
+        while limit is None or len(collected) < limit:
+            if limit is None:
+                page_request_size = page_size
+            else:
+                page_request_size = min(page_size, limit - len(collected))
             page_query = dict(base_query)
             page_query[limit_param] = str(page_request_size)
             page_query[offset_param] = str(offset)
@@ -306,7 +309,7 @@ class PaperclipClient:
                 seen.add(item[dedupe_key])
                 collected.append(item)
             offset += len(page)
-        if not truncation["truncated"] and len(collected) >= limit:
+        if limit is not None and not truncation["truncated"] and len(collected) >= limit:
             try:
                 probe_query = dict(base_query)
                 probe_query[limit_param] = "1"
