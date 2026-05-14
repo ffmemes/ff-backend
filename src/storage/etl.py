@@ -240,7 +240,12 @@ async def etl_memes_from_raw_telegram_posts(
                         NOT :filter_meme_source_ids
                         OR MRT.meme_source_id = ANY(:meme_source_ids)
                     )
-                    AND JSONB_ARRAY_LENGTH(MRT.media) = 1 -- only one attachment
+                    AND JSONB_ARRAY_LENGTH(
+                        CASE
+                            WHEN JSONB_TYPEOF(MRT.media) = 'array' THEN MRT.media
+                            ELSE '[]'::jsonb
+                        END
+                    ) = 1 -- only one attachment
                     AND (
                         NOT :fresh_only
                         OR COALESCE(MRT.updated_at, MRT.created_at) >= NOW() - INTERVAL '24 hours'
@@ -252,7 +257,13 @@ async def etl_memes_from_raw_telegram_posts(
                     )
                     -- Ad filter: skip posts with outlinks + below-median views
                     AND NOT (
-                        JSONB_ARRAY_LENGTH(COALESCE(MRT.out_links, '[]'::jsonb)) > 0
+                        JSONB_ARRAY_LENGTH(
+                            CASE
+                                WHEN JSONB_TYPEOF(COALESCE(MRT.out_links, '[]'::jsonb)) = 'array'
+                                THEN COALESCE(MRT.out_links, '[]'::jsonb)
+                                ELSE '[]'::jsonb
+                            END
+                        ) > 0
                         AND MRT.views > 0
                         AND SM.median_views IS NOT NULL
                         AND MRT.views < SM.median_views * 0.5
@@ -299,7 +310,12 @@ async def etl_memes_from_raw_telegram_posts(
                     )
                     AND meme.meme_source_id IS NULL
                     AND meme.raw_meme_id IS NULL
-                    AND JSONB_ARRAY_LENGTH(MRT.media) = 1
+                    AND JSONB_ARRAY_LENGTH(
+                        CASE
+                            WHEN JSONB_TYPEOF(MRT.media) = 'array' THEN MRT.media
+                            ELSE '[]'::jsonb
+                        END
+                    ) = 1
             """
         ),
         {

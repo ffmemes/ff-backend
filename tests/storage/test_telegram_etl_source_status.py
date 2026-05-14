@@ -3,9 +3,10 @@ from datetime import datetime
 import pytest
 import pytest_asyncio
 from sqlalchemy import delete, func, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from src.database import engine, fetch_one, meme, meme_source
+from src.database import engine, fetch_one, meme, meme_raw_telegram, meme_source
 from src.storage.constants import MemeSourceStatus
 from src.storage.etl import etl_memes_from_raw_telegram_posts, insert_parsed_posts_from_telegram
 from src.storage.parsers.schemas import TgChannelPostParsingResult
@@ -13,6 +14,7 @@ from tests.factories import TEST_ID_START, cleanup_test_data, create_meme_source
 
 IN_MODERATION_SOURCE_ID = TEST_ID_START + 2100
 ENABLED_SOURCE_ID = TEST_ID_START + 2101
+MALFORMED_SOURCE_ID = TEST_ID_START + 2102
 
 
 def _post(source_id: int, post_id: int) -> TgChannelPostParsingResult:
@@ -86,3 +88,30 @@ async def test_telegram_etl_processes_raw_posts_from_enabled_source(
     created = await fetch_one(select(meme).where(meme.c.meme_source_id == ENABLED_SOURCE_ID))
     assert created is not None
     assert created["status"] == "created"
+
+
+@pytest.mark.asyncio
+async def test_telegram_etl_ignores_malformed_media_rows(conn: AsyncConnection):
+    await create_meme_source(
+        conn,
+        id=MALFORMED_SOURCE_ID,
+        status=MemeSourceStatus.PARSING_ENABLED.value,
+    )
+    await conn.execute(
+        insert(meme_raw_telegram).values(
+            meme_source_id=MALFORMED_SOURCE_ID,
+            post_id=3003,
+            url="https://t.me/malformed/3003",
+            date=datetime.utcnow(),
+            content="мем дня",
+            media={"url": "https://example.com/not-array.jpg"},
+            out_links={"url": "https://example.com"},
+            views=100,
+        )
+    )
+    await conn.commit()
+
+    await etl_memes_from_raw_telegram_posts()
+
+    created = await fetch_one(select(meme).where(meme.c.meme_source_id == MALFORMED_SOURCE_ID))
+    assert created is None
