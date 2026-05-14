@@ -150,6 +150,17 @@ async def tg_meme_pipeline() -> None:
     safe_emit("ff.pipeline.telegram.completed", "ff.pipeline.telegram")
 
 
+async def process_cached_telegram_source(meme_source_id: int, limit: int = 100) -> None:
+    """Process cached raw Telegram posts for one just-enabled source."""
+    await etl_memes_from_raw_telegram_posts([meme_source_id], fresh_only=False)
+    unloaded_memes = await get_unloaded_tg_memes(
+        limit=limit,
+        meme_source_ids=[meme_source_id],
+        fresh_only=False,
+    )
+    await _process_unloaded_memes(unloaded_memes, "prepared Telegram source")
+
+
 @flow(
     name="Memes from VK Pipeline",
     description="Process raw memes parsed from VK",

@@ -191,6 +191,69 @@ meme_source_candidate = Table(
     ),
 )
 
+meme_source_candidate_poll = Table(
+    "meme_source_candidate_poll",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column(
+        "candidate_id",
+        ForeignKey("meme_source_candidate.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    Column("chat_id", BigInteger, nullable=False),
+    Column("message_id", BigInteger),
+    Column(
+        "prepared_meme_source_id",
+        ForeignKey("meme_source.id", ondelete="SET NULL"),
+    ),
+    Column("status", String, nullable=False, server_default="draft"),
+    Column("opened_at", DateTime),
+    Column("closes_at", DateTime, nullable=False),
+    Column("closed_at", DateTime),
+    Column(
+        "result_meme_source_id",
+        ForeignKey("meme_source.id", ondelete="SET NULL"),
+    ),
+    Column("data", JSONB),
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime, onupdate=func.now()),
+    Index("ix_meme_source_candidate_poll_status_closes_at", "status", "closes_at"),
+    Index(
+        "uq_meme_source_candidate_poll_message",
+        "chat_id",
+        "message_id",
+        unique=True,
+        postgresql_where=text("message_id IS NOT NULL"),
+    ),
+    Index(
+        "uq_meme_source_candidate_poll_active_global",
+        text("(true)"),
+        unique=True,
+        postgresql_where=text("status IN ('draft', 'open')"),
+    ),
+    Index(
+        "uq_meme_source_candidate_poll_active_candidate",
+        "candidate_id",
+        unique=True,
+        postgresql_where=text("status IN ('draft', 'open')"),
+    ),
+)
+
+meme_source_candidate_vote = Table(
+    "meme_source_candidate_vote",
+    metadata,
+    Column(
+        "poll_id",
+        ForeignKey("meme_source_candidate_poll.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("user_id", BigInteger, primary_key=True),
+    Column("vote", SmallInteger, nullable=False),
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+    Column("updated_at", DateTime, onupdate=func.now()),
+)
+
 
 meme_raw_telegram = Table(
     "meme_raw_telegram",

@@ -47,6 +47,8 @@ def normalize_telegram_channel_url(forwarded_url: str) -> Optional[str]:
 async def insert_parsed_posts_from_telegram(
     meme_source_id: int,
     telegram_posts: list[TgChannelPostParsingResult],
+    *,
+    discover_candidates: bool = True,
 ) -> None:
     # 1. find which memes are already in the database
     # 2. update existing memes
@@ -86,9 +88,10 @@ async def insert_parsed_posts_from_telegram(
         )
         await execute(update_query)
 
-    # Only newly-inserted posts feed candidate discovery; otherwise every parse
-    # cycle re-counts the same forwarded URLs and corrupts times_forwarded.
-    await discover_source_candidates_from_telegram_posts(meme_source_id, new_posts)
+    if discover_candidates:
+        # Only newly-inserted posts feed candidate discovery; otherwise every parse
+        # cycle re-counts the same forwarded URLs and corrupts times_forwarded.
+        await discover_source_candidates_from_telegram_posts(meme_source_id, new_posts)
 
 
 async def discover_source_candidates_from_telegram_posts(
@@ -189,7 +192,11 @@ async def insert_parsed_posts_from_vk(
         await execute(update_query)
 
 
-async def etl_memes_from_raw_telegram_posts() -> None:
+async def etl_memes_from_raw_telegram_posts(
+    meme_source_ids: list[int] | None = None,
+    *,
+    fresh_only: bool = True,
+) -> None:
     # get transformed posts
     # find ones that are already in the database
     # create rows and update rows
@@ -228,8 +235,16 @@ async def etl_memes_from_raw_telegram_posts() -> None:
                 LEFT JOIN source_medians SM
                     ON SM.meme_source_id = MRT.meme_source_id
                 WHERE 1=1
+                    AND MS.status = 'parsing_enabled'
+                    AND (
+                        NOT :filter_meme_source_ids
+                        OR MRT.meme_source_id = ANY(:meme_source_ids)
+                    )
                     AND JSONB_ARRAY_LENGTH(MRT.media) = 1 -- only one attachment
-                    AND COALESCE(MRT.updated_at, MRT.created_at) >= NOW() - INTERVAL '24 hours'
+                    AND (
+                        NOT :fresh_only
+                        OR COALESCE(MRT.updated_at, MRT.created_at) >= NOW() - INTERVAL '24 hours'
+                    )
                     AND (
                         MRT.views = 0
                         OR SM.median_views IS NULL
@@ -243,7 +258,12 @@ async def etl_memes_from_raw_telegram_posts() -> None:
                         AND MRT.views < SM.median_views * 0.5
                     )
             """  # noqa: E501
-        )
+        ),
+        {
+            "filter_meme_source_ids": meme_source_ids is not None,
+            "meme_source_ids": meme_source_ids or [],
+            "fresh_only": fresh_only,
+        },
     )
 
     # find rows which already exist in db by two index columns:
@@ -262,15 +282,31 @@ async def etl_memes_from_raw_telegram_posts() -> None:
                     MRT.meme_source_id,
                     MRT.id AS raw_meme_id
                 FROM meme_raw_telegram MRT
+                INNER JOIN meme_source MS
+                    ON MS.id = MRT.meme_source_id
                 LEFT JOIN meme
                     ON meme.meme_source_id = MRT.meme_source_id
                     AND meme.raw_meme_id = MRT.id
                 WHERE 1=1
+                    AND MS.status = 'parsing_enabled'
+                    AND (
+                        NOT :filter_meme_source_ids
+                        OR MRT.meme_source_id = ANY(:meme_source_ids)
+                    )
+                    AND (
+                        NOT :fresh_only
+                        OR COALESCE(MRT.updated_at, MRT.created_at) >= NOW() - INTERVAL '24 hours'
+                    )
                     AND meme.meme_source_id IS NULL
                     AND meme.raw_meme_id IS NULL
                     AND JSONB_ARRAY_LENGTH(MRT.media) = 1
             """
-        )
+        ),
+        {
+            "filter_meme_source_ids": meme_source_ids is not None,
+            "meme_source_ids": meme_source_ids or [],
+            "fresh_only": fresh_only,
+        },
     )
 
     await update_or_create_memes(transformed_memes, memes_not_in_memes_table)

@@ -31,6 +31,7 @@ from src.flows.crossposting.meme import (
 )
 from src.flows.crossposting.stats_collector import collect_channel_stats
 from src.flows.crossposting.weekly_report import post_weekly_burger_report
+from src.flows.moderator.source_voting import daily_moderator_source_voting
 
 # Monitors
 from src.flows.monitors.ghost_users import monitor_ghost_users
@@ -113,6 +114,11 @@ if __name__ == "__main__":
         auto_snooze_stale_sources_flow.to_deployment(
             name="Auto-snooze stale meme sources",
             schedules=[CronSchedule(cron="15 1 * * *", timezone=LON)],
+        ),
+        # ── Moderator community loops ──
+        daily_moderator_source_voting.to_deployment(
+            name="Daily Moderator Source Voting",
+            schedules=[CronSchedule(cron="0 10 * * *", timezone=MSK)],
         ),
         # ── Broadcasts ──
         broadcast_next_meme_to_active_15m_ago.to_deployment(

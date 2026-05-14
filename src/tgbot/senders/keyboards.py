@@ -10,6 +10,7 @@ from src.tgbot.constants import (
     MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA,
     MEME_SOURCE_SET_LANG_PATTERN,
     SOURCE_CANDIDATE_ACTION_PATTERN,
+    SOURCE_CANDIDATE_VOTE_PATTERN,
     Reaction,
 )
 
@@ -153,6 +154,33 @@ def source_candidate_actions_keyboard(candidate_id: int) -> InlineKeyboardMarkup
                     "🗑 Dismiss",
                     callback_data=SOURCE_CANDIDATE_ACTION_PATTERN.format(
                         candidate_id=candidate_id, action="dismiss"
+                    ),
+                ),
+            ]
+        ]
+    )
+
+
+def source_candidate_vote_keyboard(
+    poll_id: int,
+    yes_count: int = 0,
+    no_count: int = 0,
+) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(
+                    f"✅ Добавить {yes_count}",
+                    callback_data=SOURCE_CANDIDATE_VOTE_PATTERN.format(
+                        poll_id=poll_id,
+                        vote=Reaction.LIKE.value,
+                    ),
+                ),
+                InlineKeyboardButton(
+                    f"❌ Пропустить {no_count}",
+                    callback_data=SOURCE_CANDIDATE_VOTE_PATTERN.format(
+                        poll_id=poll_id,
+                        vote=Reaction.DISLIKE.value,
                     ),
                 ),
             ]

@@ -22,7 +22,6 @@ from src.stats.meme_source import calculate_meme_source_stats
 from src.storage.constants import MemeStatus, MemeType
 from src.storage.service import find_meme_duplicate, update_meme
 from src.storage.upload import download_meme_content_from_tg
-from src.tgbot.constants import UserType
 from src.tgbot.handlers.treasury.constants import TrxType
 from src.tgbot.handlers.treasury.payments import pay_if_not_paid_with_alert
 from src.tgbot.handlers.upload.constants import SUPPORTED_LANGUAGES
@@ -185,6 +184,20 @@ def review_keyboard(upload_id: int) -> InlineKeyboardMarkup:
     )
 
 
+async def restore_review_keyboard(message: Any, upload_id: int) -> None:
+    try:
+        await message.edit_reply_markup(reply_markup=review_keyboard(upload_id))
+    except BadRequest as exc:
+        if "Message is not modified" not in str(exc):
+            raise
+
+
+def _is_upload_review_chat(message: Any) -> bool:
+    if message is None or settings.UPLOADED_MEMES_REVIEW_CHAT_ID is None:
+        return False
+    return str(message.chat_id) == str(settings.UPLOADED_MEMES_REVIEW_CHAT_ID)
+
+
 def _tg_user_info_to_name(tg_user_info: dict):
     if tg_user_info.get("username"):
         return "@" + tg_user_info["username"]
@@ -244,12 +257,9 @@ async def handle_uploaded_meme_review_button(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    user = await get_user_info(update.effective_user.id)
-    if not UserType(user["type"]).is_moderator:
-        await update.callback_query.answer("You are not allowed to review memes")
+    if not _is_upload_review_chat(update.callback_query.message):
+        await update.callback_query.answer("This review button belongs to the upload review chat")
         return
-
-    await update.callback_query.answer()
 
     reg = re.match(UPLOADED_MEME_REVIEW_CALLBACK_DATA_REGEXP, update.callback_query.data)
     upload_id, action = int(reg.group(1)), reg.group(2)
@@ -258,7 +268,10 @@ async def handle_uploaded_meme_review_button(
 
     if meme_upload["user_id"] == update.effective_user.id:
         await update.callback_query.answer("You can't review your own memes")
+        await restore_review_keyboard(update.callback_query.message, upload_id)
         return
+
+    await update.callback_query.answer()
 
     meme = await update_meme_by_upload_id(
         upload_id,

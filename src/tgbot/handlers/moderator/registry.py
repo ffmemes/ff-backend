@@ -10,6 +10,7 @@ from src.tgbot.constants import (
     MEME_SOURCE_SET_LANG_REGEXP,
     MEME_SOURCE_SET_STATUS_REGEXP,
     SOURCE_CANDIDATE_ACTION_REGEXP,
+    SOURCE_CANDIDATE_VOTE_REGEXP,
 )
 from src.tgbot.handlers.moderator import get_meme, meme_source
 from src.tgbot.handlers.moderator.invite import (
@@ -19,6 +20,7 @@ from src.tgbot.handlers.moderator.invite import (
 from src.tgbot.handlers.moderator.source_candidates import (
     handle_discovered_sources_command,
     handle_source_candidate_action,
+    handle_source_candidate_vote,
 )
 
 
@@ -50,6 +52,10 @@ def add_moderator_handlers(application: Application) -> None:
             CallbackQueryHandler(
                 handle_source_candidate_action,
                 pattern=SOURCE_CANDIDATE_ACTION_REGEXP,
+            ),
+            CallbackQueryHandler(
+                handle_source_candidate_vote,
+                pattern=SOURCE_CANDIDATE_VOTE_REGEXP,
             ),
             CommandHandler(
                 "meme",
