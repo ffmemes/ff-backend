@@ -173,9 +173,34 @@ async def prepare_source_candidate(
         )
         return {"status": "unsupported_type", "candidate": candidate, "source": None}
 
-    source = await _create_or_reuse_prepared_source(candidate, added_by_user_id)
+    source = await _get_meme_source_by_url(candidate["url"])
     if source is None:
-        return {"status": "source_create_failed", "candidate": candidate, "source": None}
+        try:
+            posts = (
+                await fetch_telegram_candidate_posts(candidate["url"], nposts=nposts)
+                if posts is None
+                else posts
+            )
+        except Exception:
+            return {"status": "prepare_failed", "candidate": candidate, "source": source}
+    elif source["status"] == MemeSourceStatus.PARSING_ENABLED.value:
+        await _mark_candidate(
+            candidate_id,
+            status=CANDIDATE_STATUS_PROMOTED,
+            promoted_meme_source_id=source["id"],
+            expected_status=CANDIDATE_STATUS_DISCOVERED,
+        )
+        return {"status": "already_enabled", "candidate": candidate, "source": source}
+    elif posts is None:
+        try:
+            posts = await fetch_telegram_candidate_posts(candidate["url"], nposts=nposts)
+        except Exception:
+            return {"status": "prepare_failed", "candidate": candidate, "source": source}
+
+    if source is None:
+        source = await _create_or_reuse_prepared_source(candidate, added_by_user_id)
+        if source is None:
+            return {"status": "source_create_failed", "candidate": candidate, "source": None}
     if source["status"] == MemeSourceStatus.PARSING_ENABLED.value:
         await _mark_candidate(
             candidate_id,
@@ -184,9 +209,6 @@ async def prepare_source_candidate(
             expected_status=CANDIDATE_STATUS_DISCOVERED,
         )
         return {"status": "already_enabled", "candidate": candidate, "source": source}
-
-    if posts is None:
-        posts = await fetch_telegram_candidate_posts(candidate["url"], nposts=nposts)
 
     evidence = extract_cyrillic_evidence(posts)
     if not posts:
@@ -526,6 +548,12 @@ async def select_daily_source_candidate() -> dict[str, Any] | None:
                   OR NOT EXISTS (
                       SELECT 1 FROM meme_source ms WHERE ms.url = c.url
                   )
+                  OR EXISTS (
+                      SELECT 1
+                      FROM meme_source ms
+                      WHERE ms.url = c.url
+                        AND ms.status = 'in_moderation'
+                  )
               )
             ORDER BY c.times_forwarded DESC, c.last_seen_at DESC
             LIMIT 1
@@ -613,6 +641,7 @@ async def mark_source_candidate_poll_open(
         .values(
             message_id=message_id,
             opened_at=opened_at,
+            closes_at=opened_at + SOURCE_VOTE_WINDOW,
             status=POLL_STATUS_OPEN,
             updated_at=_utcnow(),
         )

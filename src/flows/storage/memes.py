@@ -159,7 +159,7 @@ async def process_cached_telegram_source(meme_source_id: int, limit: int = 100) 
         fresh_only=False,
     )
     await _process_unloaded_memes(unloaded_memes, "prepared Telegram source")
-    await update_meme_status_of_ready_memes()
+    await final_meme_pipeline()
 
 
 @flow(

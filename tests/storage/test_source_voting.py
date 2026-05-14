@@ -20,6 +20,7 @@ from src.database import (
 from src.storage.constants import MemeSourceStatus
 from src.storage.parsers.schemas import TgChannelPostParsingResult
 from src.storage.source_voting import (
+    CANDIDATE_STATUS_DISCOVERED,
     POLL_STATUS_OPEN,
     POLL_STATUS_PASSED,
     VOTE_ADD_SOURCE,
@@ -27,9 +28,11 @@ from src.storage.source_voting import (
     advance_daily_source_cycle,
     close_source_candidate_poll,
     create_source_candidate_poll,
+    mark_source_candidate_poll_open,
     post_new_source_candidate_poll,
     prepare_source_candidate,
     record_source_candidate_vote,
+    select_daily_source_candidate,
 )
 from src.tgbot.constants import TELEGRAM_MODERATOR_CHAT_ID
 from tests.factories import TEST_ID_START, cleanup_test_data
@@ -129,6 +132,59 @@ async def test_prepare_source_candidate_dismisses_non_russian_candidate(
     )
     assert candidate["status"] == "dismissed"
     assert candidate["dismissed_reason"] == "non_ru_no_cyrillic"
+
+
+@pytest.mark.asyncio
+async def test_prepare_source_candidate_handles_scrape_failure_without_stranding_candidate(
+    conn: AsyncConnection,
+):
+    await _create_candidate(conn)
+    await conn.commit()
+
+    with patch(
+        "src.storage.source_voting.fetch_telegram_candidate_posts",
+        new=AsyncMock(side_effect=RuntimeError("scrape failed")),
+    ):
+        result = await prepare_source_candidate(CANDIDATE_ID)
+
+    assert result["status"] == "prepare_failed"
+
+    candidate = await fetch_one(
+        select(meme_source_candidate).where(meme_source_candidate.c.id == CANDIDATE_ID)
+    )
+    assert candidate["status"] == CANDIDATE_STATUS_DISCOVERED
+    assert candidate["promoted_meme_source_id"] is None
+
+    picked = await select_daily_source_candidate()
+    assert picked is not None
+    assert picked["id"] == CANDIDATE_ID
+
+
+@pytest.mark.asyncio
+async def test_opening_draft_poll_refreshes_vote_window(conn: AsyncConnection):
+    now = datetime.utcnow()
+    await _create_candidate(conn)
+    await conn.commit()
+    prepared = await prepare_source_candidate(CANDIDATE_ID, posts=[_post(4007)])
+    poll = await create_source_candidate_poll(
+        CANDIDATE_ID,
+        prepared_meme_source_id=prepared["source"]["id"],
+        chat_id=TELEGRAM_MODERATOR_CHAT_ID,
+        now=now - timedelta(days=1),
+    )
+    await conn.commit()
+
+    opened = await mark_source_candidate_poll_open(
+        poll["id"],
+        message_id=555,
+        opened_at=now,
+    )
+
+    assert opened is not None
+    assert opened["status"] == POLL_STATUS_OPEN
+    assert opened["opened_at"] == now
+    assert opened["closes_at"] == now + timedelta(hours=24)
+    assert opened["message_id"] == 555
 
 
 @pytest.mark.asyncio
