@@ -46,6 +46,9 @@ MEME_SOURCE_SET_STATUS_REGEXP = r"^ms:\d+:set_status:\w+$"
 SOURCE_CANDIDATE_ACTION_PATTERN = "msc:{candidate_id}:{action}"
 SOURCE_CANDIDATE_ACTION_REGEXP = r"^msc:\d+:(promote|dismiss)$"
 
+SOURCE_CANDIDATE_VOTE_PATTERN = "mscv:{poll_id}:{vote}"
+SOURCE_CANDIDATE_VOTE_REGEXP = r"^mscv:\d+:[12]$"
+
 LOADING_EMOJIS = [
     "🕛",
     "🕧",

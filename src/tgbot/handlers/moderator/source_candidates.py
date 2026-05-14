@@ -1,10 +1,15 @@
 from telegram import Update
+from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
+from src.storage.source_voting import record_source_candidate_vote
 from src.tgbot.constants import UserType
 from src.tgbot.handlers.moderator.meme_source import meme_source_admin_pipeline
 from src.tgbot.logs import log
-from src.tgbot.senders.keyboards import source_candidate_actions_keyboard
+from src.tgbot.senders.keyboards import (
+    source_candidate_actions_keyboard,
+    source_candidate_vote_keyboard,
+)
 from src.tgbot.service import (
     dismiss_source_candidate,
     get_source_candidate_by_id,
@@ -99,3 +104,45 @@ async def handle_source_candidate_action(
         # Funnel into the existing admin pipeline so the moderator can pick a
         # language and flip status — same UX as adding a source by URL.
         await meme_source_admin_pipeline(promoted_meme_source, update)
+
+
+async def handle_source_candidate_vote(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
+    query = update.callback_query
+    if query is None or update.effective_user is None or update.effective_chat is None:
+        return
+
+    _, poll_id, vote = query.data.split(":")
+    result = await record_source_candidate_vote(
+        poll_id=int(poll_id),
+        user_id=update.effective_user.id,
+        vote=int(vote),
+        chat_id=update.effective_chat.id,
+    )
+
+    status = result["status"]
+    if status in {"recorded", "changed"}:
+        counts = result["counts"]
+        await query.answer("Голос изменен" if status == "changed" else "Голос учтен")
+        try:
+            await query.edit_message_reply_markup(
+                reply_markup=source_candidate_vote_keyboard(
+                    int(poll_id),
+                    yes_count=counts["yes"],
+                    no_count=counts["no"],
+                )
+            )
+        except BadRequest as e:
+            if "Message is not modified" not in str(e):
+                raise
+        return
+
+    if status == "closed":
+        await query.answer("Голосование уже закрыто")
+        return
+    if status == "wrong_chat":
+        await query.answer("Это голосование работает только в модераторском чате")
+        return
+    await query.answer("Не удалось учесть голос")

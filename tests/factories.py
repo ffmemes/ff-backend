@@ -7,6 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from src.database import (
     meme,
     meme_source,
+    meme_source_candidate,
+    meme_source_candidate_poll,
+    meme_source_candidate_vote,
     meme_source_stats,
     meme_stats,
     user,
@@ -209,6 +212,19 @@ async def create_user_stats(
 
 async def cleanup_test_data(conn: AsyncConnection) -> None:
     """Delete all test data (id >= 10000) in correct FK order."""
+    await conn.execute(
+        delete(meme_source_candidate_vote).where(
+            meme_source_candidate_vote.c.user_id >= TEST_ID_START
+        )
+    )
+    await conn.execute(
+        delete(meme_source_candidate_poll).where(
+            meme_source_candidate_poll.c.candidate_id >= TEST_ID_START
+        )
+    )
+    await conn.execute(
+        delete(meme_source_candidate).where(meme_source_candidate.c.id >= TEST_ID_START)
+    )
     await conn.execute(delete(meme_stats).where(meme_stats.c.meme_id >= TEST_ID_START))
     await conn.execute(
         delete(meme_source_stats).where(meme_source_stats.c.meme_source_id >= TEST_ID_START)

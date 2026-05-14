@@ -8,8 +8,14 @@
 
 ## Manual upload & moderation workflow
 - User uploads arrive via the upload handler, then `uploaded_meme_auto_review` in [`src/tgbot/handlers/upload/moderation.py`](src/tgbot/handlers/upload/moderation.py) downloads the submission, watermarks it, and sends it to the storage chat.
-- After preprocessing, `send_uploaded_meme_to_manual_review` posts the media into the moderator chat (`settings.UPLOADED_MEMES_REVIEW_CHAT_ID`) with approve/reject buttons. Moderators interact in that chat to complete review.
-- `handle_uploaded_meme_review_button` enforces moderator-only review, updates meme status (`OK` or `REJECTED`), handles payouts, and sends outcome notifications back to the uploader. Approved memes automatically receive "like" reactions from both the uploader and reviewer to seed downstream stats.
+- After preprocessing, `send_uploaded_meme_to_manual_review` posts the media into the upload review chat (`settings.UPLOADED_MEMES_REVIEW_CHAT_ID`) with approve/reject buttons. People in that chat interact with the buttons to complete review.
+- `handle_uploaded_meme_review_button` accepts review callbacks only from the upload review chat, updates meme status (`OK` or `REJECTED`), handles payouts, and sends outcome notifications back to the uploader. Approved memes automatically receive "like" reactions from both the uploader and reviewer to seed downstream stats.
+
+## Moderator source scouting vocabulary
+- The canonical domain vocabulary is in [`CONTEXT.md`](CONTEXT.md), in Russian. Use those terms when discussing moderator/community/source flows.
+- Keep the moderator community chat (`TELEGRAM_MODERATOR_CHAT_ID`) separate from the upload review chat (`UPLOADED_MEMES_REVIEW_CHAT_ID`).
+- The daily source-voting design is in [`specs/moderator-community-loop.md`](specs/moderator-community-loop.md). It uses "подготовленный источник": a `meme_source` parked in `in_moderation` with cached raw Telegram posts, not visible to users until the source vote passes.
+- When implementing prepared sources, the Telegram ETL must only transform raw posts for `meme_source.status = 'parsing_enabled'`; this guard prevents pre-parsed candidates from leaking into recommendations before a successful vote.
 
 ## Recommendation queue generation
 - Recommendation queues are stored in Redis; see [`src/recommendations/meme_queue.py`](src/recommendations/meme_queue.py) for helper utilities.
@@ -19,8 +25,9 @@
 - User reactions are persisted through `create_user_meme_reaction` / `update_user_meme_reaction` (see [`src/recommendations/service.py`](src/recommendations/service.py)). These records drive `calculate_meme_reactions_stats` and related counters, which in turn update meme statuses and recommendation eligibility.
 
 ## Operational notes
-- Manual review happens entirely inside the designated Telegram moderator chat. Keep communications and escalations there for traceability.
+- Manual upload review happens entirely inside the designated Telegram upload review chat. Keep communications and escalations there for traceability.
 - Weekly maintenance (Prefect flow health checks, data hygiene jobs, etc.) runs through Prefect deployment definitions. Use Prefect CLI to trigger flows during scheduled operations.
+- Paperclip inspection should use the project-local CLI skill at `.codex/skills/paperclip/SKILL.md` and wrapper `.codex/paperclip-tools/paperclipai-ffmemes.sh`. Do not enable Paperclip MCP globally; it adds a large always-on tool surface.
 
 ## Describe Memes (OpenRouter Vision)
 

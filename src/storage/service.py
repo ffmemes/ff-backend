@@ -304,7 +304,12 @@ async def get_pending_memes(limit: int = 500) -> list[dict[str, Any]]:
     return await fetch_all(select_query)
 
 
-async def get_unloaded_tg_memes(limit) -> list[dict[str, Any]]:
+async def get_unloaded_tg_memes(
+    limit: int,
+    meme_source_ids: list[int] | None = None,
+    *,
+    fresh_only: bool = True,
+) -> list[dict[str, Any]]:
     """Returns memes from Telegram, that have not been yet uploaded to Telegram."""
 
     select_query = f"""
@@ -316,6 +321,7 @@ async def get_unloaded_tg_memes(limit) -> list[dict[str, Any]]:
         INNER JOIN meme_source
             ON meme_source.id = meme.meme_source_id
             AND meme_source.type = 'telegram'
+            AND meme_source.status = 'parsing_enabled'
         INNER JOIN meme_raw_telegram MRT
             ON MRT.id = meme.raw_meme_id
             AND MRT.meme_source_id = meme.meme_source_id
@@ -325,11 +331,25 @@ async def get_unloaded_tg_memes(limit) -> list[dict[str, Any]]:
                 OR meme.status = 'broken_content_link'
             )
             AND MRT.media->0->>'url' IS NOT NULL
-            AND COALESCE(MRT.updated_at, MRT.created_at) >= NOW() - INTERVAL '24 hours'
+            AND (
+                NOT :filter_meme_source_ids
+                OR meme.meme_source_id = ANY(:meme_source_ids)
+            )
+            AND (
+                NOT :fresh_only
+                OR COALESCE(MRT.updated_at, MRT.created_at) >= NOW() - INTERVAL '24 hours'
+            )
         ORDER BY meme.published_at DESC
         LIMIT {limit}
     """
-    return await fetch_all(text(select_query))
+    return await fetch_all(
+        text(select_query),
+        {
+            "filter_meme_source_ids": meme_source_ids is not None,
+            "meme_source_ids": meme_source_ids or [],
+            "fresh_only": fresh_only,
+        },
+    )
 
 
 async def get_unloaded_vk_memes(limit: int) -> list[dict[str, Any]]:
