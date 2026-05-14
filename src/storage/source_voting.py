@@ -153,6 +153,14 @@ async def prepare_source_candidate(
         source = await fetch_one(
             select(meme_source).where(meme_source.c.id == candidate["promoted_meme_source_id"])
         )
+        if source and source["status"] == MemeSourceStatus.PARSING_ENABLED.value:
+            await _mark_candidate(
+                candidate_id,
+                status=CANDIDATE_STATUS_PROMOTED,
+                promoted_meme_source_id=source["id"],
+                expected_status=CANDIDATE_STATUS_PREPARED,
+            )
+            return {"status": "already_enabled", "candidate": candidate, "source": source}
         return {"status": "prepared", "candidate": candidate, "source": source}
     if candidate["status"] != CANDIDATE_STATUS_DISCOVERED:
         return {"status": candidate["status"], "candidate": candidate, "source": None}
@@ -499,15 +507,25 @@ async def select_daily_source_candidate() -> dict[str, Any] | None:
             """
             SELECT c.*
             FROM meme_source_candidate c
-            WHERE c.status = 'discovered'
+            WHERE c.status IN ('discovered', 'prepared')
               AND c.type = 'telegram'
-              AND NOT EXISTS (
-                  SELECT 1 FROM meme_source ms WHERE ms.url = c.url
-              )
               AND NOT EXISTS (
                   SELECT 1
                   FROM meme_source_candidate_poll p
                   WHERE p.candidate_id = c.id
+                    AND p.status IN (
+                        'draft',
+                        'open',
+                        'passed',
+                        'rejected',
+                        'expired_no_quorum'
+                    )
+              )
+              AND (
+                  c.status = 'prepared'
+                  OR NOT EXISTS (
+                      SELECT 1 FROM meme_source ms WHERE ms.url = c.url
+                  )
               )
             ORDER BY c.times_forwarded DESC, c.last_seen_at DESC
             LIMIT 1
@@ -606,12 +624,78 @@ async def cancel_source_candidate_poll(poll_id: int) -> dict[str, Any] | None:
     return await _set_poll_status(poll_id, status=POLL_STATUS_CANCELLED)
 
 
+async def post_source_candidate_poll_message(
+    bot: Bot,
+    poll: dict[str, Any],
+    *,
+    now: datetime | None = None,
+    prepared: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    now = now or _utcnow()
+    candidate = await fetch_one(
+        select(meme_source_candidate).where(meme_source_candidate.c.id == poll["candidate_id"])
+    )
+    if candidate is None:
+        await cancel_source_candidate_poll(poll["id"])
+        return {"status": "candidate_not_found", "poll": poll}
+
+    source_id = poll["prepared_meme_source_id"] or candidate["promoted_meme_source_id"]
+    if source_id is None:
+        await cancel_source_candidate_poll(poll["id"])
+        return {"status": "prepared_source_not_found", "poll": poll, "candidate": candidate}
+
+    source = await fetch_one(select(meme_source).where(meme_source.c.id == source_id))
+    if source is None:
+        await cancel_source_candidate_poll(poll["id"])
+        return {"status": "prepared_source_not_found", "poll": poll, "candidate": candidate}
+
+    if poll["message_id"]:
+        opened = await mark_source_candidate_poll_open(
+            poll["id"],
+            message_id=poll["message_id"],
+            opened_at=now,
+        )
+        return {
+            "status": "opened_existing_message",
+            "poll": opened or await get_source_candidate_poll(poll["id"]),
+            "candidate": candidate,
+            "prepared": prepared or {"source": source},
+        }
+
+    message = await bot.send_message(
+        chat_id=TELEGRAM_MODERATOR_CHAT_ID,
+        text=format_source_candidate_poll_message(candidate, prepared or {"source": source}),
+        reply_markup=source_candidate_vote_keyboard(poll["id"]),
+        disable_web_page_preview=True,
+    )
+    opened = await mark_source_candidate_poll_open(
+        poll["id"],
+        message_id=message.message_id,
+        opened_at=now,
+    )
+    return {
+        "status": "posted",
+        "poll": opened or await get_source_candidate_poll(poll["id"]),
+        "candidate": candidate,
+        "prepared": prepared or {"source": source},
+    }
+
+
 async def post_new_source_candidate_poll(
     bot: Bot,
     *,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     now = now or _utcnow()
+    draft_poll = await fetch_one(
+        select(meme_source_candidate_poll)
+        .where(meme_source_candidate_poll.c.status == POLL_STATUS_DRAFT)
+        .order_by(meme_source_candidate_poll.c.created_at.asc())
+        .limit(1)
+    )
+    if draft_poll is not None:
+        return await post_source_candidate_poll_message(bot, draft_poll, now=now)
+
     candidate = await select_daily_source_candidate()
     if candidate is None:
         return {"status": "no_candidate"}
@@ -619,6 +703,8 @@ async def post_new_source_candidate_poll(
     prepared = await prepare_source_candidate(candidate["id"])
     if prepared["status"] != "prepared":
         return {"status": prepared["status"], "candidate": candidate, "prepared": prepared}
+    if prepared["source"] is None:
+        return {"status": "prepared_source_not_found", "candidate": candidate, "prepared": prepared}
 
     poll = await create_source_candidate_poll(
         candidate["id"],
@@ -629,23 +715,7 @@ async def post_new_source_candidate_poll(
     if poll is None:
         return {"status": "poll_create_failed", "candidate": candidate}
 
-    try:
-        message = await bot.send_message(
-            chat_id=TELEGRAM_MODERATOR_CHAT_ID,
-            text=format_source_candidate_poll_message(candidate, prepared),
-            reply_markup=source_candidate_vote_keyboard(poll["id"]),
-            disable_web_page_preview=True,
-        )
-    except Exception:
-        await cancel_source_candidate_poll(poll["id"])
-        raise
-
-    opened = await mark_source_candidate_poll_open(
-        poll["id"],
-        message_id=message.message_id,
-        opened_at=now,
-    )
-    return {"status": "posted", "poll": opened, "candidate": candidate, "prepared": prepared}
+    return await post_source_candidate_poll_message(bot, poll, now=now, prepared=prepared)
 
 
 async def get_unreported_source_vote(now: datetime | None = None) -> dict[str, Any] | None:
@@ -776,6 +846,13 @@ async def advance_daily_source_cycle(
 
     active_poll = await get_active_source_candidate_poll()
     if active_poll is not None:
+        if active_poll["status"] == POLL_STATUS_DRAFT:
+            result["new_poll"] = await post_source_candidate_poll_message(
+                bot,
+                active_poll,
+                now=now,
+            )
+            return result
         result["new_poll"] = {"status": "active_poll_exists", "poll": active_poll}
         return result
 

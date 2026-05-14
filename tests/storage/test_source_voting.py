@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -23,8 +24,10 @@ from src.storage.source_voting import (
     POLL_STATUS_PASSED,
     VOTE_ADD_SOURCE,
     VOTE_SKIP_SOURCE,
+    advance_daily_source_cycle,
     close_source_candidate_poll,
     create_source_candidate_poll,
+    post_new_source_candidate_poll,
     prepare_source_candidate,
     record_source_candidate_vote,
 )
@@ -225,3 +228,56 @@ async def test_close_passed_poll_enables_prepared_source_without_reparsing(
         select(meme_source_candidate).where(meme_source_candidate.c.id == CANDIDATE_ID)
     )
     assert candidate["status"] == "promoted"
+
+
+@pytest.mark.asyncio
+async def test_post_new_source_candidate_poll_retries_prepared_candidate_after_send_failure(
+    conn: AsyncConnection,
+):
+    await _create_candidate(conn)
+    await conn.commit()
+    bot = SimpleNamespace(
+        send_message=AsyncMock(
+            side_effect=[
+                RuntimeError("telegram is temporarily unavailable"),
+                SimpleNamespace(message_id=555),
+            ]
+        )
+    )
+
+    with patch(
+        "src.storage.source_voting.fetch_telegram_candidate_posts",
+        new=AsyncMock(return_value=[_post(4005)]),
+    ) as fetch_posts:
+        with pytest.raises(RuntimeError):
+            await post_new_source_candidate_poll(bot, now=datetime.utcnow())
+
+        result = await post_new_source_candidate_poll(bot, now=datetime.utcnow())
+
+    assert result["status"] == "posted"
+    assert result["poll"]["message_id"] == 555
+    assert result["poll"]["status"] == POLL_STATUS_OPEN
+    assert bot.send_message.await_count == 2
+    fetch_posts.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_daily_source_cycle_resumes_existing_draft_poll(conn: AsyncConnection):
+    await _create_candidate(conn)
+    await conn.commit()
+    prepared = await prepare_source_candidate(CANDIDATE_ID, posts=[_post(4006)])
+    poll = await create_source_candidate_poll(
+        CANDIDATE_ID,
+        prepared_meme_source_id=prepared["source"]["id"],
+        chat_id=TELEGRAM_MODERATOR_CHAT_ID,
+        now=datetime.utcnow(),
+    )
+    bot = SimpleNamespace(send_message=AsyncMock(return_value=SimpleNamespace(message_id=556)))
+
+    result = await advance_daily_source_cycle(bot, now=datetime.utcnow())
+
+    assert result["new_poll"]["status"] == "posted"
+    assert result["new_poll"]["poll"]["id"] == poll["id"]
+    assert result["new_poll"]["poll"]["message_id"] == 556
+    assert result["new_poll"]["poll"]["status"] == POLL_STATUS_OPEN
+    bot.send_message.assert_awaited_once()
