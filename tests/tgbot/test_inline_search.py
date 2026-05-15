@@ -29,6 +29,9 @@ async def test_inline_search_uses_old_new_ocr_and_openrouter_description(monkeyp
     assert "% :search_query" in captured["query"]
     assert "LEFT JOIN meme_stats MS" in captured["query"]
     assert "AS inline_quality_score" in captured["query"]
+    assert "(COALESCE(MS.nlikes, 0) + 1.)" in captured["query"]
+    assert "COALESCE(MS.nlikes, 0) + COALESCE(MS.ndislikes, 0) + 2" in captured["query"]
+    assert "NULLIF(MS.nlikes + MS.ndislikes + 1, 0)" not in captured["query"]
     assert "ORDER BY inline_search_score DESC, inline_quality_score DESC" in captured["query"]
     assert captured["params"] == {
         "search_query": "деньги",
