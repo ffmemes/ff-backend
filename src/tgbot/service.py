@@ -235,20 +235,30 @@ async def promote_source_candidate(
     return promoted
 
 
+def _escape_like_pattern(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 async def search_memes_for_inline_query(search_query: str, limit: int) -> list[dict[str, Any]]:
     limit = max(1, min(limit, 50))
+    search_pattern = f"%{_escape_like_pattern(search_query)}%"
     select_query = """
         SELECT
             M.*,
             GREATEST(
-                CASE WHEN M.ocr_result ->> 'text' ILIKE :search_pattern THEN 1.0 ELSE 0.0 END,
                 CASE
-                    WHEN M.ocr_result -> 'raw_result' ->> 'ocr_text' ILIKE :search_pattern
+                    WHEN M.ocr_result ->> 'text' ILIKE :search_pattern ESCAPE '\\'
                     THEN 1.0
                     ELSE 0.0
                 END,
                 CASE
-                    WHEN M.ocr_result ->> 'description' ILIKE :search_pattern
+                    WHEN M.ocr_result -> 'raw_result' ->> 'ocr_text'
+                        ILIKE :search_pattern ESCAPE '\\'
+                    THEN 1.0
+                    ELSE 0.0
+                END,
+                CASE
+                    WHEN M.ocr_result ->> 'description' ILIKE :search_pattern ESCAPE '\\'
                     THEN 0.9
                     ELSE 0.0
                 END,
@@ -264,9 +274,10 @@ async def search_memes_for_inline_query(search_query: str, limit: int) -> list[d
             AND M.type = :type
             AND M.telegram_file_id IS NOT NULL
             AND (
-                M.ocr_result ->> 'text' ILIKE :search_pattern
-                OR M.ocr_result -> 'raw_result' ->> 'ocr_text' ILIKE :search_pattern
-                OR M.ocr_result ->> 'description' ILIKE :search_pattern
+                M.ocr_result ->> 'text' ILIKE :search_pattern ESCAPE '\\'
+                OR M.ocr_result -> 'raw_result' ->> 'ocr_text'
+                    ILIKE :search_pattern ESCAPE '\\'
+                OR M.ocr_result ->> 'description' ILIKE :search_pattern ESCAPE '\\'
                 OR (M.ocr_result ->> 'text') % :search_query
                 OR (M.ocr_result -> 'raw_result' ->> 'ocr_text') % :search_query
                 OR (M.ocr_result ->> 'description') % :search_query
@@ -280,7 +291,7 @@ async def search_memes_for_inline_query(search_query: str, limit: int) -> list[d
         select_statement,
         {
             "search_query": search_query,
-            "search_pattern": f"%{search_query}%",
+            "search_pattern": search_pattern,
             "status": MemeStatus.OK.value,
             "type": MemeType.IMAGE.value,
             "limit": limit,
