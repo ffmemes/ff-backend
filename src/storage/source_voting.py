@@ -634,6 +634,13 @@ async def post_source_candidate_poll_message(
     prepared: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     now = now or _utcnow()
+    if poll["chat_id"] != TELEGRAM_MODERATOR_CHAT_ID:
+        await cancel_source_candidate_poll(poll["id"])
+        return {
+            "status": "wrong_chat_target",
+            "poll": await get_source_candidate_poll(poll["id"]) or poll,
+        }
+
     candidate = await fetch_one(
         select(meme_source_candidate).where(meme_source_candidate.c.id == poll["candidate_id"])
     )

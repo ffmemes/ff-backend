@@ -315,7 +315,9 @@ async def test_daily_source_cycle_resumes_existing_draft_poll(conn: AsyncConnect
 
 
 @pytest.mark.asyncio
-async def test_post_source_candidate_poll_message_uses_poll_chat_id(conn: AsyncConnection):
+async def test_post_source_candidate_poll_message_cancels_non_moderator_poll(
+    conn: AsyncConnection,
+):
     await _create_candidate(conn)
     await conn.commit()
     prepared = await prepare_source_candidate(CANDIDATE_ID, posts=[_post(4011)])
@@ -330,6 +332,6 @@ async def test_post_source_candidate_poll_message_uses_poll_chat_id(conn: AsyncC
 
     result = await post_source_candidate_poll_message(bot, poll, now=datetime.utcnow())
 
-    assert result["status"] == "posted"
-    sent_kwargs = bot.send_message.await_args.kwargs
-    assert sent_kwargs["chat_id"] == custom_chat_id
+    assert result["status"] == "wrong_chat_target"
+    bot.send_message.assert_not_awaited()
+    assert result["poll"]["status"] == "cancelled"
