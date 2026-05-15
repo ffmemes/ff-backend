@@ -13,7 +13,8 @@ User reacts -> handle_reaction() -> update_user_meme_reaction()
 Key files:
 - [`src/recommendations/candidates.py`](../src/recommendations/candidates.py) — SQL engines + CandidatesRetriever
 - [`src/recommendations/blender.py`](../src/recommendations/blender.py) — weighted random sampling
-- [`src/recommendations/meme_queue.py`](../src/recommendations/meme_queue.py) — queue check/refill/maturity routing
+- [`src/recommendations/pipeline.py`](../src/recommendations/pipeline.py) — batch selection pipeline + diagnostics
+- [`src/recommendations/meme_queue.py`](../src/recommendations/meme_queue.py) — Redis queue adapter and refill lock
 - [`src/recommendations/service.py`](../src/recommendations/service.py) — reaction persistence, reaction_exists check
 
 ## Engines (current, as of `candidates.py` engine_map)
@@ -36,12 +37,18 @@ Removed engines: `fast_dopamine`, `classic`, `multiply_all_scores`, `selected_so
 
 | Stage | Trigger | Engines | Source |
 |-------|---------|---------|--------|
-| Cold start | nmemes_sent < 30 | 3-phase adaptive with text-light guards: explore/adapt/fallback avoid OCR text above 30 words | [`meme_queue.py`](../src/recommendations/meme_queue.py) |
-| Growing | 30-100 | A/B: control uses `lr_smoothed`; treatment swaps that slot to `text_light_lr_smoothed` | [`meme_queue.py`](../src/recommendations/meme_queue.py) |
-| Mature | 100+ | Recently-liked blender v2, then A/B text-light overlay can swap `lr_smoothed` to `text_light_lr_smoothed` | [`meme_queue.py`](../src/recommendations/meme_queue.py) |
-| Moderator/Admin | user_type check | 75% low_sent_pool + 25% regular (by maturity) | [`meme_queue.py`](../src/recommendations/meme_queue.py) |
+| Cold start | nmemes_sent < 30 | 3-phase adaptive with text-light guards: explore/adapt/fallback avoid OCR text above 30 words | [`pipeline.py`](../src/recommendations/pipeline.py) |
+| Growing | 30-100 | A/B: control uses `lr_smoothed`; treatment swaps that slot to `text_light_lr_smoothed` | [`pipeline.py`](../src/recommendations/pipeline.py) |
+| Mature | 100+ | Recently-liked blender v2, then A/B text-light overlay can swap `lr_smoothed` to `text_light_lr_smoothed` | [`pipeline.py`](../src/recommendations/pipeline.py) |
+| Moderator/Admin | user_type check | 75% low_sent_pool + 25% regular (by maturity) | [`pipeline.py`](../src/recommendations/pipeline.py) |
 
 `fixed_pos={0: "lr_smoothed"}` forces first position to `lr_smoothed` in blended mode. In the `text_light_blender_v1` treatment, that fixed slot becomes `text_light_lr_smoothed`.
+
+## Diagnostics Refactor
+
+`RecommendationBatchDiagnostics` is the measurement seam for recommendation generation. Every batch emits compact diagnostics through structured logs and Sentry spans. Successful batches may include sampled full diagnostics; failures and engine errors always include full diagnostics for debugging.
+
+Realtime performance data is not stored in Postgres. Queue payloads stay backwards-compatible, with diagnostics carried out-of-band from Redis queue entries. Source diversity and shadow scoring remain behind flags and do not change ranking by default. A future Grafana/Prometheus adapter can attach at the diagnostics seam without changing recommendation behavior.
 
 ## Known Bugs
 

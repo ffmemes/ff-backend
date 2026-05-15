@@ -109,6 +109,24 @@ def plan_candidate_selection(nmemes_sent: int) -> CandidateSelectionPlan:
     )
 
 
+def plan_candidate_selection_for_user(
+    nmemes_sent: int,
+    nsessions: int | None,
+    cold_start_nsessions_gate_enabled: bool,
+    limit: int | None = None,
+) -> CandidateSelectionPlan:
+    """Plan candidate selection with the production cold-start session gate.
+
+    ``limit`` is accepted for batch-pipeline call sites that already carry it;
+    candidate selection currently depends only on maturity and session count.
+    """
+    _ = limit
+    if cold_start_nsessions_gate_enabled and (nsessions or 0) > 1 and nmemes_sent < 30:
+        return plan_candidate_selection(30)
+
+    return plan_candidate_selection(nmemes_sent)
+
+
 def low_sent_quota(limit: int, user_type: str | None) -> int:
     value = getattr(user_type, "value", user_type)
     if value is None or str(value) not in MODERATOR_USER_TYPES:

@@ -1,9 +1,6 @@
 import logging
 import uuid
-from math import ceil
 from typing import Any, Optional
-
-from sqlalchemy import text
 
 from src import redis
 from src.config import settings
@@ -17,7 +14,11 @@ from src.recommendations.blender_experiments import (
 from src.recommendations.candidates import (
     CandidatesRetriever,
 )
-from src.recommendations.utils import exclude_meme_ids_sql_filter
+from src.recommendations.pipeline import (
+    RecommendationBatchPipeline,
+    RecommendationBatchRequest,
+    record_recommendation_batch_diagnostics,
+)
 from src.storage.schemas import MemeData
 from src.tgbot.constants import UserType
 from src.tgbot.user_info import get_user_info
@@ -42,6 +43,12 @@ async def has_memes_in_queue(user_id: int) -> bool:
 async def clear_meme_queue_for_user(user_id: int) -> None:
     queue_key = redis.get_meme_queue_key(user_id)
     await redis.delete_by_key(queue_key)
+
+
+def _trim_error_message(value: str, limit: int = 300) -> str:
+    if len(value) <= limit:
+        return value
+    return value[: limit - 3] + "..."
 
 
 async def check_queue(user_id: int) -> bool:
@@ -85,14 +92,6 @@ async def generate_recommendations(
     retriever: Optional[CandidatesRetriever] = None,
     random_seed: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Uses blender to mix candidates from different engines
-
-    The function aims to keep the same logic as generate_candidates but
-    with blending.
-
-    Will be refactored
-    """
-
     user_info = await get_user_info(user_id)
     if nmemes_sent is None:
         nmemes_sent = user_info["nmemes_sent"]
@@ -104,169 +103,11 @@ async def generate_recommendations(
 
     queue_key = redis.get_meme_queue_key(user_id)
 
-    meme_ids_in_queue = []
     memes_in_queue = await redis.get_all_memes_in_queue_by_key(queue_key)
     meme_ids_in_queue = [meme["id"] for meme in memes_in_queue]
 
     if retriever is None:
         retriever = CandidatesRetriever()
-
-    async def get_low_sent_candidates(
-        user_id: int, limit: int, exclude_ids: list[int]
-    ) -> list[dict[str, Any]]:
-        if limit <= 0:
-            return []
-
-        query = f"""
-            SELECT
-                M.id,
-                M.type,
-                M.telegram_file_id,
-                M.caption,
-                'low_sent_pool' AS recommended_by,
-                COALESCE(MS.nlikes, 0) AS nlikes
-            FROM meme M
-            LEFT JOIN meme_stats MS
-                ON MS.meme_id = M.id
-            LEFT JOIN user_meme_reaction R
-                ON R.user_id = :user_id
-                AND R.meme_id = M.id
-            INNER JOIN user_language UL
-                ON UL.user_id = :user_id
-                AND UL.language_code = M.language_code
-            WHERE 1=1
-                AND M.status = 'ok'
-                AND R.meme_id IS NULL
-                {exclude_meme_ids_sql_filter(exclude_ids)}
-            ORDER BY COALESCE(MS.nmemes_sent, 0), M.id
-            LIMIT :limit
-        """
-        params: dict = {"user_id": user_id, "limit": limit}
-        if exclude_ids:
-            params["exclude_meme_ids"] = exclude_ids
-
-        return await fetch_all(text(query), params)
-
-    async def get_candidates(
-        user_id,
-        limit,
-        use_recently_liked_blender_v2: bool = True,
-        use_text_light_blender_v1: bool = True,
-    ):
-        """Route to the right engine mix based on user maturity.
-
-        Cold start (<30 memes) uses 3-phase adaptive approach:
-          Phase 1 (0-5):  Quality-first — top-liked memes with social proof
-                          (>=20 reactions, lr_smoothed >= 0.10)
-          Phase 2 (6-15): Adapt — weight sources by user's raw reactions
-          Phase 3 (16-30): Transition — blend adapt + growing engines
-
-        Fallback chain: phase engine -> lr_smoothed -> best_uploaded_memes
-
-        FFM-1161: when COLD_START_NSESSIONS_GATE_ENABLED, cold_start is only
-        used for first-session users (nsessions <= 1). Dormant returners
-        (nsessions >= 2, nmemes_sent < 30) fall through to the growing-user
-        blender below — they have stale signal, not zero signal.
-        """
-
-        in_cold_start_window = nmemes_sent < 30
-        if settings.COLD_START_NSESSIONS_GATE_ENABLED:
-            in_cold_start_window = in_cold_start_window and nsessions <= 1
-
-        # Cold start: 3-phase adaptive
-        if in_cold_start_window:
-            if nmemes_sent < 6:
-                # Phase 1: diverse exploration from top sources
-                engine = "cold_start_explore"
-            elif nmemes_sent < 16:
-                # Phase 2: adapt to user's reactions in real-time
-                engine = "cold_start_adapt"
-            else:
-                # Phase 3: transition — blend adapt with growing engines
-                weights = {
-                    "cold_start_adapt": 0.5,
-                    "text_light_lr_smoothed": 0.3,
-                    "like_spread_and_recent_memes": 0.2,
-                }
-                candidates_dict = await retriever.get_candidates_dict(
-                    weights.keys(), user_id, limit, exclude_mem_ids=meme_ids_in_queue
-                )
-                fixed_pos = {0: "cold_start_adapt"}
-                blended = blend(candidates_dict, weights, fixed_pos, limit, random_seed)
-                if blended:
-                    return blended
-                # fallback if blend is empty
-                engine = "cold_start_adapt"
-
-            candidates = await retriever.get_candidates(
-                engine, user_id, limit, exclude_mem_ids=meme_ids_in_queue
-            )
-
-            # Fallback chain: -> lr_smoothed -> best_uploaded_memes
-            if len(candidates) == 0:
-                logging.info(
-                    "Cold start %s empty for user %s, falling back to text_light_lr_smoothed",
-                    engine,
-                    user_id,
-                )
-                candidates = await retriever.get_candidates(
-                    "text_light_lr_smoothed",
-                    user_id,
-                    limit,
-                    exclude_mem_ids=meme_ids_in_queue,
-                    min_sends=10,
-                )
-
-            if len(candidates) == 0:
-                candidates = await retriever.get_candidates(
-                    "best_uploaded_memes", user_id, limit, exclude_mem_ids=meme_ids_in_queue
-                )
-
-            return candidates
-
-        if nmemes_sent < 100:
-            weights = {
-                "best_uploaded_memes": 0.1,
-                "lr_smoothed": 0.3,
-                "recently_liked": 0.2,
-                "goat": 0.1,
-                "es_ranked": 0.1,
-                "like_spread_and_recent_memes": 0.2,
-            }
-            if use_text_light_blender_v1:
-                weights = await get_text_light_blender_v1_weights(user_id, weights)
-
-            candidates_dict = await retriever.get_candidates_dict(
-                weights.keys(), user_id, limit, exclude_mem_ids=meme_ids_in_queue
-            )
-
-            fixed_engine = (
-                "text_light_lr_smoothed" if "text_light_lr_smoothed" in weights else "lr_smoothed"
-            )
-            fixed_pos = {0: fixed_engine}
-            return blend(candidates_dict, weights, fixed_pos, limit, random_seed)
-
-        # >=100. Regular mature users enter the LR-stratified recently_liked
-        # blender v2 A/B. Moderator/admin traffic keeps baseline weights because
-        # their low_sent_pool quota would confound the experiment read.
-        if use_recently_liked_blender_v2:
-            weights = await get_recently_liked_blender_v2_weights(user_id)
-            if use_text_light_blender_v1:
-                weights = await get_text_light_blender_v1_weights(user_id, weights)
-        else:
-            weights = dict(MATURE_BLENDER_CONTROL_WEIGHTS)
-
-        candidates_dict = await retriever.get_candidates_dict(
-            weights.keys(), user_id, limit, exclude_mem_ids=meme_ids_in_queue
-        )
-
-        fixed_engine = (
-            "text_light_lr_smoothed" if "text_light_lr_smoothed" in weights else "lr_smoothed"
-        )
-        fixed_pos = {0: fixed_engine}
-        candidates = blend(candidates_dict, weights, fixed_pos, limit, random_seed)
-
-        return candidates
 
     user_type_value = user_info.get("type")
     user_type = None
@@ -280,68 +121,42 @@ async def generate_recommendations(
                 user_id,
             )
 
-    candidates: list[dict[str, Any]] = []
-
-    if user_type in (UserType.MODERATOR, UserType.ADMIN):
-        low_sent_quota = ceil(limit * 0.75)
-        low_sent_candidates = await get_low_sent_candidates(
-            user_id,
-            low_sent_quota,
-            meme_ids_in_queue,
+    pipeline = RecommendationBatchPipeline(
+        retriever=retriever,
+        blend_func=blend,
+        fetch_all_func=fetch_all,
+        mature_weights_func=get_recently_liked_blender_v2_weights,
+        text_light_weights_func=get_text_light_blender_v1_weights,
+        mature_control_weights=MATURE_BLENDER_CONTROL_WEIGHTS,
+    )
+    result = await pipeline.run(
+        RecommendationBatchRequest(
+            user_id=user_id,
+            limit=limit,
+            nmemes_sent=nmemes_sent,
+            nsessions=nsessions,
+            user_type=None if user_type is None else user_type.value,
+            meme_ids_in_queue=meme_ids_in_queue,
+            random_seed=random_seed,
+            cold_start_nsessions_gate_enabled=settings.COLD_START_NSESSIONS_GATE_ENABLED,
+            text_light_blender_v1_enabled=True,
+            source_diversity_enabled=settings.RECOMMENDATION_SOURCE_DIVERSITY_ENABLED,
+            shadow_scoring_enabled=settings.RECOMMENDATION_SHADOW_SCORING_ENABLED,
+            diagnostics_sample_rate=settings.RECOMMENDATION_DIAGNOSTICS_SAMPLE_RATE,
         )
-        candidates.extend(low_sent_candidates)
-        meme_ids_in_queue.extend(candidate["id"] for candidate in low_sent_candidates)
+    )
+    candidates = result.selected
 
-        remaining_limit = max(0, limit - len(candidates))
-        if remaining_limit > 0:
-            extra_candidates = await get_candidates(
-                user_id,
-                remaining_limit,
-                use_recently_liked_blender_v2=False,
-                use_text_light_blender_v1=False,
-            )
-            candidates.extend(extra_candidates)
+    try:
+        if len(candidates) > 0:
+            await redis.add_memes_to_queue_by_key(queue_key, candidates)
+            result.diagnostics.enqueued_count = len(candidates)
+    except Exception as error:
+        result.diagnostics.outcome = "enqueue_failure"
+        result.diagnostics.error_type = type(error).__name__
+        result.diagnostics.error_message = _trim_error_message(str(error))
+        record_recommendation_batch_diagnostics(result.diagnostics, force_full=True)
+        raise
 
-        # Last resort: if both pools are empty, fetch ANY unseen meme
-        if len(candidates) == 0:
-            exclude_ids = meme_ids_in_queue
-            fallback_query = f"""
-                SELECT
-                    M.id,
-                    M.type,
-                    M.telegram_file_id,
-                    M.caption,
-                    'last_resort' AS recommended_by,
-                    COALESCE(MS.nlikes, 0) AS nlikes
-                FROM meme M
-                LEFT JOIN meme_stats MS
-                    ON MS.meme_id = M.id
-                LEFT JOIN user_meme_reaction R
-                    ON R.user_id = :user_id
-                    AND R.meme_id = M.id
-                INNER JOIN user_language UL
-                    ON UL.user_id = :user_id
-                    AND UL.language_code = M.language_code
-                WHERE M.status = 'ok'
-                    AND R.meme_id IS NULL
-                    {exclude_meme_ids_sql_filter(exclude_ids)}
-                ORDER BY M.id DESC
-                LIMIT :limit
-            """
-            params: dict = {"user_id": user_id, "limit": limit}
-            if exclude_ids:
-                params["exclude_meme_ids"] = exclude_ids
-            candidates = await fetch_all(text(fallback_query), params)
-            if candidates:
-                logging.info(
-                    "Moderator user %s: low_sent + blender empty, last_resort found %d memes",
-                    user_id,
-                    len(candidates),
-                )
-    else:
-        candidates = await get_candidates(user_id, limit)
-
-    if len(candidates) > 0:
-        await redis.add_memes_to_queue_by_key(queue_key, candidates)
-
+    record_recommendation_batch_diagnostics(result.diagnostics)
     return candidates

@@ -54,6 +54,13 @@ class Config(BaseSettings):
     # sessions fall through to the growing-user blender instead.
     COLD_START_NSESSIONS_GATE_ENABLED: bool = False
 
+    # Recommendation batch diagnostics are realtime operational data, not
+    # durable product facts. Keep compact logs/spans always on and sample full
+    # payloads so future Prometheus/Grafana adapters can reuse the same seam.
+    RECOMMENDATION_DIAGNOSTICS_SAMPLE_RATE: float = 0.01
+    RECOMMENDATION_SOURCE_DIVERSITY_ENABLED: bool = False
+    RECOMMENDATION_SHADOW_SCORING_ENABLED: bool = True
+
     PREFECT_API_URL: str | None = None
     PREFECT_AUTH_STRING: str | None = None
 
