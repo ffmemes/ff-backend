@@ -41,6 +41,11 @@ def mock_redis():
             "src.recommendations.meme_queue.redis.add_memes_to_queue_by_key",
             new_callable=AsyncMock,
         ),
+        patch(
+            "src.recommendations.meme_queue.get_text_light_blender_v1_weights",
+            new_callable=AsyncMock,
+            side_effect=lambda user_id, weights: weights,
+        ),
     ):
         yield
 
@@ -80,13 +85,13 @@ async def test_cold_start_phase1_uses_explore():
 
 
 @pytest.mark.asyncio
-async def test_cold_start_phase1_fallback_to_lr_smoothed():
-    """Phase 1 empty → fallback to lr_smoothed"""
+async def test_cold_start_phase1_fallback_to_text_light_lr_smoothed():
+    """Phase 1 empty → fallback to text_light_lr_smoothed"""
 
     async def empty(self, user_id, limit=10, exclude_meme_ids=[], **kw):
         return []
 
-    async def lr_smoothed(self, user_id, limit=10, exclude_meme_ids=[], **kw):
+    async def text_light_lr_smoothed(self, user_id, limit=10, exclude_meme_ids=[], **kw):
         return [{"id": 301}, {"id": 302}]
 
     async def best_uploaded(self, user_id, limit=10, exclude_meme_ids=[], **kw):
@@ -96,7 +101,7 @@ async def test_cold_start_phase1_fallback_to_lr_smoothed():
         engine_map = {
             "cold_start_explore": empty,
             "cold_start_adapt": empty,
-            "lr_smoothed": lr_smoothed,
+            "text_light_lr_smoothed": text_light_lr_smoothed,
             "best_uploaded_memes": best_uploaded,
         }
 
@@ -109,7 +114,7 @@ async def test_cold_start_phase1_fallback_to_lr_smoothed():
 
 @pytest.mark.asyncio
 async def test_cold_start_phase1_fallback_to_uploaded():
-    """Phase 1 + lr_smoothed both empty → fallback to best_uploaded_memes"""
+    """Phase 1 + text_light_lr_smoothed both empty → fallback to best_uploaded_memes"""
 
     async def empty(self, user_id, limit=10, exclude_meme_ids=[], **kw):
         return []
@@ -121,7 +126,7 @@ async def test_cold_start_phase1_fallback_to_uploaded():
         engine_map = {
             "cold_start_explore": empty,
             "cold_start_adapt": empty,
-            "lr_smoothed": empty,
+            "text_light_lr_smoothed": empty,
             "best_uploaded_memes": best_uploaded,
         }
 
@@ -168,12 +173,12 @@ async def test_cold_start_phase2_uses_adapt():
 
 @pytest.mark.asyncio
 async def test_cold_start_phase2_fallback():
-    """Phase 2 empty → fallback to lr_smoothed"""
+    """Phase 2 empty → fallback to text_light_lr_smoothed"""
 
     async def empty(self, user_id, limit=10, exclude_meme_ids=[], **kw):
         return []
 
-    async def lr_smoothed(self, user_id, limit=10, exclude_meme_ids=[], **kw):
+    async def text_light_lr_smoothed(self, user_id, limit=10, exclude_meme_ids=[], **kw):
         return [{"id": 301}]
 
     async def best_uploaded(self, user_id, limit=10, exclude_meme_ids=[], **kw):
@@ -183,7 +188,7 @@ async def test_cold_start_phase2_fallback():
         engine_map = {
             "cold_start_explore": empty,
             "cold_start_adapt": empty,
-            "lr_smoothed": lr_smoothed,
+            "text_light_lr_smoothed": text_light_lr_smoothed,
             "best_uploaded_memes": best_uploaded,
         }
 
@@ -216,6 +221,7 @@ async def test_cold_start_phase3_blends():
     class TestRetriever(CandidatesRetriever):
         engine_map = {
             "cold_start_adapt": cold_start_adapt,
+            "text_light_lr_smoothed": lr_smoothed,
             "lr_smoothed": lr_smoothed,
             "like_spread_and_recent_memes": like_spread,
             "best_uploaded_memes": best_uploaded,
@@ -370,6 +376,59 @@ async def test_generate_above_100_treatment_uses_recently_liked_weights():
 
 
 @pytest.mark.asyncio
+async def test_text_light_blender_v1_treatment_pins_text_light_engine():
+    captured_weights = None
+    captured_fixed_pos = None
+
+    async def one_candidate(self, user_id, limit=10, exclude_meme_ids=[], **kw):
+        return [{"id": 4, "recommended_by": "generic"}]
+
+    async def text_light_candidate(self, user_id, limit=10, exclude_meme_ids=[], **kw):
+        return [{"id": 7, "recommended_by": "text_light_lr_smoothed"}]
+
+    class TestRetriever(CandidatesRetriever):
+        engine_map = {
+            "best_uploaded_memes": one_candidate,
+            "like_spread_and_recent_memes": one_candidate,
+            "text_light_lr_smoothed": text_light_candidate,
+            "recently_liked": one_candidate,
+            "goat": one_candidate,
+            "es_ranked": one_candidate,
+        }
+
+    treatment_weights = dict(MATURE_BLENDER_CONTROL_WEIGHTS)
+    lr_weight = treatment_weights.pop("lr_smoothed")
+    treatment_weights["text_light_lr_smoothed"] = lr_weight
+
+    def capture_blend(candidates_dict, weights_dict, fixed_pos=None, limit=0, random_seed=None):
+        nonlocal captured_weights, captured_fixed_pos
+        captured_weights = weights_dict
+        captured_fixed_pos = fixed_pos
+        return [{"id": 7, "recommended_by": "text_light_lr_smoothed"}]
+
+    with (
+        patch(
+            "src.recommendations.meme_queue.get_recently_liked_blender_v2_weights",
+            new_callable=AsyncMock,
+            return_value=MATURE_BLENDER_CONTROL_WEIGHTS,
+        ),
+        patch(
+            "src.recommendations.meme_queue.get_text_light_blender_v1_weights",
+            new_callable=AsyncMock,
+            return_value=treatment_weights,
+        ),
+        patch("src.recommendations.meme_queue.blend", side_effect=capture_blend),
+    ):
+        candidates = await generate_recommendations(
+            TEST_USER_ID, 10, 200, TestRetriever(), random_seed=102
+        )
+
+    assert candidates == [{"id": 7, "recommended_by": "text_light_lr_smoothed"}]
+    assert "lr_smoothed" not in captured_weights
+    assert captured_fixed_pos == {0: "text_light_lr_smoothed"}
+
+
+@pytest.mark.asyncio
 async def test_recently_liked_blender_v2_assignment_is_mature_only():
     async def empty(self, user_id, limit=10, exclude_meme_ids=[], **kw):
         return []
@@ -384,6 +443,7 @@ async def test_recently_liked_blender_v2_assignment_is_mature_only():
             "es_ranked": empty,
             "cold_start_explore": empty,
             "cold_start_adapt": empty,
+            "text_light_lr_smoothed": empty,
         }
 
     with patch(
@@ -489,6 +549,7 @@ async def test_cold_start_all_empty():
         engine_map = {
             "cold_start_explore": empty,
             "cold_start_adapt": empty,
+            "text_light_lr_smoothed": empty,
             "lr_smoothed": empty,
             "best_uploaded_memes": empty,
             "like_spread_and_recent_memes": empty,
@@ -514,6 +575,9 @@ def _growing_retriever_class():
     async def lr_smoothed(self, user_id, limit=10, exclude_meme_ids=[], **kw):
         return [{"id": 301, "recommended_by": "lr_smoothed"}]
 
+    async def text_light_lr_smoothed(self, user_id, limit=10, exclude_meme_ids=[], **kw):
+        return [{"id": 302, "recommended_by": "text_light_lr_smoothed"}]
+
     async def best_uploaded_memes(self, user_id, limit=10, exclude_meme_ids=[], **kw):
         return [{"id": 401, "recommended_by": "best_uploaded_memes"}]
 
@@ -533,6 +597,7 @@ def _growing_retriever_class():
         engine_map = {
             "cold_start_explore": cold_start_explore,
             "cold_start_adapt": cold_start_adapt,
+            "text_light_lr_smoothed": text_light_lr_smoothed,
             "lr_smoothed": lr_smoothed,
             "best_uploaded_memes": best_uploaded_memes,
             "like_spread_and_recent_memes": like_spread_and_recent_memes,

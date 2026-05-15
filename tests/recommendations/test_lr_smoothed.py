@@ -16,7 +16,7 @@ from src.database import (
     user_meme_reaction,
     user_meme_source_stats,
 )
-from src.recommendations.candidates import get_lr_smoothed
+from src.recommendations.candidates import get_lr_smoothed, get_text_light_lr_smoothed
 
 
 @pytest_asyncio.fixture()
@@ -125,3 +125,21 @@ async def test_calculate_meme_reactions_stats(conn: AsyncConnection):
     res = await get_lr_smoothed(1)
 
     assert len(res) == 4
+
+
+@pytest.mark.asyncio
+async def test_text_light_lr_smoothed_excludes_memes_over_30_ocr_words(conn: AsyncConnection):
+    long_text = " ".join(f"word{i}" for i in range(31))
+    await conn.execute(
+        meme.update()
+        .where(meme.c.id == 5)
+        .values(ocr_result={"text": long_text, "calculated_at": "2026-05-15T00:00:00Z"})
+    )
+    await conn.commit()
+
+    res = await get_text_light_lr_smoothed(1)
+    result_ids = {row["id"] for row in res}
+
+    assert 5 not in result_ids
+    # Memes without OCR are unknown text-density, so the text-light filter must keep them.
+    assert {2, 3, 4}.issubset(result_ids)

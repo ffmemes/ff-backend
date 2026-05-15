@@ -12,6 +12,7 @@ from src.recommendations.blender import blend
 from src.recommendations.blender_experiments import (
     MATURE_BLENDER_CONTROL_WEIGHTS,
     get_recently_liked_blender_v2_weights,
+    get_text_light_blender_v1_weights,
 )
 from src.recommendations.candidates import (
     CandidatesRetriever,
@@ -146,7 +147,12 @@ async def generate_recommendations(
 
         return await fetch_all(text(query), params)
 
-    async def get_candidates(user_id, limit, use_recently_liked_blender_v2: bool = True):
+    async def get_candidates(
+        user_id,
+        limit,
+        use_recently_liked_blender_v2: bool = True,
+        use_text_light_blender_v1: bool = True,
+    ):
         """Route to the right engine mix based on user maturity.
 
         Cold start (<30 memes) uses 3-phase adaptive approach:
@@ -179,7 +185,7 @@ async def generate_recommendations(
                 # Phase 3: transition — blend adapt with growing engines
                 weights = {
                     "cold_start_adapt": 0.5,
-                    "lr_smoothed": 0.3,
+                    "text_light_lr_smoothed": 0.3,
                     "like_spread_and_recent_memes": 0.2,
                 }
                 candidates_dict = await retriever.get_candidates_dict(
@@ -199,12 +205,12 @@ async def generate_recommendations(
             # Fallback chain: -> lr_smoothed -> best_uploaded_memes
             if len(candidates) == 0:
                 logging.info(
-                    "Cold start %s empty for user %s, falling back to lr_smoothed",
+                    "Cold start %s empty for user %s, falling back to text_light_lr_smoothed",
                     engine,
                     user_id,
                 )
                 candidates = await retriever.get_candidates(
-                    "lr_smoothed",
+                    "text_light_lr_smoothed",
                     user_id,
                     limit,
                     exclude_mem_ids=meme_ids_in_queue,
@@ -227,12 +233,17 @@ async def generate_recommendations(
                 "es_ranked": 0.1,
                 "like_spread_and_recent_memes": 0.2,
             }
+            if use_text_light_blender_v1:
+                weights = await get_text_light_blender_v1_weights(user_id, weights)
 
             candidates_dict = await retriever.get_candidates_dict(
                 weights.keys(), user_id, limit, exclude_mem_ids=meme_ids_in_queue
             )
 
-            fixed_pos = {0: "lr_smoothed"}
+            fixed_engine = (
+                "text_light_lr_smoothed" if "text_light_lr_smoothed" in weights else "lr_smoothed"
+            )
+            fixed_pos = {0: fixed_engine}
             return blend(candidates_dict, weights, fixed_pos, limit, random_seed)
 
         # >=100. Regular mature users enter the LR-stratified recently_liked
@@ -240,6 +251,8 @@ async def generate_recommendations(
         # their low_sent_pool quota would confound the experiment read.
         if use_recently_liked_blender_v2:
             weights = await get_recently_liked_blender_v2_weights(user_id)
+            if use_text_light_blender_v1:
+                weights = await get_text_light_blender_v1_weights(user_id, weights)
         else:
             weights = dict(MATURE_BLENDER_CONTROL_WEIGHTS)
 
@@ -247,7 +260,10 @@ async def generate_recommendations(
             weights.keys(), user_id, limit, exclude_mem_ids=meme_ids_in_queue
         )
 
-        fixed_pos = {0: "lr_smoothed"}
+        fixed_engine = (
+            "text_light_lr_smoothed" if "text_light_lr_smoothed" in weights else "lr_smoothed"
+        )
+        fixed_pos = {0: fixed_engine}
         candidates = blend(candidates_dict, weights, fixed_pos, limit, random_seed)
 
         return candidates
@@ -282,6 +298,7 @@ async def generate_recommendations(
                 user_id,
                 remaining_limit,
                 use_recently_liked_blender_v2=False,
+                use_text_light_blender_v1=False,
             )
             candidates.extend(extra_candidates)
 

@@ -39,7 +39,7 @@ def test_stage_boundaries(nmemes_sent, stage, primary_engine):
 @pytest.mark.parametrize("nmemes_sent", [0, 5, 6, 15])
 def test_cold_start_fallback_order_and_min_sends(nmemes_sent):
     assert _fallbacks(nmemes_sent) == (
-        ("lr_smoothed", {"min_sends": 10}),
+        ("text_light_lr_smoothed", {"min_sends": 10}),
         ("best_uploaded_memes", {}),
     )
 
@@ -49,13 +49,13 @@ def test_transition_blend_and_empty_blend_fallback_order():
 
     assert dict(plan.blend_weights) == {
         "cold_start_adapt": 0.5,
-        "lr_smoothed": 0.3,
+        "text_light_lr_smoothed": 0.3,
         "like_spread_and_recent_memes": 0.2,
     }
     assert dict(plan.fixed_pos) == {0: "cold_start_adapt"}
     assert _fallbacks(16) == (
         ("cold_start_adapt", {}),
-        ("lr_smoothed", {"min_sends": 10}),
+        ("text_light_lr_smoothed", {"min_sends": 10}),
         ("best_uploaded_memes", {}),
     )
 
@@ -142,6 +142,6 @@ def test_engine_fallback_kwargs_are_read_only():
     cold_plan = plan_candidate_selection(0)
     lr_fallback = cold_plan.fallback_engines[0]
 
-    assert lr_fallback.engine == "lr_smoothed"
+    assert lr_fallback.engine == "text_light_lr_smoothed"
     with pytest.raises(TypeError):
         lr_fallback.kwargs["min_sends"] = 1

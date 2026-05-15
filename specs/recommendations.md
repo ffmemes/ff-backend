@@ -11,7 +11,7 @@ User reacts -> handle_reaction() -> update_user_meme_reaction()
 ```
 
 Key files:
-- [`src/recommendations/candidates.py`](../src/recommendations/candidates.py) — 8 SQL engines + CandidatesRetriever
+- [`src/recommendations/candidates.py`](../src/recommendations/candidates.py) — SQL engines + CandidatesRetriever
 - [`src/recommendations/blender.py`](../src/recommendations/blender.py) — weighted random sampling
 - [`src/recommendations/meme_queue.py`](../src/recommendations/meme_queue.py) — queue check/refill/maturity routing
 - [`src/recommendations/service.py`](../src/recommendations/service.py) — reaction persistence, reaction_exists check
@@ -22,6 +22,7 @@ Key files:
 |--------|-------------|
 | `best_uploaded_memes` | Top user-uploaded memes by like rate |
 | `lr_smoothed` | Global smoothed like rate ranking |
+| `text_light_lr_smoothed` | Same as `lr_smoothed`, but excludes OCR text above 30 words |
 | `like_spread_and_recent_memes` | High like rate + recent + reach diversity |
 | `recently_liked` | Memes from sources the user recently liked |
 | `goat` | All-time best memes by like rate (see [TODOS.md](../TODOS.md) for per-user recency filter) |
@@ -35,12 +36,12 @@ Removed engines: `fast_dopamine`, `classic`, `multiply_all_scores`, `selected_so
 
 | Stage | Trigger | Engines | Source |
 |-------|---------|---------|--------|
-| Cold start | nmemes_sent < 30 | 3-phase adaptive: explore -> adapt -> transition | [`meme_queue.py`](../src/recommendations/meme_queue.py) |
-| Growing | 30-100 | best_uploaded:0.1, lr_smoothed:0.3, recently_liked:0.2, goat:0.1, es_ranked:0.1, like_spread:0.2 | [`meme_queue.py`](../src/recommendations/meme_queue.py) |
-| Mature | 100+ | best_uploaded:0.3, like_spread:0.3, lr_smoothed:0.4, recently_liked:0.2, goat:0.1, es_ranked:0.1 | [`meme_queue.py`](../src/recommendations/meme_queue.py) |
+| Cold start | nmemes_sent < 30 | 3-phase adaptive with text-light guards: explore/adapt/fallback avoid OCR text above 30 words | [`meme_queue.py`](../src/recommendations/meme_queue.py) |
+| Growing | 30-100 | A/B: control uses `lr_smoothed`; treatment swaps that slot to `text_light_lr_smoothed` | [`meme_queue.py`](../src/recommendations/meme_queue.py) |
+| Mature | 100+ | Recently-liked blender v2, then A/B text-light overlay can swap `lr_smoothed` to `text_light_lr_smoothed` | [`meme_queue.py`](../src/recommendations/meme_queue.py) |
 | Moderator/Admin | user_type check | 75% low_sent_pool + 25% regular (by maturity) | [`meme_queue.py`](../src/recommendations/meme_queue.py) |
 
-`fixed_pos={0: "lr_smoothed"}` forces first position to lr_smoothed in blended mode.
+`fixed_pos={0: "lr_smoothed"}` forces first position to `lr_smoothed` in blended mode. In the `text_light_blender_v1` treatment, that fixed slot becomes `text_light_lr_smoothed`.
 
 ## Known Bugs
 

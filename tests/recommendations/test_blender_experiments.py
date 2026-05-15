@@ -10,12 +10,19 @@ from src.recommendations.blender_experiments import (
     RECENTLY_LIKED_BLENDER_V2_EXPERIMENT_ID,
     RECENTLY_LIKED_BLENDER_V2_SAMPLE_GATE_PER_VARIANT,
     RECENTLY_LIKED_BLENDER_V2_TREATMENT,
+    TEXT_LIGHT_BLENDER_V1_CONTROL,
+    TEXT_LIGHT_BLENDER_V1_EXPERIMENT_ID,
+    TEXT_LIGHT_BLENDER_V1_MAX_OCR_WORDS,
+    TEXT_LIGHT_BLENDER_V1_TREATMENT,
     _lr_quartile_from_boundaries,
     build_recently_liked_blender_v2_assignment,
+    build_text_light_blender_v1_assignment,
     get_or_assign_recently_liked_blender_v2_variant,
+    get_or_assign_text_light_blender_v1_variant,
     get_recent_7d_lr_assignment_metrics,
     get_recent_7d_lr_quartile_boundaries,
     get_recently_liked_blender_v2_weights,
+    get_text_light_blender_v1_weights,
 )
 
 
@@ -68,6 +75,25 @@ def test_assignment_is_stable_within_lr_quartile():
 
     assert first == second
     assert first_metadata == second_metadata
+
+
+def test_text_light_assignment_replaces_lr_engine_only_for_treatment():
+    base_weights = {
+        "best_uploaded_memes": 0.1,
+        "lr_smoothed": 0.3,
+        "recently_liked": 0.2,
+    }
+
+    variant, metadata = build_text_light_blender_v1_assignment(404, base_weights)
+
+    assert variant in {TEXT_LIGHT_BLENDER_V1_CONTROL, TEXT_LIGHT_BLENDER_V1_TREATMENT}
+    assert metadata["max_ocr_words"] == TEXT_LIGHT_BLENDER_V1_MAX_OCR_WORDS
+    assert metadata["filtered_engine"] == "text_light_lr_smoothed"
+    if variant == TEXT_LIGHT_BLENDER_V1_TREATMENT:
+        assert "lr_smoothed" not in metadata["assigned_weights"]
+        assert metadata["assigned_weights"]["text_light_lr_smoothed"] == 0.3
+    else:
+        assert metadata["assigned_weights"] == base_weights
 
 
 def test_lr_quartile_uses_cached_boundaries():
@@ -237,3 +263,44 @@ async def test_recently_liked_blender_v2_treatment_increases_recently_liked_weig
     assert weights == MATURE_BLENDER_TREATMENT_WEIGHTS
     assert weights["recently_liked"] > MATURE_BLENDER_CONTROL_WEIGHTS["recently_liked"]
     assert weights["lr_smoothed"] < MATURE_BLENDER_CONTROL_WEIGHTS["lr_smoothed"]
+
+
+@pytest.mark.asyncio
+async def test_existing_text_light_blender_v1_assignment_wins():
+    with patch(
+        "src.recommendations.blender_experiments.get_experiment_assignment",
+        new_callable=AsyncMock,
+        return_value={"variant": TEXT_LIGHT_BLENDER_V1_TREATMENT},
+    ) as get_assignment:
+        variant = await get_or_assign_text_light_blender_v1_variant(
+            101,
+            MATURE_BLENDER_CONTROL_WEIGHTS,
+        )
+
+    assert variant == TEXT_LIGHT_BLENDER_V1_TREATMENT
+    get_assignment.assert_awaited_once_with(101, TEXT_LIGHT_BLENDER_V1_EXPERIMENT_ID)
+
+
+@pytest.mark.asyncio
+async def test_text_light_blender_v1_treatment_replaces_lr_weight():
+    with patch(
+        "src.recommendations.blender_experiments.get_or_assign_text_light_blender_v1_variant",
+        new_callable=AsyncMock,
+        return_value=TEXT_LIGHT_BLENDER_V1_TREATMENT,
+    ):
+        weights = await get_text_light_blender_v1_weights(100, MATURE_BLENDER_CONTROL_WEIGHTS)
+
+    assert "lr_smoothed" not in weights
+    assert weights["text_light_lr_smoothed"] == MATURE_BLENDER_CONTROL_WEIGHTS["lr_smoothed"]
+
+
+@pytest.mark.asyncio
+async def test_text_light_blender_v1_control_keeps_base_weights():
+    with patch(
+        "src.recommendations.blender_experiments.get_or_assign_text_light_blender_v1_variant",
+        new_callable=AsyncMock,
+        return_value=TEXT_LIGHT_BLENDER_V1_CONTROL,
+    ):
+        weights = await get_text_light_blender_v1_weights(100, MATURE_BLENDER_TREATMENT_WEIGHTS)
+
+    assert weights == MATURE_BLENDER_TREATMENT_WEIGHTS

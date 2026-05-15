@@ -36,7 +36,13 @@ def _make_stub_retriever(candidates_by_engine: dict[str, list[dict]]):
             exclude_mem_ids: list[int] = [],
             **kwargs,
         ) -> list[dict[str, Any]]:
-            all_candidates = candidates_by_engine.get(engine_name, [])
+            fallback_engine = (
+                "lr_smoothed" if engine_name == "text_light_lr_smoothed" else engine_name
+            )
+            all_candidates = candidates_by_engine.get(
+                engine_name,
+                candidates_by_engine.get(fallback_engine, []),
+            )
             exclude_set = set(exclude_mem_ids)
             filtered = [c for c in all_candidates if c["id"] not in exclude_set]
             return filtered[:limit]
