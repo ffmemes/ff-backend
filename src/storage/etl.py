@@ -20,6 +20,8 @@ from src.storage.parsers.schemas import (
 )
 
 _TG_FORWARD_URL_PATTERN = re.compile(r"^https?://t\.me/(?:s/)?([a-zA-Z0-9_]+)(?:/\d+)?/?$")
+TG_RECENT_POSTS_WINDOW = 10
+TG_TOP_VIEWED_POSTS_LIMIT = 5
 
 
 def normalize_telegram_channel_url(forwarded_url: str) -> Optional[str]:
@@ -201,9 +203,12 @@ async def etl_memes_from_raw_telegram_posts(
     # find ones that are already in the database
     # create rows and update rows
     #
-    # Engagement filter: skip posts with views < 30% of their source's median.
-    # This filters low-quality posts (likely ads or junk) before they enter the
-    # meme table. Posts with 0 views (views not available) are kept.
+    # Engagement filters before raw posts enter the meme table:
+    # 1. From each source's latest 10 posts, only promote the top 5 by views.
+    #    Raw rows are still stored, so this threshold can be replayed later.
+    # 2. Skip posts with views < 30% of their source's median.
+    #    This filters low-quality posts (likely ads or junk). Posts with 0
+    #    views (views not available) are kept if they survive the top-view gate.
     transformed_memes = await fetch_all(
         text(
             """
@@ -215,6 +220,42 @@ async def etl_memes_from_raw_telegram_posts(
                     WHERE COALESCE(updated_at, created_at) >= NOW() - INTERVAL '24 hours'
                       AND views > 0
                     GROUP BY meme_source_id
+                ),
+                latest_source_posts AS (
+                    SELECT
+                        MRT.id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY MRT.meme_source_id
+                            ORDER BY MRT.date DESC, MRT.post_id DESC, MRT.id DESC
+                        ) AS recent_rank
+                    FROM meme_raw_telegram MRT
+                    INNER JOIN meme_source MS
+                        ON MS.id = MRT.meme_source_id
+                    WHERE MS.status = 'parsing_enabled'
+                        AND (
+                            NOT :filter_meme_source_ids
+                            OR MRT.meme_source_id = ANY(:meme_source_ids)
+                        )
+                        AND (
+                            NOT :fresh_only
+                            OR COALESCE(MRT.updated_at, MRT.created_at) >= NOW() - INTERVAL '24 hours'
+                        )
+                ),
+                top_viewed_recent_posts AS (
+                    SELECT id
+                    FROM (
+                        SELECT
+                            MRT.id,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY MRT.meme_source_id
+                                ORDER BY MRT.views DESC, MRT.date DESC, MRT.post_id DESC, MRT.id DESC
+                            ) AS views_rank
+                        FROM meme_raw_telegram MRT
+                        INNER JOIN latest_source_posts LSP
+                            ON LSP.id = MRT.id
+                        WHERE LSP.recent_rank <= :recent_posts_window
+                    ) ranked_recent
+                    WHERE views_rank <= :top_viewed_posts_limit
                 )
                 SELECT
                     DISTINCT ON (COALESCE(MRT.forwarded_url, random()::text))
@@ -234,6 +275,8 @@ async def etl_memes_from_raw_telegram_posts(
                     ON MS.id = MRT.meme_source_id
                 LEFT JOIN source_medians SM
                     ON SM.meme_source_id = MRT.meme_source_id
+                INNER JOIN top_viewed_recent_posts TVRP
+                    ON TVRP.id = MRT.id
                 WHERE 1=1
                     AND MS.status = 'parsing_enabled'
                     AND (
@@ -274,6 +317,8 @@ async def etl_memes_from_raw_telegram_posts(
             "filter_meme_source_ids": meme_source_ids is not None,
             "meme_source_ids": meme_source_ids or [],
             "fresh_only": fresh_only,
+            "recent_posts_window": TG_RECENT_POSTS_WINDOW,
+            "top_viewed_posts_limit": TG_TOP_VIEWED_POSTS_LIMIT,
         },
     )
 
