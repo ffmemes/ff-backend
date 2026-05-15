@@ -258,8 +258,20 @@ async def search_memes_for_inline_query(search_query: str, limit: int) -> list[d
                     COALESCE(M.ocr_result -> 'raw_result' ->> 'ocr_text', '')
                 ),
                 word_similarity(:search_query, COALESCE(M.ocr_result ->> 'description', '')) * 0.9
-            ) AS inline_search_score
+            ) AS inline_search_score,
+            COALESCE((MS.nlikes + 1.) / NULLIF(MS.nlikes + MS.ndislikes + 1, 0), 0.5)
+            * CASE WHEN COALESCE(MS.raw_impr_rank, 99999) <= 1 THEN 1 ELSE 0.8 END
+            * CASE WHEN COALESCE(MS.age_days, 99999) < 90 THEN 1 ELSE 0.8 END
+            * CASE
+                WHEN COALESCE(MS.nmemes_sent, 0) <= 1 THEN 1
+                ELSE (MS.nlikes + MS.ndislikes) * 1. / NULLIF(MS.nmemes_sent, 0)
+              END
+            * (1.0 + LEAST(COALESCE(MS.invited_count, 0), 10) * 0.1)
+            * (1.0 + GREATEST(COALESCE(MS.engagement_score, 0), 0))
+            AS inline_quality_score
         FROM meme M
+        LEFT JOIN meme_stats MS
+            ON MS.meme_id = M.id
         WHERE M.status = :status
             AND M.type = :type
             AND M.telegram_file_id IS NOT NULL
@@ -271,7 +283,7 @@ async def search_memes_for_inline_query(search_query: str, limit: int) -> list[d
                 OR (M.ocr_result -> 'raw_result' ->> 'ocr_text') % :search_query
                 OR (M.ocr_result ->> 'description') % :search_query
             )
-        ORDER BY inline_search_score DESC, M.published_at DESC
+        ORDER BY inline_search_score DESC, inline_quality_score DESC, M.published_at DESC
         LIMIT :limit;
     """
     select_statement = text(select_query)

@@ -1,6 +1,11 @@
 import pytest
 
 from src.tgbot import service
+from src.tgbot.handlers.inline import INLINE_SEARCH_RESULT_LIMIT
+
+
+def test_inline_search_returns_twenty_results():
+    assert INLINE_SEARCH_RESULT_LIMIT == 20
 
 
 @pytest.mark.asyncio
@@ -22,6 +27,9 @@ async def test_inline_search_uses_old_new_ocr_and_openrouter_description(monkeyp
     assert "ocr_result ->> 'description'" in captured["query"]
     assert "ILIKE :search_pattern" in captured["query"]
     assert "% :search_query" in captured["query"]
+    assert "LEFT JOIN meme_stats MS" in captured["query"]
+    assert "AS inline_quality_score" in captured["query"]
+    assert "ORDER BY inline_search_score DESC, inline_quality_score DESC" in captured["query"]
     assert captured["params"] == {
         "search_query": "деньги",
         "search_pattern": "%деньги%",
