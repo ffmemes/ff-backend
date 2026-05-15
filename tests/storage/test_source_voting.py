@@ -335,3 +335,38 @@ async def test_post_source_candidate_poll_message_cancels_non_moderator_poll(
     assert result["status"] == "wrong_chat_target"
     bot.send_message.assert_not_awaited()
     assert result["poll"]["status"] == "cancelled"
+
+
+@pytest.mark.asyncio
+async def test_post_source_candidate_poll_message_pins_silently(conn: AsyncConnection):
+    await _create_candidate(conn)
+    await conn.commit()
+    prepared = await prepare_source_candidate(CANDIDATE_ID, posts=[_post(4012)])
+    poll = await create_source_candidate_poll(
+        CANDIDATE_ID,
+        prepared_meme_source_id=prepared["source"]["id"],
+        chat_id=TELEGRAM_MODERATOR_CHAT_ID,
+        now=datetime.utcnow(),
+    )
+    message = SimpleNamespace(message_id=778)
+    bot = SimpleNamespace(
+        send_message=AsyncMock(return_value=message),
+        pin_chat_message=AsyncMock(),
+    )
+
+    result = await post_source_candidate_poll_message(bot, poll, now=datetime.utcnow())
+
+    assert result["status"] == "posted"
+    sent_text = bot.send_message.await_args.kwargs["text"]
+    assert sent_text == (
+        "Добавляем новый источник мемов?\n\n"
+        f"🔗 {CANDIDATE_URL}\n\n"
+        "Наши паблики пересылали мемы оттуда 5 раз.\n"
+        "Откройте ссылку и проголосуйте ниже.\n"
+        "Голосование решит, начнем ли брать оттуда мемы на постоянке."
+    )
+    bot.pin_chat_message.assert_awaited_once_with(
+        chat_id=TELEGRAM_MODERATOR_CHAT_ID,
+        message_id=778,
+        disable_notification=True,
+    )

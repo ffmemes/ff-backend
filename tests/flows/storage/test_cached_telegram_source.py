@@ -10,12 +10,12 @@ async def test_process_cached_telegram_source_promotes_uploaded_memes(monkeypatc
     etl = AsyncMock()
     get_unloaded = AsyncMock(return_value=[{"id": 1}])
     process_unloaded = AsyncMock()
-    promote_ready = AsyncMock(return_value=[{"id": 1, "status": "ok"}])
+    finalize = AsyncMock()
 
     monkeypatch.setattr(memes, "etl_memes_from_raw_telegram_posts", etl)
     monkeypatch.setattr(memes, "get_unloaded_tg_memes", get_unloaded)
     monkeypatch.setattr(memes, "_process_unloaded_memes", process_unloaded)
-    monkeypatch.setattr(memes, "update_meme_status_of_ready_memes", promote_ready)
+    monkeypatch.setattr(memes, "final_meme_pipeline", finalize)
 
     await memes.process_cached_telegram_source(42, limit=5)
 
@@ -29,4 +29,4 @@ async def test_process_cached_telegram_source_promotes_uploaded_memes(monkeypatc
         [{"id": 1}],
         "prepared Telegram source",
     )
-    promote_ready.assert_awaited_once()
+    finalize.assert_awaited_once()

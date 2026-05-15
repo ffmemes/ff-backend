@@ -159,7 +159,9 @@ async def process_cached_telegram_source(meme_source_id: int, limit: int = 100) 
         fresh_only=False,
     )
     await _process_unloaded_memes(unloaded_memes, "prepared Telegram source")
-    await update_meme_status_of_ready_memes()
+    # Run the same finalization path as scheduled pipelines so dedup logic
+    # (file_id exact + OCR fuzzy) is applied before memes become publishable.
+    await final_meme_pipeline()
 
 
 @flow(
