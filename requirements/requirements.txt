@@ -1,0 +1,3 @@
+# Aggregate manifest for GitHub Dependency Graph.
+-r prod.txt
+-r dev.txt
