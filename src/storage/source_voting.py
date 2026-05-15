@@ -316,6 +316,8 @@ async def record_source_candidate_vote(
     poll = await get_source_candidate_poll(poll_id)
     if poll is None:
         return {"status": "not_found"}
+    if chat_id != TELEGRAM_MODERATOR_CHAT_ID or poll["chat_id"] != TELEGRAM_MODERATOR_CHAT_ID:
+        return {"status": "wrong_chat", "poll": poll}
     if poll["chat_id"] != chat_id:
         return {"status": "wrong_chat", "poll": poll}
     if poll["status"] != POLL_STATUS_OPEN or poll["closes_at"] <= now:
@@ -663,7 +665,7 @@ async def post_source_candidate_poll_message(
         }
 
     message = await bot.send_message(
-        chat_id=TELEGRAM_MODERATOR_CHAT_ID,
+        chat_id=poll["chat_id"],
         text=format_source_candidate_poll_message(candidate, prepared or {"source": source}),
         reply_markup=source_candidate_vote_keyboard(poll["id"]),
         disable_web_page_preview=True,
