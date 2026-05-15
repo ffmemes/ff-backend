@@ -28,6 +28,7 @@ from src.storage.source_voting import (
     close_source_candidate_poll,
     create_source_candidate_poll,
     post_new_source_candidate_poll,
+    post_source_candidate_poll_message,
     prepare_source_candidate,
     record_source_candidate_vote,
 )
@@ -175,6 +176,36 @@ async def test_source_candidate_vote_is_unique_and_mutable(conn: AsyncConnection
 
 
 @pytest.mark.asyncio
+async def test_source_candidate_vote_rejects_poll_outside_moderator_chat(
+    conn: AsyncConnection,
+):
+    await _create_candidate(conn)
+    await conn.commit()
+    prepared = await prepare_source_candidate(CANDIDATE_ID, posts=[_post(4010)])
+    wrong_chat_id = TELEGRAM_MODERATOR_CHAT_ID + 99
+    poll = await create_source_candidate_poll(
+        CANDIDATE_ID,
+        prepared_meme_source_id=prepared["source"]["id"],
+        chat_id=wrong_chat_id,
+        now=datetime.utcnow(),
+    )
+    await conn.execute(
+        meme_source_candidate_poll.update()
+        .where(meme_source_candidate_poll.c.id == poll["id"])
+        .values(status=POLL_STATUS_OPEN, message_id=130, opened_at=datetime.utcnow())
+    )
+    await conn.commit()
+
+    result = await record_source_candidate_vote(
+        poll_id=poll["id"],
+        user_id=TEST_ID_START + 10,
+        vote=VOTE_ADD_SOURCE,
+        chat_id=wrong_chat_id,
+    )
+    assert result["status"] == "wrong_chat"
+
+
+@pytest.mark.asyncio
 async def test_close_passed_poll_enables_prepared_source_without_reparsing(
     conn: AsyncConnection,
 ):
@@ -281,3 +312,26 @@ async def test_daily_source_cycle_resumes_existing_draft_poll(conn: AsyncConnect
     assert result["new_poll"]["poll"]["message_id"] == 556
     assert result["new_poll"]["poll"]["status"] == POLL_STATUS_OPEN
     bot.send_message.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_post_source_candidate_poll_message_cancels_non_moderator_poll(
+    conn: AsyncConnection,
+):
+    await _create_candidate(conn)
+    await conn.commit()
+    prepared = await prepare_source_candidate(CANDIDATE_ID, posts=[_post(4011)])
+    custom_chat_id = TELEGRAM_MODERATOR_CHAT_ID + 77
+    poll = await create_source_candidate_poll(
+        CANDIDATE_ID,
+        prepared_meme_source_id=prepared["source"]["id"],
+        chat_id=custom_chat_id,
+        now=datetime.utcnow(),
+    )
+    bot = SimpleNamespace(send_message=AsyncMock(return_value=SimpleNamespace(message_id=777)))
+
+    result = await post_source_candidate_poll_message(bot, poll, now=datetime.utcnow())
+
+    assert result["status"] == "wrong_chat_target"
+    bot.send_message.assert_not_awaited()
+    assert result["poll"]["status"] == "cancelled"

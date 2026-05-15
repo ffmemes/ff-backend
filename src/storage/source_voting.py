@@ -316,6 +316,8 @@ async def record_source_candidate_vote(
     poll = await get_source_candidate_poll(poll_id)
     if poll is None:
         return {"status": "not_found"}
+    if chat_id != TELEGRAM_MODERATOR_CHAT_ID or poll["chat_id"] != TELEGRAM_MODERATOR_CHAT_ID:
+        return {"status": "wrong_chat", "poll": poll}
     if poll["chat_id"] != chat_id:
         return {"status": "wrong_chat", "poll": poll}
     if poll["status"] != POLL_STATUS_OPEN or poll["closes_at"] <= now:
@@ -632,6 +634,13 @@ async def post_source_candidate_poll_message(
     prepared: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     now = now or _utcnow()
+    if poll["chat_id"] != TELEGRAM_MODERATOR_CHAT_ID:
+        await cancel_source_candidate_poll(poll["id"])
+        return {
+            "status": "wrong_chat_target",
+            "poll": await get_source_candidate_poll(poll["id"]) or poll,
+        }
+
     candidate = await fetch_one(
         select(meme_source_candidate).where(meme_source_candidate.c.id == poll["candidate_id"])
     )
@@ -663,7 +672,7 @@ async def post_source_candidate_poll_message(
         }
 
     message = await bot.send_message(
-        chat_id=TELEGRAM_MODERATOR_CHAT_ID,
+        chat_id=poll["chat_id"],
         text=format_source_candidate_poll_message(candidate, prepared or {"source": source}),
         reply_markup=source_candidate_vote_keyboard(poll["id"]),
         disable_web_page_preview=True,
