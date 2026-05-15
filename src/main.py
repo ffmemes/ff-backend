@@ -10,7 +10,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from src import redis
 from src.config import app_configs, settings
-from src.observability.sentry import before_send_log
+from src.observability.sentry import before_send, before_send_log
 from src.tgbot import app as tgbot_app
 from src.tgbot.router import router as tgbot_router
 
@@ -64,6 +64,8 @@ if settings.ENVIRONMENT.is_deployed:
         ignore_errors=[
             "telegram.error.Forbidden",  # handled by error.py → marks user as blocked_bot
         ],
+        include_local_variables=False,
+        before_send=before_send,
         before_send_log=before_send_log,
     )
 

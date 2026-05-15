@@ -1,4 +1,5 @@
 from src.observability.sentry import (
+    before_send,
     before_send_log,
     sentry_log_extra,
     user_upload_observability_context,
@@ -77,10 +78,12 @@ def test_sentry_log_extra_flattens_safe_context_and_filters_secret_values():
 
 def test_before_send_log_scrubs_searchable_attributes_and_truncates_body():
     log = {
-        "body": "x" * 2100,
+        "body": "token=secret-value " + ("x" * 2100),
         "attributes": {
             "ff_user_upload_upload_id": 202,
             "authorization": "Bearer secret",
+            "sentry.message.parameter.0": "https://api.telegram.org/bot123:secret/sendPhoto",
+            "message": "callback token=secret-value",
         },
     }
 
@@ -89,5 +92,36 @@ def test_before_send_log_scrubs_searchable_attributes_and_truncates_body():
     assert scrubbed is log
     assert scrubbed["attributes"]["ff_user_upload_upload_id"] == 202
     assert scrubbed["attributes"]["authorization"] == "[Filtered]"
+    assert scrubbed["attributes"]["sentry.message.parameter.0"] == "[Filtered]"
+    assert scrubbed["attributes"]["message"] == "callback token=[Filtered]"
+    assert scrubbed["body"].startswith("token=[Filtered]")
     assert len(scrubbed["body"]) < 2100
     assert scrubbed["body"].endswith("...[truncated]")
+
+
+def test_before_send_drops_exception_frame_vars():
+    event = {
+        "exception": {
+            "values": [
+                {
+                    "stacktrace": {
+                        "frames": [
+                            {
+                                "filename": "src/tgbot/handlers/upload/moderation.py",
+                                "vars": {
+                                    "meme": {"telegram_file_id": "raw-file-id"},
+                                    "image_bytes": "raw-bytes",
+                                },
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    }
+
+    scrubbed = before_send(event, {})
+
+    assert scrubbed is event
+    frame = scrubbed["exception"]["values"][0]["stacktrace"]["frames"][0]
+    assert "vars" not in frame

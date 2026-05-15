@@ -26,6 +26,23 @@ SENSITIVE_KEY_PARTS = (
 
 MAX_CONTEXT_STRING_LENGTH = 500
 MAX_LOG_BODY_LENGTH = 2000
+SENTRY_LOG_PARAMETER_PREFIX = "sentry.message.parameter."
+URL_PATTERN = re.compile(r"https?://[^\s)>\]]+")
+BEARER_TOKEN_PATTERN = re.compile(r"\bBearer\s+[A-Za-z0-9._~+/=-]+", re.IGNORECASE)
+SECRET_ASSIGNMENT_PATTERN = re.compile(
+    r"(?i)\b(api[_-]?key|authorization|bot[_-]?token|dsn|password|secret|token)"
+    r"\s*[:=]\s*([^\s,;]+)"
+)
+TELEGRAM_BOT_TOKEN_PATTERN = re.compile(r"\b\d{6,}:[A-Za-z0-9_-]{20,}\b")
+HIGH_ENTROPY_TOKEN_PATTERN = re.compile(
+    r"\b(?=[A-Za-z0-9_-]{32,}\b)(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9_-]+\b"
+)
+
+
+def before_send(event: dict[str, Any], _hint: dict[str, Any]) -> dict[str, Any] | None:
+    """Remove sensitive exception payloads before Sentry stores an event."""
+    _drop_exception_frame_vars(event)
+    return event
 
 
 def before_send_log(log: dict[str, Any], _hint: dict[str, Any]) -> dict[str, Any] | None:
@@ -33,13 +50,12 @@ def before_send_log(log: dict[str, Any], _hint: dict[str, Any]) -> dict[str, Any
     attributes = log.get("attributes")
     if isinstance(attributes, dict):
         log["attributes"] = {
-            key: "[Filtered]" if _is_sensitive_key(key) else value
-            for key, value in attributes.items()
+            key: _scrub_log_attribute(key, value) for key, value in attributes.items()
         }
 
     body = log.get("body")
-    if isinstance(body, str) and len(body) > MAX_LOG_BODY_LENGTH:
-        log["body"] = body[:MAX_LOG_BODY_LENGTH] + "...[truncated]"
+    if isinstance(body, str):
+        log["body"] = _scrub_log_text(body)
 
     return log
 
@@ -307,6 +323,48 @@ def _clean_scalar(value: Any) -> Any:
     return text
 
 
+def _drop_exception_frame_vars(event: dict[str, Any]) -> None:
+    exception = event.get("exception")
+    if not isinstance(exception, dict):
+        return
+
+    values = exception.get("values")
+    if not isinstance(values, list):
+        return
+
+    for exception_value in values:
+        if not isinstance(exception_value, dict):
+            continue
+        stacktrace = exception_value.get("stacktrace")
+        if not isinstance(stacktrace, dict):
+            continue
+        frames = stacktrace.get("frames")
+        if not isinstance(frames, list):
+            continue
+        for frame in frames:
+            if isinstance(frame, dict):
+                frame.pop("vars", None)
+
+
+def _scrub_log_attribute(key: str, value: Any) -> Any:
+    if _is_sensitive_key(key) or _is_sentry_log_parameter_key(key):
+        return "[Filtered]"
+    if isinstance(value, str):
+        return _scrub_log_text(value)
+    return value
+
+
+def _scrub_log_text(text: str) -> str:
+    scrubbed = URL_PATTERN.sub("[Filtered]", text)
+    scrubbed = BEARER_TOKEN_PATTERN.sub("Bearer [Filtered]", scrubbed)
+    scrubbed = SECRET_ASSIGNMENT_PATTERN.sub(r"\1=[Filtered]", scrubbed)
+    scrubbed = TELEGRAM_BOT_TOKEN_PATTERN.sub("[Filtered]", scrubbed)
+    scrubbed = HIGH_ENTROPY_TOKEN_PATTERN.sub("[Filtered]", scrubbed)
+    if len(scrubbed) > MAX_LOG_BODY_LENGTH:
+        return scrubbed[:MAX_LOG_BODY_LENGTH] + "...[truncated]"
+    return scrubbed
+
+
 def _tag_value(value: Any) -> str:
     return str(_clean_scalar(value))[:200].replace("\n", " ")
 
@@ -320,6 +378,10 @@ def _enum_value(value: Any) -> Any:
 def _is_sensitive_key(key: str) -> bool:
     normalized = key.lower()
     return any(part in normalized for part in SENSITIVE_KEY_PARTS)
+
+
+def _is_sentry_log_parameter_key(key: str) -> bool:
+    return key.lower().startswith(SENTRY_LOG_PARAMETER_PREFIX)
 
 
 def _is_raw_telegram_file_id_key(key: str) -> bool:
