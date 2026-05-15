@@ -269,7 +269,8 @@ async def search_memes_for_inline_query(search_query: str, limit: int) -> list[d
                 ),
                 word_similarity(:search_query, COALESCE(M.ocr_result ->> 'description', '')) * 0.9
             ) AS inline_search_score,
-            COALESCE((MS.nlikes + 1.) / NULLIF(MS.nlikes + MS.ndislikes + 1, 0), 0.5)
+            (COALESCE(MS.nlikes, 0) + 1.)
+            / (COALESCE(MS.nlikes, 0) + COALESCE(MS.ndislikes, 0) + 2)
             * CASE WHEN COALESCE(MS.raw_impr_rank, 99999) <= 1 THEN 1 ELSE 0.8 END
             * CASE WHEN COALESCE(MS.age_days, 99999) < 90 THEN 1 ELSE 0.8 END
             * CASE
