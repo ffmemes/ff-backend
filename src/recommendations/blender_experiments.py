@@ -33,6 +33,11 @@ RECENTLY_LIKED_BLENDER_V2_QUARTILE_BOUNDARIES_LOCK_KEY = (
 )
 RECENTLY_LIKED_BLENDER_V2_QUARTILE_BOUNDARIES_TTL_SECONDS = 15 * 60
 RECENTLY_LIKED_BLENDER_V2_QUARTILE_BOUNDARIES_LOCK_SECONDS = 30
+TEXT_LIGHT_BLENDER_V1_EXPERIMENT_ID = "text_light_blender_v1"
+TEXT_LIGHT_BLENDER_V1_CONTROL = "control"
+TEXT_LIGHT_BLENDER_V1_TREATMENT = "treatment_text_light_lr_smoothed"
+TEXT_LIGHT_BLENDER_V1_MAX_OCR_WORDS = 30
+TEXT_LIGHT_BLENDER_V1_SAMPLE_GATE_PER_VARIANT = 1000
 
 MATURE_BLENDER_CONTROL_WEIGHTS = {
     "best_uploaded_memes": 0.3,
@@ -64,6 +69,21 @@ def _weights_for_variant(variant: str) -> dict[str, float]:
     if variant == RECENTLY_LIKED_BLENDER_V2_TREATMENT:
         return dict(MATURE_BLENDER_TREATMENT_WEIGHTS)
     return dict(MATURE_BLENDER_CONTROL_WEIGHTS)
+
+
+def _text_light_weights(base_weights: dict[str, float]) -> dict[str, float]:
+    weights = dict(base_weights)
+    lr_weight = weights.pop("lr_smoothed", 0.0)
+    weights["text_light_lr_smoothed"] = lr_weight
+    return weights
+
+
+def _text_light_variant_for_user(user_id: int) -> str:
+    key = f"{TEXT_LIGHT_BLENDER_V1_EXPERIMENT_ID}:{user_id}"
+    bucket = int.from_bytes(hashlib.sha256(key.encode("utf-8")).digest()[:8], "big") % 2
+    if bucket == 0:
+        return TEXT_LIGHT_BLENDER_V1_CONTROL
+    return TEXT_LIGHT_BLENDER_V1_TREATMENT
 
 
 def _coerce_lr_quartile_boundaries(raw_boundaries: Any) -> tuple[float, float, float] | None:
@@ -350,3 +370,73 @@ async def get_recently_liked_blender_v2_weights(user_id: int) -> dict[str, float
         return dict(MATURE_BLENDER_CONTROL_WEIGHTS)
 
     return _weights_for_variant(variant)
+
+
+def build_text_light_blender_v1_assignment(
+    user_id: int,
+    base_weights: dict[str, float],
+) -> tuple[str, dict[str, Any]]:
+    variant = _text_light_variant_for_user(user_id)
+    treatment_weights = _text_light_weights(base_weights)
+    assignment_metadata = {
+        "assignment_strategy": "sha256(experiment_id:user_id)%2",
+        "max_ocr_words": TEXT_LIGHT_BLENDER_V1_MAX_OCR_WORDS,
+        "filtered_engine": "text_light_lr_smoothed",
+        "control_engine": "lr_smoothed",
+        "sample_gate_per_variant": TEXT_LIGHT_BLENDER_V1_SAMPLE_GATE_PER_VARIANT,
+        "primary_read": "compare post-assignment like_rate, session depth, fast-skip rate",
+        "base_weights": dict(base_weights),
+        "assigned_weights": (
+            treatment_weights if variant == TEXT_LIGHT_BLENDER_V1_TREATMENT else dict(base_weights)
+        ),
+    }
+    return variant, assignment_metadata
+
+
+async def get_or_assign_text_light_blender_v1_variant(
+    user_id: int,
+    base_weights: dict[str, float],
+) -> str:
+    assignment = await get_experiment_assignment(
+        user_id,
+        TEXT_LIGHT_BLENDER_V1_EXPERIMENT_ID,
+    )
+    if assignment is not None:
+        return assignment["variant"]
+
+    proposed_variant, assignment_metadata = build_text_light_blender_v1_assignment(
+        user_id,
+        base_weights,
+    )
+    inserted = await assign_experiment(
+        user_id,
+        TEXT_LIGHT_BLENDER_V1_EXPERIMENT_ID,
+        proposed_variant,
+        assignment_metadata,
+    )
+    if inserted:
+        return proposed_variant
+
+    return (
+        await get_experiment_variant(user_id, TEXT_LIGHT_BLENDER_V1_EXPERIMENT_ID)
+        or TEXT_LIGHT_BLENDER_V1_CONTROL
+    )
+
+
+async def get_text_light_blender_v1_weights(
+    user_id: int,
+    base_weights: dict[str, float],
+) -> dict[str, float]:
+    try:
+        variant = await get_or_assign_text_light_blender_v1_variant(user_id, base_weights)
+    except Exception:
+        logger.warning(
+            "text-light blender v1 assignment failed for user %d",
+            user_id,
+            exc_info=True,
+        )
+        return dict(base_weights)
+
+    if variant == TEXT_LIGHT_BLENDER_V1_TREATMENT:
+        return _text_light_weights(base_weights)
+    return dict(base_weights)

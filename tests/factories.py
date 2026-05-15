@@ -77,6 +77,7 @@ async def create_meme(
     raw_meme_id: int | None = None,
     published_at: datetime | None = None,
     created_at: datetime | None = None,
+    ocr_result: dict | None = None,
 ) -> dict:
     if raw_meme_id is None:
         raw_meme_id = id
@@ -93,6 +94,7 @@ async def create_meme(
         "language_code": language_code,
         "telegram_file_id": telegram_file_id,
         "caption": caption,
+        "ocr_result": ocr_result,
         "published_at": published_at,
         "created_at": created_at,
     }

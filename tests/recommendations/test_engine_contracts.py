@@ -99,6 +99,7 @@ async def base_data():
 ENGINES_LEFT_JOIN_UMSS = [
     "best_uploaded_memes",
     "lr_smoothed",
+    "text_light_lr_smoothed",
     "like_spread_and_recent_memes",
     "es_ranked",
 ]

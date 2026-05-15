@@ -40,7 +40,10 @@ class CandidateSelectionPlan:
         object.__setattr__(self, "fallback_engines", tuple(self.fallback_engines))
 
 
-LR_SMOOTHED_COLD_FALLBACK = EngineFallback("lr_smoothed", {"min_sends": 10})
+TEXT_LIGHT_LR_SMOOTHED_COLD_FALLBACK = EngineFallback(
+    "text_light_lr_smoothed",
+    {"min_sends": 10},
+)
 BEST_UPLOADED_FALLBACK = EngineFallback("best_uploaded_memes")
 
 
@@ -49,14 +52,14 @@ def plan_candidate_selection(nmemes_sent: int) -> CandidateSelectionPlan:
         return CandidateSelectionPlan(
             maturity_stage=COLD_START_1,
             primary_engine="cold_start_explore",
-            fallback_engines=(LR_SMOOTHED_COLD_FALLBACK, BEST_UPLOADED_FALLBACK),
+            fallback_engines=(TEXT_LIGHT_LR_SMOOTHED_COLD_FALLBACK, BEST_UPLOADED_FALLBACK),
         )
 
     if nmemes_sent < 16:
         return CandidateSelectionPlan(
             maturity_stage=COLD_START_2,
             primary_engine="cold_start_adapt",
-            fallback_engines=(LR_SMOOTHED_COLD_FALLBACK, BEST_UPLOADED_FALLBACK),
+            fallback_engines=(TEXT_LIGHT_LR_SMOOTHED_COLD_FALLBACK, BEST_UPLOADED_FALLBACK),
         )
 
     if nmemes_sent < 30:
@@ -65,13 +68,13 @@ def plan_candidate_selection(nmemes_sent: int) -> CandidateSelectionPlan:
             primary_engine=None,
             blend_weights={
                 "cold_start_adapt": 0.5,
-                "lr_smoothed": 0.3,
+                "text_light_lr_smoothed": 0.3,
                 "like_spread_and_recent_memes": 0.2,
             },
             fixed_pos={0: "cold_start_adapt"},
             fallback_engines=(
                 EngineFallback("cold_start_adapt"),
-                LR_SMOOTHED_COLD_FALLBACK,
+                TEXT_LIGHT_LR_SMOOTHED_COLD_FALLBACK,
                 BEST_UPLOADED_FALLBACK,
             ),
         )

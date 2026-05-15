@@ -14,6 +14,17 @@ logger = logging.getLogger(__name__)
 GOAT_MIN_REACTIONS = 10  # (nlikes + ndislikes) — enough statistical signal
 GOAT_MIN_LR = 0.20  # lr_smoothed — minimum proven like rate
 GOAT_MIN_AGE_DAYS = 3  # days since created_at — must have aged enough to accumulate reactions
+TEXT_LIGHT_MAX_OCR_WORDS = 30
+
+_OCR_TEXT_SQL = "trim(coalesce(M.ocr_result->>'text', M.ocr_result->'raw_result'->>'ocr_text', ''))"
+TEXT_LIGHT_OCR_FILTER_SQL = f"""
+            AND (
+                CASE
+                    WHEN {_OCR_TEXT_SQL} = '' THEN 0
+                    ELSE cardinality(regexp_split_to_array({_OCR_TEXT_SQL}, '[[:space:]]+'))
+                END
+            ) <= :text_light_max_ocr_words
+"""
 
 
 def _build_params(
@@ -113,11 +124,13 @@ async def like_spread_and_recent_memes(
     return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
 
 
-async def get_lr_smoothed(
+async def _get_lr_smoothed_candidates(
     user_id: int,
     limit: int = 10,
     exclude_meme_ids: list[int] = [],
     min_sends: int = 0,
+    recommended_by: str = "lr_smoothed",
+    text_light: bool = False,
 ):
     """
     Uses the following score to rank memes
@@ -130,12 +143,13 @@ async def get_lr_smoothed(
     """
 
     min_sends_filter = "AND MS.nmemes_sent >= :min_sends" if min_sends > 0 else ""
+    text_light_filter = TEXT_LIGHT_OCR_FILTER_SQL if text_light else ""
 
     query = f"""
         SELECT
             M.id
             , M.type, M.telegram_file_id, M.caption
-            , 'lr_smoothed' AS recommended_by
+            , :recommended_by AS recommended_by
             , COALESCE(MS.nlikes, 0) AS nlikes
 
         FROM meme M
@@ -159,6 +173,7 @@ async def get_lr_smoothed(
             AND R.meme_id IS NULL
             AND MS.nlikes > 1
             {min_sends_filter}
+            {text_light_filter}
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
 
         ORDER BY -1
@@ -166,10 +181,44 @@ async def get_lr_smoothed(
             * MS.lr_smoothed
         LIMIT :limit
     """
-    params = _build_params(user_id, limit, exclude_meme_ids)
+    params = _build_params(user_id, limit, exclude_meme_ids, recommended_by=recommended_by)
     if min_sends > 0:
         params["min_sends"] = int(min_sends)
+    if text_light:
+        params["text_light_max_ocr_words"] = TEXT_LIGHT_MAX_OCR_WORDS
     return await fetch_all(text(query), params)
+
+
+async def get_lr_smoothed(
+    user_id: int,
+    limit: int = 10,
+    exclude_meme_ids: list[int] = [],
+    min_sends: int = 0,
+):
+    return await _get_lr_smoothed_candidates(
+        user_id,
+        limit,
+        exclude_meme_ids,
+        min_sends=min_sends,
+        recommended_by="lr_smoothed",
+        text_light=False,
+    )
+
+
+async def get_text_light_lr_smoothed(
+    user_id: int,
+    limit: int = 10,
+    exclude_meme_ids: list[int] = [],
+    min_sends: int = 0,
+):
+    return await _get_lr_smoothed_candidates(
+        user_id,
+        limit,
+        exclude_meme_ids,
+        min_sends=min_sends,
+        recommended_by="text_light_lr_smoothed",
+        text_light=True,
+    )
 
 
 async def get_es_ranked(
@@ -396,13 +445,22 @@ async def cold_start_explore(
             AND R.meme_id IS NULL
             AND (MS.nlikes + MS.ndislikes) >= 20
             AND MS.lr_smoothed >= 0.10
+            {TEXT_LIGHT_OCR_FILTER_SQL}
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
 
         ORDER BY (MS.nlikes::float / NULLIF(MS.nlikes + MS.ndislikes, 0)) DESC,
                  (MS.nlikes + MS.ndislikes) DESC
         LIMIT :limit
     """
-    return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
+    return await fetch_all(
+        text(query),
+        _build_params(
+            user_id,
+            limit,
+            exclude_meme_ids,
+            text_light_max_ocr_words=TEXT_LIGHT_MAX_OCR_WORDS,
+        ),
+    )
 
 
 async def cold_start_adapt(
@@ -462,6 +520,7 @@ async def cold_start_adapt(
             AND R.meme_id IS NULL
             AND MS.nlikes > 1
             AND MS.nmemes_sent >= 10
+            {TEXT_LIGHT_OCR_FILTER_SQL}
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
 
         ORDER BY -1
@@ -469,7 +528,15 @@ async def cold_start_adapt(
             * MS.lr_smoothed
         LIMIT :limit
     """
-    return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
+    return await fetch_all(
+        text(query),
+        _build_params(
+            user_id,
+            limit,
+            exclude_meme_ids,
+            text_light_max_ocr_words=TEXT_LIGHT_MAX_OCR_WORDS,
+        ),
+    )
 
 
 class CandidatesRetriever:
@@ -478,6 +545,7 @@ class CandidatesRetriever:
     engine_map = {
         "best_uploaded_memes": best_uploaded_memes,
         "lr_smoothed": get_lr_smoothed,
+        "text_light_lr_smoothed": get_text_light_lr_smoothed,
         "like_spread_and_recent_memes": like_spread_and_recent_memes,
         "recently_liked": get_recently_liked,
         "goat": goat,
