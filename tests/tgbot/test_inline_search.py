@@ -20,7 +20,7 @@ async def test_inline_search_uses_old_new_ocr_and_openrouter_description(monkeyp
     assert "ocr_result ->> 'text'" in captured["query"]
     assert "ocr_result -> 'raw_result' ->> 'ocr_text'" in captured["query"]
     assert "ocr_result ->> 'description'" in captured["query"]
-    assert "ILIKE :search_pattern" in captured["query"]
+    assert "ILIKE :search_pattern ESCAPE '\\'" in captured["query"]
     assert "% :search_query" in captured["query"]
     assert captured["params"] == {
         "search_query": "деньги",
@@ -44,3 +44,19 @@ async def test_inline_search_clamps_limit(monkeypatch):
     await service.search_memes_for_inline_query("money", limit=1000)
 
     assert captured["params"]["limit"] == 50
+
+
+@pytest.mark.asyncio
+async def test_inline_search_escapes_like_wildcards(monkeypatch):
+    captured = {}
+
+    async def fake_fetch_all(query, params=None):
+        captured["params"] = params
+        return []
+
+    monkeypatch.setattr(service, "fetch_all", fake_fetch_all)
+
+    await service.search_memes_for_inline_query(r"%%_\\", limit=10)
+
+    assert captured["params"]["search_query"] == r"%%_\\"
+    assert captured["params"]["search_pattern"] == r"%\%\%\_\\\\%"
