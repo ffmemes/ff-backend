@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 import pytest_asyncio
@@ -15,16 +15,23 @@ from tests.factories import TEST_ID_START, cleanup_test_data, create_meme_source
 IN_MODERATION_SOURCE_ID = TEST_ID_START + 2100
 ENABLED_SOURCE_ID = TEST_ID_START + 2101
 MALFORMED_SOURCE_ID = TEST_ID_START + 2102
+TOP_VIEWED_SOURCE_ID = TEST_ID_START + 2103
 
 
-def _post(source_id: int, post_id: int) -> TgChannelPostParsingResult:
+def _post(
+    source_id: int,
+    post_id: int,
+    *,
+    views: int = 100,
+    date: datetime | None = None,
+) -> TgChannelPostParsingResult:
     return TgChannelPostParsingResult(
         post_id=post_id,
         url=f"https://t.me/test_source_{source_id}/{post_id}",
         content="мем дня",
         media=[{"url": "https://example.com/meme.jpg"}],
-        views=100,
-        date=datetime.utcnow(),
+        views=views,
+        date=date or datetime.utcnow(),
     )
 
 
@@ -34,7 +41,14 @@ async def conn():
         yield conn
         await conn.execute(
             delete(meme_source).where(
-                meme_source.c.id.in_([IN_MODERATION_SOURCE_ID, ENABLED_SOURCE_ID])
+                meme_source.c.id.in_(
+                    [
+                        IN_MODERATION_SOURCE_ID,
+                        ENABLED_SOURCE_ID,
+                        MALFORMED_SOURCE_ID,
+                        TOP_VIEWED_SOURCE_ID,
+                    ]
+                )
             )
         )
         await conn.commit()
@@ -115,3 +129,60 @@ async def test_telegram_etl_ignores_malformed_media_rows(conn: AsyncConnection):
 
     created = await fetch_one(select(meme).where(meme.c.meme_source_id == MALFORMED_SOURCE_ID))
     assert created is None
+
+
+@pytest.mark.asyncio
+async def test_telegram_etl_promotes_top_five_views_from_latest_ten_posts(
+    conn: AsyncConnection,
+):
+    await create_meme_source(
+        conn,
+        id=TOP_VIEWED_SOURCE_ID,
+        status=MemeSourceStatus.PARSING_ENABLED.value,
+    )
+    await conn.commit()
+
+    base_date = datetime(2026, 1, 1, 12, 0, 0)
+    posts = [
+        # Older than the latest-10 window: high views must not matter.
+        _post(TOP_VIEWED_SOURCE_ID, 4001, views=9999, date=base_date),
+        _post(TOP_VIEWED_SOURCE_ID, 4002, views=8888, date=base_date + timedelta(minutes=1)),
+        # Latest 10 posts: only the top 5 by views should enter `meme`.
+        _post(TOP_VIEWED_SOURCE_ID, 4003, views=10, date=base_date + timedelta(minutes=2)),
+        _post(TOP_VIEWED_SOURCE_ID, 4004, views=900, date=base_date + timedelta(minutes=3)),
+        _post(TOP_VIEWED_SOURCE_ID, 4005, views=30, date=base_date + timedelta(minutes=4)),
+        _post(TOP_VIEWED_SOURCE_ID, 4006, views=800, date=base_date + timedelta(minutes=5)),
+        _post(TOP_VIEWED_SOURCE_ID, 4007, views=40, date=base_date + timedelta(minutes=6)),
+        _post(TOP_VIEWED_SOURCE_ID, 4008, views=700, date=base_date + timedelta(minutes=7)),
+        _post(TOP_VIEWED_SOURCE_ID, 4009, views=50, date=base_date + timedelta(minutes=8)),
+        _post(TOP_VIEWED_SOURCE_ID, 4010, views=600, date=base_date + timedelta(minutes=9)),
+        _post(TOP_VIEWED_SOURCE_ID, 4011, views=60, date=base_date + timedelta(minutes=10)),
+        _post(TOP_VIEWED_SOURCE_ID, 4012, views=500, date=base_date + timedelta(minutes=11)),
+    ]
+
+    await insert_parsed_posts_from_telegram(
+        TOP_VIEWED_SOURCE_ID,
+        posts,
+        discover_candidates=False,
+    )
+    await etl_memes_from_raw_telegram_posts([TOP_VIEWED_SOURCE_ID], fresh_only=False)
+
+    created = await fetch_one(
+        select(func.count().label("n"))
+        .select_from(meme)
+        .where(meme.c.meme_source_id == TOP_VIEWED_SOURCE_ID)
+    )
+    rows = await conn.execute(
+        select(meme_raw_telegram.c.post_id)
+        .select_from(meme)
+        .join(
+            meme_raw_telegram,
+            (meme_raw_telegram.c.id == meme.c.raw_meme_id)
+            & (meme_raw_telegram.c.meme_source_id == meme.c.meme_source_id),
+        )
+        .where(meme.c.meme_source_id == TOP_VIEWED_SOURCE_ID)
+        .order_by(meme_raw_telegram.c.post_id)
+    )
+
+    assert created["n"] == 5
+    assert [row.post_id for row in rows] == [4004, 4006, 4008, 4010, 4012]
