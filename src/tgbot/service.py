@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Sequence
 
-from sqlalchemy import bindparam, exists, select, text
+from sqlalchemy import exists, select, text
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database import (
@@ -236,19 +236,56 @@ async def promote_source_candidate(
 
 
 async def search_memes_for_inline_query(search_query: str, limit: int) -> list[dict[str, Any]]:
-    select_query = f"""
+    limit = max(1, min(limit, 50))
+    select_query = """
         SELECT
-            M.*
+            M.*,
+            GREATEST(
+                CASE WHEN M.ocr_result ->> 'text' ILIKE :search_pattern THEN 1.0 ELSE 0.0 END,
+                CASE
+                    WHEN M.ocr_result -> 'raw_result' ->> 'ocr_text' ILIKE :search_pattern
+                    THEN 1.0
+                    ELSE 0.0
+                END,
+                CASE
+                    WHEN M.ocr_result ->> 'description' ILIKE :search_pattern
+                    THEN 0.9
+                    ELSE 0.0
+                END,
+                word_similarity(:search_query, COALESCE(M.ocr_result ->> 'text', '')),
+                word_similarity(
+                    :search_query,
+                    COALESCE(M.ocr_result -> 'raw_result' ->> 'ocr_text', '')
+                ),
+                word_similarity(:search_query, COALESCE(M.ocr_result ->> 'description', '')) * 0.9
+            ) AS inline_search_score
         FROM meme M
-        WHERE M.status = '{MemeStatus.OK}'
-        AND M.type = '{MemeType.IMAGE}'
-        AND M.ocr_result IS NOT NULL
-        ORDER BY word_similarity(:search_query, M.ocr_result ->> 'text') DESC
-        LIMIT {limit};
+        WHERE M.status = :status
+            AND M.type = :type
+            AND M.telegram_file_id IS NOT NULL
+            AND (
+                M.ocr_result ->> 'text' ILIKE :search_pattern
+                OR M.ocr_result -> 'raw_result' ->> 'ocr_text' ILIKE :search_pattern
+                OR M.ocr_result ->> 'description' ILIKE :search_pattern
+                OR (M.ocr_result ->> 'text') % :search_query
+                OR (M.ocr_result -> 'raw_result' ->> 'ocr_text') % :search_query
+                OR (M.ocr_result ->> 'description') % :search_query
+            )
+        ORDER BY inline_search_score DESC, M.published_at DESC
+        LIMIT :limit;
     """
-    select_statement = text(select_query).bindparams(bindparam("search_query", value=search_query))
+    select_statement = text(select_query)
 
-    return await fetch_all(select_statement)
+    return await fetch_all(
+        select_statement,
+        {
+            "search_query": search_query,
+            "search_pattern": f"%{search_query}%",
+            "status": MemeStatus.OK.value,
+            "type": MemeType.IMAGE.value,
+            "limit": limit,
+        },
+    )
 
 
 async def get_user_languages(
