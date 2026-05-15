@@ -236,6 +236,10 @@ async def etl_memes_from_raw_telegram_posts(
                             NOT :filter_meme_source_ids
                             OR MRT.meme_source_id = ANY(:meme_source_ids)
                         )
+                        AND (
+                            NOT :fresh_only
+                            OR COALESCE(MRT.updated_at, MRT.created_at) >= NOW() - INTERVAL '24 hours'
+                        )
                 ),
                 top_viewed_recent_posts AS (
                     SELECT id

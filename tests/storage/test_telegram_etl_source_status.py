@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from src.database import engine, fetch_one, meme, meme_raw_telegram, meme_source
+from src.storage import etl as telegram_etl
 from src.storage.constants import MemeSourceStatus
 from src.storage.etl import etl_memes_from_raw_telegram_posts, insert_parsed_posts_from_telegram
 from src.storage.parsers.schemas import TgChannelPostParsingResult
@@ -53,6 +54,34 @@ async def conn():
         )
         await conn.commit()
         await cleanup_test_data(conn)
+
+
+@pytest.mark.asyncio
+async def test_telegram_etl_applies_freshness_before_top_view_ranking(monkeypatch):
+    captured_queries = []
+
+    async def fake_fetch_all(query, params=None):
+        captured_queries.append((str(query), params))
+        return []
+
+    async def fake_update_or_create_memes(transformed_memes, memes_not_in_memes_table):
+        return None
+
+    monkeypatch.setattr(telegram_etl, "fetch_all", fake_fetch_all)
+    monkeypatch.setattr(telegram_etl, "update_or_create_memes", fake_update_or_create_memes)
+
+    await etl_memes_from_raw_telegram_posts(fresh_only=True)
+
+    transform_query, transform_params = captured_queries[0]
+    latest_source_posts_query = transform_query.split("latest_source_posts AS (", 1)[1].split(
+        "),\n                top_viewed_recent_posts", 1
+    )[0]
+
+    assert transform_params["fresh_only"] is True
+    assert "NOT :fresh_only" in latest_source_posts_query
+    assert "COALESCE(MRT.updated_at, MRT.created_at) >= NOW() - INTERVAL '24 hours'" in (
+        latest_source_posts_query
+    )
 
 
 @pytest.mark.asyncio
