@@ -15,6 +15,18 @@ from src.tgbot.router import router as tgbot_router
 logger = logging.getLogger(__name__)
 
 
+def _filter_expected_sentry_events(event, hint):  # noqa: ANN001
+    exception_values = event.get("exception", {}).get("values", [])
+    for exception in exception_values:
+        if (
+            exception.get("type") == "MaxTurnsExceeded"
+            and exception.get("module") == "agents.exceptions"
+        ):
+            return None
+
+    return event
+
+
 @asynccontextmanager
 async def lifespan(_application: FastAPI) -> AsyncGenerator:
     # Startup
@@ -53,6 +65,7 @@ if settings.ENVIRONMENT.is_deployed:
         ignore_errors=[
             "telegram.error.Forbidden",  # handled by error.py → marks user as blocked_bot
         ],
+        before_send=_filter_expected_sentry_events,
     )
 
 

@@ -7,6 +7,7 @@ import pytest
 
 from src.tgbot import service
 from src.tgbot.constants import UserType
+from src.tgbot.handlers import block
 
 
 def test_blocked_bot_at_timestamp_converts_aware_datetime_to_naive_utc() -> None:
@@ -50,3 +51,39 @@ async def test_mark_user_blocked_sends_naive_timestamp_to_db(monkeypatch) -> Non
     blocked_bot_at = update_user.await_args.kwargs["blocked_bot_at"]
     assert blocked_bot_at == datetime(2026, 4, 27, 20, 0, 27)
     assert blocked_bot_at.tzinfo is None
+
+
+@pytest.mark.asyncio
+async def test_handle_user_blocked_bot_escapes_admin_log_html(monkeypatch) -> None:
+    messages = []
+    user = SimpleNamespace(id=10002, name="<3", language_code="<en>")
+    update = SimpleNamespace(
+        effective_chat=SimpleNamespace(id=10002),
+        my_chat_member=SimpleNamespace(
+            from_user=user,
+            date=datetime(2026, 5, 11, 7, 18, 19, tzinfo=timezone.utc),
+        ),
+    )
+    context = SimpleNamespace(bot=object())
+
+    monkeypatch.setattr(
+        block,
+        "mark_user_blocked",
+        AsyncMock(
+            return_value={
+                "created_at": datetime(2024, 2, 18, 12, 57, 50),
+                "nickname": "<boss>",
+            }
+        ),
+    )
+
+    async def fake_log(message, _bot):
+        messages.append(message)
+
+    monkeypatch.setattr(block, "log", fake_log)
+
+    await block.handle_user_blocked_bot(update, context)
+
+    assert "&lt;3" in messages[0]
+    assert "&lt;en&gt;" in messages[0]
+    assert "&lt;boss&gt;" in messages[0]

@@ -5,11 +5,13 @@ Methods for Meme uploading via bot:
 """
 
 import asyncio
+import logging
 import re
 from datetime import datetime
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ChatType, ParseMode
+from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 from src import localizer
@@ -41,6 +43,7 @@ from src.tgbot.user_info import get_user_info
 from src.tgbot.utils import (
     check_if_user_follows_related_channel,
     get_related_channel_link,
+    safe_answer_callback_query,
 )
 
 RULES_ACCEPTED_CALLBACK_DATA_PATTERN = "upload:{upload_id}:rules:accepted"
@@ -53,6 +56,8 @@ LANGUAGE_SELECTED_OTHER_CALLBACK_DATA_PATTERN = "upload:{upload_id}:lang:other"
 LANGUAGE_SELECTED_OTHER_CALLBACK_DATA_REGEXP = r"upload:(\d+):lang:other"
 
 UPLOAD_BAN_INVITES_TO_UNLOCK = 20
+
+logger = logging.getLogger(__name__)
 
 
 def get_upload_banned_message(invited_users: int) -> str:
@@ -272,14 +277,15 @@ async def handle_rules_accepted_callback(
     _: ContextTypes.DEFAULT_TYPE,
 ) -> None:
     # user accepted the rules. Next, we need to ask to specify the language of a meme
-    await update.callback_query.answer()
+    await safe_answer_callback_query(update.callback_query)
     user_info = await get_user_info(update.effective_user.id)
 
     upload_id = int(
         re.match(RULES_ACCEPTED_CALLBACK_DATA_REGEXP, update.callback_query.data).group(1)
     )
 
-    await update.callback_query.message.edit_caption(
+    await _edit_upload_callback_caption(
+        update.callback_query.message,
         localizer.t("upload.select_language", user_info["interface_lang"]),
         reply_markup=InlineKeyboardMarkup(get_meme_language_selector_keyboard(upload_id)),
         parse_mode=ParseMode.HTML,
@@ -291,7 +297,7 @@ async def handle_meme_upload_lang_other(
     update: Update,
     _: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    await update.callback_query.answer()
+    await safe_answer_callback_query(update.callback_query)
     user_info = await get_user_info(update.effective_user.id)
     await update.effective_user.send_message(
         localizer.t("upload.we_can_add_language_you_need", user_info["interface_lang"]),
@@ -303,7 +309,7 @@ async def handle_meme_upload_lang_selected(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    await update.callback_query.answer()
+    await safe_answer_callback_query(update.callback_query)
     user_info = await get_user_info(update.effective_user.id)
 
     reg = re.match(LANGUAGE_SELECTED_CALLBACK_DATA_REGEXP, update.callback_query.data)
@@ -316,7 +322,8 @@ async def handle_meme_upload_lang_selected(
 
     # TODO: create a meme object from meme_raw_upload
 
-    await update.callback_query.message.edit_caption(
+    await _edit_upload_callback_caption(
+        update.callback_query.message,
         localizer.t("upload.submitted", user_info["interface_lang"]),
         reply_markup=None,
         parse_mode=ParseMode.HTML,
@@ -326,3 +333,12 @@ async def handle_meme_upload_lang_selected(
     await check_queue(update.effective_user.id)  # to ensure user has memes in queue
     await asyncio.sleep(5)
     await next_message(context.bot, update.effective_user.id, update)
+
+
+async def _edit_upload_callback_caption(message, caption: str, **kwargs) -> None:
+    try:
+        await message.edit_caption(caption, **kwargs)
+    except BadRequest as error:
+        if "message is not modified" not in str(error).lower():
+            raise
+        logger.info("Upload callback caption already matched the requested state")

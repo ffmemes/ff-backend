@@ -24,6 +24,7 @@ from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
 from src.tgbot.senders.meme_like_count_experiment import get_visible_meme_like_count
 from src.tgbot.senders.utils import collect_user_languages, has_russian_language
 from src.tgbot.service import mark_user_blocked
+from src.tgbot.telegram_retry import telegram_call_with_retry
 from src.tgbot.user_info import get_user_info
 
 logger = logging.getLogger(__name__)
@@ -112,32 +113,38 @@ async def send_new_message_with_meme(
     reply_markup: InlineKeyboardMarkup | None = None,
 ) -> Message:
     async def _do_send(parse_mode):
-        if meme.type == MemeType.IMAGE:
-            return await bot.send_photo(
-                chat_id=user_id,
-                photo=meme.telegram_file_id,
-                caption=meme.caption,
-                reply_markup=reply_markup,
-                parse_mode=parse_mode,
-            )
-        elif meme.type == MemeType.VIDEO:
-            return await bot.send_video(
-                chat_id=user_id,
-                video=meme.telegram_file_id,
-                caption=meme.caption,
-                reply_markup=reply_markup,
-                parse_mode=parse_mode,
-            )
-        elif meme.type == MemeType.ANIMATION:
-            return await bot.send_animation(
-                chat_id=user_id,
-                animation=meme.telegram_file_id,
-                caption=meme.caption,
-                reply_markup=reply_markup,
-                parse_mode=parse_mode,
-            )
-        else:
-            raise NotImplementedError(f"Can't send meme. Unknown meme type: {meme.type}")
+        async def _send():
+            if meme.type == MemeType.IMAGE:
+                return await bot.send_photo(
+                    chat_id=user_id,
+                    photo=meme.telegram_file_id,
+                    caption=meme.caption,
+                    reply_markup=reply_markup,
+                    parse_mode=parse_mode,
+                )
+            elif meme.type == MemeType.VIDEO:
+                return await bot.send_video(
+                    chat_id=user_id,
+                    video=meme.telegram_file_id,
+                    caption=meme.caption,
+                    reply_markup=reply_markup,
+                    parse_mode=parse_mode,
+                )
+            elif meme.type == MemeType.ANIMATION:
+                return await bot.send_animation(
+                    chat_id=user_id,
+                    animation=meme.telegram_file_id,
+                    caption=meme.caption,
+                    reply_markup=reply_markup,
+                    parse_mode=parse_mode,
+                )
+            else:
+                raise NotImplementedError(f"Can't send meme. Unknown meme type: {meme.type}")
+
+        return await telegram_call_with_retry(
+            _send,
+            action=f"send_meme_{meme.type.value}",
+        )
 
     try:
         return await _do_send(ParseMode.HTML)
@@ -161,16 +168,34 @@ async def edit_last_message_with_meme(
     reply_markup: InlineKeyboardMarkup | None = None,
 ) -> Message | None:
     try:
-        await message.edit_media(
-            media=get_input_media(meme),
-            reply_markup=reply_markup,
-        )
-        return await message.edit_caption(
-            caption=meme.caption,
-            parse_mode=ParseMode.HTML,
-            reply_markup=reply_markup,
+        try:
+            await telegram_call_with_retry(
+                lambda: message.edit_media(
+                    media=get_input_media(meme),
+                    reply_markup=reply_markup,
+                ),
+                action="edit_media",
+            )
+        except BadRequest as error:
+            if not _is_message_not_modified_error(error):
+                raise
+            logger.info("Telegram media for meme %s was already current", meme.id)
+        return await telegram_call_with_retry(
+            lambda: message.edit_caption(
+                caption=meme.caption,
+                parse_mode=ParseMode.HTML,
+                reply_markup=reply_markup,
+            ),
+            action="edit_caption",
         )
     except BadRequest as error:
         if "Message to edit not found" in str(error):
             return None
+        if _is_message_not_modified_error(error):
+            logger.info("Telegram message for meme %s was already current", meme.id)
+            return message
         raise
+
+
+def _is_message_not_modified_error(error: BadRequest) -> bool:
+    return "message is not modified" in str(error).lower()
