@@ -22,6 +22,7 @@ from src.tgbot.user_info import get_user_info
 
 MIN_SEARCH_QUERY_LENGTH = 3
 MAX_SEARCH_QUERY_LENGTH = 128
+INLINE_SEARCH_RESULT_LIMIT = 20
 INLINE_SEARCH_RESULT_CACHE_SECONDS = 60 * 60 * 12  # 12 hours
 
 
@@ -81,7 +82,7 @@ async def search_inline(update: Update, _: ContextTypes.DEFAULT_TYPE):
             ),
         )
 
-    memes = await search_memes_for_inline_query(query, limit=10)
+    memes = await search_memes_for_inline_query(query, limit=INLINE_SEARCH_RESULT_LIMIT)
 
     if len(memes) == 0:
         no_results_button = InlineQueryResultsButton(
