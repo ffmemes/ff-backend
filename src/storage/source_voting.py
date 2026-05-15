@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
 from telegram import Bot
+from telegram.error import TelegramError
 
 from src.database import (
     execute,
@@ -538,22 +539,17 @@ async def select_daily_source_candidate() -> dict[str, Any] | None:
 
 def format_source_candidate_poll_message(
     candidate: dict[str, Any],
-    prepared: dict[str, Any],
+    _prepared: dict[str, Any],
 ) -> str:
-    evidence = prepared.get("cyrillic_evidence") or "кириллица найдена в последних постах"
-    first_seen = candidate.get("first_seen_at")
-    last_seen = candidate.get("last_seen_at")
     return "\n".join(
         [
             "Добавляем новый источник мемов?",
             "",
-            f"Источник: {candidate['url']}",
-            f"Форвардов в текущих источниках: {candidate['times_forwarded']}",
-            f"Первый раз видели: {first_seen}",
-            f"Последний раз видели: {last_seen}",
-            f"Русскоязычный сигнал: {evidence}",
+            f"🔗 {candidate['url']}",
             "",
-            "Голосование решает, добавляем ли источник в обычный парсинг и рекомендации.",
+            f"Наши паблики пересылали мемы оттуда {candidate['times_forwarded']} раз.",
+            "Откройте ссылку и проголосуйте ниже.",
+            "Голосование решит, начнем ли брать оттуда мемы на постоянке.",
         ]
     )
 
@@ -677,6 +673,16 @@ async def post_source_candidate_poll_message(
         reply_markup=source_candidate_vote_keyboard(poll["id"]),
         disable_web_page_preview=True,
     )
+    if hasattr(bot, "pin_chat_message"):
+        try:
+            await bot.pin_chat_message(
+                chat_id=poll["chat_id"],
+                message_id=message.message_id,
+                disable_notification=True,
+            )
+        except TelegramError:
+            # Best-effort: poll should still stay open even if bot cannot pin.
+            pass
     opened = await mark_source_candidate_poll_open(
         poll["id"],
         message_id=message.message_id,
