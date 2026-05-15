@@ -16,6 +16,7 @@ from telegram.ext import (
 )
 
 from src.config import settings
+from src.observability.sentry import telegram_update_scope
 from src.tgbot.constants import (
     LANG_SETTINGS_END_CALLBACK_DATA,
     LANG_SETTINGS_LANG_CHANGE_CALLBACK_PATTERN,
@@ -454,36 +455,37 @@ async def process_event(payload: dict) -> None:
     # https://github.com/python-telegram-bot/python-telegram-bot/wiki/Webhooks#custom-solution
 
     lock = None
-    try:
-        user_id = _get_update_user_id(update)
-        if user_id is not None:
-            try:
-                # FastAPI runs webhook background tasks concurrently across Gunicorn workers.
-                # Keep one user's handler chain serialized so double taps/retries don't overlap
-                # DB-heavy reaction and next-message operations.
-                lock = await acquire_update_user_lock(user_id)
-            except Exception:  # noqa: BLE001
-                logging.warning(
-                    "Failed to acquire Telegram update lock for user %s; processing unlocked",
-                    user_id,
-                    exc_info=True,
-                )
-
-        await application.process_update(update)
-    except Exception as e:
-        import sys
-
-        cb = ""
-        if update.callback_query:
-            cb = f" cb={update.callback_query.data}"
-        sys.stderr.write(f"[process_event] UNHANDLED ERROR{cb}: {e}\n")
-        sys.stderr.flush()
-        raise
-    finally:
+    with telegram_update_scope(update):
         try:
-            await release_update_user_lock(lock)
-        except Exception:  # noqa: BLE001
-            logging.warning("Failed to release Telegram update lock", exc_info=True)
+            user_id = _get_update_user_id(update)
+            if user_id is not None:
+                try:
+                    # FastAPI runs webhook background tasks concurrently across Gunicorn workers.
+                    # Keep one user's handler chain serialized so double taps/retries don't overlap
+                    # DB-heavy reaction and next-message operations.
+                    lock = await acquire_update_user_lock(user_id)
+                except Exception:  # noqa: BLE001
+                    logging.warning(
+                        "Failed to acquire Telegram update lock for user %s; processing unlocked",
+                        user_id,
+                        exc_info=True,
+                    )
+
+            await application.process_update(update)
+        except Exception as e:
+            import sys
+
+            cb = ""
+            if update.callback_query:
+                cb = f" cb={update.callback_query.data}"
+            sys.stderr.write(f"[process_event] UNHANDLED ERROR{cb}: {e}\n")
+            sys.stderr.flush()
+            raise
+        finally:
+            try:
+                await release_update_user_lock(lock)
+            except Exception:  # noqa: BLE001
+                logging.warning("Failed to release Telegram update lock", exc_info=True)
 
 
 async def setup_webhook(application: Application) -> None:

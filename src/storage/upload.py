@@ -9,6 +9,10 @@ from pydantic import AnyHttpUrl
 from telegram.error import BadRequest, RetryAfter
 
 from src.config import settings
+from src.observability.sentry import (
+    capture_telegram_storage_upload_failure,
+    sentry_log_extra,
+)
 from src.storage.constants import MemeStatus, MemeType
 from src.storage.parsers.constants import USER_AGENT
 from src.storage.service import (
@@ -16,6 +20,8 @@ from src.storage.service import (
     update_meme,
 )
 from src.tgbot.bot import bot
+
+logger = logging.getLogger(__name__)
 
 
 async def download_meme_content_file(
@@ -128,11 +134,15 @@ async def _upload_meme_content_to_tg(
 async def upload_meme_content_to_tg(
     meme: dict[str, Any],
     content: bytes,
+    *,
+    observability_context: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     # just a wrapper to handle retries
 
     meme_result = None
-    for _ in range(3):  # attempts
+    max_attempts = 3
+    content_size = len(content)
+    for attempt in range(1, max_attempts + 1):
         try:
             meme_result = await _upload_meme_content_to_tg(
                 meme_id=meme["id"],
@@ -142,15 +152,64 @@ async def upload_meme_content_to_tg(
             if meme_result and meme_result.get("telegram_file_id"):
                 return meme_result
         except RetryAfter as e:
-            logging.warning(f"Flood control exceeded: {e}")
+            logger.warning(
+                "Flood control exceeded while uploading meme to Telegram",
+                extra=sentry_log_extra(
+                    observability_context,
+                    meme_id=meme["id"],
+                    meme_type=meme["type"],
+                    attempt=attempt,
+                    max_attempts=max_attempts,
+                    retry_after=e.retry_after,
+                    content_size=content_size,
+                    error_type=type(e).__name__,
+                ),
+            )
             await asyncio.sleep(e.retry_after)
         except BadRequest as e:
-            logging.warning("Can't upload meme %s. Telegram error: %s", meme["id"], e)
+            logger.warning(
+                "Telegram rejected meme upload: %s",
+                e,
+                extra=sentry_log_extra(
+                    observability_context,
+                    meme_id=meme["id"],
+                    meme_type=meme["type"],
+                    attempt=attempt,
+                    max_attempts=max_attempts,
+                    content_size=content_size,
+                    error_type=type(e).__name__,
+                ),
+            )
+            capture_telegram_storage_upload_failure(
+                meme,
+                reason="bad_request",
+                attempt=attempt,
+                max_attempts=max_attempts,
+                content_size=content_size,
+                error=e,
+                observability_context=observability_context,
+            )
             await update_meme(meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK)
             return None
 
         await asyncio.sleep(3)  # flood control
 
-    logging.warning(f"Meme {meme['id']} failed to upload to Telegram after 3 attempts.")
+    logger.warning(
+        "Meme failed to upload to Telegram after retries",
+        extra=sentry_log_extra(
+            observability_context,
+            meme_id=meme["id"],
+            meme_type=meme["type"],
+            max_attempts=max_attempts,
+            content_size=content_size,
+        ),
+    )
+    capture_telegram_storage_upload_failure(
+        meme,
+        reason="retry_exhausted",
+        max_attempts=max_attempts,
+        content_size=content_size,
+        observability_context=observability_context,
+    )
     await update_meme(meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK)
     return None
