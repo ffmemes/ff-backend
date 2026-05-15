@@ -5,10 +5,12 @@ from typing import AsyncGenerator
 import httpx
 import sentry_sdk
 from fastapi import FastAPI
+from sentry_sdk.integrations.logging import LoggingIntegration
 from starlette.middleware.cors import CORSMiddleware
 
 from src import redis
 from src.config import app_configs, settings
+from src.observability.sentry import before_send_log
 from src.tgbot import app as tgbot_app
 from src.tgbot.router import router as tgbot_router
 
@@ -50,9 +52,19 @@ if settings.ENVIRONMENT.is_deployed:
     sentry_sdk.init(
         dsn=settings.SENTRY_DSN,
         environment=settings.ENVIRONMENT.value,
+        release=f"ff-backend@{settings.APP_VERSION}",
+        enable_logs=True,
+        integrations=[
+            LoggingIntegration(
+                sentry_logs_level=logging.WARNING,
+                level=logging.INFO,
+                event_level=logging.ERROR,
+            ),
+        ],
         ignore_errors=[
             "telegram.error.Forbidden",  # handled by error.py → marks user as blocked_bot
         ],
+        before_send_log=before_send_log,
     )
 
 

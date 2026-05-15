@@ -16,6 +16,12 @@ from src.flows.storage.memes import (
     add_watermark_to_meme_content,
     upload_meme_content_to_tg,
 )
+from src.observability.sentry import (
+    capture_handled_exception,
+    capture_handled_issue,
+    sentry_log_extra,
+    user_upload_observability_context,
+)
 from src.recommendations.service import create_user_meme_reaction
 from src.stats.meme import calculate_meme_reactions_and_engagement
 from src.stats.meme_source import calculate_meme_source_stats
@@ -38,6 +44,8 @@ UPLOADED_MEME_REVIEW_CALLBACK_DATA_REGEXP = r"upload:(\d+):review:(\w+)"
 LEADERBOARD_URL = (
     "https://metabase.okhlopkov.com/public/question/663c4def-4b42-4303-aa3b-73ab5bfa677a"
 )
+
+logger = logging.getLogger(__name__)
 
 
 async def _notify_uploader(
@@ -114,6 +122,41 @@ async def _check_duplicate_via_ocr(meme: dict[str, Any]) -> tuple[dict[str, Any]
 async def uploaded_meme_auto_review(
     meme: dict[str, Any], meme_upload: dict[str, Any], bot: Bot
 ) -> None:
+    observability_context = user_upload_observability_context(meme, meme_upload)
+    try:
+        return await _uploaded_meme_auto_review(meme, meme_upload, bot, observability_context)
+    except Exception as exc:
+        logger.warning(
+            "Unhandled user upload auto-review failure",
+            exc_info=True,
+            extra=sentry_log_extra(
+                observability_context,
+                phase="auto_review",
+                error_type=type(exc).__name__,
+            ),
+        )
+        capture_handled_exception(
+            "user_upload.auto_review_unhandled",
+            exc,
+            level="error",
+            user_id=meme_upload.get("user_id"),
+            tags={
+                "ff.module": "user_upload",
+                "ff.failure_kind": "auto_review_unhandled",
+                "meme.type": meme.get("type"),
+                "error.type": type(exc).__name__,
+            },
+            contexts=observability_context,
+        )
+        raise
+
+
+async def _uploaded_meme_auto_review(
+    meme: dict[str, Any],
+    meme_upload: dict[str, Any],
+    bot: Bot,
+    observability_context: dict[str, Any],
+) -> None:
     uploader_lang = await _get_uploader_lang(meme_upload["user_id"])
 
     logging.info(f"Downloading meme {meme['id']} content")
@@ -122,13 +165,35 @@ async def uploaded_meme_auto_review(
     logging.info(f"Adding watermark to meme {meme['id']} content")
     watermarked_meme_content = await add_watermark_to_meme_content(image_bytes, meme["type"])
     if watermarked_meme_content is None:
+        capture_handled_issue(
+            "user_upload.watermark_failed",
+            level="warning",
+            user_id=meme_upload.get("user_id"),
+            tags={
+                "ff.module": "user_upload",
+                "ff.failure_kind": "watermark_failed",
+                "meme.type": meme.get("type"),
+            },
+            contexts=observability_context,
+        )
         return await _notify_uploader(
             bot, meme_upload, localizer.t("upload.watermark_failed", uploader_lang)
         )
 
     logging.info(f"Uploading watermarked meme {meme['id']} content to Telegram")
-    meme = await upload_meme_content_to_tg(meme, watermarked_meme_content)
+    meme = await upload_meme_content_to_tg(
+        meme,
+        watermarked_meme_content,
+        observability_context=observability_context,
+    )
     if meme is None:
+        logger.warning(
+            "User upload could not be stored in Telegram",
+            extra=sentry_log_extra(
+                observability_context,
+                phase="upload_to_storage",
+            ),
+        )
         return await _notify_uploader(
             bot, meme_upload, localizer.t("upload.tg_upload_failed", uploader_lang)
         )
