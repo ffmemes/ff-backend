@@ -121,9 +121,27 @@ def _extract_forward(msg: Message) -> tuple[int | None, int | None, int | None]:
 
 
 async def save_telegram_message(msg: Message) -> None:
+    reply_to_message = getattr(msg, "reply_to_message", None)
+    if reply_to_message is not None:
+        try:
+            await _save_telegram_message_row(reply_to_message)
+        except Exception as e:
+            logger.warning(
+                "Failed to save reply target %s for message %s in chat %s: %s",
+                getattr(reply_to_message, "message_id", None),
+                getattr(msg, "message_id", None),
+                getattr(getattr(msg, "chat", None), "id", None),
+                e,
+            )
+
+    return await _save_telegram_message_row(msg)
+
+
+async def _save_telegram_message_row(msg: Message) -> None:
     # Prefer sender_chat when present (anonymous channel posts)
     sender_chat_id = None
     user_id = None
+    reply_to_message = getattr(msg, "reply_to_message", None)
 
     if getattr(msg, "sender_chat", None):
         sender_chat_id = msg.sender_chat.id
@@ -155,7 +173,7 @@ async def save_telegram_message(msg: Message) -> None:
             user_id=user_id,
             sender_chat_id=sender_chat_id,
             text=msg.text or msg.caption,
-            reply_to_message_id=msg.reply_to_message.message_id if msg.reply_to_message else None,
+            reply_to_message_id=reply_to_message.message_id if reply_to_message else None,
             media_type=media_type,
             file_id=file_id,
             media_group_id=msg.media_group_id,
