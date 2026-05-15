@@ -46,10 +46,13 @@ async def analyse_meme_caption(meme: dict[str, Any]) -> None:
             return
 
 
-async def add_watermark_to_meme_content(meme_content: bytes, meme_type: MemeType) -> bytes:
+async def add_watermark_to_meme_content(meme_content: bytes, meme_type: MemeType) -> bytes | None:
     if meme_type == MemeType.IMAGE:
         # we can add watermark only to photos right now
-        return add_watermark(meme_content)
+        watermarked_content = add_watermark(meme_content)
+        if watermarked_content is None:
+            return None
+        return watermarked_content.getvalue()
     return meme_content
 
 
