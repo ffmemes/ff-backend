@@ -378,7 +378,8 @@ for Paperclip service-level config, but not for Codex auth or per-agent
 
 | Secret | Used by | Purpose |
 |--------|---------|---------|
-| `ANALYST_DATABASE_URL` | Analyst, QA, Comms | Read-only prod DB access. Comms also receives this as env `DATABASE_URL` by explicit CEO decision; this supports data reads, not `editorial_posts` writes. |
+| `ANALYST_DATABASE_URL` | Analyst, QA, Comms | Read-only prod DB access. |
+| `DATABASE_URL` (comms-manager only) | Comms | `comms_writer` Postgres role URL. Narrow grants: SELECT/INSERT/UPDATE on `editorial_posts` + USAGE/SELECT on its identity sequence + 10s `statement_timeout`. Required by `publish_editorial_post` to claim and update the row that the stats collector reads. Do NOT bind to `FFMEMES_DATABASE_URL` or any full-write app DB secret. |
 | `COOLIFY_ACCESS_TOKEN` | CTO, QA, Release Engineer | Coolify API for container logs |
 | `COOLIFY_BASE_URL` | CTO, QA, Release Engineer | Coolify API URL |
 | `SENTRY_AUTH_TOKEN` | CTO, QA | Sentry CLI authentication (read-only project scope) |
@@ -388,7 +389,7 @@ for Paperclip service-level config, but not for Codex auth or per-agent
 | `TEST_DATABASE_URL` | CTO | Test/staging DB for safe experiments |
 | `TELEGRAM_BOT_TOKEN` | Telegram plugin | @ffnerdbot token (NOT @ffmemesbot!) |
 
-The least-privilege `comms_writer` role in `docs/comms/comms-writer-role-setup.sql` remains available as a future upgrade if Comms needs to persist `editorial_posts` rows from the agent runtime. Do not bind Comms to `FFMEMES_DATABASE_URL` or any full-write app DB secret.
+`comms_writer` is provisioned on prod (role exists with `statement_timeout=10s`; `editorial_posts` ACL `comms_writer=arw/postgres`; `editorial_posts_id_seq` ACL `comms_writer=rU/postgres`). The Paperclip secret `DATABASE_URL` on the comms-manager agent must carry the `comms_writer` connection URL (`postgresql+asyncpg://comms_writer:<password>@<host>:<port>/ff`); the registered password is the one used when `docs/comms/comms-writer-role-setup.sql` was run. See FFM-919 for the original Option-2 decision and FFM-1178 for the runtime restoration.
 
 QA runtime access is considered degraded unless all of these are present in the live QA `adapterConfig.env`: `PATH` with `/paperclip/bin`, `ANALYST_DATABASE_URL`, `COOLIFY_BASE_URL`, `COOLIFY_ACCESS_TOKEN`, `SENTRY_AUTH_TOKEN`, `PREFECT_API_URL`, `PREFECT_AUTH_STRING`.
 
