@@ -8,6 +8,7 @@ from src.feed_turn.planner import (
     MATURE,
     low_sent_quota,
     plan_candidate_selection,
+    plan_candidate_selection_for_user,
 )
 
 
@@ -87,6 +88,53 @@ def test_mature_blend_plan():
         "es_ranked": 0.1,
     }
     assert dict(plan.fixed_pos) == {0: "lr_smoothed"}
+    assert plan.fallback_engines == ()
+
+
+@pytest.mark.parametrize(
+    ("nmemes_sent", "stage"),
+    [
+        (5, COLD_START_1),
+        (8, COLD_START_2),
+        (20, COLD_START_3),
+    ],
+)
+def test_plan_for_user_gate_disabled_keeps_low_sent_users_in_cold_start(nmemes_sent, stage):
+    plan = plan_candidate_selection_for_user(
+        nmemes_sent=nmemes_sent,
+        nsessions=5,
+        cold_start_nsessions_gate_enabled=False,
+        limit=10,
+    )
+
+    assert plan.maturity_stage == stage
+
+
+@pytest.mark.parametrize("nsessions", [0, 1])
+def test_plan_for_user_gate_enabled_keeps_first_session_low_sent_users_in_cold_start(
+    nsessions,
+):
+    plan = plan_candidate_selection_for_user(
+        nmemes_sent=8,
+        nsessions=nsessions,
+        cold_start_nsessions_gate_enabled=True,
+        limit=10,
+    )
+
+    assert plan.maturity_stage == COLD_START_2
+    assert plan.primary_engine == "cold_start_adapt"
+
+
+def test_plan_for_user_gate_enabled_routes_returning_low_sent_users_to_growing_plan():
+    plan = plan_candidate_selection_for_user(
+        nmemes_sent=8,
+        nsessions=2,
+        cold_start_nsessions_gate_enabled=True,
+        limit=10,
+    )
+
+    assert plan.maturity_stage == GROWING
+    assert "cold_start_adapt" not in plan.blend_weights
     assert plan.fallback_engines == ()
 
 
