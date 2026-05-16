@@ -177,6 +177,27 @@ async def test_cold_start_falls_back_when_primary_engine_is_empty():
 
 
 @pytest.mark.asyncio
+async def test_fallback_diagnostics_record_engine_that_supplied_candidates():
+    retriever = FakeRetriever(
+        {
+            "cold_start_explore": [],
+            "text_light_lr_smoothed": [],
+            "best_uploaded_memes": [_meme(401, "best_uploaded_memes")],
+        }
+    )
+
+    result = await _pipeline(retriever).run(_request(nmemes_sent=3, nsessions=1))
+
+    assert _ids(result.selected) == [401]
+    assert [call["engine"] for call in retriever.calls] == [
+        "cold_start_explore",
+        "text_light_lr_smoothed",
+        "best_uploaded_memes",
+    ]
+    assert result.diagnostics.fallback_used == "best_uploaded_memes"
+
+
+@pytest.mark.asyncio
 async def test_blend_engine_failure_is_recorded_but_other_engines_continue():
     retriever = FakeRetriever(
         {

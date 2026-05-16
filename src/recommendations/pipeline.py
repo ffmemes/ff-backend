@@ -453,7 +453,6 @@ class RecommendationBatchPipeline:
         diagnostics: RecommendationBatchDiagnostics,
     ) -> list[Candidate]:
         for fallback in plan.fallback_engines:
-            diagnostics.fallback_used = diagnostics.fallback_used or fallback.engine
             candidates = await self._fetch_engine(
                 fallback.engine,
                 request.user_id,
@@ -463,6 +462,7 @@ class RecommendationBatchPipeline:
                 **dict(fallback.kwargs),
             )
             if candidates:
+                diagnostics.fallback_used = fallback.engine
                 return candidates
         return []
 
