@@ -63,7 +63,10 @@ async def test_edit_last_message_treats_not_modified_as_success():
 
 
 @pytest.mark.asyncio
-async def test_send_new_message_does_not_retry_transient_send_error():
+async def test_send_new_message_does_not_retry_ambiguous_transport_error(monkeypatch):
+    sleep = AsyncMock()
+    monkeypatch.setattr("src.tgbot.telegram_retry.asyncio.sleep", sleep)
+
     class Bot:
         def __init__(self) -> None:
             self.send_photo_calls = 0
@@ -78,3 +81,4 @@ async def test_send_new_message_does_not_retry_transient_send_error():
         await send_new_message_with_meme(bot, 12001, _meme())
 
     assert bot.send_photo_calls == 1
+    sleep.assert_not_awaited()

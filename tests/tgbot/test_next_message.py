@@ -19,6 +19,47 @@ def _meme() -> MemeData:
 
 
 @pytest.mark.asyncio
+async def test_next_message_does_not_try_another_meme_after_ambiguous_send_error(
+    monkeypatch,
+):
+    get_next = AsyncMock(return_value=_meme())
+    send_new = AsyncMock(side_effect=NetworkError("Server disconnected"))
+    create_reaction = AsyncMock()
+    check_queue = AsyncMock()
+
+    monkeypatch.setattr(
+        next_message,
+        "get_user_info",
+        AsyncMock(return_value={"interface_lang": "en", "nmemes_sent": 1}),
+    )
+    monkeypatch.setattr(next_message, "collect_user_languages", AsyncMock(return_value={"en"}))
+    monkeypatch.setattr(next_message, "get_popup_to_send", AsyncMock(return_value=None))
+    monkeypatch.setattr(next_message, "get_next_meme_for_user", get_next)
+    monkeypatch.setattr(next_message, "get_visible_meme_like_count", AsyncMock(return_value=0))
+    monkeypatch.setattr(next_message, "meme_reaction_keyboard", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(
+        next_message,
+        "get_meme_caption_for_user_id",
+        AsyncMock(return_value="<b>caption</b>"),
+    )
+    monkeypatch.setattr(next_message, "send_new_message_with_meme", send_new)
+    monkeypatch.setattr(next_message, "create_user_meme_reaction", create_reaction)
+    monkeypatch.setattr(next_message.meme_queue, "check_queue", check_queue)
+
+    with pytest.raises(NetworkError):
+        await next_message.next_message(
+            bot=object(),
+            user_id=12001,
+            prev_update=SimpleNamespace(callback_query=None),
+        )
+
+    assert get_next.await_count == 1
+    assert send_new.await_count == 1
+    create_reaction.assert_not_awaited()
+    check_queue.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_replace_previous_message_does_not_send_new_message_after_transient_edit_error(
     monkeypatch,
 ):
