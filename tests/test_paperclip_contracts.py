@@ -19,6 +19,7 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 from paperclip_contracts import (  # noqa: E402
+    AGENT_WORKFLOW_INVARIANTS,
     ALLOWED_ISSUE_CLASSES,
     DECISION_ACTIONS,
     EXECUTION_CATEGORIES,
@@ -26,6 +27,7 @@ from paperclip_contracts import (  # noqa: E402
     NESTED_STATES,
     OUTCOME_ACTIONS,
     OUTCOME_ALIASES,
+    agent_workflow_invariant_violations,
     canonical_action,
     is_decision_action,
     is_outcome_action,
@@ -223,3 +225,40 @@ def test_parent_child_violation_handles_multiple_children():
         _ref("FFM-4", status="blocked", nested="blocked_without_access"),
     ]
     assert parent_child_status_violation("done", children) == ["FFM-2", "FFM-4"]
+
+
+# --- agent workflow invariants ---------------------------------------------
+
+
+def test_agent_workflow_invariants_constant_is_stable():
+    assert AGENT_WORKFLOW_INVARIANTS == (
+        "ssh_default_path",
+        "secret_recovery_prompt",
+        "missing_paperclip_first_path",
+    )
+
+
+def test_agent_workflow_invariant_flags_ssh_default_path():
+    text = "If deploy fails, start with SSH and inspect the container as the primary path."
+    assert agent_workflow_invariant_violations(text) == ("ssh_default_path",)
+
+
+def test_agent_workflow_invariant_flags_secret_recovery_prompt():
+    text = "Search the machine and logs to recover the missing API key before continuing."
+    assert agent_workflow_invariant_violations(text) == ("secret_recovery_prompt",)
+
+
+def test_agent_workflow_invariant_flags_missing_paperclip_as_blocker():
+    text = (
+        "Paperclip MCP unavailable. This is a blocker and the audit cannot continue "
+        "until the connector is installed."
+    )
+    assert agent_workflow_invariant_violations(text) == ("missing_paperclip_first_path",)
+
+
+def test_agent_workflow_invariant_allows_capability_gap_reporting():
+    text = (
+        "Prefer Paperclip MCP/API for live inspection. If unavailable, record a "
+        "capability gap and continue with local read-only audits."
+    )
+    assert agent_workflow_invariant_violations(text) == ()

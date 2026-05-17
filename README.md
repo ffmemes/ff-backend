@@ -24,10 +24,11 @@ docker compose exec app ipython
 ```
 
 ### Linters
-Format the code with `ruff --fix` and `ruff format`
+Format and lint the same paths CI checks:
 ```shell
-docker compose exec app format
+just lint
 ```
+For a read-only CI-equivalent check, run `just lint-check`.
 
 ### Migrations
 - Create an automatic migration from changes in `src/database.py`

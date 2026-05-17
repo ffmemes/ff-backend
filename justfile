@@ -29,11 +29,15 @@ downgrade *args:
   docker compose exec app alembic downgrade {{args}}
 
 ruff *args:
-  docker compose exec app ruff {{args}} src
-  docker compose exec app ruff format src
+  docker compose exec app ruff {{args}}
 
 lint:
-  just ruff --fix
+  docker compose exec app ruff check --fix src/ tests/
+  docker compose exec app ruff format src/ tests/
+
+lint-check:
+  docker compose exec app ruff check src/ tests/
+  docker compose exec app ruff format --check src/ tests/
 
 backup:
   docker compose exec app_db scripts/backup

@@ -1,6 +1,9 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file is legacy guidance for Claude Code (claude.ai/code). Codex is now the
+primary coding-agent surface for this repo; keep new agent instructions in
+`AGENTS.md` and the scoped docs linked from `docs/agents/`. Update this file only
+when a legacy Claude workflow needs the same operational fact.
 
 ## What This Is
 
@@ -48,7 +51,8 @@ docker compose exec app pytest tests/recommendations/test_blender.py
 - **Cache/Queue**: Redis 6.2 (recommendation queues per user, user info cache, 1h TTL)
 - **Jobs**: Prefect 3.4 (parsing, stats, crossposting crons)
 - **Describe Memes**: OpenRouter FREE vision models only ([`src/flows/storage/describe_memes.py`](src/flows/storage/describe_memes.py)), runs every 15 min, 9/batch (~864/day). **NEVER add paid models** — the client rejects models not ending in `:free` and Redis caps calls at 900 attempts/day. Free-tier 429s/timeouts/invalid model output are normal: cool down that model and retry in later scheduled runs. Need $10+ lifetime purchases for 1,000 req/day. See [specs/describe-memes.md](specs/describe-memes.md). Circuit breaker auto-pauses after 3 failures/hour
-- **Python**: 3.10 (dev), 3.12 (prod)
+- **Python**: 3.14 in CI and current app containers unless a deployment doc says
+  otherwise.
 
 ### Docker Compose Services
 
@@ -270,6 +274,10 @@ SELECT
 **Expected healthy values**: new_memes > 100, ok_pct ~90-96%, active_users > 100, reactions > 5000, stats updated within last 15 min
 
 ## gstack
+
+Codex-first agent entrypoints live in `AGENTS.md` and
+`docs/agents/README.md`. This section remains for legacy Claude/gstack
+workflows only.
 
 Use the `/browse` skill from gstack for all web browsing. Never use `mcp__claude-in-chrome__*` tools.
 
