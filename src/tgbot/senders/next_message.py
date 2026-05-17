@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 from telegram import Bot, InlineKeyboardMarkup, Message, Update
-from telegram.error import BadRequest, Forbidden, TimedOut
+from telegram.error import BadRequest, Forbidden, NetworkError, TimedOut
 
 from src.recommendations import meme_queue
 from src.recommendations.service import (
@@ -123,9 +123,9 @@ async def next_message(
             await _disable_broken_meme(meme, error)
             attempt += 1
             continue
-        except TimedOut:
+        except (NetworkError, TimedOut):
             logger.warning(
-                "Telegram API timed out delivering meme %s to user %s, retrying",
+                "Telegram API transport error delivering meme %s to user %s, retrying",
                 meme.id,
                 user_id,
             )
@@ -168,6 +168,13 @@ async def _replace_previous_message(
 ) -> Message:
     try:
         edited_message = await edit_last_message_with_meme(previous_message, meme, reply_markup)
+    except NetworkError as error:
+        logger.warning(
+            "Failed to edit previous message for meme %s: %s. Sending new message instead.",
+            meme.id,
+            error,
+        )
+        edited_message = None
     except BadRequest as error:
         if _is_missing_message_error(error):
             logger.info(

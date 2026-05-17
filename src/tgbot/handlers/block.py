@@ -5,7 +5,7 @@ Handles user blocking / unblocking the bot.
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from src.tgbot.logs import log
+from src.tgbot.logs import html_escape, log
 from src.tgbot.service import mark_user_blocked, mark_user_unblocked
 
 
@@ -31,10 +31,10 @@ async def handle_user_blocked_bot(update: Update, context: ContextTypes.DEFAULT_
 
     # Lightweight admin log: fields we already have, no stats recompute.
     message = (
-        f"⛔️ <b>BLOCKED</b> by {user_tg.name} / #{user_id}\n"
+        f"⛔️ <b>BLOCKED</b> by {html_escape(user_tg.name)} / #{user_id}\n"
         f"<b>registered</b>: {updated['created_at']}\n"
-        f"<b>tg lang</b>: {user_tg.language_code}\n"
-        f"<b>nickname</b>: {updated.get('nickname') or '—'}"
+        f"<b>tg lang</b>: {html_escape(user_tg.language_code or '—')}\n"
+        f"<b>nickname</b>: {html_escape(updated.get('nickname') or '—')}"
     )
     await log(message, context.bot)
 
