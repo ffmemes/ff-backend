@@ -3,7 +3,7 @@ import logging
 import traceback
 
 from telegram import Update
-from telegram.error import Forbidden, TimedOut
+from telegram.error import Forbidden, NetworkError, TimedOut
 from telegram.ext import ContextTypes
 
 from src.tgbot.constants import (
@@ -21,14 +21,22 @@ async def send_stacktrace_to_tg_chat(update: Update, context: ContextTypes.DEFAU
 
     user_id = update.effective_user.id
 
-    logging.error("Exception while handling an update:", exc_info=context.error)
-
     # if the error is that we can't send them a message,
     #  then handle it as not a real error.
     if isinstance(context.error, Forbidden):
         await log(f"User #{user_id} blocked the bot", context.bot)
         await mark_user_blocked(user_id, source="forbidden_global_error")
         return
+
+    if isinstance(context.error, (NetworkError, TimedOut)):
+        logging.warning(
+            "Transient Telegram transport error while handling update for user %s: %s",
+            user_id,
+            context.error,
+        )
+        return
+
+    logging.error("Exception while handling an update:", exc_info=context.error)
 
     tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
     tb_string = html.escape("".join(tb_list))
@@ -65,12 +73,23 @@ Wait for 2 minutes and press /start.
             text=f"{base_message}\n\n{channel_message}",
             chat_id=user_id,
         )
+    except Forbidden:
+        await mark_user_blocked(user_id, source="forbidden_crash_notification")
+    except (NetworkError, TimedOut) as error:
+        logging.warning("Failed to send crash message due to Telegram transport error: %s", error)
     except Exception:  # noqa: BLE001
         logging.exception("Failed to send crash message with channel link")
         try:
             await context.bot.send_message(
                 text=base_message,
                 chat_id=user_id,
+            )
+        except Forbidden:
+            await mark_user_blocked(user_id, source="forbidden_crash_notification_fallback")
+        except (NetworkError, TimedOut) as error:
+            logging.warning(
+                "Failed to send crash message fallback due to Telegram transport error: %s",
+                error,
             )
         except Exception:  # noqa: BLE001
             logging.exception("Failed to send crash message fallback")

@@ -46,10 +46,12 @@ Current production chain:
 [
     "google/gemma-4-31b-it:free",
     "google/gemma-4-26b-a4b-it:free",
-    "google/gemma-3-27b-it:free",
-    "google/gemma-3-12b-it:free",
 ]
 ```
+
+Gemma 3 free vision model IDs are intentionally excluded: they are no longer
+listed by OpenRouter and create avoidable failed attempts under the daily free
+quota.
 
 Do not add paid fallbacks. A paid fallback can spend the account below zero, after which OpenRouter returns 402 for all models, including free models.
 

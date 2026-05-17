@@ -125,3 +125,34 @@ def test_before_send_drops_exception_frame_vars():
     assert scrubbed is event
     frame = scrubbed["exception"]["values"][0]["stacktrace"]["frames"][0]
     assert "vars" not in frame
+
+
+def test_before_send_drops_handled_chat_agent_max_turns_event():
+    event = {
+        "logger": "src.tgbot.handlers.chat.agent.runner",
+        "exception": {
+            "values": [
+                {
+                    "type": "MaxTurnsExceeded",
+                    "module": "agents.exceptions",
+                }
+            ]
+        },
+    }
+
+    assert before_send(event, {}) is None
+
+
+def test_before_send_keeps_unexpected_max_turns_events():
+    event = {
+        "exception": {
+            "values": [
+                {
+                    "type": "MaxTurnsExceeded",
+                    "module": "agents.exceptions",
+                }
+            ]
+        },
+    }
+
+    assert before_send(event, {}) is event
