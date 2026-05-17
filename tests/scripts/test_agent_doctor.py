@@ -40,7 +40,7 @@ def test_real_describe_memes_models_are_free() -> None:
     assert result.name == "describe_memes:free_models"
 
 
-def test_paperclip_wrapper_check_is_read_only_and_present(tmp_path: Path) -> None:
+def test_paperclip_access_adapter_accepts_repo_local_wrapper(tmp_path: Path) -> None:
     skill = tmp_path / ".codex" / "skills" / "paperclip"
     tools = tmp_path / ".codex" / "paperclip-tools"
     skill.mkdir(parents=True)
@@ -50,10 +50,35 @@ def test_paperclip_wrapper_check_is_read_only_and_present(tmp_path: Path) -> Non
     wrapper.write_text("#!/bin/sh\n", encoding="utf-8")
     wrapper.chmod(0o700)
 
-    result = doctor.check_paperclip_local_wrapper(tmp_path)
+    result = doctor.check_paperclip_access_adapter(
+        tmp_path, env={}, command_resolver=lambda _: None
+    )
 
     assert result.ok is True
-    assert result.name == "paperclip:local_wrapper"
+    assert result.name == "paperclip:access_adapter"
+
+
+def test_paperclip_access_adapter_accepts_native_runtime(tmp_path: Path) -> None:
+    result = doctor.check_paperclip_access_adapter(
+        tmp_path,
+        env={"PAPERCLIP_URL": "https://paperclip.test", "PAPERCLIP_API_KEY": "set"},
+        command_resolver=lambda command: (
+            "/usr/local/bin/paperclipai" if command == "paperclipai" else None
+        ),
+    )
+
+    assert result.ok is True
+    assert "native Paperclip CLI/env present" in result.detail
+
+
+def test_paperclip_access_adapter_reports_missing_paths(tmp_path: Path) -> None:
+    result = doctor.check_paperclip_access_adapter(
+        tmp_path, env={}, command_resolver=lambda _: None
+    )
+
+    assert result.ok is False
+    assert "repo-local wrapper missing" in result.detail
+    assert "native adapter missing" in result.detail
 
 
 def test_render_text_marks_failures() -> None:

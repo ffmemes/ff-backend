@@ -3,7 +3,7 @@
 
 Checks command availability and repo contracts that should be true before an
 agent starts Paperclip/architecture work. This script never reads secret files,
-requires no env vars, and does not call network services.
+does not print secret values, and does not call network services.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import os
 import shutil
 import sys
 from dataclasses import dataclass
@@ -87,15 +88,46 @@ def check_describe_memes_models(root: Path = ROOT) -> CheckResult:
     return CheckResult("describe_memes:free_models", True, f"{len(model_ids)} free model(s)")
 
 
-def check_paperclip_local_wrapper(root: Path = ROOT) -> CheckResult:
+def check_paperclip_access_adapter(
+    root: Path = ROOT,
+    env: dict[str, str] | None = None,
+    command_resolver=shutil.which,
+) -> CheckResult:
+    """Verify a Paperclip access path exists for this runtime.
+
+    Codex desktop uses the repo-local `.codex` wrapper. Paperclip-managed
+    agents run inside a different checkout where `.codex` is intentionally not
+    tracked; there the native `paperclipai` CLI plus Paperclip env bindings are
+    the valid adapter.
+    """
+    env = dict(os.environ if env is None else env)
     skill = root / ".codex" / "skills" / "paperclip" / "SKILL.md"
     wrapper = root / ".codex" / "paperclip-tools" / "paperclipai-ffmemes.sh"
     missing = [str(path.relative_to(root)) for path in (skill, wrapper) if not path.exists()]
+    if not missing and wrapper.stat().st_mode & 0o111:
+        return CheckResult("paperclip:access_adapter", True, "repo-local wrapper present")
+
+    native_cli = command_resolver("paperclipai")
+    native_url = bool(env.get("PAPERCLIP_URL") or env.get("PAPERCLIP_API_URL"))
+    native_key = bool(env.get("PAPERCLIP_API_KEY"))
+    if native_cli and native_url and native_key:
+        return CheckResult("paperclip:access_adapter", True, "native Paperclip CLI/env present")
+
+    adapter_gaps: list[str] = []
     if missing:
-        return CheckResult("paperclip:local_wrapper", False, "missing: " + ", ".join(missing))
-    if not wrapper.stat().st_mode & 0o111:
-        return CheckResult("paperclip:local_wrapper", False, "wrapper is not executable")
-    return CheckResult("paperclip:local_wrapper", True, "skill and wrapper present")
+        adapter_gaps.append("repo-local wrapper missing: " + ", ".join(missing))
+    elif not wrapper.stat().st_mode & 0o111:
+        adapter_gaps.append("repo-local wrapper is not executable")
+    native_missing = []
+    if not native_cli:
+        native_missing.append("paperclipai")
+    if not native_url:
+        native_missing.append("PAPERCLIP_URL|PAPERCLIP_API_URL")
+    if not native_key:
+        native_missing.append("PAPERCLIP_API_KEY")
+    if native_missing:
+        adapter_gaps.append("native adapter missing: " + ", ".join(native_missing))
+    return CheckResult("paperclip:access_adapter", False, "; ".join(adapter_gaps))
 
 
 def check_paperclip_contracts_importable() -> CheckResult:
@@ -150,7 +182,7 @@ def run_checks(commands: Iterable[str] = ("git", "python3", "rg", "pytest")) -> 
     results.extend(
         [
             check_describe_memes_models(),
-            check_paperclip_local_wrapper(),
+            check_paperclip_access_adapter(),
             check_paperclip_contracts_importable(),
             check_agent_workflow_invariants(),
         ]
