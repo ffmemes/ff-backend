@@ -63,7 +63,7 @@ async def test_edit_last_message_treats_not_modified_as_success():
 
 
 @pytest.mark.asyncio
-async def test_send_new_message_retries_transient_send_error(monkeypatch):
+async def test_send_new_message_does_not_retry_ambiguous_transport_error(monkeypatch):
     sleep = AsyncMock()
     monkeypatch.setattr("src.tgbot.telegram_retry.asyncio.sleep", sleep)
 
@@ -73,14 +73,12 @@ async def test_send_new_message_retries_transient_send_error(monkeypatch):
 
         async def send_photo(self, **_kwargs):
             self.send_photo_calls += 1
-            if self.send_photo_calls == 1:
-                raise NetworkError("All connection attempts failed")
-            return "sent"
+            raise NetworkError("All connection attempts failed")
 
     bot = Bot()
 
-    result = await send_new_message_with_meme(bot, 12001, _meme())
+    with pytest.raises(NetworkError):
+        await send_new_message_with_meme(bot, 12001, _meme())
 
-    assert result == "sent"
-    assert bot.send_photo_calls == 2
-    sleep.assert_awaited_once()
+    assert bot.send_photo_calls == 1
+    sleep.assert_not_awaited()
