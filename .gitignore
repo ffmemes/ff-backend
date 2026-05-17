@@ -149,7 +149,9 @@ test.py
 .gstack/
 .codex/
 !.codex/
+/.codex/*
 !.codex/skills/
+/.codex/skills/*
 !.codex/skills/paperclip/
 /.codex/skills/paperclip/*
 !.codex/skills/paperclip/SKILL.md
