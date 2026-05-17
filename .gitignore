@@ -151,8 +151,10 @@ test.py
 !.codex/
 !.codex/skills/
 !.codex/skills/paperclip/
+/.codex/skills/paperclip/*
 !.codex/skills/paperclip/SKILL.md
 !.codex/paperclip-tools/
+/.codex/paperclip-tools/*
 !.codex/paperclip-tools/paperclipai-ffmemes.sh
 .agents/
 

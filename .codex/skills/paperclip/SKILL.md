@@ -29,6 +29,20 @@ setup, use:
 The wrapper keeps Paperclip access task-scoped for this repository and avoids
 enabling the Paperclip MCP server globally.
 
+It sources `.codex/paperclip-tools/paperclip.env` when present, normalizes
+`PAPERCLIP_URL` to `PAPERCLIP_API_URL`, sets `PAPERCLIP_CONTEXT`, and defaults
+`PAPERCLIP_COMPANY_ID` to the FFmemes company. Do not print `paperclip.env`.
+
+Useful read-only commands:
+
+```bash
+.codex/paperclip-tools/paperclipai-ffmemes.sh --version
+.codex/paperclip-tools/paperclipai-ffmemes.sh company list --json
+.codex/paperclip-tools/paperclipai-ffmemes.sh dashboard get -C 96ee7b2e-6df2-43c8-bbe3-53e19297308a --json
+.codex/paperclip-tools/paperclipai-ffmemes.sh issue list -C 96ee7b2e-6df2-43c8-bbe3-53e19297308a --status todo,in_progress,blocked,done --json
+.codex/paperclip-tools/paperclipai-ffmemes.sh issue get FFM-1250 --json
+```
+
 ## Heartbeat Rules
 
 - Use `PAPERCLIP_WAKE_PAYLOAD_JSON` first when it is present.
