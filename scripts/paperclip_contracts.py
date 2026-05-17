@@ -243,3 +243,46 @@ def parent_child_status_violation(
         if isinstance(ident, str):
             bad.append(ident)
     return bad
+
+
+# Paperclip agent workflow hardening contracts. These are intentionally pure
+# text classifiers so docs, prompts, routines, and doctor checks can reuse the
+# same "do not teach agents the wrong path" rules without a live Paperclip API.
+AGENT_WORKFLOW_INVARIANT_PATTERNS: Mapping[str, tuple[re.Pattern[str], ...]] = {
+    "ssh_default_path": (
+        re.compile(r"\bssh\b.+\b(?:default|first|primary|normal)\s+path\b", re.IGNORECASE),
+        re.compile(r"\b(?:start|begin|first)\s+with\s+ssh\b", re.IGNORECASE),
+    ),
+    "secret_recovery_prompt": (
+        re.compile(
+            r"\b(?:recover|find|search|grep)\b.+\b(?:secret|token|api[_ -]?key)\b", re.IGNORECASE
+        ),
+        re.compile(
+            r"\b(?:secret|token|api[_ -]?key)\b.+\b(?:logs?|machine|filesystem)\b", re.IGNORECASE
+        ),
+    ),
+    "missing_paperclip_first_path": (
+        re.compile(
+            r"\b(?:paperclip\s+(?:mcp|api)|paperclipai)\b.+\b(?:unavailable|missing|broken)\b"
+            r".+\b(?:blocker|blocked|cannot\s+continue)\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+    ),
+}
+
+AGENT_WORKFLOW_INVARIANTS: tuple[str, ...] = tuple(AGENT_WORKFLOW_INVARIANT_PATTERNS)
+
+
+def agent_workflow_invariant_violations(text: str) -> tuple[str, ...]:
+    """Return workflow-hardening invariants violated by `text`.
+
+    The rules stay narrow on purpose: they target high-risk agent prompts that
+    normalize SSH/manual secret hunting or make missing Paperclip access a hard
+    blocker instead of a capability gap to report.
+    """
+    if not text:
+        return ()
+    violations = [
+        name for name, patterns in AGENT_WORKFLOW_INVARIANT_PATTERNS.items() if _any(patterns, text)
+    ]
+    return tuple(violations)
