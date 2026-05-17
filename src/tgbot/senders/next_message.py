@@ -125,12 +125,12 @@ async def next_message(
             continue
         except (NetworkError, TimedOut):
             logger.warning(
-                "Telegram API transport error delivering meme %s to user %s, retrying",
+                "Telegram API transport error delivering meme %s to user %s; "
+                "not retrying ambiguous send",
                 meme.id,
                 user_id,
             )
-            attempt += 1
-            continue
+            raise
 
         # Lock the experiment cohort BEFORE the first reaction lands. The
         # v_experiment_results view filters reactions on r.reacted_at >=
@@ -168,13 +168,6 @@ async def _replace_previous_message(
 ) -> Message:
     try:
         edited_message = await edit_last_message_with_meme(previous_message, meme, reply_markup)
-    except NetworkError as error:
-        logger.warning(
-            "Failed to edit previous message for meme %s: %s. Sending new message instead.",
-            meme.id,
-            error,
-        )
-        edited_message = None
     except BadRequest as error:
         if _is_missing_message_error(error):
             logger.info(

@@ -113,38 +113,32 @@ async def send_new_message_with_meme(
     reply_markup: InlineKeyboardMarkup | None = None,
 ) -> Message:
     async def _do_send(parse_mode):
-        async def _send():
-            if meme.type == MemeType.IMAGE:
-                return await bot.send_photo(
-                    chat_id=user_id,
-                    photo=meme.telegram_file_id,
-                    caption=meme.caption,
-                    reply_markup=reply_markup,
-                    parse_mode=parse_mode,
-                )
-            elif meme.type == MemeType.VIDEO:
-                return await bot.send_video(
-                    chat_id=user_id,
-                    video=meme.telegram_file_id,
-                    caption=meme.caption,
-                    reply_markup=reply_markup,
-                    parse_mode=parse_mode,
-                )
-            elif meme.type == MemeType.ANIMATION:
-                return await bot.send_animation(
-                    chat_id=user_id,
-                    animation=meme.telegram_file_id,
-                    caption=meme.caption,
-                    reply_markup=reply_markup,
-                    parse_mode=parse_mode,
-                )
-            else:
-                raise NotImplementedError(f"Can't send meme. Unknown meme type: {meme.type}")
-
-        return await telegram_call_with_retry(
-            _send,
-            action=f"send_meme_{meme.type.value}",
-        )
+        if meme.type == MemeType.IMAGE:
+            return await bot.send_photo(
+                chat_id=user_id,
+                photo=meme.telegram_file_id,
+                caption=meme.caption,
+                reply_markup=reply_markup,
+                parse_mode=parse_mode,
+            )
+        elif meme.type == MemeType.VIDEO:
+            return await bot.send_video(
+                chat_id=user_id,
+                video=meme.telegram_file_id,
+                caption=meme.caption,
+                reply_markup=reply_markup,
+                parse_mode=parse_mode,
+            )
+        elif meme.type == MemeType.ANIMATION:
+            return await bot.send_animation(
+                chat_id=user_id,
+                animation=meme.telegram_file_id,
+                caption=meme.caption,
+                reply_markup=reply_markup,
+                parse_mode=parse_mode,
+            )
+        else:
+            raise NotImplementedError(f"Can't send meme. Unknown meme type: {meme.type}")
 
     try:
         return await _do_send(ParseMode.HTML)
