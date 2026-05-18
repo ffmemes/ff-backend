@@ -303,6 +303,11 @@ async def test_decision_log_shadow_counts_pre_posting_share_clicks(clean_xpost):
                     "deep_link": "s_10053_10351",
                     "created_at": now + timedelta(hours=1),
                 },
+                {
+                    "user_id": 10054,
+                    "deep_link": "s_lang_10351",
+                    "created_at": now - timedelta(hours=1),
+                },
             ],
         )
         await conn.commit()
