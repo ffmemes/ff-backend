@@ -262,7 +262,7 @@ _RU_QUERY = """
         FROM user_deep_link_log udll
         WHERE udll.created_at < selected_at.decided_at
           AND udll.deep_link ~ ('^s_[0-9]+_' || ranked.id || '$')
-          AND udll.user_id <> split_part(udll.deep_link, '_', 2)::bigint
+          AND udll.user_id::text <> split_part(udll.deep_link, '_', 2)
     ) share_clicks ON true
 """
 
@@ -349,7 +349,7 @@ _EN_QUERY = """
         FROM user_deep_link_log udll
         WHERE udll.created_at < selected_at.decided_at
           AND udll.deep_link ~ ('^s_[0-9]+_' || ranked.id || '$')
-          AND udll.user_id <> split_part(udll.deep_link, '_', 2)::bigint
+          AND udll.user_id::text <> split_part(udll.deep_link, '_', 2)
     ) share_clicks ON true
 """
 
