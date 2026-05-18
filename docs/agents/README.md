@@ -17,6 +17,7 @@ override current Codex or Paperclip decisions.
 | PR review automation | [PR review cycle](pr-review-cycle.md) | Keep GitHub payloads narrow and Paperclip issue links explicit. |
 | Moderator source scouting | [Moderator community loop spec](../../specs/moderator-community-loop.md), [CONTEXT.md](../../CONTEXT.md), and [ADR-0003](../adr/0003-prepared-source-etl-guard.md) | Use the Russian domain vocabulary; prepared sources stay parked until enabled. |
 | Describe Memes / vision OCR | [AGENTS.md](../../AGENTS.md) and [Describe Memes spec](../../specs/describe-memes.md) | Free OpenRouter vision models only. |
+| Crossposting / channel shares | [Crossposting share readout](../../specs/crossposting-share-optimization-2026-05-18.md), [Analyst crossposting SQL](../analyst/crossposting.sql), and [CONTEXT.md](../../CONTEXT.md) | Separate in-bot share clicks, channel deep links, and Telegram channel forwards/views. |
 
 ## Authority Boundaries
 

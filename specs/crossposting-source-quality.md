@@ -245,7 +245,7 @@ WHERE 1=1
   AND M.status = 'ok'
   AND M.language_code = :lang
   AND M.type = 'image'
-  AND MS.nlikes >= 2                                    -- lowered from 5 (codex #1)
+  AND MS.nlikes >= 5                                    -- kept quality floor
   AND M.meme_source_id NOT IN (SELECT meme_source_id FROM recent_src)
 ORDER BY -1
     * COALESCE((MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1), 0.5)

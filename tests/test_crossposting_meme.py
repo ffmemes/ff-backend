@@ -1,12 +1,16 @@
+from datetime import UTC, datetime, timedelta
+
 import pytest
 import pytest_asyncio
 from sqlalchemy import delete, text
+from sqlalchemy.dialects.postgresql import insert
 
 from src.crossposting.service import (
+    get_next_meme_for_tgchannelen,
     get_next_meme_for_tgchannelru,
     log_ranker_decision,
 )
-from src.database import crossposting, crossposting_decision_log, engine
+from src.database import crossposting, crossposting_decision_log, engine, user_deep_link_log
 from src.flows.crossposting.meme import _clean_caption
 from tests.factories import (
     TEST_ID_START,
@@ -14,6 +18,7 @@ from tests.factories import (
     create_meme,
     create_meme_source,
     create_meme_stats,
+    create_user,
 )
 
 
@@ -258,6 +263,79 @@ async def test_source_quality_neutral_when_no_snapshots(clean_xpost):
 
 
 @pytest.mark.asyncio
+async def test_decision_log_shadow_counts_pre_posting_share_clicks(clean_xpost):
+    async with engine.connect() as conn:
+        await create_meme_source(conn, id=10350, language_code="ru")
+        await create_meme(
+            conn, id=10351, meme_source_id=10350, language_code="ru", type="image", status="ok"
+        )
+        await create_meme_stats(conn, meme_id=10351, nlikes=10, ndislikes=2)
+
+        for user_id in (10051, 10052, 10053, 10054):
+            await create_user(conn, id=user_id)
+
+        now = datetime.now(UTC).replace(tzinfo=None)
+        await conn.execute(
+            insert(user_deep_link_log),
+            [
+                {
+                    "user_id": 10052,
+                    "deep_link": "s_10051_10351",
+                    "created_at": now - timedelta(hours=2),
+                },
+                {
+                    "user_id": 10052,
+                    "deep_link": "s_10051_10351",
+                    "created_at": now - timedelta(hours=1),
+                },
+                {
+                    "user_id": 10053,
+                    "deep_link": "s_10051_10351",
+                    "created_at": now - timedelta(hours=1),
+                },
+                {
+                    "user_id": 10051,
+                    "deep_link": "s_10051_10351",
+                    "created_at": now - timedelta(hours=1),
+                },
+                {
+                    "user_id": 10054,
+                    "deep_link": "s_10053_10351",
+                    "created_at": now + timedelta(hours=1),
+                },
+            ],
+        )
+        await conn.commit()
+
+    picked, decision = await get_next_meme_for_tgchannelru()
+    assert picked is not None
+    assert picked["id"] == 10351
+    assert decision is not None
+    only_candidate = decision["candidates"][0]
+    assert only_candidate["pre_inbot_share_clicks"] == 3
+    assert only_candidate["pre_inbot_share_click_users"] == 2
+
+
+@pytest.mark.asyncio
+async def test_en_ranker_decision_log_has_shadow_share_fields(clean_xpost):
+    async with engine.connect() as conn:
+        await create_meme_source(conn, id=10360, language_code="en")
+        await create_meme(
+            conn, id=10361, meme_source_id=10360, language_code="en", type="image", status="ok"
+        )
+        await create_meme_stats(conn, meme_id=10361, nlikes=10, ndislikes=2)
+        await conn.commit()
+
+    picked, decision = await get_next_meme_for_tgchannelen()
+    assert picked is not None
+    assert picked["id"] == 10361
+    assert decision is not None
+    only_candidate = decision["candidates"][0]
+    assert only_candidate["pre_inbot_share_clicks"] == 0
+    assert only_candidate["pre_inbot_share_click_users"] == 0
+
+
+@pytest.mark.asyncio
 async def test_ranker_decision_log_records_top5(clean_xpost):
     """Decision log persists top-N candidates with full score breakdown for retro analysis."""
     async with engine.connect() as conn:
@@ -317,6 +395,8 @@ async def test_ranker_decision_log_records_top5(clean_xpost):
         "age_days",
         "nmemes_sent",
         "invited_count",
+        "pre_inbot_share_clicks",
+        "pre_inbot_share_click_users",
         "caption_present",
         "src_signal",
         "src_quality_mult",

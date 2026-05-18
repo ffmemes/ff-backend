@@ -588,7 +588,8 @@ crossposting_decision_log = Table(
     Column("median_signal", Float),
     Column("candidate_pool_size", Integer),
     # candidates JSONB: list of {meme_id, source_id, rank, nlikes, ndislikes,
-    # raw_impr_rank, age_days, nmemes_sent, invited_count, caption_present,
+    # raw_impr_rank, age_days, nmemes_sent, invited_count,
+    # pre_inbot_share_clicks, pre_inbot_share_click_users, caption_present,
     # src_signal, src_quality_mult, lr_factor, impr_factor, age_factor,
     # caption_factor, sent_factor, invited_boost, final_score}
     Column("candidates", JSONB, nullable=False),

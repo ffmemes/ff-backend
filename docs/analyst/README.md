@@ -10,6 +10,8 @@ The Analyst agent monitors product health, tracks experiments, and produces dail
 
 ## Key Files
 - `docs/analyst/metrics.sql` — SQL queries organized by section (health, north star, engines, retention, etc.)
+- `docs/analyst/crossposting.sql` — reusable read-only queries for Telegram channel views/forwards, 24h labels, and pre-posting share signals.
+- `specs/crossposting-share-optimization-2026-05-18.md` — current compact crossposting readout and next experiment gate.
 - `experiments/active/` — Currently running experiments to monitor
 - `experiments/completed/` — Historical experiments for context
 - `experiments/reports/` — Daily report output
@@ -39,6 +41,17 @@ Key tables for analytics:
 - `reaction_id IS NULL` → Sent but no reaction yet (skip/abandon)
 
 **Critical context**: Dislike = "next meme" skip, not negative signal. Fast dislikes (<2s) on text memes = "didn't bother reading", not "bad content."
+
+## Share Attribution
+
+Telegram bot shares and Telegram channel shares are different signals:
+
+- In-bot share clicks use `s_{sharer_user_id}_{meme_id}` in `user_deep_link_log`.
+- Channel post deep links use `sc_{meme_id}_{channel}` in `user_deep_link_log`.
+- Telegram channel forwards/views live in `crossposting` and `crossposting_snapshots`, collected by Telethon.
+
+For channel-growth work, read `docs/analyst/crossposting.sql` and
+`specs/crossposting-share-optimization-2026-05-18.md` before writing new SQL.
 
 ## Engine Names (recommended_by column)
 | Engine | Description | Expected LR |
