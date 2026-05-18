@@ -1,9 +1,11 @@
 """
-Weekly burger economy report for @ffmemes channel.
+Weekly burger economy report for @fastfoodmemes channel.
 
 Posts a Sunday 14:00 MSK summary of burger transactions to the channel.
 Scheduled via Prefect cron in serve_flows.py.
 """
+
+from html import escape
 
 from prefect import flow, get_run_logger
 from sqlalchemy import text
@@ -54,12 +56,17 @@ async def _get_weekly_burger_stats() -> dict:
     top_earners = await fetch_all(
         text(
             """
-            SELECT user_id, SUM(amount) as earned
-            FROM treasury_trx
-            WHERE amount > 0
-              AND created_at > now() - interval '7 days'
-            GROUP BY user_id
-            ORDER BY earned DESC
+            SELECT
+                trx.user_id,
+                u.nickname,
+                SUM(trx.amount) as earned
+            FROM treasury_trx trx
+            LEFT JOIN "user" u
+                ON u.id = trx.user_id
+            WHERE trx.amount > 0
+              AND trx.created_at > now() - interval '7 days'
+            GROUP BY trx.user_id, u.nickname
+            ORDER BY earned DESC, trx.user_id ASC
             LIMIT 5
         """
         )
@@ -100,7 +107,9 @@ def _format_report(stats: dict) -> str:
         medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
         for i, earner in enumerate(stats["top_earners"]):
             earned = int(earner["earned"])
-            lines.append(f"{medals[i]} +{earned:,} 🍔".replace(",", " "))
+            nickname = (earner.get("nickname") or "").strip()
+            public_name = escape(nickname) if nickname else "без /nickname"
+            lines.append(f"{medals[i]} {public_name}: +{earned:,} 🍔".replace(",", " "))
 
     lines.append("")
     lines.append(
@@ -117,7 +126,7 @@ def _format_report(stats: dict) -> str:
     on_failure=[notify_telegram_on_failure],
 )
 async def post_weekly_burger_report():
-    """Post weekly burger economy snapshot to @ffmemes channel."""
+    """Post weekly burger economy snapshot to @fastfoodmemes channel."""
     logger = get_run_logger()
 
     stats = await _get_weekly_burger_stats()
