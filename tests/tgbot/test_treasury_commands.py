@@ -28,14 +28,10 @@ async def test_kitchen_uses_russian_when_ru_enabled(monkeypatch) -> None:
     caption = update.message.reply_video.call_args.kwargs["caption"]
     assert "<b>🍔 Кухня</b>" in caption
     assert "Как получить бургеры" in caption
-    assert (
-        f"если принятый мем попадет в наш канал: {PAYOUTS[TrxType.MEME_PUBLISHED]} 🍔"
-        in caption
-    )
+    assert f"если принятый мем попадет в наш канал: {PAYOUTS[TrxType.MEME_PUBLISHED]} 🍔" in caption
     assert (
         "кто-то нажал ссылку под мемом, которым ты поделился: "
-        f"{PAYOUTS[TrxType.MEME_SHARED]} 🍔 раз в день"
-        in caption
+        f"{PAYOUTS[TrxType.MEME_SHARED]} 🍔 раз в день" in caption
     )
 
 
@@ -50,8 +46,7 @@ async def test_kitchen_uses_english_when_ru_not_enabled(monkeypatch) -> None:
     assert "<b>🍔 Kitchen</b>" in caption
     assert "How to get more burgers" in caption
     assert (
-        f"if an approved meme reaches our channel: {PAYOUTS[TrxType.MEME_PUBLISHED]} 🍔"
-        in caption
+        f"if an approved meme reaches our channel: {PAYOUTS[TrxType.MEME_PUBLISHED]} 🍔" in caption
     )
     assert "Как получить бургеры" not in caption
 
