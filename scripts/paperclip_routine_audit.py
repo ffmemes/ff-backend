@@ -364,7 +364,11 @@ def classify_issue(
     # often mention approvals, posts, or prior watchdog flags while summarizing
     # their work; those must not inherit the channel-publication contract.
     is_publish_flow = title.startswith("[post:") or "daily channel post" in title
-    has_approval_signal = "approved" in lower or has_accepted_confirmation(interactions or [])
+    has_approval_signal = (
+        "decision=approved_to_publish" in lower
+        or "approved_to_publish" in lower
+        or has_accepted_confirmation(interactions or [])
+    )
     has_publish_marker = all(pattern.search(text) for pattern in PUBLISHED_MARKER_PATTERNS)
     if is_publish_flow and has_approval_signal and not has_publish_marker:
         flags.append("approved_without_publish_marker")

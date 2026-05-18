@@ -16,8 +16,9 @@ Things that trip people up:
   are different chats with different message id sequences.
 - CEO approval is not publication. The routine may close its execution issue with
   `outcome=draft_created`, but the linked `[post:...]` issue must carry a
-  structured Paperclip confirmation card. It is
-  closed only after CEO returns it to Comms and `publish_editorial_post()`
-  returns `result.message_id` / `result.editorial_post_id`.
+  CEO-authored `decision=approved_to_publish` marker for the latest draft
+  revision. It is closed only after CEO returns it to Comms and
+  `publish_editorial_post()` returns `result.message_id` /
+  `result.editorial_post_id`.
 
 Validation, rotation, and the topic ban-list are enforced in code. If `EditorialValidationError` fires, fix the draft.
