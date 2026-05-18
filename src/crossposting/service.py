@@ -123,6 +123,8 @@ def _build_decision_log(
                 "age_days": row.get("age_days"),
                 "nmemes_sent": row.get("nmemes_sent"),
                 "invited_count": row.get("invited_count"),
+                "pre_inbot_share_clicks": row.get("pre_inbot_share_clicks") or 0,
+                "pre_inbot_share_click_users": row.get("pre_inbot_share_click_users") or 0,
                 "caption_present": row.get("caption") is not None,
                 "src_signal": (
                     round(float(row["src_signal"]), 4)
@@ -178,7 +180,10 @@ def _picked_meme_dict(candidate: dict[str, Any]) -> dict[str, Any]:
 
 
 _RU_QUERY = """
-    WITH src_quality AS (
+    WITH selected_at AS (
+        SELECT NOW() AS decided_at
+    ),
+    src_quality AS (
         SELECT
             m.meme_source_id,
             AVG(cp.forwards * SQRT(GREATEST(cp.views, 1) / 100.0)) AS signal,
@@ -205,47 +210,67 @@ _RU_QUERY = """
         WHERE cp2.channel = 'tgchannelru'
           AND cp2.created_at > NOW() - INTERVAL '24 hours'
           AND cp2.telegram_message_id IS NOT NULL
+    ),
+    ranked AS (
+        SELECT
+            M.id, M.type, M.telegram_file_id, M.caption,
+            M.meme_source_id,
+            MS.nlikes, MS.ndislikes, MS.raw_impr_rank,
+            MS.age_days, MS.nmemes_sent, MS.invited_count,
+            SQ.signal AS src_signal,
+            (SELECT m_signal FROM src_median) AS median_signal,
+            COUNT(*) OVER () AS candidate_pool_size
+        FROM meme M
+        INNER JOIN meme_stats MS ON MS.meme_id = M.id
+        LEFT JOIN crossposting CP ON CP.meme_id = M.id AND CP.channel = 'tgchannelru'
+        LEFT JOIN src_quality SQ ON SQ.meme_source_id = M.meme_source_id
+        WHERE 1=1
+          AND CP.meme_id IS NULL
+          AND M.status = 'ok'
+          AND M.language_code = 'ru'
+          AND M.type = 'image'
+          AND MS.nlikes >= 5
+          AND M.meme_source_id NOT IN (SELECT meme_source_id FROM recent_src)
+        ORDER BY -1
+            * COALESCE((MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1), 0.5)
+            * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE 0.8 END
+            * CASE WHEN MS.age_days < 7 THEN 1 ELSE 0.8 END
+            * CASE WHEN M.caption IS NULL THEN 1 ELSE 0.8 END
+            * CASE
+                WHEN MS.nmemes_sent <= 1 THEN 1
+                ELSE (MS.nlikes + MS.ndislikes) * 1. / MS.nmemes_sent
+              END
+            * COALESCE(
+                LEAST(2.0, GREATEST(0.5,
+                    SQ.signal / NULLIF((SELECT m_signal FROM src_median), 0)
+                )),
+                1.0
+              )
+            * (1.0 + LEAST(MS.invited_count, 10) * 0.1)
+        LIMIT :limit
     )
     SELECT
-        M.id, M.type, M.telegram_file_id, M.caption,
-        M.meme_source_id,
-        MS.nlikes, MS.ndislikes, MS.raw_impr_rank,
-        MS.age_days, MS.nmemes_sent, MS.invited_count,
-        SQ.signal AS src_signal,
-        (SELECT m_signal FROM src_median) AS median_signal,
-        COUNT(*) OVER () AS candidate_pool_size
-    FROM meme M
-    INNER JOIN meme_stats MS ON MS.meme_id = M.id
-    LEFT JOIN crossposting CP ON CP.meme_id = M.id AND CP.channel = 'tgchannelru'
-    LEFT JOIN src_quality SQ ON SQ.meme_source_id = M.meme_source_id
-    WHERE 1=1
-      AND CP.meme_id IS NULL
-      AND M.status = 'ok'
-      AND M.language_code = 'ru'
-      AND M.type = 'image'
-      AND MS.nlikes >= 5
-      AND M.meme_source_id NOT IN (SELECT meme_source_id FROM recent_src)
-    ORDER BY -1
-        * COALESCE((MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1), 0.5)
-        * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE 0.8 END
-        * CASE WHEN MS.age_days < 7 THEN 1 ELSE 0.8 END
-        * CASE WHEN M.caption IS NULL THEN 1 ELSE 0.8 END
-        * CASE
-            WHEN MS.nmemes_sent <= 1 THEN 1
-            ELSE (MS.nlikes + MS.ndislikes) * 1. / MS.nmemes_sent
-          END
-        * COALESCE(
-            LEAST(2.0, GREATEST(0.5,
-                SQ.signal / NULLIF((SELECT m_signal FROM src_median), 0)
-            )),
-            1.0
-          )
-        * (1.0 + LEAST(MS.invited_count, 10) * 0.1)
-    LIMIT :limit
+        ranked.*,
+        COALESCE(share_clicks.pre_inbot_share_clicks, 0) AS pre_inbot_share_clicks,
+        COALESCE(share_clicks.pre_inbot_share_click_users, 0) AS pre_inbot_share_click_users
+    FROM ranked
+    CROSS JOIN selected_at
+    LEFT JOIN LATERAL (
+        SELECT
+            COUNT(*) AS pre_inbot_share_clicks,
+            COUNT(DISTINCT user_id) AS pre_inbot_share_click_users
+        FROM user_deep_link_log udll
+        WHERE udll.created_at < selected_at.decided_at
+          AND udll.deep_link ~ ('^s_[0-9]+_' || ranked.id || '$')
+          AND udll.user_id <> split_part(udll.deep_link, '_', 2)::bigint
+    ) share_clicks ON true
 """
 
 _EN_QUERY = """
-    WITH src_quality AS (
+    WITH selected_at AS (
+        SELECT NOW() AS decided_at
+    ),
+    src_quality AS (
         SELECT
             m.meme_source_id,
             AVG(cp.forwards * SQRT(GREATEST(cp.views, 1) / 100.0)) AS signal,
@@ -272,43 +297,60 @@ _EN_QUERY = """
         WHERE cp2.channel = 'tgchannelen'
           AND cp2.created_at > NOW() - INTERVAL '24 hours'
           AND cp2.telegram_message_id IS NOT NULL
+    ),
+    ranked AS (
+        SELECT
+            M.id, M.type, M.telegram_file_id, M.caption,
+            M.meme_source_id,
+            MS.nlikes, MS.ndislikes, MS.raw_impr_rank,
+            MS.age_days, MS.nmemes_sent, MS.invited_count,
+            SQ.signal AS src_signal,
+            (SELECT m_signal FROM src_median) AS median_signal,
+            COUNT(*) OVER () AS candidate_pool_size
+        FROM meme M
+        INNER JOIN meme_stats MS ON MS.meme_id = M.id
+        LEFT JOIN crossposting CP ON CP.meme_id = M.id AND CP.channel = 'tgchannelen'
+        LEFT JOIN src_quality SQ ON SQ.meme_source_id = M.meme_source_id
+        WHERE 1=1
+          AND CP.meme_id IS NULL
+          AND M.status = 'ok'
+          AND M.language_code = 'en'
+          AND M.type = 'image'
+          AND MS.nlikes >= 5
+          AND M.meme_source_id NOT IN (SELECT meme_source_id FROM recent_src)
+        ORDER BY -1
+            * COALESCE((MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1), 0.5)
+            * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE 0.5 END
+            * CASE WHEN MS.age_days < 90 THEN 1 ELSE 0.8 END
+            * CASE WHEN M.caption IS NULL THEN 1 ELSE 0.8 END
+            * CASE
+                WHEN MS.nmemes_sent <= 1 THEN 1
+                ELSE (MS.nlikes + MS.ndislikes) * 1. / MS.nmemes_sent
+              END
+            * COALESCE(
+                LEAST(2.0, GREATEST(0.5,
+                    SQ.signal / NULLIF((SELECT m_signal FROM src_median), 0)
+                )),
+                1.0
+              )
+            * (1.0 + LEAST(MS.invited_count, 10) * 0.1)
+        LIMIT :limit
     )
     SELECT
-        M.id, M.type, M.telegram_file_id, M.caption,
-        M.meme_source_id,
-        MS.nlikes, MS.ndislikes, MS.raw_impr_rank,
-        MS.age_days, MS.nmemes_sent, MS.invited_count,
-        SQ.signal AS src_signal,
-        (SELECT m_signal FROM src_median) AS median_signal,
-        COUNT(*) OVER () AS candidate_pool_size
-    FROM meme M
-    INNER JOIN meme_stats MS ON MS.meme_id = M.id
-    LEFT JOIN crossposting CP ON CP.meme_id = M.id AND CP.channel = 'tgchannelen'
-    LEFT JOIN src_quality SQ ON SQ.meme_source_id = M.meme_source_id
-    WHERE 1=1
-      AND CP.meme_id IS NULL
-      AND M.status = 'ok'
-      AND M.language_code = 'en'
-      AND M.type = 'image'
-      AND MS.nlikes >= 5
-      AND M.meme_source_id NOT IN (SELECT meme_source_id FROM recent_src)
-    ORDER BY -1
-        * COALESCE((MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1), 0.5)
-        * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE 0.5 END
-        * CASE WHEN MS.age_days < 90 THEN 1 ELSE 0.8 END
-        * CASE WHEN M.caption IS NULL THEN 1 ELSE 0.8 END
-        * CASE
-            WHEN MS.nmemes_sent <= 1 THEN 1
-            ELSE (MS.nlikes + MS.ndislikes) * 1. / MS.nmemes_sent
-          END
-        * COALESCE(
-            LEAST(2.0, GREATEST(0.5,
-                SQ.signal / NULLIF((SELECT m_signal FROM src_median), 0)
-            )),
-            1.0
-          )
-        * (1.0 + LEAST(MS.invited_count, 10) * 0.1)
-    LIMIT :limit
+        ranked.*,
+        COALESCE(share_clicks.pre_inbot_share_clicks, 0) AS pre_inbot_share_clicks,
+        COALESCE(share_clicks.pre_inbot_share_click_users, 0) AS pre_inbot_share_click_users
+    FROM ranked
+    CROSS JOIN selected_at
+    LEFT JOIN LATERAL (
+        SELECT
+            COUNT(*) AS pre_inbot_share_clicks,
+            COUNT(DISTINCT user_id) AS pre_inbot_share_click_users
+        FROM user_deep_link_log udll
+        WHERE udll.created_at < selected_at.decided_at
+          AND udll.deep_link ~ ('^s_[0-9]+_' || ranked.id || '$')
+          AND udll.user_id <> split_part(udll.deep_link, '_', 2)::bigint
+    ) share_clicks ON true
 """
 
 

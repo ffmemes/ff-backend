@@ -71,13 +71,15 @@ FROM session_lengths;
 -- =============================================
 -- SECTION: GROWTH — SHARES & REFERRALS
 -- =============================================
--- Share tracking: user clicks link under meme → logged in user_deep_link_log
--- This is the only proxy for "shares" (TG Bot API doesn't expose forward counts)
+-- In-bot share tracking: user clicks an s_{sharer_user_id}_{meme_id} link
+-- under a forwarded bot meme → logged in user_deep_link_log.
+-- Telegram channel post forwards/views are separate; see docs/analyst/crossposting.sql.
 
 SELECT
   count(*) AS deep_link_clicks_7d,
   count(DISTINCT user_id) AS unique_clickers_7d,
-  count(*) FILTER (WHERE deep_link LIKE 'meme_%') AS meme_share_clicks_7d
+  count(*) FILTER (WHERE deep_link ~ '^s_[0-9]+_[0-9]+$') AS inbot_share_clicks_7d,
+  count(*) FILTER (WHERE deep_link ~ '^sc_[0-9]+_[a-z]+') AS channel_deep_link_clicks_7d
 FROM user_deep_link_log
 WHERE created_at > now() - interval '7 days';
 

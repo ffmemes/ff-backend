@@ -15,6 +15,7 @@ Detailed specifications for each subsystem. See root [SPEC.md](../SPEC.md) for p
 | [error-profile.md](error-profile.md) | Production error analysis from logs |
 | [data-hypotheses.md](data-hypotheses.md) | Data analysis findings (H1-H7) |
 | [cohort-analysis-2026-03-29.md](cohort-analysis-2026-03-29.md) | Super users vs churned: cohort analysis, 6 experiments |
+| [crossposting-share-optimization-2026-05-18.md](crossposting-share-optimization-2026-05-18.md) | Current Telegram channel share readout, v2 results, next experiment gate |
 | [experiment-2026-03-14.md](experiment-2026-03-14.md) | Experiment: queue refill threshold + removed fast_dopamine |
 | [experiment-2026-03-16-es-ranked.md](experiment-2026-03-16-es-ranked.md) | Experiment: engagement_score ranked engine |
 | [experiment-2026-03-20-adaptive-cold-start.md](experiment-2026-03-20-adaptive-cold-start.md) | Experiment: adaptive cold start (3-phase) |
