@@ -219,7 +219,26 @@ _RU_QUERY = """
             MS.age_days, MS.nmemes_sent, MS.invited_count,
             SQ.signal AS src_signal,
             (SELECT m_signal FROM src_median) AS median_signal,
-            COUNT(*) OVER () AS candidate_pool_size
+            COUNT(*) OVER () AS candidate_pool_size,
+            ROW_NUMBER() OVER (
+                ORDER BY -1
+                    * COALESCE((MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1), 0.5)
+                    * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE 0.8 END
+                    * CASE WHEN MS.age_days < 7 THEN 1 ELSE 0.8 END
+                    * CASE WHEN M.caption IS NULL THEN 1 ELSE 0.8 END
+                    * CASE
+                        WHEN MS.nmemes_sent <= 1 THEN 1
+                        ELSE (MS.nlikes + MS.ndislikes) * 1. / MS.nmemes_sent
+                      END
+                    * COALESCE(
+                        LEAST(2.0, GREATEST(0.5,
+                            SQ.signal / NULLIF((SELECT m_signal FROM src_median), 0)
+                        )),
+                        1.0
+                      )
+                    * (1.0 + LEAST(MS.invited_count, 10) * 0.1),
+                    M.id
+            ) AS candidate_rank
         FROM meme M
         INNER JOIN meme_stats MS ON MS.meme_id = M.id
         LEFT JOIN crossposting CP ON CP.meme_id = M.id AND CP.channel = 'tgchannelru'
@@ -246,7 +265,8 @@ _RU_QUERY = """
                 )),
                 1.0
               )
-            * (1.0 + LEAST(MS.invited_count, 10) * 0.1)
+            * (1.0 + LEAST(MS.invited_count, 10) * 0.1),
+            M.id
         LIMIT :limit
     )
     SELECT
@@ -260,10 +280,20 @@ _RU_QUERY = """
             COUNT(*) AS pre_inbot_share_clicks,
             COUNT(DISTINCT user_id) AS pre_inbot_share_click_users
         FROM user_deep_link_log udll
+        CROSS JOIN LATERAL (
+            SELECT substring(
+                udll.deep_link FROM ('^s_([1-9][0-9]{0,18})_' || ranked.id || '$')
+            ) AS sharer_id
+        ) share_link
         WHERE udll.created_at < selected_at.decided_at
-          AND udll.deep_link ~ ('^s_[0-9]+_' || ranked.id || '$')
-          AND udll.user_id::text <> split_part(udll.deep_link, '_', 2)
+          AND CASE
+              WHEN share_link.sharer_id IS NULL THEN false
+              WHEN length(share_link.sharer_id) = 19
+                AND share_link.sharer_id > '9223372036854775807' THEN false
+              ELSE udll.user_id <> share_link.sharer_id::bigint
+          END
     ) share_clicks ON true
+    ORDER BY ranked.candidate_rank
 """
 
 _EN_QUERY = """
@@ -306,7 +336,26 @@ _EN_QUERY = """
             MS.age_days, MS.nmemes_sent, MS.invited_count,
             SQ.signal AS src_signal,
             (SELECT m_signal FROM src_median) AS median_signal,
-            COUNT(*) OVER () AS candidate_pool_size
+            COUNT(*) OVER () AS candidate_pool_size,
+            ROW_NUMBER() OVER (
+                ORDER BY -1
+                    * COALESCE((MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1), 0.5)
+                    * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE 0.5 END
+                    * CASE WHEN MS.age_days < 90 THEN 1 ELSE 0.8 END
+                    * CASE WHEN M.caption IS NULL THEN 1 ELSE 0.8 END
+                    * CASE
+                        WHEN MS.nmemes_sent <= 1 THEN 1
+                        ELSE (MS.nlikes + MS.ndislikes) * 1. / MS.nmemes_sent
+                      END
+                    * COALESCE(
+                        LEAST(2.0, GREATEST(0.5,
+                            SQ.signal / NULLIF((SELECT m_signal FROM src_median), 0)
+                        )),
+                        1.0
+                      )
+                    * (1.0 + LEAST(MS.invited_count, 10) * 0.1),
+                    M.id
+            ) AS candidate_rank
         FROM meme M
         INNER JOIN meme_stats MS ON MS.meme_id = M.id
         LEFT JOIN crossposting CP ON CP.meme_id = M.id AND CP.channel = 'tgchannelen'
@@ -333,7 +382,8 @@ _EN_QUERY = """
                 )),
                 1.0
               )
-            * (1.0 + LEAST(MS.invited_count, 10) * 0.1)
+            * (1.0 + LEAST(MS.invited_count, 10) * 0.1),
+            M.id
         LIMIT :limit
     )
     SELECT
@@ -347,10 +397,20 @@ _EN_QUERY = """
             COUNT(*) AS pre_inbot_share_clicks,
             COUNT(DISTINCT user_id) AS pre_inbot_share_click_users
         FROM user_deep_link_log udll
+        CROSS JOIN LATERAL (
+            SELECT substring(
+                udll.deep_link FROM ('^s_([1-9][0-9]{0,18})_' || ranked.id || '$')
+            ) AS sharer_id
+        ) share_link
         WHERE udll.created_at < selected_at.decided_at
-          AND udll.deep_link ~ ('^s_[0-9]+_' || ranked.id || '$')
-          AND udll.user_id::text <> split_part(udll.deep_link, '_', 2)
+          AND CASE
+              WHEN share_link.sharer_id IS NULL THEN false
+              WHEN length(share_link.sharer_id) = 19
+                AND share_link.sharer_id > '9223372036854775807' THEN false
+              ELSE udll.user_id <> share_link.sharer_id::bigint
+          END
     ) share_clicks ON true
+    ORDER BY ranked.candidate_rank
 """
 
 
