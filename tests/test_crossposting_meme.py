@@ -300,6 +300,21 @@ async def test_decision_log_shadow_counts_pre_posting_share_clicks(clean_xpost):
                 },
                 {
                     "user_id": 10054,
+                    "deep_link": "not_a_share_link",
+                    "created_at": now - timedelta(minutes=30),
+                },
+                {
+                    "user_id": 10054,
+                    "deep_link": "s_999999999999999999999_10351",
+                    "created_at": now - timedelta(minutes=30),
+                },
+                {
+                    "user_id": 10054,
+                    "deep_link": "s_10051_99999",
+                    "created_at": now - timedelta(minutes=30),
+                },
+                {
+                    "user_id": 10054,
                     "deep_link": "s_10053_10351",
                     "created_at": now + timedelta(hours=1),
                 },
