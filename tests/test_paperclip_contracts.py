@@ -135,7 +135,7 @@ def test_nested_state_published_terminal():
 
 
 def test_nested_state_approved_unpublished():
-    text = "outcome=draft_created\nAPPROVED_TO_PUBLISH"
+    text = "outcome=draft_created\ndecision=approved_to_publish\ndraft_revision=2"
     assert nested_state(text, slug="post") == "approved_unpublished"
 
 

@@ -79,8 +79,17 @@ def test_paperclip_update_verified_by_coolify_commit_is_green():
 
 def test_daily_channel_post_approval_still_requires_publish_markers():
     issue = {"title": "Daily Channel Post", "description": ""}
-    comments = [{"body": "CEO approved this draft; publishing still pending."}]
+    comments = [{"body": "decision=approved_to_publish\npublishing still pending."}]
 
     flags, _latest = audit.classify_issue(issue, comments)
 
     assert "approved_without_publish_marker" in flags
+
+
+def test_freeform_approval_comment_is_not_publish_approval_signal():
+    issue = {"title": "Daily Channel Post", "description": ""}
+    comments = [{"body": "CEO approved this draft; publishing still pending."}]
+
+    flags, _latest = audit.classify_issue(issue, comments)
+
+    assert "approved_without_publish_marker" not in flags

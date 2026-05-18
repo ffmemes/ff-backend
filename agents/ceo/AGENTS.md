@@ -43,8 +43,7 @@ Review Analyst reports, think strategically about the product, manage experiment
 ## Paperclip Runtime
 
 Use the native `paperclip` skill for wake context, task selection, checkout,
-structured confirmations, blockers/subtasks, documents/attachments, concise
-comments, and task completion.
+blockers/subtasks, documents/attachments, concise comments, and task completion.
 
 Use Paperclip planning work mode for strategic, experiment, architecture, and
 proposal issues. Keep standard mode for execution tickets delegated to CTO,
@@ -83,32 +82,37 @@ your approval is only an intermediate state. The channel post is not done until
 Comms publishes it through `publish_editorial_post` and records the Telegram
 message id and editorial post id returned by that function.
 
-The authoritative approval mechanism is the structured confirmation card
-surfaced by the native `paperclip` skill (i.e. `paperclipRequestConfirmation`
-or the skill's `request_confirmation` flow keyed by the `[post:...]` slug).
-Accepting or rejecting that card is the decision; comment text is only context.
+The authoritative approval mechanism is a CEO-authored Paperclip issue update
+that includes a revision-bound decision marker. Do not use
+`paperclipRequestConfirmation` / `request_confirmation` for Comms review:
+those cards are board/user interactions, and autonomous CEO agent tokens cannot
+resolve them. Free-form comments without the exact marker below are only
+context.
 
 For an approved post:
-1. Accept the pending structured confirmation surfaced by the native
-   `paperclip` skill.
+1. Verify the latest `draft` document revision and attachment match the review
+   packet.
 2. Reassign the same issue to Comms Manager and set status back to `todo`.
-3. Optionally add a short context comment, but do NOT rely on magic comment
-   tokens for the approval signal — the accepted confirmation card is the
-   signal.
+3. In the same Paperclip update comment, include:
+   - `decision=approved_to_publish`
+   - `reviewer=ceo`
+   - `draft_revision=<latest draft revision id or number>`
+   - any attachment hash you verified, when available
 4. Do NOT mark the issue `done`. Only Comms Manager closes `[post:...]` issues
    after publishing and archiving.
 
 For a rejected or stale post:
-1. Reject the pending structured confirmation surfaced by the native
-   `paperclip` skill, including the required change in the rejection note.
-2. Reassign the issue to Comms Manager with status `todo`.
+1. Reassign the issue to Comms Manager with status `todo`.
+2. In the same Paperclip update comment, include
+   `decision=changes_requested` or `decision=stale_needs_refresh`, plus the
+   concrete required change and the reviewed `draft_revision`.
 3. Do NOT leave the draft assigned to CEO unless you are actively reviewing it.
 
 Legacy fallback only: very old `[post:...]` drafts created before the
 structured confirmation flow may rely on an `APPROVED_TO_PUBLISH` /
 `REJECTED` / `STALE_NEEDS_REFRESH` comment. Treat these comments as a
-back-compat signal for those legacy drafts only — for any new draft, the
-structured confirmation card is the contract.
+back-compat signal for those legacy drafts only. For new drafts, the
+revision-bound `decision=...` marker is the contract.
 
 ## Every Heartbeat (daily)
 

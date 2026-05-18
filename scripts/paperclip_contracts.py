@@ -129,13 +129,13 @@ PUBLISHED_MARKERS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\b(?:telegram_message_id|telegram message id)\b", re.IGNORECASE),
 )
 
-# Intermediate approval signals. `APPROVED_TO_PUBLISH` is legacy fallback
-# (still permitted for old drafts per `agents/comms-manager/AGENTS.md`)
-# but `accepted` confirmation cards are the authoritative path.
+# Intermediate approval signals. New Comms drafts use a CEO-authored
+# `decision=approved_to_publish` marker bound to the reviewed draft revision.
+# `APPROVED_TO_PUBLISH` remains a legacy fallback for old drafts.
 APPROVAL_MARKERS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\boutcome\s*=\s*draft_created\b", re.IGNORECASE),
+    re.compile(r"\bdecision\s*=\s*approved_to_publish\b", re.IGNORECASE),
     re.compile(r"\bAPPROVED_TO_PUBLISH\b"),
-    re.compile(r"\bapproved\b", re.IGNORECASE),
 )
 
 STALE_DRAFT_MARKERS: tuple[re.Pattern[str], ...] = (

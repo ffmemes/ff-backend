@@ -37,12 +37,12 @@ Terminal success is `outcome=published` with both:
 - `telegram_message_id`
 - `editorial_post_id`
 
-`draft_created`, `approval_pending`, and an accepted `request_confirmation`
-card (the authoritative CEO approval signal) are intermediate states. Legacy
-`APPROVED_TO_PUBLISH` comments count as the same intermediate state for old
-drafts only. CEO approval must reassign the `[post:...]` issue to Comms
-Manager with status `todo`; CEO must not close the issue. Comms Manager is
-the only terminal owner and closes it after publishing through
+`draft_created`, `approval_pending`, and a CEO-authored
+`decision=approved_to_publish` marker for the latest draft revision are
+intermediate states. Legacy `APPROVED_TO_PUBLISH` comments count as the same
+intermediate state for old drafts only. CEO approval must reassign the
+`[post:...]` issue to Comms Manager with status `todo`; CEO must not close the
+issue. Comms Manager is the only terminal owner and closes it after publishing through
 `publish_editorial_post()` using the returned `result.message_id` and
 `result.editorial_post_id`.
 
