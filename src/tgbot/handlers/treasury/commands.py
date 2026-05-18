@@ -1,3 +1,5 @@
+from html import escape
+
 from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -20,8 +22,22 @@ from src.tgbot.handlers.treasury.service import (
 from src.tgbot.senders.utils import get_random_emoji
 
 # get_user_place_in_leaderboard,
-from src.tgbot.service import update_user
+from src.tgbot.service import get_user_languages, update_user
 from src.tgbot.user_info import update_user_info_cache
+
+
+def _format_burgers(amount: int | None) -> str:
+    return f"{int(amount or 0):,}".replace(",", " ")
+
+
+def _public_name(nickname: str | None, fallback: str) -> str:
+    nickname = (nickname or "").strip()
+    return escape(nickname) if nickname else fallback
+
+
+async def _user_has_russian_enabled(user_id: int) -> bool:
+    languages = await get_user_languages(user_id)
+    return any(language and language.startswith("ru") for language in languages)
 
 
 # command: /b / /balance
@@ -75,30 +91,59 @@ KITCHEN_EXPLAINER_VIDEO_FILE_ID = (
 # command: /kitchen
 # shows all possible ways to earn / to mine 🍔
 async def handle_show_kitchen(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Sends you the meme by it's id"""
-    text = f"""
-<b>🍔 Kitchen</b>
+    """Show current burger earning and spending rules."""
+    is_ru = await _user_has_russian_enabled(update.effective_user.id)
+    if is_ru:
+        text = f"""
+<b>🍔 Кухня</b>
 
-How to get more 🍔.
+Как получить бургеры:
 
-Menu:
-▪ forward a funny meme to the bot & pass the modedation: {PAYOUTS[TrxType.MEME_UPLOADER]} 🍔
-▪ you share a meme from bot and your friend clicks a link under meme: {PAYOUTS[TrxType.USER_INVITER]} 🍔
-▪▪ an invited friend has Telegram premium: {PAYOUTS[TrxType.USER_INVITER_PREMIUM]} 🍔
-▪▪ only new ffmemes users counts
+▪ загрузить мем в бота и пройти модерацию: {PAYOUTS[TrxType.MEME_UPLOADER]} 🍔
+▪ если принятый мем попадет в наш канал: {PAYOUTS[TrxType.MEME_PUBLISHED]} 🍔
+▪ кто-то нажал ссылку под мемом, которым ты поделился: {PAYOUTS[TrxType.MEME_SHARED]} 🍔 раз в день
+▪ новый пользователь пришел по твоей ссылке под мемом: {PAYOUTS[TrxType.USER_INVITER]} 🍔
+▪ если у нового пользователя Telegram Premium: {PAYOUTS[TrxType.USER_INVITER_PREMIUM]} 🍔
 
-▪ top 5 uploaded memes in weekly leaderboard:
+▪ топ-5 загруженных мемов недели:
     🥇: {PAYOUTS[TrxType.UPLOADER_TOP_WEEKLY_1]} 🍔
     🥈: {PAYOUTS[TrxType.UPLOADER_TOP_WEEKLY_2]} 🍔
     🥉: {PAYOUTS[TrxType.UPLOADER_TOP_WEEKLY_3]} 🍔
     4: {PAYOUTS[TrxType.UPLOADER_TOP_WEEKLY_4]} 🍔
     5: {PAYOUTS[TrxType.UPLOADER_TOP_WEEKLY_5]} 🍔
 
-▪ be active in our chats ❤️
+▪ активность в чатах во время раздач: {PAYOUTS[TrxType.ACTIVE_IN_CHAT]} 🍔
 
-Soon:
-▪ follow our channels: ? 🍔
-▪ more ways to spend your 🍔🍔🍔
+Потратить:
+▪ ответ бота в чате: {PAYOUTS[TrxType.BOT_REPLY_PAYMENT] * -1} 🍔
+▪ перевести бургеры другому: ответь на его сообщение +число, например +10
+
+/leaderboard /balance /lang /chat /nickname
+        """
+    else:
+        text = f"""
+<b>🍔 Kitchen</b>
+
+How to get more burgers:
+
+▪ upload a meme to the bot and pass moderation: {PAYOUTS[TrxType.MEME_UPLOADER]} 🍔
+▪ if an approved meme reaches our channel: {PAYOUTS[TrxType.MEME_PUBLISHED]} 🍔
+▪ someone clicks the link under a meme you shared: {PAYOUTS[TrxType.MEME_SHARED]} 🍔 once per day
+▪ a new user joins through your meme link: {PAYOUTS[TrxType.USER_INVITER]} 🍔
+▪ if that new user has Telegram Premium: {PAYOUTS[TrxType.USER_INVITER_PREMIUM]} 🍔
+
+▪ top 5 uploaded memes of the week:
+    🥇: {PAYOUTS[TrxType.UPLOADER_TOP_WEEKLY_1]} 🍔
+    🥈: {PAYOUTS[TrxType.UPLOADER_TOP_WEEKLY_2]} 🍔
+    🥉: {PAYOUTS[TrxType.UPLOADER_TOP_WEEKLY_3]} 🍔
+    4: {PAYOUTS[TrxType.UPLOADER_TOP_WEEKLY_4]} 🍔
+    5: {PAYOUTS[TrxType.UPLOADER_TOP_WEEKLY_5]} 🍔
+
+▪ chat activity during reward drops: {PAYOUTS[TrxType.ACTIVE_IN_CHAT]} 🍔
+
+Spend:
+▪ bot reply in chat: {PAYOUTS[TrxType.BOT_REPLY_PAYMENT] * -1} 🍔
+▪ send burgers to someone: reply to their message with +number, for example +10
 
 /leaderboard /balance /lang /chat /nickname
         """  # noqa
@@ -116,17 +161,27 @@ Soon:
 # command: /leaderboard /l
 async def handle_show_leaderbaord(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     emoji = get_random_emoji()
+    is_ru = await _user_has_russian_enabled(update.effective_user.id)
     leaderboard = await get_leaderboard()
 
-    LEADERBOARD_TEXT = f"{emoji} Leaderboard (last {LEADERBOARD_WINDOW_DAYS} days) {emoji}\n\n"
+    if is_ru:
+        LEADERBOARD_TEXT = (
+            f"{emoji} Лидерборд за последние {LEADERBOARD_WINDOW_DAYS} дней {emoji}\n\n"
+        )
+    else:
+        LEADERBOARD_TEXT = f"{emoji} Leaderboard (last {LEADERBOARD_WINDOW_DAYS} days) {emoji}\n\n"
+
     for i, user in enumerate(leaderboard):
         icon = "🏆" if i == 0 else "🥈" if i == 1 else "🥉" if i == 2 else "🏅"
-        nick = user["nickname"] or get_random_emoji() * 3
+        nick = _public_name(user["nickname"], get_random_emoji() * 3)
         weekly_earned = user.get("weekly_earned", 0)
-        LEADERBOARD_TEXT += f"{icon} - {nick} - {weekly_earned} 🍔\n"
+        LEADERBOARD_TEXT += f"{icon} - {nick} - {_format_burgers(weekly_earned)} 🍔\n"
 
     tokens = await get_token_supply()
-    LEADERBOARD_TEXT += f"\nTotal supply: {tokens} 🍔"
+    if is_ru:
+        LEADERBOARD_TEXT += f"\nВсего в обороте: {_format_burgers(tokens)} 🍔"
+    else:
+        LEADERBOARD_TEXT += f"\nTotal supply: {_format_burgers(tokens)} 🍔"
 
     user_lb_data = await get_user_place_in_leaderboard(update.effective_user.id)
     if user_lb_data:
@@ -136,13 +191,24 @@ async def handle_show_leaderbaord(update: Update, context: ContextTypes.DEFAULT_
             user_lb_data.get("weekly_earned", 0),
         )
         if nickname:
-            LEADERBOARD_TEXT += f"""
+            if is_ru:
+                LEADERBOARD_TEXT += f"""
 
-You:
-#{place} - {nickname} - {weekly_earned} 🍔
+Ты:
+#{place} - {_public_name(nickname, "")} - {_format_burgers(weekly_earned)} 🍔
 
 /kitchen /uploads /chat
         """
+            else:
+                LEADERBOARD_TEXT += f"""
+
+You:
+#{place} - {_public_name(nickname, "")} - {_format_burgers(weekly_earned)} 🍔
+
+/kitchen /uploads /chat
+        """
+        elif is_ru:
+            LEADERBOARD_TEXT += "\nЧтобы увидеть свое место в лидерборде, задай /nickname ⬅️\n\n"
         else:
             LEADERBOARD_TEXT += "\nTo see your place in the leaderboard, set your /nickname ⬅️\n\n"  # noqa: E501
 

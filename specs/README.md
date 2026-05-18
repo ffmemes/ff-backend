@@ -14,6 +14,7 @@ Detailed specifications for each subsystem. See root [SPEC.md](../SPEC.md) for p
 | [issues.md](issues.md) | Prioritized backlog of known bugs and improvements |
 | [error-profile.md](error-profile.md) | Production error analysis from logs |
 | [data-hypotheses.md](data-hypotheses.md) | Data analysis findings (H1-H7) |
+| [burger-tokenomics.md](burger-tokenomics.md) | Current burger ledger, payouts, commands, reports, and refactor questions |
 | [cohort-analysis-2026-03-29.md](cohort-analysis-2026-03-29.md) | Super users vs churned: cohort analysis, 6 experiments |
 | [crossposting-share-optimization-2026-05-18.md](crossposting-share-optimization-2026-05-18.md) | Current Telegram channel share readout, v2 results, next experiment gate |
 | [experiment-2026-03-14.md](experiment-2026-03-14.md) | Experiment: queue refill threshold + removed fast_dopamine |
