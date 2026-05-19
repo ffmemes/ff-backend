@@ -555,7 +555,7 @@ _SHARE_MAX_QUERY = """
         COALESCE(share_clicks.pre_inbot_share_click_users, 0)
             AS pre_inbot_share_click_users,
         (1.0 + LEAST(COALESCE(share_clicks.pre_inbot_share_click_users, 0), 5)
-            * :share_user_weight) AS share_user_boost,
+            * CAST(:share_user_weight AS DOUBLE PRECISION)) AS share_user_boost,
         (1.0 + LEAST(COALESCE(prelimited.invited_count, 0), 10) * :invited_weight)
             AS share_invited_boost,
         (
@@ -574,7 +574,7 @@ _SHARE_MAX_QUERY = """
         (
             prelimited.share_source_base
             * (1.0 + LEAST(COALESCE(share_clicks.pre_inbot_share_click_users, 0), 5)
-                * :share_user_weight)
+                * CAST(:share_user_weight AS DOUBLE PRECISION))
             * (1.0 + LEAST(COALESCE(prelimited.invited_count, 0), 10) * :invited_weight)
             * CASE WHEN prelimited.caption IS NULL THEN 1.0 ELSE 0.75 END
             * CASE
