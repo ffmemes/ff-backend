@@ -494,6 +494,30 @@ upload.rejected:
     Модератори відхилили твій мем. Надішли щось інше!
 
 
+upload.rejected_not_funny:
+  en: |-
+    😢😢😢
+
+    Your meme was rejected by our moderators: it wasn't funny enough. Send us something else!
+
+  ru: |-
+    😢😢😢
+
+    Модераторы отклонили твой мем: не смешно. Присылай что-нибудь другое!
+
+
+upload.rejected_wrong_language:
+  en: |-
+    😢😢😢
+
+    Your meme was rejected because the selected meme language doesn't match the meme. Upload it again with the correct language.
+
+  ru: |-
+    😢😢😢
+
+    Модераторы отклонили твой мем: выбран не тот язык. Загрузи его ещё раз и выбери правильный язык.
+
+
 upload.rejected_duplicate:
   en: |-
     😬 This meme is already in our collection, so we can't accept it again. Send us something else!

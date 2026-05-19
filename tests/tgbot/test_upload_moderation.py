@@ -10,11 +10,12 @@ def _update(
     *,
     user_id: int = 1,
     chat_id: int = -100,
-    data: str = "upload:42:review:reject",
+    data: str = "upload:42:review:reject_not_funny",
 ):
     message = SimpleNamespace(
         chat_id=chat_id,
         caption="review caption",
+        reply_markup=object(),
         edit_caption=AsyncMock(),
         edit_reply_markup=AsyncMock(),
     )
@@ -49,6 +50,28 @@ async def test_self_review_restores_review_buttons(monkeypatch):
     update_meme.assert_not_awaited()
 
 
+def test_review_keyboard_separates_approve_and_rejection_reasons():
+    keyboard = moderation.review_keyboard(42).inline_keyboard
+
+    assert len(keyboard) == 2
+    assert [button.text for button in keyboard[0]] == ["✅ Всё ок"]
+    assert [button.callback_data for button in keyboard[0]] == ["upload:42:review:approve"]
+    assert [button.text for button in keyboard[1]] == ["❌ Не смешно", "🌐 Не тот язык"]
+    assert [button.callback_data for button in keyboard[1]] == [
+        "upload:42:review:reject_not_funny",
+        "upload:42:review:reject_wrong_language",
+    ]
+
+
+def test_rejection_reason_messages_are_localized_in_english_and_russian():
+    assert "wasn't funny enough" in moderation.localizer.t("upload.rejected_not_funny", "en")
+    assert "не смешно" in moderation.localizer.t("upload.rejected_not_funny", "ru")
+    assert "selected meme language doesn't match" in moderation.localizer.t(
+        "upload.rejected_wrong_language", "en"
+    )
+    assert "выбран не тот язык" in moderation.localizer.t("upload.rejected_wrong_language", "ru")
+
+
 @pytest.mark.asyncio
 async def test_review_callback_outside_upload_review_chat_is_ignored(monkeypatch):
     monkeypatch.setattr(moderation.settings, "UPLOADED_MEMES_REVIEW_CHAT_ID", "-100")
@@ -68,7 +91,10 @@ async def test_review_callback_outside_upload_review_chat_is_ignored(monkeypatch
 @pytest.mark.asyncio
 async def test_upload_review_chat_member_can_reject_without_moderator_user_type(monkeypatch):
     monkeypatch.setattr(moderation.settings, "UPLOADED_MEMES_REVIEW_CHAT_ID", "-100")
-    update, message, query = _update(user_id=8)
+    update, message, query = _update(
+        user_id=8,
+        data="upload:42:review:reject_wrong_language",
+    )
     context = SimpleNamespace(bot=AsyncMock())
 
     with (
@@ -87,14 +113,16 @@ async def test_upload_review_chat_member_can_reject_without_moderator_user_type(
         patch.object(
             moderation,
             "get_user_info",
-            new=AsyncMock(return_value={"interface_lang": "en"}),
+            new=AsyncMock(return_value={"interface_lang": "ru"}),
         ) as get_user_info,
     ):
         await moderation.handle_uploaded_meme_review_button(update, context)
 
     query.answer.assert_awaited_once_with()
-    assert update_meme.await_count == 2
+    update_meme.assert_awaited_once_with(42, status=moderation.MemeStatus.REJECTED)
     pay.assert_awaited_once()
     message.edit_caption.assert_awaited_once()
+    assert "Не тот язык" in message.edit_caption.await_args.kwargs["caption"]
     notify.assert_awaited_once()
+    assert "выбран не тот язык" in notify.await_args.args[2]
     get_user_info.assert_awaited_once_with(7)
