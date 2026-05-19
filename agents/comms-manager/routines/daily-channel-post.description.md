@@ -10,6 +10,10 @@ Things that trip people up:
 - For generated/local visuals, pass `photo_bytes=png` directly. Do not post the image to the moderator chat for staging or `file_id` extraction.
 - Step 0 — read `experiments/reports/channel-stats-YYYY-MM-DD.md` for yesterday's performance.
 - Step 1 — pick the strongest `Chart-worthy: yes` finding from `experiments/reports/anomalies-YYYY-MM-DD.md`.
+- Step 2 — avoid the last 14 topic families, not just exact slugs. A new
+  session-length/North-Star slug is still a repeated session-length post.
+- Step 2b — search open/blocked `[post:...]` issues before drafting; blocked or
+  approved-unpublished drafts count as already used topics.
 - Step 7 — archive to `docs/comms/published/YYYY-MM-DD-slug.md` and close this issue with a one-liner pointing at the archive.
 - Outcome comments must include the actual public channel and Telegram URL.
   `telegram_message_id` alone is ambiguous because @ffmemes and @fastfoodmemes

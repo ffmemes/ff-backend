@@ -13,7 +13,8 @@ Invariants enforced here (not in prompt):
 - HTML tag whitelist (b, strong, i, em, code, a, blockquote).
 - `<blockquote>` is always rewritten to `<blockquote expandable>`.
 - Substring/pattern ban (describe_memes, circuit breakers, A/B iteration updates).
-- Category+entity rotation check against the last 14 editorial posts.
+- Category+entity plus canonical topic-family rotation check against the last
+  14 editorial posts.
 - Idempotency via SHA256 `draft_hash`. The hash row is INSERTED before the
   Telegram send (telegram_message_id NULL), then UPDATED with the real id
   after send returns. A retry that races with a previous in-flight call
@@ -52,6 +53,8 @@ _BLOCKQUOTE_OPEN_RE = re.compile(r"<blockquote(\s[^>]*)?>", re.IGNORECASE)
 # non-letter (or start-of-attrs) before `href` so `xhref=` is rejected.
 _HREF_ATTR_RE = re.compile(r"(?:^|[^a-z])href\s*=", re.IGNORECASE)
 _HREF_VALUE_RE = re.compile(r"href\s*=\s*['\"]([^'\"]*)['\"]", re.IGNORECASE)
+_DATE_TOKEN_RE = re.compile(r"(?:^|[_-])20\d{2}[_-]\d{2}[_-]\d{2}(?:$|[_-])")
+_TRAILING_NUMBER_RE = re.compile(r"[_-]\d+$")
 
 BANNED_SUBSTRINGS: tuple[str, ...] = (
     "describe_memes",
@@ -244,13 +247,65 @@ def _check_rotation(
     entity_id: str,
     recent: Iterable[tuple[str | None, str | None]],
 ) -> list[str]:
+    current_family = canonical_entity_family(entity_id)
     for rc, re_ in recent:
         if rc == category and re_ == entity_id:
             return [
                 f"Rotation violation: category={category!r} entity={entity_id!r} "
                 "was published in the last 14 editorial posts. Pick a different anomaly."
             ]
+        recent_family = canonical_entity_family(re_)
+        if current_family and current_family == recent_family:
+            return [
+                f"Rotation violation: entity family={current_family!r} "
+                "was published in the last 14 editorial posts. Pick a genuinely new topic, "
+                "not a new slug for the same metric."
+            ]
     return []
+
+
+def canonical_entity_family(entity_id: str | None) -> str:
+    """Collapse date-specific editorial entity ids into durable topic families.
+
+    Comms often sees daily anomalies where the metric is the same but the date
+    or wording changes. Rotation should block `session_record_20` right after
+    `session_length_median`, because readers experience both as "another
+    session-length post".
+    """
+    if not entity_id:
+        return ""
+
+    normalized = entity_id.strip().lower().replace("-", "_").replace(":", "_")
+    normalized = _DATE_TOKEN_RE.sub("_", normalized)
+    normalized = _TRAILING_NUMBER_RE.sub("", normalized)
+    normalized = re.sub(r"_+", "_", normalized).strip("_")
+
+    aliases: tuple[tuple[str, tuple[str, ...]], ...] = (
+        (
+            "session_length",
+            (
+                "north_star",
+                "session",
+                "session_length",
+                "session_median",
+                "session_record",
+                "median_memes_sent",
+                "memes_per_session",
+            ),
+        ),
+        ("wau", ("wau", "weekly_active")),
+        ("dau", ("dau", "daily_active")),
+        ("like_rate", ("lr", "like_rate")),
+        ("moderator_sources", ("moderator_source", "source_vote", "source_voting")),
+        ("source_quality", ("source", "source_quality", "source_climber")),
+        ("inline_search", ("inline_search", "inline")),
+        ("meme_like_count", ("meme_like_count", "visible_like_count", "like_count")),
+        ("video_vs_images", ("video_vs_images", "video_images", "media_type")),
+    )
+    for family, needles in aliases:
+        if any(needle in normalized for needle in needles):
+            return family
+    return normalized
 
 
 def validate_post_draft(
