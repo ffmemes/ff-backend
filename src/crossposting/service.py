@@ -520,6 +520,27 @@ _SHARE_MAX_QUERY = """
         ) ranked_base
         WHERE base_rank <= :prelimit
     ),
+    share_clicks AS MATERIALIZED (
+        SELECT
+            share_match.parts[2]::bigint AS meme_id,
+            COUNT(*) AS pre_inbot_share_clicks,
+            COUNT(DISTINCT udll.user_id) AS pre_inbot_share_click_users
+        FROM user_deep_link_log udll
+        CROSS JOIN selected_at
+        CROSS JOIN LATERAL regexp_matches(
+            udll.deep_link,
+            '^s_([1-9][0-9]{0,18})_([1-9][0-9]{0,18})$'
+        ) AS share_match(parts)
+        WHERE udll.created_at < selected_at.decided_at
+          AND CASE
+              WHEN length(share_match.parts[1]) = 19
+                AND share_match.parts[1] > '9223372036854775807' THEN false
+              WHEN length(share_match.parts[2]) = 19
+                AND share_match.parts[2] > '9223372036854775807' THEN false
+              ELSE udll.user_id <> share_match.parts[1]::bigint
+          END
+        GROUP BY share_match.parts[2]::bigint
+    ),
     scored AS MATERIALIZED (
         SELECT
             with_shares.*,
@@ -566,25 +587,7 @@ _SHARE_MAX_QUERY = """
               END
         ) AS share_max_score
             FROM prelimited
-            CROSS JOIN selected_at
-            LEFT JOIN LATERAL (
-                SELECT
-                    COUNT(*) AS pre_inbot_share_clicks,
-                    COUNT(DISTINCT user_id) AS pre_inbot_share_click_users
-                FROM user_deep_link_log udll
-                CROSS JOIN LATERAL (
-                    SELECT substring(
-                        udll.deep_link FROM ('^s_([1-9][0-9]{0,18})_' || prelimited.id || '$')
-                    ) AS sharer_id
-                ) share_link
-                WHERE udll.created_at < selected_at.decided_at
-                  AND CASE
-                      WHEN share_link.sharer_id IS NULL THEN false
-                      WHEN length(share_link.sharer_id) = 19
-                        AND share_link.sharer_id > '9223372036854775807' THEN false
-                      ELSE udll.user_id <> share_link.sharer_id::bigint
-                  END
-            ) share_clicks ON true
+            LEFT JOIN share_clicks ON share_clicks.meme_id = prelimited.id
         ) with_shares
     )
     SELECT *
