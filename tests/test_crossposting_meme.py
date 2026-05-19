@@ -8,6 +8,8 @@ from sqlalchemy.dialects.postgresql import insert
 from src.crossposting.service import (
     get_next_meme_for_tgchannelen,
     get_next_meme_for_tgchannelru,
+    get_next_share_max_meme_for_tgchannelen,
+    get_next_share_max_meme_for_tgchannelru,
     log_ranker_decision,
 )
 from src.database import crossposting, crossposting_decision_log, engine, user_deep_link_log
@@ -363,6 +365,146 @@ async def test_en_ranker_decision_log_has_shadow_share_fields(clean_xpost):
     only_candidate = decision["candidates"][0]
     assert only_candidate["pre_inbot_share_clicks"] == 0
     assert only_candidate["pre_inbot_share_click_users"] == 0
+
+
+@pytest.mark.asyncio
+async def test_ru_share_max_picker_boosts_prior_inbot_shares(clean_xpost):
+    async with engine.connect() as conn:
+        await create_meme_source(conn, id=10370, language_code="ru")
+        await create_meme_source(conn, id=10380, language_code="ru")
+        await create_meme(
+            conn, id=10371, meme_source_id=10370, language_code="ru", type="image", status="ok"
+        )
+        await create_meme(
+            conn, id=10381, meme_source_id=10380, language_code="ru", type="image", status="ok"
+        )
+        await create_meme_stats(conn, meme_id=10371, nlikes=10, ndislikes=2)
+        await create_meme_stats(conn, meme_id=10381, nlikes=10, ndislikes=2)
+        for i in range(5):
+            left_id = 10372 + i
+            right_id = 10382 + i
+            await create_meme(
+                conn,
+                id=left_id,
+                meme_source_id=10370,
+                language_code="ru",
+                type="image",
+                status="ok",
+            )
+            await create_meme_stats(conn, meme_id=left_id, nlikes=5, ndislikes=0)
+            await _insert_crossposting(
+                conn, "tgchannelru", left_id, hours_ago=24 * 5, views=100, forwards=5
+            )
+            await create_meme(
+                conn,
+                id=right_id,
+                meme_source_id=10380,
+                language_code="ru",
+                type="image",
+                status="ok",
+            )
+            await create_meme_stats(conn, meme_id=right_id, nlikes=5, ndislikes=0)
+            await _insert_crossposting(
+                conn, "tgchannelru", right_id, hours_ago=24 * 5, views=100, forwards=5
+            )
+        for user_id in (10071, 10072):
+            await create_user(conn, id=user_id)
+        await conn.execute(
+            insert(user_deep_link_log),
+            [
+                {
+                    "user_id": 10072,
+                    "deep_link": "s_10071_10381",
+                    "created_at": datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=1),
+                },
+            ],
+        )
+        await conn.commit()
+
+    picked, decision = await get_next_share_max_meme_for_tgchannelru()
+    assert picked is not None
+    assert decision is not None
+    debug_candidates = [
+        (
+            c["meme_id"],
+            c["pre_inbot_share_click_users"],
+            c["share_user_boost"],
+            c["share_max_base_score"],
+            c["share_max_score"],
+        )
+        for c in decision["candidates"]
+    ]
+    assert picked["id"] == 10381, debug_candidates
+    assert decision["score_version"] == 3
+    top_candidate = decision["candidates"][0]
+    assert top_candidate["pre_inbot_share_click_users"] == 1
+    assert top_candidate["share_user_boost"] == 1.5
+    assert top_candidate["share_max_score"] > top_candidate["share_max_base_score"]
+
+
+@pytest.mark.asyncio
+async def test_en_share_max_picker_logs_but_does_not_boost_prior_shares(clean_xpost):
+    async with engine.connect() as conn:
+        await create_meme_source(conn, id=10390, language_code="en")
+        await create_meme_source(conn, id=10410, language_code="en")
+        await create_meme(
+            conn, id=10391, meme_source_id=10390, language_code="en", type="image", status="ok"
+        )
+        await create_meme(
+            conn, id=10411, meme_source_id=10410, language_code="en", type="image", status="ok"
+        )
+        await create_meme_stats(conn, meme_id=10391, nlikes=10, ndislikes=2)
+        await create_meme_stats(conn, meme_id=10411, nlikes=10, ndislikes=2)
+        for i in range(5):
+            left_id = 10392 + i
+            right_id = 10412 + i
+            await create_meme(
+                conn,
+                id=left_id,
+                meme_source_id=10390,
+                language_code="en",
+                type="image",
+                status="ok",
+            )
+            await create_meme_stats(conn, meme_id=left_id, nlikes=5, ndislikes=0)
+            await _insert_crossposting(
+                conn, "tgchannelen", left_id, hours_ago=24 * 5, views=100, forwards=5
+            )
+            await create_meme(
+                conn,
+                id=right_id,
+                meme_source_id=10410,
+                language_code="en",
+                type="image",
+                status="ok",
+            )
+            await create_meme_stats(conn, meme_id=right_id, nlikes=5, ndislikes=0)
+            await _insert_crossposting(
+                conn, "tgchannelen", right_id, hours_ago=24 * 5, views=100, forwards=5
+            )
+        for user_id in (10091, 10092):
+            await create_user(conn, id=user_id)
+        await conn.execute(
+            insert(user_deep_link_log),
+            [
+                {
+                    "user_id": 10092,
+                    "deep_link": "s_10091_10411",
+                    "created_at": datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=1),
+                },
+            ],
+        )
+        await conn.commit()
+
+    picked, decision = await get_next_share_max_meme_for_tgchannelen()
+    assert picked is not None
+    assert picked["id"] == 10391
+    assert decision is not None
+    assert decision["score_version"] == 3
+    shared_candidate = next(c for c in decision["candidates"] if c["meme_id"] == 10411)
+    assert shared_candidate["pre_inbot_share_click_users"] == 1
+    assert shared_candidate["share_user_boost"] == 1.0
+    assert shared_candidate["share_max_score"] == shared_candidate["share_max_base_score"]
 
 
 @pytest.mark.asyncio
