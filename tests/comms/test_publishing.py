@@ -257,6 +257,30 @@ def test_canonical_entity_family_strips_dates_and_aliases_session_terms():
     assert canonical_entity_family("north_star_daily") == "session_length"
 
 
+def test_canonical_entity_family_strips_colon_prefixed_iso_dates():
+    assert canonical_entity_family("cohort_week:2026-04-27") == "cohort_week"
+    assert canonical_entity_family("cohort_week:2026-05-04") == "cohort_week"
+
+
+def test_validate_rejects_rotation_same_colon_date_family():
+    result = validate_post_draft(
+        text="<b>hi</b>",
+        has_media=True,
+        category="C",
+        entity_id="cohort_week:2026-05-04",
+        recent=[("C", "cohort_week:2026-04-27")],
+    )
+    assert not result.ok
+    assert any("entity family='cohort_week'" in e for e in result.errors)
+
+
+def test_canonical_entity_family_keeps_moderator_sources_distinct():
+    assert canonical_entity_family("moderator_source") == "moderator_sources"
+    assert canonical_entity_family("source_vote") == "moderator_sources"
+    assert canonical_entity_family("source_voting") == "moderator_sources"
+    assert canonical_entity_family("source_climber") == "source_quality"
+
+
 # ── Metadata ──────────────────────────────────────────────────────────────
 
 

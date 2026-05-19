@@ -275,7 +275,7 @@ def canonical_entity_family(entity_id: str | None) -> str:
     if not entity_id:
         return ""
 
-    normalized = entity_id.strip().lower().replace("-", "_")
+    normalized = entity_id.strip().lower().replace("-", "_").replace(":", "_")
     normalized = _DATE_TOKEN_RE.sub("_", normalized)
     normalized = _TRAILING_NUMBER_RE.sub("", normalized)
     normalized = re.sub(r"_+", "_", normalized).strip("_")
@@ -296,11 +296,11 @@ def canonical_entity_family(entity_id: str | None) -> str:
         ("wau", ("wau", "weekly_active")),
         ("dau", ("dau", "daily_active")),
         ("like_rate", ("lr", "like_rate")),
+        ("moderator_sources", ("moderator_source", "source_vote", "source_voting")),
         ("source_quality", ("source", "source_quality", "source_climber")),
         ("inline_search", ("inline_search", "inline")),
         ("meme_like_count", ("meme_like_count", "visible_like_count", "like_count")),
         ("video_vs_images", ("video_vs_images", "video_images", "media_type")),
-        ("moderator_sources", ("moderator_source", "source_vote", "source_voting")),
     )
     for family, needles in aliases:
         if any(needle in normalized for needle in needles):
