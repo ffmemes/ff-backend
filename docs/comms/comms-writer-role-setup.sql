@@ -5,11 +5,11 @@
 -- + telegram_message_id backfill). Granting it the full app DATABASE_URL is
 -- overkill; this role is the least-privilege handle the Comms env should use.
 --
--- Optional future upgrade. Current Paperclip config maps the Comms agent's
--- DATABASE_URL env var to the existing ANALYST_DATABASE_URL read-only secret
--- by CEO decision. If Comms needs to persist editorial_posts directly from
--- the agent runtime, run this once on prod against the ff database as a
--- superuser. After this, create/update the Comms Paperclip secret binding:
+-- The Comms agent receives ANALYST_DATABASE_URL for read-only analysis and
+-- DATABASE_URL for the narrow publishing write path. DATABASE_URL must NOT be
+-- mapped to ANALYST_DATABASE_URL or to the full app FFMEMES_DATABASE_URL.
+-- Run this once on prod against the ff database as a superuser. After this,
+-- create/update the Comms Paperclip secret binding:
 --   DATABASE_URL=postgresql+asyncpg://comms_writer:<password>@<host>:<port>/ff
 -- (use the asyncpg driver — src/database.py builds an async engine).
 --

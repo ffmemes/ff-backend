@@ -65,9 +65,10 @@ UTC by the `Write Channel Stats Report` Prefect deployment). It contains:
 - Category frequency + last-7 category/entity combos (rotation hint)
 
 Use this as a taste signal: formats/topics that landed above the median →
-do more of that. Weak ones → avoid the same framing. Entity combos from
-the last 7 posts are enforced by code as a hard rotation check (see
-"Posting" below), but you should also aim for variety beyond that.
+do more of that. Weak ones → avoid the same framing. Entity combos and
+canonical topic families from the last 14 posts are enforced by code as a hard
+rotation check (see "Posting" below), but you should also aim for variety
+beyond that.
 
 If the file is missing (first run, or cron failed), proceed without it —
 the rotation check still runs against the database.
@@ -89,19 +90,28 @@ Pick ONE from:
 **Never fall back to topics from the HARD BAN list below.**
 
 ### Step 2 — Rotation check (enforce variety)
-Read the last 7 posts from the channel:
+Read the last 14 posts from the channel:
 ```python
 from src.comms.channel_history import get_last_n_posts
-recent = await get_last_n_posts(n=7)
+recent = await get_last_n_posts(n=14)
 ```
-Extract the topic/entity of each. Your next post MUST differ from the last 7 on
-BOTH `category` (A-F) AND `entity_id` (the specific source, metric, or feature
-the post is about). Reject a topic if any recent post covered the same
-category+entity. Pick the next strongest anomaly instead.
+Extract the topic/entity of each. Your next post MUST differ from recent posts
+on the actual topic family, not just on a new slug. For example,
+`session_record_20`, `session_length_median`, and `north_star_daily` are the
+same public topic: session length. Reject the topic and pick the next strongest
+anomaly if the reader would experience it as "another post about the same
+metric/source/feature".
 
 If `get_last_n_posts` returns `[]` (Telethon misconfigured / session expired),
 log a warning to `$ADMIN_LOGS_CHAT_ID` and proceed without rotation — failing
 closed would block the channel.
+
+### Step 2b — Draft backlog check
+Before creating a new `[post:...]` issue, search Paperclip for open or blocked
+`[post:...]` issues and read `docs/comms/published/`. Treat approved-but-not-
+published and blocked drafts as already used topics for rotation. Do not write
+another session-length/North-Star post while a session-length draft is waiting
+for CEO approval, write access, or publication.
 
 ### Step 3 — HARD BAN self-check (before drafting)
 Your topic must NOT be any of:
@@ -390,7 +400,7 @@ try:
         text=final_post_text,           # HTML-formatted, see "Post Formatting"
         channel="ffmemes",               # "ffmemes" build-in-public, "ru" @fastfoodmemes, "en" @fast_food_memes
         category="C",                    # A/B/C/D/E/F — see "Content Categories"
-        entity_id="dau_delta_2026_04_24",# stable slug for the specific anomaly/topic
+        entity_id="dau_delta",           # stable topic family, not a date-specific slug
         photo_bytes=png,                 # OR photo_file_id / photo_url — always include a visual
         topic_slug="dau-delta-anomaly",
         button_text=None, button_url=None,  # optional inline button
@@ -415,8 +425,9 @@ don't try):
 - **Expandable-by-default blockquotes.** Every `<blockquote>` is rewritten
   to `<blockquote expandable>`.
 - **Substring/pattern ban.** The HARD BAN list from Step 3 is enforced here.
-- **Rotation check.** `(category, entity_id)` is compared against the last
-  14 editorial posts in the database. Duplicate key → rejected.
+- **Rotation check.** `(category, entity_id)` and canonical topic family are
+  compared against the last 14 editorial posts in the database. Duplicate
+  family, even with a new slug, is rejected.
 - **Idempotency.** Same `(channel, text, photo, category, entity_id)` →
   same `draft_hash` → no double-post. Safe to retry.
 - **Stats registration.** Inserts into `editorial_posts` so the stats
@@ -554,8 +565,9 @@ curl -s -X POST "https://api.telegram.org/bot${FFMEMES_PROD_TELEGRAM_BOT_TOKEN}/
   progress, or any infra firefighting — the HARD BAN is enforced by code
 - Do NOT write iteration updates like "день 11/14" for an experiment — post
   the conclusive learning when it's done, not the progress bar
-- Do NOT skip the rotation check — posts must differ from the last 14 on
-  category AND entity_id (enforced)
+- Do NOT skip the rotation check — posts must differ from the last 14 by
+  actual topic family. Do not hide repetition by changing the `entity_id`
+  suffix or date
 - Do NOT nest `<blockquote>` inside another `<blockquote>` — Telegram doesn't
   render it and the validator rejects it
 - Do NOT write "нажми чтобы развернуть" / "тапни чтобы развернуть" —
