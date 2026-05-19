@@ -423,8 +423,18 @@ async def test_ru_share_max_picker_boosts_prior_inbot_shares(clean_xpost):
 
     picked, decision = await get_next_share_max_meme_for_tgchannelru()
     assert picked is not None
-    assert picked["id"] == 10381, decision
     assert decision is not None
+    debug_candidates = [
+        (
+            c["meme_id"],
+            c["pre_inbot_share_click_users"],
+            c["share_user_boost"],
+            c["share_max_base_score"],
+            c["share_max_score"],
+        )
+        for c in decision["candidates"]
+    ]
+    assert picked["id"] == 10381, debug_candidates
     assert decision["score_version"] == 3
     top_candidate = decision["candidates"][0]
     assert top_candidate["pre_inbot_share_click_users"] == 1
