@@ -380,9 +380,7 @@ async def post_share_max_meme_to_tgchannelru():
     """
     logger = get_run_logger()
 
-    meme_data, decision = await get_next_share_max_meme_for_tgchannelru(
-        respect_recent_source_cap=False
-    )
+    meme_data, decision = await get_next_share_max_meme_for_tgchannelru()
     if meme_data is None:
         logger.warning("No qualifying share-max meme for TG Channel RU, skipping slot")
         return
