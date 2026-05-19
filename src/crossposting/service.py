@@ -573,11 +573,13 @@ _SHARE_MAX_QUERY = """
                     COUNT(DISTINCT user_id) AS pre_inbot_share_click_users
                 FROM user_deep_link_log udll
                 CROSS JOIN LATERAL (
-                    SELECT split_part(udll.deep_link, '_', 2) AS sharer_id
+                    SELECT substring(
+                        udll.deep_link FROM ('^s_([1-9][0-9]{0,18})_' || prelimited.id || '$')
+                    ) AS sharer_id
                 ) share_link
                 WHERE udll.created_at < selected_at.decided_at
-                  AND udll.deep_link ~ ('^s_[1-9][0-9]{0,18}_' || prelimited.id || '$')
                   AND CASE
+                      WHEN share_link.sharer_id IS NULL THEN false
                       WHEN length(share_link.sharer_id) = 19
                         AND share_link.sharer_id > '9223372036854775807' THEN false
                       ELSE udll.user_id <> share_link.sharer_id::bigint
