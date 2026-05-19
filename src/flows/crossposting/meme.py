@@ -9,6 +9,8 @@ from src.crossposting.constants import Channel
 from src.crossposting.service import (
     get_next_meme_for_tgchannelen,
     get_next_meme_for_tgchannelru,
+    get_next_share_max_meme_for_tgchannelen,
+    get_next_share_max_meme_for_tgchannelru,
     log_meme_sent,
     log_ranker_decision,
 )
@@ -293,6 +295,121 @@ async def post_meme_to_tgchannelru():
             logger.info(f"VK posted meme {next_meme.id} as post_id={vk_result.get('post_id')}")
         except Exception as e:
             logger.error(f"VK crosspost failed for meme {next_meme.id}: {e}")
+
+    uploader_user_id = await get_meme_uploader_user_id(next_meme.id)
+    if uploader_user_id:
+        balance = await pay_if_not_paid(uploader_user_id, TrxType.MEME_PUBLISHED, str(next_meme.id))
+        if balance:
+            link = TELEGRAM_CHANNEL_RU_LINK + "/" + str(msg.message_id)
+            await bot.send_message(
+                uploader_user_id,
+                f"""
+/b: +<b>{PAYOUTS[TrxType.MEME_PUBLISHED]}</b> 🍔 за то, что мы <a href="{link}">запостили твой мем к себе в канал</a>.
+                """,  # noqa
+                parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True,
+            )
+
+
+@flow(
+    name="Post Share Max Meme to TG Channel EN",
+    retries=0,
+    timeout_seconds=300,
+    on_failure=[notify_telegram_on_failure],
+)
+async def post_share_max_meme_to_tgchannelen():
+    """One-shot experimental post using score_version=3 share-max ranking."""
+    logger = get_run_logger()
+
+    meme_data, decision = await get_next_share_max_meme_for_tgchannelen(
+        respect_recent_source_cap=False
+    )
+    if meme_data is None:
+        logger.warning("No qualifying share-max meme for TG Channel EN, skipping slot")
+        return
+    next_meme = MemeData(**meme_data)
+    logger.info(f"Next share-max meme for TG Channel EN: {next_meme.id}")
+
+    if decision:
+        try:
+            await log_ranker_decision(**decision)
+        except Exception as e:
+            logger.error(f"log_ranker_decision failed for share-max {next_meme.id}: {e}")
+
+    caption_text = _get_en_caption_for_crossposting_meme(next_meme, Channel.TG_CHANNEL_EN)
+    next_meme.caption = caption_text
+    msg = await send_new_message_with_meme(
+        bot, TELEGRAM_CHANNEL_EN_CHAT_ID, next_meme, reply_markup=None
+    )
+
+    await log_meme_sent(
+        next_meme.id,
+        Channel.TG_CHANNEL_EN,
+        telegram_message_id=msg.message_id,
+        caption_text=caption_text,
+        score_version=3,
+    )
+    await update_meme(next_meme.id, status=MemeStatus.PUBLISHED)
+
+    uploader_user_id = await get_meme_uploader_user_id(next_meme.id)
+    if uploader_user_id:
+        balance = await pay_if_not_paid(uploader_user_id, TrxType.MEME_PUBLISHED, str(next_meme.id))
+        if balance:
+            link = TELEGRAM_CHANNEL_EN_LINK + "/" + str(msg.message_id)
+            await bot.send_message(
+                uploader_user_id,
+                f"""
+/b: +<b>{PAYOUTS[TrxType.MEME_PUBLISHED]}</b> 🍔 because we <a href="{link}">posted your meme in our channel</a>.
+                """,  # noqa
+                parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True,
+            )
+
+
+@flow(
+    name="Post Share Max Meme to TG Channel RU",
+    retries=0,
+    timeout_seconds=300,
+    on_failure=[notify_telegram_on_failure],
+)
+async def post_share_max_meme_to_tgchannelru():
+    """One-shot experimental post using score_version=3 share-max ranking.
+
+    Unlike the scheduled RU flow, this does not crosspost to VK; the experiment
+    isolates Telegram channel forwards.
+    """
+    logger = get_run_logger()
+
+    meme_data, decision = await get_next_share_max_meme_for_tgchannelru(
+        respect_recent_source_cap=False
+    )
+    if meme_data is None:
+        logger.warning("No qualifying share-max meme for TG Channel RU, skipping slot")
+        return
+    next_meme = MemeData(**meme_data)
+    logger.info(f"Next share-max meme for TG Channel RU: {next_meme.id}")
+
+    if decision:
+        try:
+            await log_ranker_decision(**decision)
+        except Exception as e:
+            logger.error(f"log_ranker_decision failed for share-max {next_meme.id}: {e}")
+
+    caption_text = _get_ru_caption_for_crossposting_meme(next_meme, Channel.TG_CHANNEL_RU)
+    next_meme.caption = caption_text
+
+    msg = await send_new_message_with_meme(
+        bot, TELEGRAM_CHANNEL_RU_CHAT_ID, next_meme, reply_markup=None
+    )
+
+    await log_meme_sent(
+        next_meme.id,
+        Channel.TG_CHANNEL_RU,
+        telegram_message_id=msg.message_id,
+        caption_text=caption_text,
+        score_version=3,
+    )
+    await update_meme(next_meme.id, status=MemeStatus.PUBLISHED)
 
     uploader_user_id = await get_meme_uploader_user_id(next_meme.id)
     if uploader_user_id:
