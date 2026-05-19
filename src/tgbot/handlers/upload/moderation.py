@@ -39,7 +39,18 @@ from src.tgbot.service import get_tg_user_by_id
 from src.tgbot.user_info import get_user_info
 
 UPLOADED_MEME_REIVIEW_CALLBACK_DATA_PATTERN = "upload:{upload_id}:review:{action}"
-UPLOADED_MEME_REVIEW_CALLBACK_DATA_REGEXP = r"upload:(\d+):review:(\w+)"
+UPLOADED_MEME_REVIEW_CALLBACK_DATA_REGEXP = r"upload:(\d+):review:([a-z_]+)"
+UPLOADED_MEME_REVIEW_APPROVE_ACTION = "approve"
+UPLOADED_MEME_REVIEW_REJECT_NOT_FUNNY_ACTION = "reject_not_funny"
+UPLOADED_MEME_REVIEW_REJECT_WRONG_LANGUAGE_ACTION = "reject_wrong_language"
+UPLOADED_MEME_REVIEW_REJECTION_LOCALIZATION_KEYS = {
+    UPLOADED_MEME_REVIEW_REJECT_NOT_FUNNY_ACTION: "upload.rejected_not_funny",
+    UPLOADED_MEME_REVIEW_REJECT_WRONG_LANGUAGE_ACTION: "upload.rejected_wrong_language",
+}
+UPLOADED_MEME_REVIEW_REJECTION_CAPTION_REASONS = {
+    UPLOADED_MEME_REVIEW_REJECT_NOT_FUNNY_ACTION: "Не смешно",
+    UPLOADED_MEME_REVIEW_REJECT_WRONG_LANGUAGE_ACTION: "Не тот язык",
+}
 
 LEADERBOARD_URL = (
     "https://metabase.okhlopkov.com/public/question/663c4def-4b42-4303-aa3b-73ab5bfa677a"
@@ -233,15 +244,25 @@ def review_keyboard(upload_id: int) -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="✅ Approve",
+                    text="✅ Всё ок",
                     callback_data=UPLOADED_MEME_REIVIEW_CALLBACK_DATA_PATTERN.format(
-                        upload_id=upload_id, action="approve"
+                        upload_id=upload_id, action=UPLOADED_MEME_REVIEW_APPROVE_ACTION
+                    ),
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="❌ Не смешно",
+                    callback_data=UPLOADED_MEME_REIVIEW_CALLBACK_DATA_PATTERN.format(
+                        upload_id=upload_id,
+                        action=UPLOADED_MEME_REVIEW_REJECT_NOT_FUNNY_ACTION,
                     ),
                 ),
                 InlineKeyboardButton(
-                    text="❌ Reject",
+                    text="🌐 Не тот язык",
                     callback_data=UPLOADED_MEME_REIVIEW_CALLBACK_DATA_PATTERN.format(
-                        upload_id=upload_id, action="reject"
+                        upload_id=upload_id,
+                        action=UPLOADED_MEME_REVIEW_REJECT_WRONG_LANGUAGE_ACTION,
                     ),
                 ),
             ],
@@ -261,6 +282,14 @@ def _is_upload_review_chat(message: Any) -> bool:
     if message is None or settings.UPLOADED_MEMES_REVIEW_CHAT_ID is None:
         return False
     return str(message.chat_id) == str(settings.UPLOADED_MEMES_REVIEW_CHAT_ID)
+
+
+def _is_uploaded_meme_approve_action(action: str) -> bool:
+    return action == UPLOADED_MEME_REVIEW_APPROVE_ACTION
+
+
+def _is_uploaded_meme_rejection_action(action: str) -> bool:
+    return action in UPLOADED_MEME_REVIEW_REJECTION_LOCALIZATION_KEYS
 
 
 def _tg_user_info_to_name(tg_user_info: dict):
@@ -328,6 +357,14 @@ async def handle_uploaded_meme_review_button(
 
     reg = re.match(UPLOADED_MEME_REVIEW_CALLBACK_DATA_REGEXP, update.callback_query.data)
     upload_id, action = int(reg.group(1)), reg.group(2)
+
+    if not _is_uploaded_meme_approve_action(action) and not _is_uploaded_meme_rejection_action(
+        action
+    ):
+        await update.callback_query.answer("Unknown upload review action")
+        await restore_review_keyboard(update.callback_query.message, upload_id)
+        return
+
     meme_upload = await get_meme_raw_upload_by_id(upload_id)
     prev_caption = update.callback_query.message.caption
 
@@ -340,7 +377,7 @@ async def handle_uploaded_meme_review_button(
 
     meme = await update_meme_by_upload_id(
         upload_id,
-        status=MemeStatus.OK if action == "approve" else MemeStatus.REJECTED,
+        status=(MemeStatus.OK if _is_uploaded_meme_approve_action(action) else MemeStatus.REJECTED),
     )
 
     await pay_if_not_paid_with_alert(
@@ -350,7 +387,7 @@ async def handle_uploaded_meme_review_button(
         external_id=str(meme["id"]),
     )
 
-    if action == "approve":
+    if _is_uploaded_meme_approve_action(action):
         new_caption = prev_caption + "\n✅ Approved by {}".format(update.effective_user.name)
         if (
             update.callback_query.message.caption != new_caption
@@ -397,8 +434,10 @@ async def handle_uploaded_meme_review_button(
         )
 
     else:
-        await update_meme_by_upload_id(upload_id, status=MemeStatus.REJECTED)
-        new_caption = prev_caption + "\n❌ Rejected by {}".format(update.effective_user.name)
+        rejection_reason = UPLOADED_MEME_REVIEW_REJECTION_CAPTION_REASONS[action]
+        new_caption = prev_caption + "\n❌ Rejected by {}: {}".format(
+            update.effective_user.name, rejection_reason
+        )
         if (
             update.callback_query.message.caption != new_caption
             or update.callback_query.message.reply_markup is not None
@@ -413,6 +452,7 @@ async def handle_uploaded_meme_review_button(
                     raise
 
         uploader_lang = await _get_uploader_lang(meme_upload["user_id"])
+        localization_key = UPLOADED_MEME_REVIEW_REJECTION_LOCALIZATION_KEYS[action]
         await _notify_uploader(
-            context.bot, meme_upload, localizer.t("upload.rejected", uploader_lang)
+            context.bot, meme_upload, localizer.t(localization_key, uploader_lang)
         )
