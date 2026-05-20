@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -311,6 +312,78 @@ async def test_source_candidate_vote_early_rejects_clear_negative_poll(
 
 
 @pytest.mark.asyncio
+async def test_early_reject_close_has_single_winner_under_concurrent_calls(
+    conn: AsyncConnection,
+):
+    now = datetime.utcnow()
+    await _create_candidate(conn)
+    await conn.commit()
+    prepared = await prepare_source_candidate(CANDIDATE_ID, posts=[_post(4017)])
+    poll = await create_source_candidate_poll(
+        CANDIDATE_ID,
+        prepared_meme_source_id=prepared["source"]["id"],
+        chat_id=TELEGRAM_MODERATOR_CHAT_ID,
+        now=now,
+    )
+    await conn.execute(
+        meme_source_candidate_poll.update()
+        .where(meme_source_candidate_poll.c.id == poll["id"])
+        .values(
+            status=POLL_STATUS_OPEN,
+            message_id=133,
+            opened_at=now - timedelta(hours=2),
+            closes_at=now + timedelta(hours=22),
+        )
+    )
+    await conn.execute(
+        insert(meme_source_candidate_vote),
+        [
+            {
+                "poll_id": poll["id"],
+                "user_id": TEST_ID_START + 30 + offset,
+                "vote": VOTE_SKIP_SOURCE,
+            }
+            for offset in range(1, 7)
+        ],
+    )
+    await conn.commit()
+
+    advance_calls = 0
+    entered_advance = asyncio.Event()
+    release_advance = asyncio.Event()
+
+    async def blocking_advance_meme_source(*args, **kwargs):
+        nonlocal advance_calls
+        advance_calls += 1
+        entered_advance.set()
+        await release_advance.wait()
+
+    with patch("src.storage.source_voting.advance_meme_source", new=blocking_advance_meme_source):
+        first = asyncio.create_task(
+            close_source_candidate_poll(
+                poll["id"],
+                now=now,
+                close_reason=SOURCE_VOTE_EARLY_REJECT_REASON,
+            )
+        )
+        await asyncio.wait_for(entered_advance.wait(), timeout=1)
+
+        second = asyncio.create_task(
+            close_source_candidate_poll(
+                poll["id"],
+                now=now,
+                close_reason=SOURCE_VOTE_EARLY_REJECT_REASON,
+            )
+        )
+        await asyncio.sleep(0.05)
+        release_advance.set()
+        results = await asyncio.gather(first, second)
+
+    assert advance_calls == 1
+    assert {result["status"] for result in results} == {POLL_STATUS_REJECTED, "already_closed"}
+
+
+@pytest.mark.asyncio
 async def test_source_candidate_vote_does_not_early_reject_before_min_open_time(
     conn: AsyncConnection,
 ):
@@ -529,6 +602,34 @@ async def test_daily_source_cycle_early_rejects_negative_poll_and_posts_next_can
         chat_id=TELEGRAM_MODERATOR_CHAT_ID,
         message_id=558,
     )
+    bot.send_message.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_post_new_source_candidate_poll_is_idempotent_when_active_poll_exists(
+    conn: AsyncConnection,
+):
+    now = datetime.utcnow()
+    await _create_candidate(conn)
+    await _create_candidate(
+        conn,
+        candidate_id=SECOND_CANDIDATE_ID,
+        url=SECOND_CANDIDATE_URL,
+        times_forwarded=4,
+    )
+    await conn.commit()
+
+    bot = SimpleNamespace(send_message=AsyncMock(return_value=SimpleNamespace(message_id=560)))
+    with patch(
+        "src.storage.source_voting.fetch_telegram_candidate_posts",
+        new=AsyncMock(return_value=[_post(4018)]),
+    ):
+        first = await post_new_source_candidate_poll(bot, now=now)
+        second = await post_new_source_candidate_poll(bot, now=now)
+
+    assert first["status"] == "posted"
+    assert second["status"] == "active_poll_exists"
+    assert second["poll"]["id"] == first["poll"]["id"]
     bot.send_message.assert_awaited_once()
 
 

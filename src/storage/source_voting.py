@@ -422,6 +422,7 @@ async def _set_poll_status(
     closed_at: datetime | None = None,
     result_meme_source_id: int | None = None,
     data: dict[str, Any] | None = None,
+    expected_status: str | None = None,
 ) -> dict[str, Any] | None:
     values: dict[str, Any] = {"status": status, "updated_at": _utcnow()}
     if closed_at is not None:
@@ -430,12 +431,12 @@ async def _set_poll_status(
         values["result_meme_source_id"] = result_meme_source_id
     if data is not None:
         values["data"] = data
-    return await fetch_one(
-        meme_source_candidate_poll.update()
-        .where(meme_source_candidate_poll.c.id == poll_id)
-        .values(**values)
-        .returning(meme_source_candidate_poll)
+    update_stmt = meme_source_candidate_poll.update().where(
+        meme_source_candidate_poll.c.id == poll_id
     )
+    if expected_status is not None:
+        update_stmt = update_stmt.where(meme_source_candidate_poll.c.status == expected_status)
+    return await fetch_one(update_stmt.values(**values).returning(meme_source_candidate_poll))
 
 
 async def _append_source_vote_metadata(
@@ -563,6 +564,21 @@ async def close_source_candidate_poll(
         result_source = await enable_passed_source_poll(poll, counts, now)
     else:
         status = POLL_STATUS_REJECTED
+        early_reject_close = close_reason == SOURCE_VOTE_EARLY_REJECT_REASON
+        if early_reject_close:
+            claimed_poll = await _set_poll_status(
+                poll_id,
+                status=status,
+                closed_at=now,
+                data=poll_data,
+                expected_status=POLL_STATUS_OPEN,
+            )
+            if claimed_poll is None:
+                return {
+                    "status": "already_closed",
+                    "poll": await get_source_candidate_poll(poll_id) or poll,
+                }
+            poll = claimed_poll
         if poll["prepared_meme_source_id"]:
             await advance_meme_source(
                 poll["prepared_meme_source_id"],
@@ -587,13 +603,21 @@ async def close_source_candidate_poll(
             ),
         )
 
-    updated_poll = await _set_poll_status(
-        poll_id,
-        status=status,
-        closed_at=now,
-        result_meme_source_id=None if result_source is None else result_source["id"],
-        data=poll_data,
-    )
+    updated_poll = poll
+    if status != POLL_STATUS_REJECTED or close_reason != SOURCE_VOTE_EARLY_REJECT_REASON:
+        updated_poll = await _set_poll_status(
+            poll_id,
+            status=status,
+            closed_at=now,
+            result_meme_source_id=None if result_source is None else result_source["id"],
+            data=poll_data,
+            expected_status=POLL_STATUS_OPEN,
+        )
+        if updated_poll is None:
+            return {
+                "status": "already_closed",
+                "poll": await get_source_candidate_poll(poll_id) or poll,
+            }
     return {
         "status": status,
         "poll": updated_poll,
@@ -758,6 +782,7 @@ async def create_source_candidate_poll(
                 "closes_at": now + SOURCE_VOTE_WINDOW,
             }
         )
+        .on_conflict_do_nothing()
         .returning(meme_source_candidate_poll)
     )
     return await fetch_one(stmt)
@@ -869,14 +894,11 @@ async def post_new_source_candidate_poll(
     now: datetime | None = None,
 ) -> dict[str, Any]:
     now = now or _utcnow()
-    draft_poll = await fetch_one(
-        select(meme_source_candidate_poll)
-        .where(meme_source_candidate_poll.c.status == POLL_STATUS_DRAFT)
-        .order_by(meme_source_candidate_poll.c.created_at.asc())
-        .limit(1)
-    )
-    if draft_poll is not None:
-        return await post_source_candidate_poll_message(bot, draft_poll, now=now)
+    active_poll = await get_active_source_candidate_poll()
+    if active_poll is not None:
+        if active_poll["status"] == POLL_STATUS_DRAFT:
+            return await post_source_candidate_poll_message(bot, active_poll, now=now)
+        return {"status": "active_poll_exists", "poll": active_poll}
 
     candidate = await select_daily_source_candidate()
     if candidate is None:
@@ -895,6 +917,11 @@ async def post_new_source_candidate_poll(
         now=now,
     )
     if poll is None:
+        active_poll = await get_active_source_candidate_poll()
+        if active_poll is not None:
+            if active_poll["status"] == POLL_STATUS_DRAFT:
+                return await post_source_candidate_poll_message(bot, active_poll, now=now)
+            return {"status": "active_poll_exists", "poll": active_poll}
         return {"status": "poll_create_failed", "candidate": candidate}
 
     return await post_source_candidate_poll_message(bot, poll, now=now, prepared=prepared)
