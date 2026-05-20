@@ -2,7 +2,11 @@ from telegram import Update
 from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
-from src.storage.source_voting import record_source_candidate_vote
+from src.storage.source_voting import (
+    post_new_source_candidate_poll,
+    record_source_candidate_vote,
+    update_closed_source_candidate_poll_message,
+)
 from src.tgbot.constants import UserType
 from src.tgbot.handlers.moderator.meme_source import meme_source_admin_pipeline
 from src.tgbot.logs import log
@@ -137,6 +141,13 @@ async def handle_source_candidate_vote(
         except BadRequest as e:
             if "Message is not modified" not in str(e):
                 raise
+        return
+
+    if status == "early_rejected":
+        close_result = result["close_result"]
+        await query.answer("Источник отклонён, открываю следующий")
+        await update_closed_source_candidate_poll_message(context.bot, close_result)
+        await post_new_source_candidate_poll(context.bot)
         return
 
     if status == "closed":

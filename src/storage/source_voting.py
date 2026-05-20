@@ -43,6 +43,9 @@ SOURCE_VOTE_QUORUM = 3
 SOURCE_VOTE_MIN_LIKES = 2
 SOURCE_VOTE_LIKE_SHARE_THRESHOLD = 0.30
 SOURCE_VOTE_WINDOW = timedelta(hours=24)
+SOURCE_VOTE_EARLY_REJECT_MIN_OPEN = timedelta(minutes=90)
+SOURCE_VOTE_EARLY_REJECT_MIN_DISLIKES = 6
+SOURCE_VOTE_EARLY_REJECT_REASON = "early_negative_not_meme_source"
 
 _CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]")
 
@@ -363,6 +366,25 @@ async def record_source_candidate_vote(
     await execute(stmt)
 
     counts = await get_source_candidate_vote_counts(poll_id)
+    if source_vote_should_reject_early(poll, counts, now):
+        close_result = await close_source_candidate_poll(
+            poll_id,
+            now=now,
+            close_reason=SOURCE_VOTE_EARLY_REJECT_REASON,
+        )
+        if close_result["status"] == POLL_STATUS_REJECTED:
+            return {
+                "status": "early_rejected",
+                "poll": close_result["poll"],
+                "counts": close_result["counts"],
+                "close_result": close_result,
+            }
+        return {
+            "status": "closed",
+            "poll": close_result.get("poll", poll),
+            "counts": counts,
+        }
+
     return {
         "status": "changed" if existing and existing["vote"] != vote else "recorded",
         "poll": poll,
@@ -376,6 +398,20 @@ def source_vote_passed(counts: dict[str, int]) -> bool:
         total >= SOURCE_VOTE_QUORUM
         and counts["yes"] >= SOURCE_VOTE_MIN_LIKES
         and counts["yes"] / total > SOURCE_VOTE_LIKE_SHARE_THRESHOLD
+    )
+
+
+def source_vote_should_reject_early(
+    poll: dict[str, Any],
+    counts: dict[str, int],
+    now: datetime,
+) -> bool:
+    opened_at = poll.get("opened_at")
+    return (
+        opened_at is not None
+        and opened_at + SOURCE_VOTE_EARLY_REJECT_MIN_OPEN <= now
+        and counts["yes"] == 0
+        and counts["no"] >= SOURCE_VOTE_EARLY_REJECT_MIN_DISLIKES
     )
 
 
@@ -432,6 +468,37 @@ async def _append_source_vote_metadata(
     )
 
 
+async def _append_source_vote_rejection_metadata(
+    source_id: int,
+    *,
+    poll: dict[str, Any],
+    counts: dict[str, int],
+    rejected_at: datetime,
+    reason: str,
+) -> dict[str, Any] | None:
+    source = await fetch_one(select(meme_source).where(meme_source.c.id == source_id))
+    if source is None:
+        return None
+    data = dict(source.get("data") or {})
+    data["source_vote_rejection"] = {
+        **dict(data.get("source_vote_rejection") or {}),
+        "poll_id": poll["id"],
+        "candidate_id": poll["candidate_id"],
+        "chat_id": poll["chat_id"],
+        "message_id": poll["message_id"],
+        "yes": counts["yes"],
+        "no": counts["no"],
+        "closed_at": rejected_at.isoformat(),
+        "reason": reason,
+    }
+    return await fetch_one(
+        meme_source.update()
+        .where(meme_source.c.id == source_id)
+        .values(data=data, updated_at=_utcnow())
+        .returning(meme_source)
+    )
+
+
 async def enable_passed_source_poll(
     poll: dict[str, Any],
     counts: dict[str, int],
@@ -470,6 +537,7 @@ async def close_source_candidate_poll(
     poll_id: int,
     *,
     now: datetime | None = None,
+    close_reason: str | None = None,
 ) -> dict[str, Any]:
     now = now or _utcnow()
     poll = await get_source_candidate_poll(poll_id)
@@ -477,10 +545,15 @@ async def close_source_candidate_poll(
         return {"status": "not_found"}
     if poll["status"] != POLL_STATUS_OPEN:
         return {"status": "already_closed", "poll": poll}
+    candidate = await fetch_one(
+        select(meme_source_candidate).where(meme_source_candidate.c.id == poll["candidate_id"])
+    )
 
     counts = await get_source_candidate_vote_counts(poll_id)
     poll_data = dict(poll.get("data") or {})
     poll_data["final_counts"] = counts
+    if close_reason is not None:
+        poll_data["close_reason"] = close_reason
 
     result_source = None
     if counts["total"] < SOURCE_VOTE_QUORUM:
@@ -497,10 +570,21 @@ async def close_source_candidate_poll(
                 status=MemeSourceStatus.PARSING_DISABLED.value,
                 trigger_parse=False,
             )
+            await _append_source_vote_rejection_metadata(
+                poll["prepared_meme_source_id"],
+                poll=poll,
+                counts=counts,
+                rejected_at=now,
+                reason=close_reason or "vote_failed",
+            )
         await _mark_candidate(
             poll["candidate_id"],
             status=CANDIDATE_STATUS_DISMISSED,
-            dismissed_reason=f"source_vote:{poll_id}",
+            dismissed_reason=(
+                f"source_vote:{poll_id}"
+                if close_reason is None
+                else f"source_vote:{poll_id}:{close_reason}"
+            ),
         )
 
     updated_poll = await _set_poll_status(
@@ -513,9 +597,24 @@ async def close_source_candidate_poll(
     return {
         "status": status,
         "poll": updated_poll,
+        "candidate": candidate,
         "counts": counts,
         "source": result_source,
     }
+
+
+async def get_early_rejectable_source_candidate_poll(
+    now: datetime | None = None,
+) -> dict[str, Any] | None:
+    now = now or _utcnow()
+    poll = await get_active_source_candidate_poll()
+    if poll is None or poll["status"] != POLL_STATUS_OPEN:
+        return None
+
+    counts = await get_source_candidate_vote_counts(poll["id"])
+    if source_vote_should_reject_early(poll, counts, now):
+        return poll
+    return None
 
 
 async def select_daily_source_candidate() -> dict[str, Any] | None:
@@ -578,19 +677,66 @@ def format_closed_poll_message(result: dict[str, Any]) -> str:
     counts = result["counts"]
     status = result["status"]
     if status == POLL_STATUS_PASSED:
-        outcome = "Источник добавлен."
+        outcome = "Голосование завершено: источник добавлен."
     elif status == POLL_STATUS_REJECTED:
-        outcome = "Источник отклонён."
+        outcome = "Голосование завершено: мем-источник отклонён."
     elif status == POLL_STATUS_EXPIRED_NO_QUORUM:
-        outcome = "Недостаточно голосов. Автоматически не возвращаем."
+        outcome = "Голосование завершено: недостаточно голосов. Автоматически не возвращаем."
     else:
         outcome = f"Голосование закрыто: {status}."
-    return (
-        f"{outcome}\n\n"
-        f"За: {counts['yes']}\n"
-        f"Против: {counts['no']}\n"
-        f"Всего голосов: {counts['total']}"
+    candidate = result.get("candidate")
+    lines: list[str] = []
+    if candidate is not None:
+        lines.extend(
+            [
+                "Добавляли новый источник мемов?",
+                "",
+                f"🔗 {candidate['url']}",
+                "",
+                f"Наши паблики пересылали мемы оттуда {candidate['times_forwarded']} раз.",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            outcome,
+            "",
+            "Результаты голосования:",
+            f"За: {counts['yes']}",
+            f"Против: {counts['no']}",
+            f"Всего голосов: {counts['total']}",
+        ]
     )
+    return "\n".join(lines)
+
+
+async def update_closed_source_candidate_poll_message(
+    bot: Bot,
+    result: dict[str, Any],
+) -> None:
+    poll = result.get("poll")
+    if not poll or not poll.get("message_id"):
+        return
+
+    try:
+        await bot.edit_message_text(
+            chat_id=poll["chat_id"],
+            message_id=poll["message_id"],
+            text=format_closed_poll_message(result),
+            disable_web_page_preview=True,
+        )
+    except TelegramError:
+        pass
+
+    if not hasattr(bot, "unpin_chat_message"):
+        return
+    try:
+        await bot.unpin_chat_message(
+            chat_id=poll["chat_id"],
+            message_id=poll["message_id"],
+        )
+    except TelegramError:
+        pass
 
 
 async def create_source_candidate_poll(
@@ -869,16 +1015,21 @@ async def advance_daily_source_cycle(
     result["report"] = await post_next_day_source_report(bot, now=now)
 
     due_poll = await get_due_source_candidate_poll(now)
-    if due_poll is not None:
-        close_result = await close_source_candidate_poll(due_poll["id"], now=now)
+    poll_to_close = due_poll
+    close_reason = None
+    if poll_to_close is None:
+        poll_to_close = await get_early_rejectable_source_candidate_poll(now)
+        if poll_to_close is not None:
+            close_reason = SOURCE_VOTE_EARLY_REJECT_REASON
+
+    if poll_to_close is not None:
+        close_result = await close_source_candidate_poll(
+            poll_to_close["id"],
+            now=now,
+            close_reason=close_reason,
+        )
         result["closed_poll"] = close_result
-        if due_poll["message_id"]:
-            await bot.edit_message_text(
-                chat_id=due_poll["chat_id"],
-                message_id=due_poll["message_id"],
-                text=format_closed_poll_message(close_result),
-                disable_web_page_preview=True,
-            )
+        await update_closed_source_candidate_poll_message(bot, close_result)
 
     active_poll = await get_active_source_candidate_poll()
     if active_poll is not None:
