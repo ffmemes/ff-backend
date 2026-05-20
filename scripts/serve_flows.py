@@ -120,7 +120,7 @@ if __name__ == "__main__":
         # ── Moderator community loops ──
         daily_moderator_source_voting.to_deployment(
             name="Daily Moderator Source Voting",
-            schedules=[CronSchedule(cron="0 10 * * *", timezone=MSK)],
+            schedules=[CronSchedule(cron="*/15 * * * *", timezone=MSK)],
         ),
         # ── Broadcasts ──
         broadcast_next_meme_to_active_15m_ago.to_deployment(

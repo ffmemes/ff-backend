@@ -183,15 +183,20 @@ If the poll is closed, answer `Голосование уже закрыто` and
 
 ## Daily Source Cycle
 
-Run once every 24 hours from a small scheduled flow or admin command.
+Run from a small scheduled flow or admin command. The production schedule may
+check frequently (for example every 15 minutes) so early negative polls can be
+closed soon after they become eligible.
 
 Order matters:
 
 1. Post the **Next-Day Source Report** for the last source that passed and was enabled in a previous cycle, if it has not been reported yet.
-2. Close the currently `open` poll, if one exists:
+2. Close the currently `open` poll if its 24-hour window has elapsed or if it
+   matches the early negative rule:
    - recompute likes/dislikes from `meme_source_candidate_vote`;
    - mark the poll `passed`, `rejected`, or `expired_no_quorum`;
-   - edit the moderator-chat message so voting is visibly closed.
+   - edit the moderator-chat message so it keeps the source URL and shows
+     final vote results;
+   - unpin the closed voting message.
 3. If the closed poll passed, enable the prepared source:
    - load `poll.prepared_meme_source_id` or the candidate's `promoted_meme_source_id`;
    - set `language_code='ru'`;
@@ -208,7 +213,7 @@ Order matters:
    - create or reuse a `meme_source` row with `status='in_moderation'`;
    - fetch the latest public Telegram posts once;
    - inspect the fetched posts for Cyrillic evidence;
-   - if Cyrillic is absent, dismiss the candidate and stop the cycle for the day without posting a poll;
+   - if Cyrillic is absent, dismiss the candidate and stop the current run without posting a poll;
    - if Cyrillic is present, save the fetched posts into `meme_raw_telegram`;
    - mark the candidate `prepared` and store `promoted_meme_source_id`.
 6. Insert `meme_source_candidate_poll` as `draft`, with `prepared_meme_source_id` and `closes_at = now() + interval '24 hours'`.
@@ -216,7 +221,9 @@ Order matters:
 8. Update poll with `chat_id`, `message_id`, `opened_at`, `status='open'`.
 9. If send fails, mark `status='cancelled'` and keep the prepared source in `in_moderation` for an admin retry.
 
-Hard limit: 1 new source poll per day. The point is a steady community ritual, not a high-volume ops feed.
+Hard limit: exactly one active source poll at a time. The point is a steady
+community ritual, not a high-volume ops feed; early-rejected non-meme sources
+may be replaced before the full 24-hour window.
 
 Message content should include:
 
@@ -285,7 +292,12 @@ Outcomes:
 
 Rejected sources must not return to the automatic daily cycle. If the owner wants to revisit one, they can add it manually later.
 
-Do not early-close. The daily cycle closes the poll after the full 24-hour window.
+Early negative close: after the poll has been open for at least 90 minutes,
+if it has 0 likes and at least 6 dislikes, close it immediately as
+`rejected`, set the prepared source to `parsing_disabled`, dismiss the
+candidate with `dismissed_reason='source_vote:{poll_id}:early_negative_not_meme_source'`,
+write `meme_source.data.source_vote_rejection.reason='early_negative_not_meme_source'`,
+and try to post the next candidate.
 
 ## Passing Source Flow
 

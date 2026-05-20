@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -23,6 +24,8 @@ from src.storage.source_voting import (
     CANDIDATE_STATUS_DISCOVERED,
     POLL_STATUS_OPEN,
     POLL_STATUS_PASSED,
+    POLL_STATUS_REJECTED,
+    SOURCE_VOTE_EARLY_REJECT_REASON,
     VOTE_ADD_SOURCE,
     VOTE_SKIP_SOURCE,
     advance_daily_source_cycle,
@@ -40,6 +43,8 @@ from tests.factories import TEST_ID_START, cleanup_test_data
 
 CANDIDATE_ID = TEST_ID_START + 2200
 CANDIDATE_URL = "https://t.me/ffm_source_vote_candidate"
+SECOND_CANDIDATE_ID = TEST_ID_START + 2201
+SECOND_CANDIDATE_URL = "https://t.me/ffm_source_vote_candidate_next"
 
 
 def _post(post_id: int, content: str = "смешной мем") -> TgChannelPostParsingResult:
@@ -53,15 +58,21 @@ def _post(post_id: int, content: str = "смешной мем") -> TgChannelPost
     )
 
 
-async def _create_candidate(conn: AsyncConnection) -> None:
+async def _create_candidate(
+    conn: AsyncConnection,
+    *,
+    candidate_id: int = CANDIDATE_ID,
+    url: str = CANDIDATE_URL,
+    times_forwarded: int = 5,
+) -> None:
     await conn.execute(
         insert(meme_source_candidate)
         .values(
-            id=CANDIDATE_ID,
+            id=candidate_id,
             type="telegram",
-            url=CANDIDATE_URL,
+            url=url,
             status="discovered",
-            times_forwarded=5,
+            times_forwarded=times_forwarded,
             first_seen_at=datetime(2026, 5, 1, 10, 0, 0),
             last_seen_at=datetime(2026, 5, 2, 10, 0, 0),
         )
@@ -80,13 +91,17 @@ async def conn():
         )
         await conn.execute(
             delete(meme_source_candidate_poll).where(
-                meme_source_candidate_poll.c.candidate_id == CANDIDATE_ID
+                meme_source_candidate_poll.c.candidate_id.in_([CANDIDATE_ID, SECOND_CANDIDATE_ID])
             )
         )
         await conn.execute(
-            delete(meme_source_candidate).where(meme_source_candidate.c.id == CANDIDATE_ID)
+            delete(meme_source_candidate).where(
+                meme_source_candidate.c.id.in_([CANDIDATE_ID, SECOND_CANDIDATE_ID])
+            )
         )
-        await conn.execute(delete(meme_source).where(meme_source.c.url == CANDIDATE_URL))
+        await conn.execute(
+            delete(meme_source).where(meme_source.c.url.in_([CANDIDATE_URL, SECOND_CANDIDATE_URL]))
+        )
         await conn.commit()
         await cleanup_test_data(conn)
 
@@ -235,6 +250,186 @@ async def test_source_candidate_vote_rejects_poll_outside_moderator_chat(
 
 
 @pytest.mark.asyncio
+async def test_source_candidate_vote_early_rejects_clear_negative_poll(
+    conn: AsyncConnection,
+):
+    now = datetime.utcnow()
+    await _create_candidate(conn)
+    await conn.commit()
+    prepared = await prepare_source_candidate(CANDIDATE_ID, posts=[_post(4013)])
+    poll = await create_source_candidate_poll(
+        CANDIDATE_ID,
+        prepared_meme_source_id=prepared["source"]["id"],
+        chat_id=TELEGRAM_MODERATOR_CHAT_ID,
+        now=now,
+    )
+    await conn.execute(
+        meme_source_candidate_poll.update()
+        .where(meme_source_candidate_poll.c.id == poll["id"])
+        .values(
+            status=POLL_STATUS_OPEN,
+            message_id=131,
+            opened_at=now - timedelta(hours=2),
+            closes_at=now + timedelta(hours=22),
+        )
+    )
+    await conn.commit()
+
+    result = None
+    for offset in range(1, 7):
+        result = await record_source_candidate_vote(
+            poll_id=poll["id"],
+            user_id=TEST_ID_START + 20 + offset,
+            vote=VOTE_SKIP_SOURCE,
+            chat_id=TELEGRAM_MODERATOR_CHAT_ID,
+            now=now,
+        )
+
+    assert result is not None
+    assert result["status"] == "early_rejected"
+    assert result["counts"] == {"yes": 0, "no": 6, "total": 6}
+
+    closed_poll = await fetch_one(
+        select(meme_source_candidate_poll).where(meme_source_candidate_poll.c.id == poll["id"])
+    )
+    assert closed_poll["status"] == POLL_STATUS_REJECTED
+    assert closed_poll["data"]["close_reason"] == SOURCE_VOTE_EARLY_REJECT_REASON
+
+    source = await fetch_one(
+        select(meme_source).where(meme_source.c.id == prepared["source"]["id"])
+    )
+    assert source["status"] == MemeSourceStatus.PARSING_DISABLED.value
+    assert source["data"]["source_vote_rejection"]["reason"] == SOURCE_VOTE_EARLY_REJECT_REASON
+    assert source["data"]["source_vote_rejection"]["no"] == 6
+
+    candidate = await fetch_one(
+        select(meme_source_candidate).where(meme_source_candidate.c.id == CANDIDATE_ID)
+    )
+    assert candidate["status"] == "dismissed"
+    assert candidate["dismissed_reason"] == (
+        f"source_vote:{poll['id']}:{SOURCE_VOTE_EARLY_REJECT_REASON}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_early_reject_close_has_single_winner_under_concurrent_calls(
+    conn: AsyncConnection,
+):
+    now = datetime.utcnow()
+    await _create_candidate(conn)
+    await conn.commit()
+    prepared = await prepare_source_candidate(CANDIDATE_ID, posts=[_post(4017)])
+    poll = await create_source_candidate_poll(
+        CANDIDATE_ID,
+        prepared_meme_source_id=prepared["source"]["id"],
+        chat_id=TELEGRAM_MODERATOR_CHAT_ID,
+        now=now,
+    )
+    await conn.execute(
+        meme_source_candidate_poll.update()
+        .where(meme_source_candidate_poll.c.id == poll["id"])
+        .values(
+            status=POLL_STATUS_OPEN,
+            message_id=133,
+            opened_at=now - timedelta(hours=2),
+            closes_at=now + timedelta(hours=22),
+        )
+    )
+    await conn.execute(
+        insert(meme_source_candidate_vote),
+        [
+            {
+                "poll_id": poll["id"],
+                "user_id": TEST_ID_START + 30 + offset,
+                "vote": VOTE_SKIP_SOURCE,
+            }
+            for offset in range(1, 7)
+        ],
+    )
+    await conn.commit()
+
+    advance_calls = 0
+    entered_advance = asyncio.Event()
+    release_advance = asyncio.Event()
+
+    async def blocking_advance_meme_source(*args, **kwargs):
+        nonlocal advance_calls
+        advance_calls += 1
+        entered_advance.set()
+        await release_advance.wait()
+
+    with patch("src.storage.source_voting.advance_meme_source", new=blocking_advance_meme_source):
+        first = asyncio.create_task(
+            close_source_candidate_poll(
+                poll["id"],
+                now=now,
+                close_reason=SOURCE_VOTE_EARLY_REJECT_REASON,
+            )
+        )
+        await asyncio.wait_for(entered_advance.wait(), timeout=1)
+
+        second = asyncio.create_task(
+            close_source_candidate_poll(
+                poll["id"],
+                now=now,
+                close_reason=SOURCE_VOTE_EARLY_REJECT_REASON,
+            )
+        )
+        await asyncio.sleep(0.05)
+        release_advance.set()
+        results = await asyncio.gather(first, second)
+
+    assert advance_calls == 1
+    assert {result["status"] for result in results} == {POLL_STATUS_REJECTED, "already_closed"}
+
+
+@pytest.mark.asyncio
+async def test_source_candidate_vote_does_not_early_reject_before_min_open_time(
+    conn: AsyncConnection,
+):
+    now = datetime.utcnow()
+    await _create_candidate(conn)
+    await conn.commit()
+    prepared = await prepare_source_candidate(CANDIDATE_ID, posts=[_post(4014)])
+    poll = await create_source_candidate_poll(
+        CANDIDATE_ID,
+        prepared_meme_source_id=prepared["source"]["id"],
+        chat_id=TELEGRAM_MODERATOR_CHAT_ID,
+        now=now,
+    )
+    await conn.execute(
+        meme_source_candidate_poll.update()
+        .where(meme_source_candidate_poll.c.id == poll["id"])
+        .values(
+            status=POLL_STATUS_OPEN,
+            message_id=132,
+            opened_at=now - timedelta(minutes=89),
+            closes_at=now + timedelta(hours=22),
+        )
+    )
+    await conn.commit()
+
+    result = None
+    for offset in range(1, 7):
+        result = await record_source_candidate_vote(
+            poll_id=poll["id"],
+            user_id=TEST_ID_START + 40 + offset,
+            vote=VOTE_SKIP_SOURCE,
+            chat_id=TELEGRAM_MODERATOR_CHAT_ID,
+            now=now,
+        )
+
+    assert result is not None
+    assert result["status"] == "recorded"
+    assert result["counts"] == {"yes": 0, "no": 6, "total": 6}
+
+    open_poll = await fetch_one(
+        select(meme_source_candidate_poll).where(meme_source_candidate_poll.c.id == poll["id"])
+    )
+    assert open_poll["status"] == POLL_STATUS_OPEN
+
+
+@pytest.mark.asyncio
 async def test_close_passed_poll_enables_prepared_source_without_reparsing(
     conn: AsyncConnection,
 ):
@@ -340,6 +535,101 @@ async def test_daily_source_cycle_resumes_existing_draft_poll(conn: AsyncConnect
     assert result["new_poll"]["poll"]["id"] == poll["id"]
     assert result["new_poll"]["poll"]["message_id"] == 556
     assert result["new_poll"]["poll"]["status"] == POLL_STATUS_OPEN
+    bot.send_message.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_daily_source_cycle_early_rejects_negative_poll_and_posts_next_candidate(
+    conn: AsyncConnection,
+):
+    now = datetime.utcnow()
+    await _create_candidate(conn)
+    await _create_candidate(
+        conn,
+        candidate_id=SECOND_CANDIDATE_ID,
+        url=SECOND_CANDIDATE_URL,
+        times_forwarded=4,
+    )
+    await conn.commit()
+    prepared = await prepare_source_candidate(CANDIDATE_ID, posts=[_post(4015)])
+    poll = await create_source_candidate_poll(
+        CANDIDATE_ID,
+        prepared_meme_source_id=prepared["source"]["id"],
+        chat_id=TELEGRAM_MODERATOR_CHAT_ID,
+        now=now,
+    )
+    await conn.execute(
+        meme_source_candidate_poll.update()
+        .where(meme_source_candidate_poll.c.id == poll["id"])
+        .values(
+            status=POLL_STATUS_OPEN,
+            message_id=558,
+            opened_at=now - timedelta(hours=2),
+            closes_at=now + timedelta(hours=22),
+        )
+    )
+    await conn.commit()
+
+    for offset in range(1, 7):
+        await record_source_candidate_vote(
+            poll_id=poll["id"],
+            user_id=TEST_ID_START + 60 + offset,
+            vote=VOTE_SKIP_SOURCE,
+            chat_id=TELEGRAM_MODERATOR_CHAT_ID,
+            now=now - timedelta(minutes=31),
+        )
+
+    bot = SimpleNamespace(
+        edit_message_text=AsyncMock(),
+        unpin_chat_message=AsyncMock(),
+        send_message=AsyncMock(return_value=SimpleNamespace(message_id=559)),
+    )
+    with patch(
+        "src.storage.source_voting.fetch_telegram_candidate_posts",
+        new=AsyncMock(return_value=[_post(4016)]),
+    ):
+        result = await advance_daily_source_cycle(bot, now=now)
+
+    assert result["closed_poll"]["status"] == POLL_STATUS_REJECTED
+    assert result["closed_poll"]["poll"]["data"]["close_reason"] == SOURCE_VOTE_EARLY_REJECT_REASON
+    assert result["new_poll"]["status"] == "posted"
+    assert result["new_poll"]["candidate"]["id"] == SECOND_CANDIDATE_ID
+    bot.edit_message_text.assert_awaited_once()
+    edited_text = bot.edit_message_text.await_args.kwargs["text"]
+    assert CANDIDATE_URL in edited_text
+    assert "Голосование завершено: мем-источник отклонён." in edited_text
+    bot.unpin_chat_message.assert_awaited_once_with(
+        chat_id=TELEGRAM_MODERATOR_CHAT_ID,
+        message_id=558,
+    )
+    bot.send_message.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_post_new_source_candidate_poll_is_idempotent_when_active_poll_exists(
+    conn: AsyncConnection,
+):
+    now = datetime.utcnow()
+    await _create_candidate(conn)
+    await _create_candidate(
+        conn,
+        candidate_id=SECOND_CANDIDATE_ID,
+        url=SECOND_CANDIDATE_URL,
+        times_forwarded=4,
+    )
+    await conn.commit()
+
+    bot = SimpleNamespace(send_message=AsyncMock(return_value=SimpleNamespace(message_id=560)))
+    with patch(
+        "src.storage.source_voting.fetch_telegram_candidate_posts",
+        new=AsyncMock(return_value=[_post(4018)]),
+    ):
+        first = await post_new_source_candidate_poll(bot, now=now)
+        second = await post_new_source_candidate_poll(bot, now=now)
+
+    assert first["status"] == "posted"
+    assert second["status"] == "active_poll_exists"
+    assert second["poll"]["id"] == first["poll"]["id"]
     bot.send_message.assert_awaited_once()
 
 

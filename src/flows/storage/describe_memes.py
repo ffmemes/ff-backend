@@ -39,6 +39,7 @@ from src.database import execute, fetch_all, fetch_one, meme
 from src.flows.events import safe_emit
 from src.flows.hooks import notify_telegram_on_failure
 from src.redis import redis_client
+from src.storage.service import find_meme_duplicate, resolve_meme_duplicate
 from src.storage.upload import download_meme_content_from_tg
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
@@ -242,6 +243,7 @@ async def get_memes_to_describe(limit: int = 30) -> list[dict]:
             M.id,
             M.telegram_file_id,
             M.ocr_result,
+            M.status,
             M.language_code
         FROM meme M
         LEFT JOIN meme_stats MS ON MS.meme_id = M.id
@@ -646,6 +648,18 @@ async def describe_single_meme(meme_row: dict, log, *, deadline: float | None = 
 
     update_query = meme.update().where(meme.c.id == meme_id).values(**update_kwargs).returning(meme)
     await fetch_one(update_query)
+
+    if meme_row.get("status") == "ok":
+        duplicate_meme_id = await find_meme_duplicate(meme_id, merged.get("text", ""))
+        if duplicate_meme_id:
+            result = await resolve_meme_duplicate(meme_id, duplicate_meme_id)
+            log.info(
+                "Meme %s resolved as OCR duplicate of %s after describe: %s",
+                meme_id,
+                duplicate_meme_id,
+                result,
+            )
+
     return "ok"
 
 
