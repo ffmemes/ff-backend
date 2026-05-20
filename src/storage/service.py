@@ -434,15 +434,16 @@ async def find_meme_duplicate(meme_id: int, imagetext: str) -> int | None:
 async def resolve_meme_duplicate(dupe_id: int, original_id: int) -> dict[str, int]:
     """Mark a meme as duplicate with full cleanup.
 
-    1. Move reactions from dupe → original (skip conflicts)
-    2. Delete remaining reactions on dupe
-    3. Delete meme_stats for dupe
-    4. Set meme status='duplicate', duplicate_of=original_id
+    1. Move user reactions from dupe -> original (skip conflicts)
+    2. Move group-chat reactions from dupe -> original (skip conflicts)
+    3. Delete remaining reactions on dupe
+    4. Delete meme_stats for dupe
+    5. Set meme status='duplicate', duplicate_of=original_id
+    6. Refresh basic meme_stats counters for original
 
-    Stats for original will auto-recalculate on next 5-15 min cycle.
-    Returns counts: {moved, conflicts, deleted_stats}.
+    Returns counts for moved/deleted reaction rows.
     """
-    # 1. Move non-conflicting reactions to original
+    # 1. Move non-conflicting user reactions to original
     move_query = text(
         """
         WITH moved AS (
@@ -465,7 +466,31 @@ async def resolve_meme_duplicate(dupe_id: int, original_id: int) -> dict[str, in
     res = await fetch_one(move_query, {"dupe_id": dupe_id, "original_id": original_id})
     moved = res["moved"] if res else 0
 
-    # 2. Delete all reactions remaining on dupe (conflicts + already moved)
+    # 2. Move non-conflicting group-chat reactions to original
+    move_chat_reactions = text(
+        """
+        WITH moved AS (
+            INSERT INTO chat_meme_reaction
+                (chat_id, meme_id, user_id, reaction, reacted_at)
+            SELECT chat_id, :original_id, user_id, reaction, reacted_at
+            FROM chat_meme_reaction
+            WHERE meme_id = :dupe_id
+              AND NOT EXISTS (
+                  SELECT 1 FROM chat_meme_reaction existing
+                  WHERE existing.chat_id = chat_meme_reaction.chat_id
+                    AND existing.user_id = chat_meme_reaction.user_id
+                    AND existing.meme_id = :original_id
+              )
+            ON CONFLICT (chat_id, meme_id, user_id) DO NOTHING
+            RETURNING 1
+        )
+        SELECT count(*) AS moved FROM moved
+    """
+    )
+    res = await fetch_one(move_chat_reactions, {"dupe_id": dupe_id, "original_id": original_id})
+    chat_moved = res["moved"] if res else 0
+
+    # 3. Delete all reactions remaining on dupe (conflicts + already moved)
     delete_reactions = text(
         """
         WITH deleted AS (
@@ -477,13 +502,24 @@ async def resolve_meme_duplicate(dupe_id: int, original_id: int) -> dict[str, in
     res = await fetch_one(delete_reactions, {"dupe_id": dupe_id})
     conflicts = res["conflicts"] if res else 0
 
-    # 3. Delete meme_stats for dupe (stale, will not regenerate since no reactions)
+    delete_chat_reactions = text(
+        """
+        WITH deleted AS (
+            DELETE FROM chat_meme_reaction WHERE meme_id = :dupe_id RETURNING 1
+        )
+        SELECT count(*) AS deleted FROM deleted
+    """
+    )
+    res = await fetch_one(delete_chat_reactions, {"dupe_id": dupe_id})
+    chat_deleted = res["deleted"] if res else 0
+
+    # 4. Delete meme_stats for dupe (stale, will not regenerate since no reactions)
     await execute(
         text("DELETE FROM meme_stats WHERE meme_id = :dupe_id"),
         {"dupe_id": dupe_id},
     )
 
-    # 4. Mark meme as duplicate
+    # 5. Mark meme as duplicate
     await execute(
         text(
             """
@@ -495,7 +531,53 @@ async def resolve_meme_duplicate(dupe_id: int, original_id: int) -> dict[str, in
         {"dupe_id": dupe_id, "original_id": original_id},
     )
 
-    return {"moved": moved, "conflicts": conflicts}
+    # 6. Refresh basic original counters now. Incremental stats only revisits recent
+    # reactions, while duplicate cleanup often moves old rows.
+    await execute(
+        text(
+            """
+            INSERT INTO meme_stats (
+                meme_id, nlikes, ndislikes, nmemes_sent, age_days, sec_to_react, updated_at
+            )
+            SELECT
+                M.id AS meme_id,
+                COUNT(R.*) FILTER (WHERE R.reaction_id = 1) AS nlikes,
+                COUNT(R.*) FILTER (WHERE R.reaction_id = 2) AS ndislikes,
+                COUNT(R.*) AS nmemes_sent,
+                EXTRACT('DAYS' FROM NOW() - M.published_at)::int AS age_days,
+                COALESCE(EXTRACT(
+                    EPOCH FROM percentile_cont(0.5)
+                        WITHIN GROUP (ORDER BY R.reacted_at - R.sent_at)
+                        FILTER (
+                            WHERE R.reacted_at - R.sent_at
+                            BETWEEN '0.5 second'
+                            AND '1 minute'
+                        )
+                ), 99999) AS sec_to_react,
+                NOW() AS updated_at
+            FROM meme M
+            LEFT JOIN user_meme_reaction R
+                ON R.meme_id = M.id
+            WHERE M.id = :original_id
+            GROUP BY M.id
+            ON CONFLICT (meme_id) DO UPDATE SET
+                nlikes = EXCLUDED.nlikes,
+                ndislikes = EXCLUDED.ndislikes,
+                nmemes_sent = EXCLUDED.nmemes_sent,
+                age_days = EXCLUDED.age_days,
+                sec_to_react = EXCLUDED.sec_to_react,
+                updated_at = EXCLUDED.updated_at
+        """
+        ),
+        {"original_id": original_id},
+    )
+
+    return {
+        "moved": moved,
+        "conflicts": conflicts,
+        "chat_moved": chat_moved,
+        "chat_deleted": chat_deleted,
+    }
 
 
 async def resolve_all_file_id_duplicates() -> dict[str, int]:

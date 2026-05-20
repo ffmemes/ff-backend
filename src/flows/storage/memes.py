@@ -16,6 +16,7 @@ from src.storage.service import (
     get_pending_memes,
     get_unloaded_tg_memes,
     get_unloaded_vk_memes,
+    resolve_all_file_id_duplicates,
     resolve_meme_duplicate,
     update_meme,
     update_meme_status_of_ready_memes,
@@ -219,6 +220,10 @@ async def final_meme_pipeline() -> None:
 
     # next step of a pipeline
     await update_meme_status_of_ready_memes()
+
+    file_id_duplicates = await resolve_all_file_id_duplicates()
+    if file_id_duplicates["resolved"]:
+        logger.info("Resolved file_id duplicates: %s", file_id_duplicates)
 
     safe_emit(
         "ff.pipeline.final.completed",
