@@ -376,21 +376,18 @@ async def test_generate_above_100_treatment_uses_recently_liked_weights():
 
 
 @pytest.mark.asyncio
-async def test_text_light_blender_v1_treatment_pins_text_light_engine():
+async def test_text_light_blender_v1_is_disabled_in_queue_generation():
     captured_weights = None
     captured_fixed_pos = None
 
     async def one_candidate(self, user_id, limit=10, exclude_meme_ids=[], **kw):
         return [{"id": 4, "recommended_by": "generic"}]
 
-    async def text_light_candidate(self, user_id, limit=10, exclude_meme_ids=[], **kw):
-        return [{"id": 7, "recommended_by": "text_light_lr_smoothed"}]
-
     class TestRetriever(CandidatesRetriever):
         engine_map = {
             "best_uploaded_memes": one_candidate,
             "like_spread_and_recent_memes": one_candidate,
-            "text_light_lr_smoothed": text_light_candidate,
+            "lr_smoothed": one_candidate,
             "recently_liked": one_candidate,
             "goat": one_candidate,
             "es_ranked": one_candidate,
@@ -404,7 +401,7 @@ async def test_text_light_blender_v1_treatment_pins_text_light_engine():
         nonlocal captured_weights, captured_fixed_pos
         captured_weights = weights_dict
         captured_fixed_pos = fixed_pos
-        return [{"id": 7, "recommended_by": "text_light_lr_smoothed"}]
+        return [{"id": 4, "recommended_by": "lr_smoothed"}]
 
     with (
         patch(
@@ -416,16 +413,17 @@ async def test_text_light_blender_v1_treatment_pins_text_light_engine():
             "src.recommendations.meme_queue.get_text_light_blender_v1_weights",
             new_callable=AsyncMock,
             return_value=treatment_weights,
-        ),
+        ) as get_text_light_weights,
         patch("src.recommendations.meme_queue.blend", side_effect=capture_blend),
     ):
         candidates = await generate_recommendations(
             TEST_USER_ID, 10, 200, TestRetriever(), random_seed=102
         )
 
-    assert candidates == [{"id": 7, "recommended_by": "text_light_lr_smoothed"}]
-    assert "lr_smoothed" not in captured_weights
-    assert captured_fixed_pos == {0: "text_light_lr_smoothed"}
+    assert candidates == [{"id": 4, "recommended_by": "lr_smoothed"}]
+    assert captured_weights == MATURE_BLENDER_CONTROL_WEIGHTS
+    assert captured_fixed_pos == {0: "lr_smoothed"}
+    get_text_light_weights.assert_not_awaited()
 
 
 @pytest.mark.asyncio

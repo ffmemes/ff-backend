@@ -139,7 +139,9 @@ async def generate_recommendations(
             meme_ids_in_queue=meme_ids_in_queue,
             random_seed=random_seed,
             cold_start_nsessions_gate_enabled=settings.COLD_START_NSESSIONS_GATE_ENABLED,
-            text_light_blender_v1_enabled=True,
+            # FFM-1357: stop new exposure until this overlay has a CEO-owned
+            # active experiment record. Existing assignment rows remain readable.
+            text_light_blender_v1_enabled=False,
             source_diversity_enabled=settings.RECOMMENDATION_SOURCE_DIVERSITY_ENABLED,
             shadow_scoring_enabled=settings.RECOMMENDATION_SHADOW_SCORING_ENABLED,
             diagnostics_sample_rate=settings.RECOMMENDATION_DIAGNOSTICS_SAMPLE_RATE,
