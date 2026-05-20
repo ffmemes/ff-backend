@@ -90,9 +90,7 @@ async def conn():
         )
         await conn.execute(
             delete(meme_source_candidate_poll).where(
-                meme_source_candidate_poll.c.candidate_id.in_(
-                    [CANDIDATE_ID, SECOND_CANDIDATE_ID]
-                )
+                meme_source_candidate_poll.c.candidate_id.in_([CANDIDATE_ID, SECOND_CANDIDATE_ID])
             )
         )
         await conn.execute(
@@ -520,10 +518,7 @@ async def test_daily_source_cycle_early_rejects_negative_poll_and_posts_next_can
         result = await advance_daily_source_cycle(bot, now=now)
 
     assert result["closed_poll"]["status"] == POLL_STATUS_REJECTED
-    assert (
-        result["closed_poll"]["poll"]["data"]["close_reason"]
-        == SOURCE_VOTE_EARLY_REJECT_REASON
-    )
+    assert result["closed_poll"]["poll"]["data"]["close_reason"] == SOURCE_VOTE_EARLY_REJECT_REASON
     assert result["new_poll"]["status"] == "posted"
     assert result["new_poll"]["candidate"]["id"] == SECOND_CANDIDATE_ID
     bot.edit_message_text.assert_awaited_once()
