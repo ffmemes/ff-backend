@@ -70,7 +70,7 @@ class RecommendationBatchRequest:
     meme_ids_in_queue: Sequence[int] = field(default_factory=tuple)
     random_seed: int | None = None
     cold_start_nsessions_gate_enabled: bool = False
-    text_light_blender_v1_enabled: bool = True
+    text_light_blender_v1_enabled: bool = False
     source_diversity_enabled: bool = False
     shadow_scoring_enabled: bool = True
     diagnostics_sample_rate: float = 0.01
