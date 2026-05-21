@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -28,6 +29,7 @@ from src.storage.source_voting import (
     advance_daily_source_cycle,
     close_source_candidate_poll,
     create_source_candidate_poll,
+    get_source_candidate_vote_counts,
     mark_source_candidate_poll_open,
     post_new_source_candidate_poll,
     post_source_candidate_poll_message,
@@ -202,6 +204,69 @@ async def test_source_candidate_vote_is_unique_and_mutable(conn: AsyncConnection
     assert second["counts"] == {"yes": 1, "no": 1, "total": 2}
     assert changed["status"] == "changed"
     assert changed["counts"] == {"yes": 0, "no": 2, "total": 2}
+
+
+@pytest.mark.asyncio
+async def test_source_candidate_vote_does_not_early_reject_on_sixth_skip_racing_first_add(
+    conn: AsyncConnection,
+):
+    await _create_candidate(conn)
+    await conn.commit()
+    prepared = await prepare_source_candidate(CANDIDATE_ID, posts=[_post(4008)])
+    now = datetime.utcnow()
+    poll = await create_source_candidate_poll(
+        CANDIDATE_ID,
+        prepared_meme_source_id=prepared["source"]["id"],
+        chat_id=TELEGRAM_MODERATOR_CHAT_ID,
+        now=now,
+    )
+    await conn.execute(
+        meme_source_candidate_poll.update()
+        .where(meme_source_candidate_poll.c.id == poll["id"])
+        .values(status=POLL_STATUS_OPEN, message_id=129, opened_at=now)
+    )
+    await conn.commit()
+
+    for offset in range(1, 6):
+        await record_source_candidate_vote(
+            poll_id=poll["id"],
+            user_id=TEST_ID_START + offset,
+            vote=VOTE_SKIP_SOURCE,
+            chat_id=TELEGRAM_MODERATOR_CHAT_ID,
+            now=now,
+        )
+
+    sixth_skip, first_add, close_attempt = await asyncio.gather(
+        record_source_candidate_vote(
+            poll_id=poll["id"],
+            user_id=TEST_ID_START + 6,
+            vote=VOTE_SKIP_SOURCE,
+            chat_id=TELEGRAM_MODERATOR_CHAT_ID,
+            now=now,
+        ),
+        record_source_candidate_vote(
+            poll_id=poll["id"],
+            user_id=TEST_ID_START + 7,
+            vote=VOTE_ADD_SOURCE,
+            chat_id=TELEGRAM_MODERATOR_CHAT_ID,
+            now=now,
+        ),
+        close_source_candidate_poll(poll["id"], now=now),
+    )
+
+    assert sixth_skip["status"] == "recorded"
+    assert first_add["status"] == "recorded"
+    assert close_attempt["status"] == "not_due"
+    assert await get_source_candidate_vote_counts(poll["id"]) == {
+        "yes": 1,
+        "no": 6,
+        "total": 7,
+    }
+
+    stored_poll = await fetch_one(
+        select(meme_source_candidate_poll).where(meme_source_candidate_poll.c.id == poll["id"])
+    )
+    assert stored_poll["status"] == POLL_STATUS_OPEN
 
 
 @pytest.mark.asyncio

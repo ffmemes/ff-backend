@@ -4,10 +4,12 @@ from typing import Any
 
 from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import AsyncConnection
 from telegram import Bot
 from telegram.error import TelegramError
 
 from src.database import (
+    engine,
     execute,
     fetch_all,
     fetch_one,
@@ -280,6 +282,10 @@ async def get_source_candidate_vote_counts(poll_id: int) -> dict[str, int]:
         ),
         {"poll_id": poll_id},
     )
+    return _source_candidate_vote_counts_from_rows(rows)
+
+
+def _source_candidate_vote_counts_from_rows(rows: list[dict[str, Any]]) -> dict[str, int]:
     yes = 0
     no = 0
     for row in rows:
@@ -290,10 +296,41 @@ async def get_source_candidate_vote_counts(poll_id: int) -> dict[str, int]:
     return {"yes": yes, "no": no, "total": yes + no}
 
 
+async def _get_source_candidate_vote_counts_in_transaction(
+    conn: AsyncConnection,
+    poll_id: int,
+) -> dict[str, int]:
+    result = await conn.execute(
+        text(
+            """
+            SELECT vote, COUNT(*) AS voters
+            FROM meme_source_candidate_vote
+            WHERE poll_id = :poll_id
+            GROUP BY vote
+            """
+        ),
+        {"poll_id": poll_id},
+    )
+    return _source_candidate_vote_counts_from_rows([row._asdict() for row in result.all()])
+
+
 async def get_source_candidate_poll(poll_id: int) -> dict[str, Any] | None:
     return await fetch_one(
         select(meme_source_candidate_poll).where(meme_source_candidate_poll.c.id == poll_id)
     )
+
+
+async def _get_source_candidate_poll_for_update(
+    conn: AsyncConnection,
+    poll_id: int,
+) -> dict[str, Any] | None:
+    result = await conn.execute(
+        select(meme_source_candidate_poll)
+        .where(meme_source_candidate_poll.c.id == poll_id)
+        .with_for_update()
+    )
+    row = result.first()
+    return row._asdict() if row is not None else None
 
 
 async def get_active_source_candidate_poll() -> dict[str, Any] | None:
@@ -328,41 +365,44 @@ async def record_source_candidate_vote(
     if vote not in (VOTE_ADD_SOURCE, VOTE_SKIP_SOURCE):
         return {"status": "invalid_vote"}
 
-    poll = await get_source_candidate_poll(poll_id)
-    if poll is None:
-        return {"status": "not_found"}
-    if chat_id != TELEGRAM_MODERATOR_CHAT_ID or poll["chat_id"] != TELEGRAM_MODERATOR_CHAT_ID:
-        return {"status": "wrong_chat", "poll": poll}
-    if poll["chat_id"] != chat_id:
-        return {"status": "wrong_chat", "poll": poll}
-    if poll["status"] != POLL_STATUS_OPEN or poll["closes_at"] <= now:
-        return {"status": "closed", "poll": poll}
+    async with engine.begin() as conn:
+        poll = await _get_source_candidate_poll_for_update(conn, poll_id)
+        if poll is None:
+            return {"status": "not_found"}
+        if chat_id != TELEGRAM_MODERATOR_CHAT_ID or poll["chat_id"] != TELEGRAM_MODERATOR_CHAT_ID:
+            return {"status": "wrong_chat", "poll": poll}
+        if poll["chat_id"] != chat_id:
+            return {"status": "wrong_chat", "poll": poll}
+        if poll["status"] != POLL_STATUS_OPEN or poll["closes_at"] <= now:
+            return {"status": "closed", "poll": poll}
 
-    existing = await fetch_one(
-        select(meme_source_candidate_vote)
-        .where(meme_source_candidate_vote.c.poll_id == poll_id)
-        .where(meme_source_candidate_vote.c.user_id == user_id)
-    )
-    stmt = (
-        insert(meme_source_candidate_vote)
-        .values(
-            {
-                "poll_id": poll_id,
-                "user_id": user_id,
-                "vote": vote,
-            }
+        existing_result = await conn.execute(
+            select(meme_source_candidate_vote)
+            .where(meme_source_candidate_vote.c.poll_id == poll_id)
+            .where(meme_source_candidate_vote.c.user_id == user_id)
         )
-        .on_conflict_do_update(
-            index_elements=(
-                meme_source_candidate_vote.c.poll_id,
-                meme_source_candidate_vote.c.user_id,
-            ),
-            set_={"vote": vote, "updated_at": now},
+        existing_row = existing_result.first()
+        existing = existing_row._asdict() if existing_row is not None else None
+        stmt = (
+            insert(meme_source_candidate_vote)
+            .values(
+                {
+                    "poll_id": poll_id,
+                    "user_id": user_id,
+                    "vote": vote,
+                }
+            )
+            .on_conflict_do_update(
+                index_elements=(
+                    meme_source_candidate_vote.c.poll_id,
+                    meme_source_candidate_vote.c.user_id,
+                ),
+                set_={"vote": vote, "updated_at": now},
+            )
         )
-    )
-    await execute(stmt)
+        await conn.execute(stmt)
 
-    counts = await get_source_candidate_vote_counts(poll_id)
+        counts = await _get_source_candidate_vote_counts_in_transaction(conn, poll_id)
     return {
         "status": "changed" if existing and existing["vote"] != vote else "recorded",
         "poll": poll,
@@ -400,6 +440,33 @@ async def _set_poll_status(
         .values(**values)
         .returning(meme_source_candidate_poll)
     )
+
+
+async def _set_poll_status_in_transaction(
+    conn: AsyncConnection,
+    poll_id: int,
+    *,
+    status: str,
+    closed_at: datetime | None = None,
+    result_meme_source_id: int | None = None,
+    data: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    values: dict[str, Any] = {"status": status, "updated_at": _utcnow()}
+    if closed_at is not None:
+        values["closed_at"] = closed_at
+    if result_meme_source_id is not None:
+        values["result_meme_source_id"] = result_meme_source_id
+    if data is not None:
+        values["data"] = data
+
+    result = await conn.execute(
+        meme_source_candidate_poll.update()
+        .where(meme_source_candidate_poll.c.id == poll_id)
+        .values(**values)
+        .returning(meme_source_candidate_poll)
+    )
+    row = result.first()
+    return row._asdict() if row is not None else None
 
 
 async def _append_source_vote_metadata(
@@ -472,44 +539,48 @@ async def close_source_candidate_poll(
     now: datetime | None = None,
 ) -> dict[str, Any]:
     now = now or _utcnow()
-    poll = await get_source_candidate_poll(poll_id)
-    if poll is None:
-        return {"status": "not_found"}
-    if poll["status"] != POLL_STATUS_OPEN:
-        return {"status": "already_closed", "poll": poll}
+    async with engine.begin() as conn:
+        poll = await _get_source_candidate_poll_for_update(conn, poll_id)
+        if poll is None:
+            return {"status": "not_found"}
+        if poll["status"] != POLL_STATUS_OPEN:
+            return {"status": "already_closed", "poll": poll}
+        if poll["closes_at"] > now:
+            return {"status": "not_due", "poll": poll}
 
-    counts = await get_source_candidate_vote_counts(poll_id)
-    poll_data = dict(poll.get("data") or {})
-    poll_data["final_counts"] = counts
+        counts = await _get_source_candidate_vote_counts_in_transaction(conn, poll_id)
+        poll_data = dict(poll.get("data") or {})
+        poll_data["final_counts"] = counts
 
-    result_source = None
-    if counts["total"] < SOURCE_VOTE_QUORUM:
-        status = POLL_STATUS_EXPIRED_NO_QUORUM
-    elif source_vote_passed(counts):
-        status = POLL_STATUS_PASSED
-        result_source = await enable_passed_source_poll(poll, counts, now)
-    else:
-        status = POLL_STATUS_REJECTED
-        if poll["prepared_meme_source_id"]:
-            await advance_meme_source(
-                poll["prepared_meme_source_id"],
-                moderator_id=f"source-vote:{poll_id}",
-                status=MemeSourceStatus.PARSING_DISABLED.value,
-                trigger_parse=False,
+        result_source = None
+        if counts["total"] < SOURCE_VOTE_QUORUM:
+            status = POLL_STATUS_EXPIRED_NO_QUORUM
+        elif source_vote_passed(counts):
+            status = POLL_STATUS_PASSED
+            result_source = await enable_passed_source_poll(poll, counts, now)
+        else:
+            status = POLL_STATUS_REJECTED
+            if poll["prepared_meme_source_id"]:
+                await advance_meme_source(
+                    poll["prepared_meme_source_id"],
+                    moderator_id=f"source-vote:{poll_id}",
+                    status=MemeSourceStatus.PARSING_DISABLED.value,
+                    trigger_parse=False,
+                )
+            await _mark_candidate(
+                poll["candidate_id"],
+                status=CANDIDATE_STATUS_DISMISSED,
+                dismissed_reason=f"source_vote:{poll_id}",
             )
-        await _mark_candidate(
-            poll["candidate_id"],
-            status=CANDIDATE_STATUS_DISMISSED,
-            dismissed_reason=f"source_vote:{poll_id}",
-        )
 
-    updated_poll = await _set_poll_status(
-        poll_id,
-        status=status,
-        closed_at=now,
-        result_meme_source_id=None if result_source is None else result_source["id"],
-        data=poll_data,
-    )
+        updated_poll = await _set_poll_status_in_transaction(
+            conn,
+            poll_id,
+            status=status,
+            closed_at=now,
+            result_meme_source_id=None if result_source is None else result_source["id"],
+            data=poll_data,
+        )
     return {
         "status": status,
         "poll": updated_poll,
