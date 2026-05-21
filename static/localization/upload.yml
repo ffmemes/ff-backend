@@ -551,6 +551,17 @@ upload.tg_upload_failed:
     ❌ Щось пішло не так при завантаженні мема в Telegram. Просто спробуй ще раз.
 
 
+upload.file_too_big:
+  en: |-
+    ❌ This file is too big for Telegram processing. Please upload a smaller image or video.
+
+  ru: |-
+    ❌ Этот файл слишком большой для обработки в Telegram. Загрузи картинку или видео поменьше.
+
+  uk: |-
+    ❌ Цей файл завеликий для обробки в Telegram. Завантаж зображення або відео меншого розміру.
+
+
 upload.no_uploads_yet:
   en: |-
     📭 <b>You haven't uploaded any memes yet!</b>

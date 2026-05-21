@@ -59,6 +59,13 @@ LEADERBOARD_URL = (
 logger = logging.getLogger(__name__)
 
 
+def _telegram_download_failure_kind(exc: BadRequest) -> str:
+    message = str(exc).lower()
+    if "too big" in message:
+        return "telegram_file_too_big"
+    return "telegram_download_bad_request"
+
+
 async def _notify_uploader(
     bot: Bot,
     meme_upload: dict[str, Any],
@@ -171,7 +178,42 @@ async def _uploaded_meme_auto_review(
     uploader_lang = await _get_uploader_lang(meme_upload["user_id"])
 
     logging.info(f"Downloading meme {meme['id']} content")
-    image_bytes = await download_meme_content_from_tg(meme["telegram_file_id"])
+    try:
+        image_bytes = await download_meme_content_from_tg(meme["telegram_file_id"])
+    except BadRequest as exc:
+        failure_kind = _telegram_download_failure_kind(exc)
+        logger.warning(
+            "User upload could not be downloaded from Telegram",
+            exc_info=True,
+            extra=sentry_log_extra(
+                observability_context,
+                phase="download_from_telegram",
+                error_type=type(exc).__name__,
+                failure_kind=failure_kind,
+            ),
+        )
+        capture_handled_issue(
+            "user_upload.telegram_download_failed",
+            level="warning",
+            user_id=meme_upload.get("user_id"),
+            tags={
+                "ff.module": "user_upload",
+                "ff.failure_kind": failure_kind,
+                "meme.type": meme.get("type"),
+                "error.type": type(exc).__name__,
+            },
+            contexts=observability_context,
+            error=exc,
+        )
+        await update_meme(meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK)
+        localization_key = (
+            "upload.file_too_big"
+            if failure_kind == "telegram_file_too_big"
+            else "upload.tg_upload_failed"
+        )
+        return await _notify_uploader(
+            bot, meme_upload, localizer.t(localization_key, uploader_lang)
+        )
 
     logging.info(f"Adding watermark to meme {meme['id']} content")
     watermarked_meme_content = await add_watermark_to_meme_content(image_bytes, meme["type"])
