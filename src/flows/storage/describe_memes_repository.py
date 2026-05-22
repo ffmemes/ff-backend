@@ -102,7 +102,7 @@ async def save_meme_description(
         merged["text"] = ocr_text
 
     update_kwargs: dict[str, Any] = {"ocr_result": merged}
-    language_code = language.lower()
+    language_code = language.strip().lower() if isinstance(language, str) else ""
     if language_code in KNOWN_LANGUAGES:
         update_kwargs["language_code"] = language_code
 
