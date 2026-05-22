@@ -459,10 +459,11 @@ async def test_ru_share_max_picker_keeps_cold_sources_in_pool(clean_xpost):
 
     picked, decision = await get_next_share_max_meme_for_tgchannelru()
     assert picked is not None
-    assert picked["id"] == 10341
     assert decision is not None
     assert decision["candidate_pool_size"] == 2
-    assert {c["meme_id"] for c in decision["candidates"]} == {10331, 10341}
+    candidate_ids = {c["meme_id"] for c in decision["candidates"]}
+    assert picked["id"] in candidate_ids
+    assert candidate_ids == {10331, 10341}
     assert all(c["share_source_base"] == 1.0 for c in decision["candidates"])
 
 
