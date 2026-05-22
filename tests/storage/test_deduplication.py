@@ -103,7 +103,15 @@ async def test_resolve_duplicate_moves_reactions_and_refreshes_stats(dedup_setup
     async with engine.connect() as conn:
         await create_meme(conn, id=10001, meme_source_id=10001)
         await create_meme(conn, id=10002, meme_source_id=10001)
-        await create_meme_stats(conn, meme_id=10001, nlikes=1, ndislikes=1, nmemes_sent=2)
+        await create_meme_stats(
+            conn,
+            meme_id=10001,
+            nlikes=1,
+            ndislikes=1,
+            nmemes_sent=2,
+            lr_smoothed=99,
+            engagement_score=99,
+        )
         await create_meme_stats(conn, meme_id=10002, nlikes=2, ndislikes=1, nmemes_sent=3)
         await create_reaction(conn, user_id=10001, meme_id=10001, reaction_id=1)
         await create_reaction(conn, user_id=10002, meme_id=10001, reaction_id=2)
@@ -121,6 +129,8 @@ async def test_resolve_duplicate_moves_reactions_and_refreshes_stats(dedup_setup
     assert original_stats["nlikes"] == 2
     assert original_stats["ndislikes"] == 2
     assert original_stats["nmemes_sent"] == 4
+    assert original_stats["lr_smoothed"] == 0
+    assert original_stats["engagement_score"] == 0
 
     dupe = await _row(meme, id=10002)
     assert dupe["status"] == MemeStatus.DUPLICATE.value

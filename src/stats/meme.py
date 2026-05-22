@@ -1,6 +1,9 @@
 import logging
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncConnection
 
 from src.database import execute, fetch_all
 
@@ -16,12 +19,55 @@ async def calculate_meme_reactions_and_engagement(
     min_user_reactions: int = 10,
     min_meme_reactions: int = 3,
     lookback_hours: int = 3,
+    meme_ids: list[int] | None = None,
+    include_user_history: bool = False,
+) -> None:
+    await _execute_meme_reactions_and_engagement(
+        execute,
+        min_user_reactions=min_user_reactions,
+        min_meme_reactions=min_meme_reactions,
+        lookback_hours=lookback_hours,
+        meme_ids=meme_ids,
+        include_user_history=include_user_history,
+    )
+
+
+async def calculate_meme_reactions_and_engagement_on_connection(
+    conn: AsyncConnection,
+    *,
+    min_user_reactions: int = 10,
+    min_meme_reactions: int = 3,
+    lookback_hours: int = 3,
+    meme_ids: list[int] | None = None,
+    include_user_history: bool = False,
+) -> None:
+    await _execute_meme_reactions_and_engagement(
+        conn.execute,
+        min_user_reactions=min_user_reactions,
+        min_meme_reactions=min_meme_reactions,
+        lookback_hours=lookback_hours,
+        meme_ids=meme_ids,
+        include_user_history=include_user_history,
+    )
+
+
+async def _execute_meme_reactions_and_engagement(
+    execute_query: Callable[[Any, dict[str, Any]], Awaitable[Any]],
+    *,
+    min_user_reactions: int,
+    min_meme_reactions: int,
+    lookback_hours: int,
+    meme_ids: list[int] | None,
+    include_user_history: bool,
 ) -> None:
     """Combined lr_smoothed + engagement_score + basic counts — incremental mode.
 
     Only recomputes stats for memes that received reactions in the last
     `lookback_hours` hours. Memes with no recent activity keep their existing
-    meme_stats rows unchanged (ON CONFLICT DO UPDATE only fires for included rows).
+    meme_stats rows unchanged unless explicitly included in `meme_ids`.
+    When `include_user_history` is true, user baselines are built from all
+    reactions by users who touched the target memes; this is used after moving
+    historical reactions during deduplication.
 
     lr_smoothed algorithm:
         1. like_symmetrical: reaction_id=1 → +1, else → -1
@@ -50,6 +96,25 @@ async def calculate_meme_reactions_and_engagement(
             WHERE COALESCE(reacted_at, sent_at) > NOW() - :lookback_hours * INTERVAL '1 hour'
         ),
 
+        FORCED_MEME_IDS AS (
+            SELECT M.id AS meme_id
+            FROM meme M
+            WHERE :has_forced_meme_ids
+              AND M.id = ANY(:meme_ids)
+        ),
+
+        TARGET_MEME_IDS AS (
+            SELECT meme_id FROM RECENT_MEME_IDS
+            UNION
+            SELECT meme_id FROM FORCED_MEME_IDS
+        ),
+
+        AFFECTED_USERS AS (
+            SELECT DISTINCT user_id
+            FROM user_meme_reaction
+            WHERE meme_id IN (SELECT meme_id FROM TARGET_MEME_IDS)
+        ),
+
         BASE_REACTIONS AS (
             SELECT
                 R.user_id, R.meme_id, R.reaction_id,
@@ -62,7 +127,13 @@ async def calculate_meme_reactions_and_engagement(
                     OVER (PARTITION BY R.user_id) AS user_last_reaction_sent_at
             FROM user_meme_reaction R
             JOIN meme ON R.meme_id = meme.id
-            WHERE R.meme_id IN (SELECT meme_id FROM RECENT_MEME_IDS)
+            WHERE (
+                (:include_user_history AND R.user_id IN (SELECT user_id FROM AFFECTED_USERS))
+                OR (
+                    NOT :include_user_history
+                    AND R.meme_id IN (SELECT meme_id FROM TARGET_MEME_IDS)
+                )
+            )
         ),
 
         WITH_USER_AVGS AS (
@@ -118,30 +189,31 @@ async def calculate_meme_reactions_and_engagement(
                 COUNT(lr_smoothed_val) AS n_lr_reactions,
                 COUNT(es_smoothed_val) AS n_es_reactions
             FROM SMOOTHED
+            WHERE meme_id IN (SELECT meme_id FROM TARGET_MEME_IDS)
             GROUP BY meme_id
         ),
 
         BASIC_COUNTS AS (
             SELECT
-                meme_id
-                , COUNT(*) FILTER (WHERE reaction_id = 1) AS nlikes
-                , COUNT(*) FILTER (WHERE reaction_id = 2) AS ndislikes
-                , COUNT(*) AS nmemes_sent
+                M.id AS meme_id
+                , COUNT(*) FILTER (WHERE E.reaction_id = 1) AS nlikes
+                , COUNT(*) FILTER (WHERE E.reaction_id = 2) AS ndislikes
+                , COUNT(E.*) AS nmemes_sent
                 , MAX(EXTRACT('DAYS' FROM NOW() - M.published_at)) AS age_days
                 , COALESCE(EXTRACT(
                     EPOCH FROM
                     percentile_cont(0.5)
-                        WITHIN GROUP (ORDER BY reacted_at - sent_at)
+                        WITHIN GROUP (ORDER BY E.reacted_at - E.sent_at)
                         FILTER (
-                            WHERE reacted_at - sent_at
+                            WHERE E.reacted_at - E.sent_at
                             BETWEEN '0.5 second'
                             AND '1 minute'
                         )
                 ), 99999) AS sec_to_react
                 , NOW() AS updated_at
-            FROM user_meme_reaction E
-            INNER JOIN meme M ON M.id = E.meme_id
-            WHERE E.meme_id IN (SELECT meme_id FROM RECENT_MEME_IDS)
+            FROM meme M
+            LEFT JOIN user_meme_reaction E ON E.meme_id = M.id
+            WHERE M.id IN (SELECT meme_id FROM TARGET_MEME_IDS)
             GROUP BY 1
         )
 
@@ -173,12 +245,16 @@ async def calculate_meme_reactions_and_engagement(
             lr_smoothed = EXCLUDED.lr_smoothed,
             engagement_score = EXCLUDED.engagement_score
     """
-    await execute(
+    forced_meme_ids = meme_ids or [0]
+    await execute_query(
         text(query),
         {
             "min_user_reactions": min_user_reactions,
             "min_meme_reactions": min_meme_reactions,
             "lookback_hours": lookback_hours,
+            "has_forced_meme_ids": bool(meme_ids),
+            "meme_ids": forced_meme_ids,
+            "include_user_history": include_user_history,
         },
     )
 

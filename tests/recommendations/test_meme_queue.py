@@ -8,7 +8,7 @@ from src.recommendations.blender_experiments import (
     MATURE_BLENDER_TREATMENT_WEIGHTS,
 )
 from src.recommendations.candidates import CandidatesRetriever
-from src.recommendations.meme_queue import generate_recommendations
+from src.recommendations.meme_queue import generate_recommendations, get_next_meme_for_user
 
 TEST_USER_ID = 99999
 
@@ -51,6 +51,47 @@ def mock_redis():
 
 
 # ── Cold start Phase 1 (nmemes_sent < 6): cold_start_explore ──
+
+
+@pytest.mark.asyncio
+async def test_get_next_meme_for_user_skips_stale_queue_payloads():
+    queued_payloads = [
+        {
+            "id": 101,
+            "type": "image",
+            "telegram_file_id": "stale-file-id",
+            "caption": None,
+        },
+        {
+            "id": 102,
+            "type": "image",
+            "telegram_file_id": "fresh-file-id",
+            "caption": None,
+        },
+    ]
+
+    async def pop_queue(_queue_key):
+        return queued_payloads.pop(0) if queued_payloads else None
+
+    async def is_sendable(_user_id: int, meme_id: int) -> bool:
+        return meme_id == 102
+
+    with (
+        patch(
+            "src.recommendations.meme_queue.redis.pop_meme_from_queue_by_key",
+            new_callable=AsyncMock,
+            side_effect=pop_queue,
+        ),
+        patch(
+            "src.recommendations.meme_queue._queued_meme_is_sendable",
+            new_callable=AsyncMock,
+            side_effect=is_sendable,
+        ),
+    ):
+        meme = await get_next_meme_for_user(TEST_USER_ID)
+
+    assert meme is not None
+    assert meme.id == 102
 
 
 @pytest.mark.asyncio

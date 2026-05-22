@@ -34,13 +34,23 @@ async def get_next_meme_for_user(user_id: int) -> MemeData | None:
         if not meme_data:
             return None
 
-        if await _queued_meme_is_sendable(user_id, int(meme_data["id"])):
+        try:
+            meme_id = int(meme_data["id"])
+        except (KeyError, TypeError, ValueError):
+            logging.warning(
+                "discarding malformed queued meme payload for user_id=%s payload=%s",
+                user_id,
+                meme_data,
+            )
+            continue
+
+        if await _queued_meme_is_sendable(user_id, meme_id):
             return MemeData(**meme_data)
 
         logging.info(
-            "Dropped stale queued meme %s for user %s before send",
-            meme_data.get("id"),
+            "discarding stale queued meme payload for user_id=%s meme_id=%s",
             user_id,
+            meme_id,
         )
 
 
