@@ -83,7 +83,8 @@ See [dedup.md](dedup.md) for improvement plan.
 | `src/storage/parsers/vk.py` | VK API parser |
 | `src/storage/parsers/ig.py` | Instagram HikerAPI parser |
 | `src/storage/etl.py` | Raw -> processed meme transformation |
-| `src/storage/service.py` | DB queries, find_meme_duplicate() |
+| `src/storage/service.py` | Shared DB queries and meme status updates |
+| `src/storage/deduplication.py` | File ID/OCR duplicate detection and resolution |
 | `src/storage/watermark.py` | Image watermarking (Pillow) |
 | `src/storage/ads.py` | Ad keyword detection |
 | `src/flows/storage/memes.py` | Pipeline orchestration (tg/vk/ig_meme_pipeline) |

@@ -5,6 +5,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from src.database import (
+    chat_meme_reaction,
     meme,
     meme_source,
     meme_source_candidate,
@@ -236,6 +237,9 @@ async def cleanup_test_data(conn: AsyncConnection) -> None:
     )
     await conn.execute(
         delete(user_meme_reaction).where(user_meme_reaction.c.user_id >= TEST_ID_START)
+    )
+    await conn.execute(
+        delete(chat_meme_reaction).where(chat_meme_reaction.c.user_id >= TEST_ID_START)
     )
     await conn.execute(delete(user_language).where(user_language.c.user_id >= TEST_ID_START))
     await conn.execute(delete(user_stats).where(user_stats.c.user_id >= TEST_ID_START))

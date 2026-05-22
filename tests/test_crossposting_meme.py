@@ -443,6 +443,30 @@ async def test_ru_share_max_picker_boosts_prior_inbot_shares(clean_xpost):
 
 
 @pytest.mark.asyncio
+async def test_ru_share_max_picker_keeps_cold_sources_in_pool(clean_xpost):
+    async with engine.connect() as conn:
+        await create_meme_source(conn, id=10330, language_code="ru")
+        await create_meme_source(conn, id=10340, language_code="ru")
+        await create_meme(
+            conn, id=10331, meme_source_id=10330, language_code="ru", type="image", status="ok"
+        )
+        await create_meme(
+            conn, id=10341, meme_source_id=10340, language_code="ru", type="image", status="ok"
+        )
+        await create_meme_stats(conn, meme_id=10331, nlikes=10, ndislikes=2)
+        await create_meme_stats(conn, meme_id=10341, nlikes=10, ndislikes=2, invited_count=5)
+        await conn.commit()
+
+    picked, decision = await get_next_share_max_meme_for_tgchannelru()
+    assert picked is not None
+    assert picked["id"] == 10341
+    assert decision is not None
+    assert decision["candidate_pool_size"] == 2
+    assert {c["meme_id"] for c in decision["candidates"]} == {10331, 10341}
+    assert all(c["share_source_base"] == 1.0 for c in decision["candidates"])
+
+
+@pytest.mark.asyncio
 async def test_en_share_max_picker_logs_but_does_not_boost_prior_shares(clean_xpost):
     async with engine.connect() as conn:
         await create_meme_source(conn, id=10390, language_code="en")

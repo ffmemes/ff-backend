@@ -26,7 +26,6 @@ import time
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 
-
 # --- Config ---
 API_ID = os.environ.get("TELEGRAM_API_ID")
 API_HASH = os.environ.get("TELEGRAM_API_HASH")
@@ -150,9 +149,11 @@ async def test_delete(client, bot):
                 if btn.data and b"delete" in btn.data.lower():
                     await msg.click(data=btn.data)
                     confirm_msg = await wait_for_response(client, bot, msg.id)
-                    if confirm_msg and ("ciao" in (confirm_msg.text or "").lower() or "start" in (confirm_msg.text or "").lower()):
+                    confirm_text = (confirm_msg.text or "").lower() if confirm_msg else ""
+                    if confirm_msg and ("ciao" in confirm_text or "start" in confirm_text):
                         return "PASS", f"State deleted: {(confirm_msg.text or '')[:80]}"
-                    return "WARN", f"Delete clicked but unexpected response: {(confirm_msg.text if confirm_msg else 'no response')[:80]}"
+                    response = confirm_msg.text if confirm_msg else "no response"
+                    return "WARN", f"Delete clicked but unexpected response: {response[:80]}"
 
     if "sure" in (msg.text or "").lower() or "delete" in (msg.text or "").lower():
         return "WARN", f"Got confirmation prompt but no button found: {(msg.text or '')[:80]}"

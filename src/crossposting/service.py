@@ -41,8 +41,8 @@ async def log_meme_sent(
 
 # Per-channel ranker constants (mirror the SQL ORDER BY).
 _CHANNEL_PARAMS: dict[str, dict[str, Any]] = {
-    "tgchannelru": {"impr_penalty": 0.8, "age_threshold": 7},
-    "tgchannelen": {"impr_penalty": 0.5, "age_threshold": 90},
+    "tgchannelru": {"impr_penalty": 0.8, "age_threshold": 7, "language_code": "ru"},
+    "tgchannelen": {"impr_penalty": 0.5, "age_threshold": 90, "language_code": "en"},
 }
 
 
@@ -185,7 +185,7 @@ def _picked_meme_dict(candidate: dict[str, Any]) -> dict[str, Any]:
     return {k: candidate[k] for k in _PICKED_FIELDS}
 
 
-_RU_QUERY = """
+_STANDARD_RANKER_QUERY = """
     WITH selected_at AS (
         SELECT NOW() AS decided_at
     ),
@@ -196,7 +196,7 @@ _RU_QUERY = """
             COUNT(*) AS n_posts
         FROM crossposting cp
         JOIN meme m ON m.id = cp.meme_id
-        WHERE cp.channel = 'tgchannelru'
+        WHERE cp.channel = :channel
           AND cp.created_at > NOW() - INTERVAL '30 days'
           AND cp.created_at < NOW() - INTERVAL '48 hours'
           AND cp.views IS NOT NULL
@@ -213,7 +213,7 @@ _RU_QUERY = """
         SELECT DISTINCT m2.meme_source_id
         FROM crossposting cp2
         JOIN meme m2 ON m2.id = cp2.meme_id
-        WHERE cp2.channel = 'tgchannelru'
+        WHERE cp2.channel = :channel
           AND cp2.created_at > NOW() - INTERVAL '24 hours'
           AND cp2.telegram_message_id IS NOT NULL
     ),
@@ -229,8 +229,8 @@ _RU_QUERY = """
             ROW_NUMBER() OVER (
                 ORDER BY -1
                     * COALESCE((MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1), 0.5)
-                    * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE 0.8 END
-                    * CASE WHEN MS.age_days < 7 THEN 1 ELSE 0.8 END
+                    * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE :impr_penalty END
+                    * CASE WHEN MS.age_days < :age_threshold THEN 1 ELSE 0.8 END
                     * CASE WHEN M.caption IS NULL THEN 1 ELSE 0.8 END
                     * CASE
                         WHEN MS.nmemes_sent <= 1 THEN 1
@@ -247,136 +247,19 @@ _RU_QUERY = """
             ) AS candidate_rank
         FROM meme M
         INNER JOIN meme_stats MS ON MS.meme_id = M.id
-        LEFT JOIN crossposting CP ON CP.meme_id = M.id AND CP.channel = 'tgchannelru'
+        LEFT JOIN crossposting CP ON CP.meme_id = M.id AND CP.channel = :channel
         LEFT JOIN src_quality SQ ON SQ.meme_source_id = M.meme_source_id
         WHERE 1=1
           AND CP.meme_id IS NULL
           AND M.status = 'ok'
-          AND M.language_code = 'ru'
+          AND M.language_code = :language_code
           AND M.type = 'image'
           AND MS.nlikes >= 5
           AND M.meme_source_id NOT IN (SELECT meme_source_id FROM recent_src)
         ORDER BY -1
             * COALESCE((MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1), 0.5)
-            * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE 0.8 END
-            * CASE WHEN MS.age_days < 7 THEN 1 ELSE 0.8 END
-            * CASE WHEN M.caption IS NULL THEN 1 ELSE 0.8 END
-            * CASE
-                WHEN MS.nmemes_sent <= 1 THEN 1
-                ELSE (MS.nlikes + MS.ndislikes) * 1. / MS.nmemes_sent
-              END
-            * COALESCE(
-                LEAST(2.0, GREATEST(0.5,
-                    SQ.signal / NULLIF((SELECT m_signal FROM src_median), 0)
-                )),
-                1.0
-              )
-            * (1.0 + LEAST(MS.invited_count, 10) * 0.1),
-            M.id
-        LIMIT :limit
-    )
-    SELECT
-        ranked.*,
-        COALESCE(share_clicks.pre_inbot_share_clicks, 0) AS pre_inbot_share_clicks,
-        COALESCE(share_clicks.pre_inbot_share_click_users, 0) AS pre_inbot_share_click_users
-    FROM ranked
-    CROSS JOIN selected_at
-    LEFT JOIN LATERAL (
-        SELECT
-            COUNT(*) AS pre_inbot_share_clicks,
-            COUNT(DISTINCT user_id) AS pre_inbot_share_click_users
-        FROM user_deep_link_log udll
-        CROSS JOIN LATERAL (
-            SELECT substring(
-                udll.deep_link FROM ('^s_([1-9][0-9]{0,18})_' || ranked.id || '$')
-            ) AS sharer_id
-        ) share_link
-        WHERE udll.created_at < selected_at.decided_at
-          AND CASE
-              WHEN share_link.sharer_id IS NULL THEN false
-              WHEN length(share_link.sharer_id) = 19
-                AND share_link.sharer_id > '9223372036854775807' THEN false
-              ELSE udll.user_id <> share_link.sharer_id::bigint
-          END
-    ) share_clicks ON true
-    ORDER BY ranked.candidate_rank
-"""
-
-_EN_QUERY = """
-    WITH selected_at AS (
-        SELECT NOW() AS decided_at
-    ),
-    src_quality AS (
-        SELECT
-            m.meme_source_id,
-            AVG(cp.forwards * SQRT(GREATEST(cp.views, 1) / 100.0)) AS signal,
-            COUNT(*) AS n_posts
-        FROM crossposting cp
-        JOIN meme m ON m.id = cp.meme_id
-        WHERE cp.channel = 'tgchannelen'
-          AND cp.created_at > NOW() - INTERVAL '30 days'
-          AND cp.created_at < NOW() - INTERVAL '48 hours'
-          AND cp.views IS NOT NULL
-          AND cp.views > 0
-          AND m.type = 'image'
-        GROUP BY m.meme_source_id
-        HAVING COUNT(*) >= 5
-    ),
-    src_median AS (
-        SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY signal) AS m_signal
-        FROM src_quality
-    ),
-    recent_src AS (
-        SELECT DISTINCT m2.meme_source_id
-        FROM crossposting cp2
-        JOIN meme m2 ON m2.id = cp2.meme_id
-        WHERE cp2.channel = 'tgchannelen'
-          AND cp2.created_at > NOW() - INTERVAL '24 hours'
-          AND cp2.telegram_message_id IS NOT NULL
-    ),
-    ranked AS (
-        SELECT
-            M.id, M.type, M.telegram_file_id, M.caption,
-            M.meme_source_id,
-            MS.nlikes, MS.ndislikes, MS.raw_impr_rank,
-            MS.age_days, MS.nmemes_sent, MS.invited_count,
-            SQ.signal AS src_signal,
-            (SELECT m_signal FROM src_median) AS median_signal,
-            COUNT(*) OVER () AS candidate_pool_size,
-            ROW_NUMBER() OVER (
-                ORDER BY -1
-                    * COALESCE((MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1), 0.5)
-                    * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE 0.5 END
-                    * CASE WHEN MS.age_days < 90 THEN 1 ELSE 0.8 END
-                    * CASE WHEN M.caption IS NULL THEN 1 ELSE 0.8 END
-                    * CASE
-                        WHEN MS.nmemes_sent <= 1 THEN 1
-                        ELSE (MS.nlikes + MS.ndislikes) * 1. / MS.nmemes_sent
-                      END
-                    * COALESCE(
-                        LEAST(2.0, GREATEST(0.5,
-                            SQ.signal / NULLIF((SELECT m_signal FROM src_median), 0)
-                        )),
-                        1.0
-                      )
-                    * (1.0 + LEAST(MS.invited_count, 10) * 0.1),
-                    M.id
-            ) AS candidate_rank
-        FROM meme M
-        INNER JOIN meme_stats MS ON MS.meme_id = M.id
-        LEFT JOIN crossposting CP ON CP.meme_id = M.id AND CP.channel = 'tgchannelen'
-        LEFT JOIN src_quality SQ ON SQ.meme_source_id = M.meme_source_id
-        WHERE 1=1
-          AND CP.meme_id IS NULL
-          AND M.status = 'ok'
-          AND M.language_code = 'en'
-          AND M.type = 'image'
-          AND MS.nlikes >= 5
-          AND M.meme_source_id NOT IN (SELECT meme_source_id FROM recent_src)
-        ORDER BY -1
-            * COALESCE((MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1), 0.5)
-            * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE 0.5 END
-            * CASE WHEN MS.age_days < 90 THEN 1 ELSE 0.8 END
+            * CASE WHEN MS.raw_impr_rank <= 1 THEN 1 ELSE :impr_penalty END
+            * CASE WHEN MS.age_days < :age_threshold THEN 1 ELSE 0.8 END
             * CASE WHEN M.caption IS NULL THEN 1 ELSE 0.8 END
             * CASE
                 WHEN MS.nmemes_sent <= 1 THEN 1
@@ -490,7 +373,6 @@ _SHARE_MAX_QUERY = """
           AND M.type = 'image'
           AND M.telegram_file_id IS NOT NULL
           AND MS.nlikes >= 5
-          AND SQ.signal IS NOT NULL
           AND (
               :respect_recent_source_cap = false
               OR M.meme_source_id NOT IN (SELECT meme_source_id FROM recent_src)
@@ -616,6 +498,23 @@ _SHARE_MAX_PARAMS: dict[str, dict[str, Any]] = {
 }
 
 
+async def _get_next_meme_for_channel(
+    channel: str,
+    *,
+    log_top_n: int,
+    score_version: int,
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    params = {
+        **_CHANNEL_PARAMS[channel],
+        "channel": channel,
+        "limit": log_top_n,
+    }
+    rows = await fetch_all(text(_STANDARD_RANKER_QUERY), params)
+    if not rows:
+        return None, None
+    return _picked_meme_dict(rows[0]), _build_decision_log(channel, score_version, rows)
+
+
 async def get_next_meme_for_tgchannelru(
     log_top_n: int = 5,
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
@@ -629,20 +528,22 @@ async def get_next_meme_for_tgchannelru(
     - ``decision_log`` — kwargs dict for ``log_ranker_decision``, with the top-N
       candidates and per-candidate score breakdown. ``None`` when no candidates.
     """
-    rows = await fetch_all(text(_RU_QUERY), {"limit": log_top_n})
-    if not rows:
-        return None, None
-    return _picked_meme_dict(rows[0]), _build_decision_log("tgchannelru", 2, rows)
+    return await _get_next_meme_for_channel(
+        "tgchannelru",
+        log_top_n=log_top_n,
+        score_version=2,
+    )
 
 
 async def get_next_meme_for_tgchannelen(
     log_top_n: int = 5,
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     """Same as :func:`get_next_meme_for_tgchannelru` but for @fast_food_memes (EN)."""
-    rows = await fetch_all(text(_EN_QUERY), {"limit": log_top_n})
-    if not rows:
-        return None, None
-    return _picked_meme_dict(rows[0]), _build_decision_log("tgchannelen", 2, rows)
+    return await _get_next_meme_for_channel(
+        "tgchannelen",
+        log_top_n=log_top_n,
+        score_version=2,
+    )
 
 
 async def get_next_share_max_meme_for_tgchannelru(

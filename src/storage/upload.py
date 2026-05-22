@@ -14,9 +14,9 @@ from src.observability.sentry import (
     sentry_log_extra,
 )
 from src.storage.constants import MemeStatus, MemeType
+from src.storage.deduplication import find_duplicate_by_file_id
 from src.storage.parsers.constants import USER_AGENT
 from src.storage.service import (
-    find_meme_duplicate_by_file_id,
     update_meme,
 )
 from src.tgbot.bot import bot
@@ -107,8 +107,8 @@ async def _upload_meme_content_to_tg(
     if not file_id:
         return None
 
-    # Check if this file_id already exists on another ok meme (cross-source dupe)
-    duplicate_of = await find_meme_duplicate_by_file_id(meme_id, file_id)
+    # Check if this file_id already exists before the meme reaches recommendations.
+    duplicate_of = await find_duplicate_by_file_id(meme_id, file_id)
     if duplicate_of:
         logging.info(
             "Meme %s is a file_id duplicate of meme %s, marking as duplicate.",

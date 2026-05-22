@@ -161,3 +161,88 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS
 ON user_meme_reaction (meme_id, reacted_at)
 INCLUDE (user_id, reaction_id, sent_at);
 ```
+
+## May 21 recheck
+
+Prod snapshots were fresh through 2026-05-21 11:00 UTC. The v2 ranker did not
+show a clear forward-rate regression:
+
+| Channel | Recent mature image posts | Recent agg fwd/1k | v2 agg fwd/1k |
+| --- | ---: | ---: | ---: |
+| RU | 43 | 23.57 | 24.59 |
+| EN | 39 | 18.65 | 18.42 |
+
+Subscriber growth is the unsolved part: RU was 2165 -> 2155 over the last
+30 days, while EN was 623 -> 653. Better meme selection alone is still not
+enough to grow RU.
+
+Operational finding: normal scheduled posts were not the only channel volume.
+Weekly uploaded-meme reward albums add 5 media posts at once and were logged as
+`score_version=1`, which mixed non-ranker posts into old-ranker readouts. The
+May 21 cleanup sets reward album logs to `score_version=0` and keeps their
+caption on the first media item for analysis.
+
+Frequency adjustment: RU scheduled posts move from `8,10,11,12,14,16` MSK to
+`8,10,14,16,21` MSK. This removes the 10/11/12 hourly cluster and moves one
+slot into the evening reactivation window. Bot activity in the last 30 days:
+21:00 MSK had 30.5k reactions / 367 active users; 22:00 MSK had 32.0k reactions
+/ 349 active users. Use 21:00 first because the active-user base is slightly
+wider and the slot is less late.
+
+ML status: `scripts/eval_crossposting_ml.py` now runs a read-only logistic
+baseline against 24h channel labels. Initial 90-day run:
+
+| Channel | Labeled images | Logistic AUC | Source-signal AUC | Pre-share top20 lift |
+| --- | ---: | ---: | ---: | ---: |
+| RU | 164 | 0.491 | 0.568 | 1.96x |
+| EN | 162 | 0.548 | 0.410 | 2.45x |
+
+Conclusion: this is not yet strong enough to ship an ML ranker. The next useful
+step is richer candidate-level offline evaluation, not turning on `score_version=3`.
+Keep ML work timestamp-safe: labels from 24h snapshots, features only from data
+available before the simulated decision.
+
+May 22 correction: the first `pre_share_users_top20_lift` readout was inflated
+by evaluator tie-bias. `top_quintile_lift` sorted `(score, label)` tuples, so
+equal scores placed positive labels before negative labels. After making ties
+label-neutral, `pre_share_users` is not shippable: the 120-day split has only
+1/52 RU test posts and 0/51 EN test posts with positive pre-share coverage;
+the corrected pre-share top20 lift is 0.93x for RU and 1.00x for EN. Keep prior
+share clicks as a logged feature until coverage improves.
+
+### Segment-first ML plan
+
+The flat meme-level model is not the right abstraction. The next evaluator
+should model `meme x user_segment` evidence first, then aggregate segment
+responses into a channel-success prediction.
+
+User segments to test before any production ranker:
+
+- Engagement depth: new, casual, regular, heavy, based on recent reaction count
+  and active days.
+- Taste/source affinity: top source clusters per user from historical likes and
+  skips; start with `meme_source_id` families, add OCR/description embeddings
+  only after the tabular baseline is sane.
+- Reaction behavior: fast liker, slow reader, fast skipper, high-share clicker.
+- Language/context: selected languages, observed liked meme language, local
+  active-hour bucket.
+
+Candidate segment features:
+
+- Segment impressions before channel post.
+- Segment like rate and Wilson-smoothed like rate.
+- Segment median reaction time and fast-skip rate.
+- Segment in-bot share click users.
+- Coverage: number of distinct segments with enough evidence.
+
+Targets should stay channel-specific:
+
+- Primary target: `forwards_24h / views_24h` above channel rolling median or
+  top quartile. This captures shareability without over-rewarding high reach.
+- Secondary target: reaction rate above rolling median.
+- Reach target: `views_24h` above expected views for that channel/hour/day.
+  Keep reach separate because post timing and subscriber base can dominate it.
+
+Do not train on all-time aggregates such as current `meme_stats.invited_count`
+for historical examples. Every feature must be reconstructed as of the simulated
+decision time.

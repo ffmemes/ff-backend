@@ -39,7 +39,6 @@ async def main():
 
     # Find source in DB
     from sqlalchemy import text
-    from src.database import fetch_one
 
     source = await fetch_one(
         text("SELECT id, url, status FROM meme_source WHERE url = :url"),
@@ -72,7 +71,7 @@ async def main():
 
     if posts:
         await insert_parsed_posts_from_telegram(source["id"], posts)
-        print(f"Inserted into meme_raw_telegram")
+        print("Inserted into meme_raw_telegram")
 
     await update_meme_source(
         meme_source_id=source["id"], parsed_at=datetime.now(timezone.utc)

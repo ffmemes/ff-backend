@@ -6,17 +6,18 @@ from src.flows.events import safe_emit
 from src.flows.hooks import notify_telegram_on_failure
 from src.storage import ads
 from src.storage.constants import MemeStatus, MemeType
+from src.storage.deduplication import (
+    deduplicate_pending_meme,
+    sweep_file_id_duplicates,
+)
 from src.storage.etl import (
     etl_memes_from_raw_telegram_posts,
     etl_memes_from_raw_vk_posts,
 )
 from src.storage.service import (
-    find_meme_duplicate,
-    find_meme_duplicate_by_file_id,
     get_pending_memes,
     get_unloaded_tg_memes,
     get_unloaded_vk_memes,
-    resolve_meme_duplicate,
     update_meme,
     update_meme_status_of_ready_memes,
 )
@@ -200,28 +201,31 @@ async def final_meme_pipeline() -> None:
     memes = await get_pending_memes()
     logger.info(f"Final meme pipeline has {len(memes)} pending memes.")
 
+    processed_meme_ids = []
     for meme in memes:
+        processed_meme_ids.append(meme["id"])
         await analyse_meme_caption(meme)
 
-        # exact file_id dedup: catches cross-source reposts of identical files
-        if meme["telegram_file_id"]:
-            dup_id = await find_meme_duplicate_by_file_id(meme["id"], meme["telegram_file_id"])
-            if dup_id:
-                await resolve_meme_duplicate(meme["id"], dup_id)
-                continue
+        result = await deduplicate_pending_meme(meme)
+        if result.duplicate_found:
+            logger.info(
+                "Meme %s resolved as %s duplicate of %s before ok promotion.",
+                result.meme_id,
+                result.reason,
+                result.duplicate_of,
+            )
 
-        # it's ok if there is no OCR result for videos
-        if meme["ocr_result"]:
-            duplicate_meme_id = await find_meme_duplicate(meme["id"], meme["ocr_result"]["text"])
-            if duplicate_meme_id:
-                await resolve_meme_duplicate(meme["id"], duplicate_meme_id)
-                continue
-
-    # next step of a pipeline
-    await update_meme_status_of_ready_memes()
+    promoted_memes = await update_meme_status_of_ready_memes(processed_meme_ids)
+    file_id_duplicates = await sweep_file_id_duplicates()
+    if file_id_duplicates["resolved"]:
+        logger.info("Resolved file_id duplicates: %s", file_id_duplicates)
 
     safe_emit(
         "ff.pipeline.final.completed",
         "ff.pipeline.final",
-        {"memes_processed": len(memes)},
+        {
+            "memes_processed": len(memes),
+            "memes_promoted": len(promoted_memes),
+            "file_id_duplicates_resolved": file_id_duplicates["resolved"],
+        },
     )

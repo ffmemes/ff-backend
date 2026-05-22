@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import ANY, AsyncMock, patch
 
 import pytest
 
@@ -126,3 +126,99 @@ async def test_upload_review_chat_member_can_reject_without_moderator_user_type(
     notify.assert_awaited_once()
     assert "выбран не тот язык" in notify.await_args.args[2]
     get_user_info.assert_awaited_once_with(7)
+
+
+@pytest.mark.asyncio
+async def test_auto_review_does_not_revive_exact_file_id_duplicate(monkeypatch):
+    meme = {
+        "id": 10002,
+        "type": moderation.MemeType.IMAGE,
+        "telegram_file_id": "uploaded-file-id",
+    }
+    meme_upload = {"id": 42, "user_id": 10001, "message_id": 777}
+    stored_duplicate = {
+        **meme,
+        "status": moderation.MemeStatus.DUPLICATE.value,
+        "duplicate_of": 10000,
+    }
+    bot = AsyncMock()
+
+    with (
+        patch.object(moderation, "_get_uploader_lang", new=AsyncMock(return_value="ru")),
+        patch.object(
+            moderation,
+            "download_meme_content_from_tg",
+            new=AsyncMock(return_value=b"image"),
+        ),
+        patch.object(
+            moderation,
+            "add_watermark_to_meme_content",
+            new=AsyncMock(return_value=b"watermarked"),
+        ),
+        patch.object(
+            moderation,
+            "upload_meme_content_to_tg",
+            new=AsyncMock(return_value=stored_duplicate),
+        ),
+        patch.object(moderation, "update_meme", new=AsyncMock()) as update_meme,
+        patch.object(
+            moderation,
+            "create_user_meme_reaction",
+            new=AsyncMock(),
+        ) as create_reaction,
+        patch.object(moderation, "_notify_uploader", new=AsyncMock()) as notify,
+        patch.object(moderation, "send_uploaded_meme_to_manual_review", new=AsyncMock()) as review,
+    ):
+        await moderation._uploaded_meme_auto_review(meme, meme_upload, bot, {})
+
+    update_meme.assert_not_awaited()
+    review.assert_not_awaited()
+    create_reaction.assert_awaited_once_with(
+        10001,
+        10000,
+        "uploaded_meme",
+        reaction_id=1,
+        reacted_at=ANY,
+    )
+    notify.assert_awaited_once()
+    assert "повтор" in notify.await_args.args[2].lower()
+
+
+@pytest.mark.asyncio
+async def test_inline_ocr_duplicate_uses_dedup_resolver(monkeypatch):
+    meme = {
+        "id": 10002,
+        "type": moderation.MemeType.IMAGE,
+        "telegram_file_id": "uploaded-file-id",
+    }
+    refreshed = {
+        **meme,
+        "ocr_result": {"text": "same visible meme text"},
+    }
+
+    with (
+        patch.object(moderation, "describe_single_meme", new=AsyncMock(return_value="ok")),
+        patch(
+            "src.tgbot.service.get_meme_by_id",
+            new=AsyncMock(return_value=refreshed),
+        ),
+        patch.object(
+            moderation,
+            "find_duplicate_by_ocr_text",
+            new=AsyncMock(return_value=10000),
+        ) as find_duplicate,
+        patch.object(
+            moderation,
+            "resolve_duplicate",
+            new=AsyncMock(
+                return_value=SimpleNamespace(original_id=10000, reason="upload_ocr_text")
+            ),
+        ) as resolve_duplicate,
+    ):
+        refreshed_result, duplicate = await moderation._deduplicate_upload_via_ocr(meme)
+
+    assert refreshed_result == refreshed
+    assert duplicate is not None
+    assert duplicate.duplicate_of == 10000
+    find_duplicate.assert_awaited_once_with(10002, "same visible meme text")
+    resolve_duplicate.assert_awaited_once_with(10002, 10000, reason="upload_ocr_text")

@@ -13,8 +13,8 @@ You'll be prompted for:
 
 The output is a session string — store it as TELEGRAM_SESSION_STRING env var.
 """
-from telethon.sync import TelegramClient
 from telethon.sessions import StringSession
+from telethon.sync import TelegramClient
 
 api_id = int(input("API ID: "))
 api_hash = input("API Hash: ")
