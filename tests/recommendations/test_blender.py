@@ -111,3 +111,29 @@ def test_blender_limit():
 
     res = blend(candidates_dict, weights_dict, limit=2)
     assert len(res) == 2
+
+
+def test_blender_skips_duplicate_heads_without_mutating_inputs():
+    candidates_dict = {
+        "engine_1": [
+            {"id": 1},
+            {"id": 2},
+        ],
+        "engine_2": [
+            {"id": 1},
+            {"id": 3},
+        ],
+    }
+    weights_dict = {
+        "engine_1": 1,
+        "engine_2": 1,
+    }
+
+    res = blend(
+        candidates_dict,
+        weights_dict,
+        fixed_pos={0: "engine_1", 1: "engine_2"},
+    )
+
+    assert [item["id"] for item in res] == [1, 3, 2]
+    assert [item["id"] for item in candidates_dict["engine_2"]] == [1, 3]

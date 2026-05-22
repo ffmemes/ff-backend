@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
@@ -11,6 +12,7 @@ from src.storage.deduplication import (
     deduplicate_pending_meme,
     find_duplicate_by_file_id,
     find_duplicate_by_ocr_text,
+    ocr_text_from_meme,
     resolve_duplicate,
     sweep_file_id_duplicates,
 )
@@ -96,6 +98,16 @@ async def test_find_duplicate_by_file_id_prefers_published_original(dedup_setup)
 @pytest.mark.asyncio
 async def test_find_duplicate_by_ocr_text_skips_short_text(dedup_setup):
     assert await find_duplicate_by_ocr_text(10001, "too short") is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("image_text", [None, 123, {"text": "visible meme text"}])
+async def test_find_duplicate_by_ocr_text_skips_non_string_text(image_text):
+    assert await find_duplicate_by_ocr_text(10001, image_text) is None
+
+
+def test_ocr_text_from_meme_skips_non_string_values():
+    assert ocr_text_from_meme({"ocr_result": {"text": None, "raw_result": {"ocr_text": 123}}}) == ""
 
 
 @pytest.mark.asyncio
@@ -306,6 +318,62 @@ async def test_deduplicate_described_meme_resolves_only_ok_memes(dedup_setup):
     assert review_result.duplicate_found is False
     review_meme = await _row(meme, id=10003)
     assert review_meme["status"] == MemeStatus.WAITING_REVIEW.value
+
+
+@pytest.mark.asyncio
+async def test_deduplicate_described_meme_skips_when_current_status_changed(monkeypatch):
+    resolver = AsyncMock(return_value=None)
+    monkeypatch.setattr(
+        "src.storage.deduplication.policies.find_duplicate_by_ocr_text",
+        AsyncMock(return_value=10001),
+    )
+    monkeypatch.setattr(
+        "src.storage.deduplication.policies.resolve_duplicate_if_current_status",
+        resolver,
+    )
+
+    result = await deduplicate_described_meme(
+        10002,
+        "same visible meme text",
+        status=MemeStatus.OK.value,
+    )
+
+    assert result.duplicate_found is False
+    resolver.assert_awaited_once_with(
+        10002,
+        10001,
+        reason="ocr_text",
+        allowed_dupe_statuses={MemeStatus.OK.value},
+    )
+
+
+@pytest.mark.asyncio
+async def test_deduplicate_described_meme_rechecks_current_status(dedup_setup):
+    async with engine.connect() as conn:
+        await create_meme(
+            conn,
+            id=10001,
+            meme_source_id=10001,
+            ocr_result={"text": "same visible meme text", "calculated_at": "2026-05-20T00:00:00Z"},
+        )
+        await create_meme(
+            conn,
+            id=10002,
+            meme_source_id=10001,
+            status=MemeStatus.PUBLISHED.value,
+        )
+        await conn.commit()
+
+    result = await deduplicate_described_meme(
+        10002,
+        "same visible meme text",
+        status=MemeStatus.OK.value,
+    )
+
+    assert result.duplicate_found is False
+    published_meme = await _row(meme, id=10002)
+    assert published_meme["status"] == MemeStatus.PUBLISHED.value
+    assert published_meme["duplicate_of"] is None
 
 
 @pytest.mark.asyncio

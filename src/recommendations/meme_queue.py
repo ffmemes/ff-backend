@@ -28,10 +28,17 @@ from src.tgbot.user_info import get_user_info
 
 async def get_next_meme_for_user(user_id: int) -> MemeData | None:
     queue_key = redis.get_meme_queue_key(user_id)
+    discarded_unsendable = False
+    refilled_after_discard = False
 
     while True:
         meme_data = await redis.pop_meme_from_queue_by_key(queue_key)
         if not meme_data:
+            if discarded_unsendable and not refilled_after_discard:
+                refilled_after_discard = True
+                discarded_unsendable = False
+                await check_queue(user_id)
+                continue
             return None
 
         try:
@@ -42,11 +49,13 @@ async def get_next_meme_for_user(user_id: int) -> MemeData | None:
                 user_id,
                 meme_data,
             )
+            discarded_unsendable = True
             continue
 
         if await _queued_meme_is_sendable(user_id, meme_id):
             return MemeData(**meme_data)
 
+        discarded_unsendable = True
         logging.info(
             "discarding stale queued meme payload for user_id=%s meme_id=%s",
             user_id,

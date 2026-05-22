@@ -1,3 +1,4 @@
+from collections.abc import Collection
 from typing import Any
 
 from sqlalchemy import text
@@ -55,9 +56,50 @@ async def resolve_duplicate(
     reason: str,
 ) -> DuplicateResolution:
     """Mark a meme as duplicate and move all safe reaction history to the original."""
+    resolution = await _resolve_duplicate(
+        dupe_id,
+        original_id,
+        reason=reason,
+        allowed_dupe_statuses=None,
+    )
+    assert resolution is not None
+    return resolution
 
-    async def _resolve(conn: AsyncConnection) -> DuplicateResolution:
+
+async def resolve_duplicate_if_current_status(
+    dupe_id: int,
+    original_id: int,
+    *,
+    reason: str,
+    allowed_dupe_statuses: Collection[str],
+) -> DuplicateResolution | None:
+    """Resolve only if the dupe still has one of the expected current statuses."""
+    return await _resolve_duplicate(
+        dupe_id,
+        original_id,
+        reason=reason,
+        allowed_dupe_statuses=allowed_dupe_statuses,
+    )
+
+
+async def _resolve_duplicate(
+    dupe_id: int,
+    original_id: int,
+    *,
+    reason: str,
+    allowed_dupe_statuses: Collection[str] | None,
+) -> DuplicateResolution | None:
+    """Mark a meme as duplicate and move all safe reaction history to the original."""
+
+    async def _resolve(conn: AsyncConnection) -> DuplicateResolution | None:
         canonical_original_id = await _canonical_original_id(conn, original_id)
+        if not await _mark_duplicate(
+            conn,
+            dupe_id,
+            canonical_original_id,
+            allowed_dupe_statuses=allowed_dupe_statuses,
+        ):
+            return None
 
         reactions_moved = await _move_user_reactions(conn, dupe_id, canonical_original_id)
         chat_reactions_moved = await _move_chat_reactions(conn, dupe_id, canonical_original_id)
@@ -67,16 +109,6 @@ async def resolve_duplicate(
         await conn.execute(
             text("DELETE FROM meme_stats WHERE meme_id = :dupe_id"),
             {"dupe_id": dupe_id},
-        )
-        await conn.execute(
-            text(
-                """
-                UPDATE meme
-                SET status = 'duplicate', duplicate_of = :original_id
-                WHERE id = :dupe_id
-            """
-            ),
-            {"dupe_id": dupe_id, "original_id": canonical_original_id},
         )
         await conn.execute(
             text(
@@ -101,6 +133,35 @@ async def resolve_duplicate(
         )
 
     return await run_in_transaction(_resolve)
+
+
+async def _mark_duplicate(
+    conn: AsyncConnection,
+    dupe_id: int,
+    original_id: int,
+    *,
+    allowed_dupe_statuses: Collection[str] | None,
+) -> bool:
+    params: dict[str, Any] = {"dupe_id": dupe_id, "original_id": original_id}
+    status_filter = ""
+    if allowed_dupe_statuses is not None:
+        params["allowed_dupe_statuses"] = list(allowed_dupe_statuses)
+        status_filter = "AND status = ANY(:allowed_dupe_statuses)"
+
+    row = await _fetch_one(
+        conn,
+        text(
+            f"""
+            UPDATE meme
+            SET status = 'duplicate', duplicate_of = :original_id
+            WHERE id = :dupe_id
+              {status_filter}
+            RETURNING id
+        """
+        ),
+        params,
+    )
+    return allowed_dupe_statuses is None or row is not None
 
 
 async def _move_user_reactions(
