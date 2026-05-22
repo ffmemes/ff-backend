@@ -127,7 +127,14 @@ async def create_meme_stats(
         "invited_count": invited_count,
         "updated_at": FIXED_DT,
     }
-    await conn.execute(insert(meme_stats).values(row).on_conflict_do_nothing())
+    await conn.execute(
+        insert(meme_stats)
+        .values(row)
+        .on_conflict_do_update(
+            index_elements=(meme_stats.c.meme_id,),
+            set_={key: value for key, value in row.items() if key != "meme_id"},
+        )
+    )
     return row
 
 
