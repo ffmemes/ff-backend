@@ -7,7 +7,10 @@ from src.storage.deduplication.finder import (
     ocr_text_from_meme,
 )
 from src.storage.deduplication.models import DeduplicationResult
-from src.storage.deduplication.resolver import resolve_duplicate
+from src.storage.deduplication.resolver import (
+    resolve_duplicate,
+    resolve_duplicate_if_current_status,
+)
 
 
 async def deduplicate_pending_meme(meme_row: dict[str, Any]) -> DeduplicationResult:
@@ -46,5 +49,12 @@ async def deduplicate_described_meme(
     if not duplicate_of:
         return DeduplicationResult(meme_id)
 
-    resolution = await resolve_duplicate(meme_id, duplicate_of, reason="ocr_text")
+    resolution = await resolve_duplicate_if_current_status(
+        meme_id,
+        duplicate_of,
+        reason="ocr_text",
+        allowed_dupe_statuses={MemeStatus.OK.value},
+    )
+    if resolution is None:
+        return DeduplicationResult(meme_id)
     return DeduplicationResult(meme_id, duplicate_of, "ocr_text", resolution)

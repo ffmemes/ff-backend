@@ -95,6 +95,58 @@ async def test_get_next_meme_for_user_skips_stale_queue_payloads():
 
 
 @pytest.mark.asyncio
+async def test_get_next_meme_for_user_refills_after_draining_stale_payloads():
+    queued_payloads = [
+        {
+            "id": 101,
+            "type": "image",
+            "telegram_file_id": "stale-file-id",
+            "caption": None,
+        },
+    ]
+
+    async def pop_queue(_queue_key):
+        return queued_payloads.pop(0) if queued_payloads else None
+
+    async def refill_queue(_user_id: int) -> bool:
+        queued_payloads.append(
+            {
+                "id": 102,
+                "type": "image",
+                "telegram_file_id": "fresh-file-id",
+                "caption": None,
+            }
+        )
+        return True
+
+    async def is_sendable(_user_id: int, meme_id: int) -> bool:
+        return meme_id == 102
+
+    with (
+        patch(
+            "src.recommendations.meme_queue.redis.pop_meme_from_queue_by_key",
+            new_callable=AsyncMock,
+            side_effect=pop_queue,
+        ),
+        patch(
+            "src.recommendations.meme_queue._queued_meme_is_sendable",
+            new_callable=AsyncMock,
+            side_effect=is_sendable,
+        ),
+        patch(
+            "src.recommendations.meme_queue.check_queue",
+            new_callable=AsyncMock,
+            side_effect=refill_queue,
+        ) as check_queue,
+    ):
+        meme = await get_next_meme_for_user(TEST_USER_ID)
+
+    assert meme is not None
+    assert meme.id == 102
+    check_queue.assert_awaited_once_with(TEST_USER_ID)
+
+
+@pytest.mark.asyncio
 async def test_cold_start_phase1_uses_explore():
     """Phase 1 (<6 memes): uses cold_start_explore engine"""
 
