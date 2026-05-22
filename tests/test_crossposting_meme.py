@@ -461,7 +461,7 @@ async def test_ru_share_max_picker_keeps_cold_sources_in_pool(clean_xpost):
     assert picked is not None
     assert picked["id"] == 10341
     assert decision is not None
-    assert decision["candidate_pool_size"] == 2
+    assert decision["pool_size"] == 2
     candidate_ids = {c["meme_id"] for c in decision["candidates"]}
     assert candidate_ids == {10331, 10341}
     assert all(c["share_source_base"] == 1.0 for c in decision["candidates"])
