@@ -6,26 +6,32 @@ from sqlalchemy.dialects import postgresql
 from src.flows.storage import describe_memes_repository as repository
 
 
+@pytest.mark.parametrize(
+    "result, expected_raw_language",
+    [
+        ({"ocr_text": "visible text", "description": "a meme"}, ""),
+        ({"ocr_text": "visible text", "description": "a meme", "language": None}, None),
+        ({"ocr_text": "visible text", "description": "a meme", "language": 123}, 123),
+    ],
+)
 @pytest.mark.asyncio
-async def test_save_meme_description_ignores_non_string_language(monkeypatch):
+async def test_save_meme_description_ignores_missing_or_non_string_language(
+    monkeypatch, result, expected_raw_language
+):
     fetch_one = AsyncMock(return_value={})
     monkeypatch.setattr(repository, "fetch_one", fetch_one)
+    result["__model"] = "test-model:free"
 
     merged = await repository.save_meme_description(
         42,
         {},
-        {
-            "ocr_text": "visible text",
-            "description": "a meme",
-            "language": None,
-            "__model": "test-model:free",
-        },
+        result,
     )
 
     update_query = fetch_one.await_args.args[0]
     update_params = update_query.compile(dialect=postgresql.dialect()).params
 
-    assert merged["raw_result"]["language"] is None
+    assert merged["raw_result"]["language"] == expected_raw_language
     assert "language_code" not in update_params
 
 
