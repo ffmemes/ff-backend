@@ -73,11 +73,21 @@ def check_command_available(command: str) -> CheckResult:
 
 
 def check_describe_memes_models(root: Path = ROOT) -> CheckResult:
-    path = root / "src" / "flows" / "storage" / "describe_memes.py"
-    try:
-        model_ids = extract_vision_models(path)
-    except Exception as exc:
-        return CheckResult("describe_memes:free_models", False, str(exc))
+    paths = (
+        root / "src" / "flows" / "storage" / "describe_memes.py",
+        root / "src" / "flows" / "storage" / "openrouter_vision.py",
+    )
+    errors: list[str] = []
+    for path in paths:
+        try:
+            model_ids = extract_vision_models(path)
+            source_path = path
+            break
+        except Exception as exc:
+            errors.append(str(exc))
+    else:
+        return CheckResult("describe_memes:free_models", False, "; ".join(errors))
+
     paid = non_free_openrouter_models(model_ids)
     if paid:
         return CheckResult(
@@ -85,7 +95,11 @@ def check_describe_memes_models(root: Path = ROOT) -> CheckResult:
             False,
             "non-free model ids: " + ", ".join(paid),
         )
-    return CheckResult("describe_memes:free_models", True, f"{len(model_ids)} free model(s)")
+    return CheckResult(
+        "describe_memes:free_models",
+        True,
+        f"{len(model_ids)} free model(s) in {source_path.relative_to(root)}",
+    )
 
 
 def check_paperclip_access_adapter(
