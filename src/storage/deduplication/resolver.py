@@ -209,36 +209,128 @@ async def _refresh_original_stats(conn: AsyncConnection, original_id: int) -> No
         text(
             """
             INSERT INTO meme_stats (
-                meme_id, nlikes, ndislikes, nmemes_sent, age_days, sec_to_react, updated_at
+                meme_id, nlikes, ndislikes, nmemes_sent,
+                age_days, sec_to_react, updated_at,
+                lr_smoothed, engagement_score
+            )
+            WITH AFFECTED_MEME AS (
+                SELECT id, published_at
+                FROM meme
+                WHERE id = :original_id
+            ),
+            AFFECTED_USERS AS (
+                SELECT DISTINCT user_id
+                FROM user_meme_reaction
+                WHERE meme_id = :original_id
+            ),
+            BASE_REACTIONS AS (
+                SELECT
+                    R.user_id, R.meme_id, R.reaction_id,
+                    R.sent_at, R.reacted_at,
+                    CASE WHEN R.reaction_id = 1 THEN 1
+                         WHEN R.reaction_id IS NOT NULL THEN -1
+                    END AS like_sym,
+                    EXTRACT(EPOCH FROM R.reacted_at - R.sent_at) AS sec_to_react,
+                    MAX(CASE WHEN R.reaction_id IS NOT NULL THEN R.sent_at END)
+                        OVER (PARTITION BY R.user_id) AS user_last_reaction_sent_at
+                FROM user_meme_reaction R
+                WHERE R.user_id IN (SELECT user_id FROM AFFECTED_USERS)
+            ),
+            WITH_USER_AVGS AS (
+                SELECT *,
+                    AVG(like_sym) OVER (
+                        PARTITION BY user_id ORDER BY sent_at
+                    ) AS lr_avg,
+                    COUNT(like_sym) OVER (
+                        PARTITION BY user_id ORDER BY sent_at
+                    ) AS n_user_lr_reactions,
+                    CASE
+                        WHEN reaction_id = 1 THEN 1.0
+                        WHEN reaction_id = 2
+                            AND sec_to_react BETWEEN 0.5 AND 60
+                            AND sec_to_react > 3 THEN -1.0
+                        WHEN reaction_id = 2
+                            AND sec_to_react BETWEEN 0.5 AND 60
+                            AND sec_to_react <= 3 THEN -0.5
+                        WHEN reaction_id = 2 THEN -1.0
+                        WHEN reaction_id IS NULL
+                            AND sent_at < user_last_reaction_sent_at THEN -0.3
+                        ELSE NULL
+                    END AS engagement_value
+                FROM BASE_REACTIONS
+            ),
+            SMOOTHED AS (
+                SELECT
+                    user_id, meme_id,
+                    CASE WHEN n_user_lr_reactions >= 10
+                        THEN like_sym - lr_avg
+                        ELSE NULL
+                    END AS lr_smoothed_val,
+                    CASE WHEN engagement_value IS NOT NULL THEN
+                        engagement_value - AVG(engagement_value) OVER (
+                            PARTITION BY user_id ORDER BY sent_at
+                        )
+                        ELSE NULL
+                    END AS es_smoothed_val
+                FROM WITH_USER_AVGS
+            ),
+            MEME_SCORES AS (
+                SELECT
+                    meme_id,
+                    AVG(lr_smoothed_val) AS lr_smoothed,
+                    AVG(es_smoothed_val) AS engagement_score,
+                    COUNT(lr_smoothed_val) AS n_lr_reactions,
+                    COUNT(es_smoothed_val) AS n_es_reactions
+                FROM SMOOTHED
+                WHERE meme_id = :original_id
+                GROUP BY meme_id
+            ),
+            BASIC_COUNTS AS (
+                SELECT
+                    M.id AS meme_id,
+                    COUNT(R.*) FILTER (WHERE R.reaction_id = 1) AS nlikes,
+                    COUNT(R.*) FILTER (WHERE R.reaction_id = 2) AS ndislikes,
+                    COUNT(R.*) AS nmemes_sent,
+                    EXTRACT('DAYS' FROM NOW() - M.published_at)::int AS age_days,
+                    COALESCE(EXTRACT(
+                        EPOCH FROM percentile_cont(0.5)
+                            WITHIN GROUP (ORDER BY R.reacted_at - R.sent_at)
+                            FILTER (
+                                WHERE R.reacted_at - R.sent_at
+                                BETWEEN '0.5 second'
+                                AND '1 minute'
+                            )
+                    ), 99999) AS sec_to_react,
+                    NOW() AS updated_at
+                FROM AFFECTED_MEME M
+                LEFT JOIN user_meme_reaction R
+                    ON R.meme_id = M.id
+                GROUP BY M.id, M.published_at
             )
             SELECT
-                M.id AS meme_id,
-                COUNT(R.*) FILTER (WHERE R.reaction_id = 1) AS nlikes,
-                COUNT(R.*) FILTER (WHERE R.reaction_id = 2) AS ndislikes,
-                COUNT(R.*) AS nmemes_sent,
-                EXTRACT('DAYS' FROM NOW() - M.published_at)::int AS age_days,
-                COALESCE(EXTRACT(
-                    EPOCH FROM percentile_cont(0.5)
-                        WITHIN GROUP (ORDER BY R.reacted_at - R.sent_at)
-                        FILTER (
-                            WHERE R.reacted_at - R.sent_at
-                            BETWEEN '0.5 second'
-                            AND '1 minute'
-                        )
-                ), 99999) AS sec_to_react,
-                NOW() AS updated_at
-            FROM meme M
-            LEFT JOIN user_meme_reaction R
-                ON R.meme_id = M.id
-            WHERE M.id = :original_id
-            GROUP BY M.id
+                BC.meme_id, BC.nlikes, BC.ndislikes, BC.nmemes_sent,
+                BC.age_days, BC.sec_to_react, BC.updated_at,
+                COALESCE(
+                    CASE WHEN MS.n_lr_reactions >= 3
+                        THEN MS.lr_smoothed ELSE NULL END,
+                    0
+                ) AS lr_smoothed,
+                COALESCE(
+                    CASE WHEN MS.n_es_reactions >= 3
+                        THEN MS.engagement_score ELSE NULL END,
+                    0
+                ) AS engagement_score
+            FROM BASIC_COUNTS BC
+            LEFT JOIN MEME_SCORES MS ON MS.meme_id = BC.meme_id
             ON CONFLICT (meme_id) DO UPDATE SET
                 nlikes = EXCLUDED.nlikes,
                 ndislikes = EXCLUDED.ndislikes,
                 nmemes_sent = EXCLUDED.nmemes_sent,
                 age_days = EXCLUDED.age_days,
                 sec_to_react = EXCLUDED.sec_to_react,
-                updated_at = EXCLUDED.updated_at
+                updated_at = EXCLUDED.updated_at,
+                lr_smoothed = EXCLUDED.lr_smoothed,
+                engagement_score = EXCLUDED.engagement_score
         """
         ),
         {"original_id": original_id},

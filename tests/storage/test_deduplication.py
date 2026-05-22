@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 import pytest
 import pytest_asyncio
 from sqlalchemy import insert, select
@@ -130,6 +132,54 @@ async def test_resolve_duplicate_moves_reactions_and_refreshes_stats(dedup_setup
             select(user_meme_reaction).where(user_meme_reaction.c.meme_id == 10002)
         )
         assert reaction_rows.all() == []
+
+
+@pytest.mark.asyncio
+async def test_resolve_duplicate_recomputes_derived_original_stats(dedup_setup):
+    base_sent_at = datetime(2024, 1, 1, 12, 0, 0)
+    affected_users = [10001, 10002, 10003]
+
+    async with engine.connect() as conn:
+        await create_meme(conn, id=10001, meme_source_id=10001)
+        await create_meme(conn, id=10002, meme_source_id=10001)
+        await create_meme_stats(conn, meme_id=10001, lr_smoothed=-9.0)
+        await conn.execute(
+            meme_stats.update().where(meme_stats.c.meme_id == 10001).values(engagement_score=-9.0)
+        )
+
+        for index in range(9):
+            other_meme_id = 10100 + index
+            sent_at = base_sent_at + timedelta(minutes=index)
+            await create_meme(conn, id=other_meme_id, meme_source_id=10001)
+            for user_id in affected_users:
+                await create_reaction(
+                    conn,
+                    user_id=user_id,
+                    meme_id=other_meme_id,
+                    reaction_id=2,
+                    sent_at=sent_at,
+                    reacted_at=sent_at + timedelta(seconds=5),
+                )
+
+        target_sent_at = base_sent_at + timedelta(minutes=9)
+        for user_id in affected_users:
+            await create_reaction(
+                conn,
+                user_id=user_id,
+                meme_id=10002,
+                reaction_id=1,
+                sent_at=target_sent_at,
+                reacted_at=target_sent_at + timedelta(seconds=5),
+            )
+        await conn.commit()
+
+    await resolve_duplicate(10002, 10001, reason="test")
+
+    original_stats = await _row(meme_stats, meme_id=10001)
+    assert original_stats["nlikes"] == 3
+    assert original_stats["nmemes_sent"] == 3
+    assert original_stats["lr_smoothed"] == pytest.approx(1.8)
+    assert original_stats["engagement_score"] == pytest.approx(1.8)
 
 
 @pytest.mark.asyncio

@@ -16,7 +16,8 @@ from tests.factories import (
 from src import redis
 from src.database import engine
 from src.recommendations.candidates import CandidatesRetriever
-from src.recommendations.meme_queue import generate_recommendations
+from src.recommendations.meme_queue import generate_recommendations, get_next_meme_for_user
+from src.storage.constants import MemeStatus
 
 # IDs for queue tests
 QUEUE_USER = 10010
@@ -226,6 +227,34 @@ async def test_queue_memes_have_required_fields(queue_user):
         assert "type" in c or True  # stub has type
         assert "recommended_by" in c
         assert "nlikes" in c
+
+
+@pytest.mark.asyncio
+async def test_get_next_meme_skips_stale_duplicate_payload(queue_user):
+    async with engine.connect() as conn:
+        await create_meme(
+            conn,
+            id=10020,
+            meme_source_id=10010,
+            status=MemeStatus.DUPLICATE.value,
+        )
+        await create_meme(conn, id=10021, meme_source_id=10010)
+        await conn.commit()
+
+    queue_key = redis.get_meme_queue_key(QUEUE_USER)
+    await redis.add_memes_to_queue_by_key(
+        queue_key,
+        [
+            _meme(10020, "lr_smoothed"),
+            _meme(10021, "lr_smoothed"),
+        ],
+    )
+
+    next_meme = await get_next_meme_for_user(QUEUE_USER)
+
+    assert next_meme is not None
+    assert next_meme.id == 10021
+    assert await redis.get_all_memes_in_queue_by_key(queue_key) == []
 
 
 @pytest.mark.asyncio
