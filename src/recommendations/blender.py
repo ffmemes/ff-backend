@@ -1,13 +1,44 @@
 import random
+from collections import deque
 from typing import Any
 
 EPS = 1e-6
 
 
+def _validate_blend_inputs(
+    candidates_dict: dict[str, list[dict[str, Any]]],
+    weights_dict: dict[str, float],
+    fixed_pos: dict[int, str],
+) -> None:
+    if set(candidates_dict.keys()) != set(weights_dict.keys()):
+        raise ValueError("Keys in candidates_dict and weights_dict do not match")
+
+    for engine in fixed_pos.values():
+        if engine not in candidates_dict:
+            raise ValueError(f"Engine {engine} does not present in candidates_dict")
+
+
+def _active_engines(
+    candidate_queues: dict[str, deque[dict[str, Any]]],
+    seen_candidate_ids: set[Any],
+) -> list[str]:
+    active_engines = []
+    for engine, candidates in candidate_queues.items():
+        while candidates and candidates[0]["id"] in seen_candidate_ids:
+            candidates.popleft()
+        if candidates:
+            active_engines.append(engine)
+    return active_engines
+
+
+def _engine_weights(engines: list[str], weights_dict: dict[str, float]) -> list[float]:
+    return [weights_dict[engine] + EPS for engine in engines]
+
+
 def blend(
     candidates_dict: dict[str, list[dict[str, Any]]],
     weights_dict: dict[str, float],
-    fixed_pos: dict[int, str] = None,
+    fixed_pos: dict[int, str] | None = None,
     limit: int = 0,
     random_seed: int | None = None,
 ) -> list[dict[str, Any]]:
@@ -28,65 +59,34 @@ def blend(
     """
 
     rng = random.Random(random_seed)
-
-    # input validation and processing
-    if set(candidates_dict.keys()) != set(weights_dict.keys()):
-        raise ValueError("Keys in candidates_dict and weights_dict do not match")
-
-    if fixed_pos:
-        for engine in fixed_pos.values():
-            if engine not in candidates_dict:
-                raise ValueError(f"Engine {engine} does not present in candidates_dict")
+    fixed_pos = fixed_pos or {}
+    _validate_blend_inputs(candidates_dict, weights_dict, fixed_pos)
 
     if limit == 0:
-        for candidates in candidates_dict.values():
-            limit += len(candidates)
+        limit = sum(len(candidates) for candidates in candidates_dict.values())
 
-    # candidates_dict will be changed inplace further
-    candidates_dict = candidates_dict.copy()
-    for engine in candidates_dict.keys():
-        candidates_dict[engine] = candidates_dict[engine].copy()
+    candidate_queues = {
+        engine: deque(candidates)
+        for engine, candidates in candidates_dict.items()
+        if len(candidates) > 0
+    }
+    seen_candidate_ids: set[Any] = set()
+    result = []
 
-    # engines list is ensured to have non-empty engines
-    engines = [engine for engine in candidates_dict.keys() if len(candidates_dict[engine]) > 0]
-
-    weights = [(weights_dict[engine] + EPS) for engine in engines]
-    if len(engines) == 0:
-        return []
-
-    res = []
-
-    for res_idx in range(limit):
-        engine = None
-
-        # process fixed positions
-        if fixed_pos and res_idx in fixed_pos:
-            engine = fixed_pos[res_idx] if fixed_pos[res_idx] in engines else None
-
-        # sample engine
-        if engine is None:
-            engine = rng.choices(population=engines, weights=weights)[0]
-
-        next_item = candidates_dict[engine][0].copy()
-        res.append(next_item)
-
-        # process candidates intersection
-        for engine in engines:
-            # remove all matches with next_item
-            stop = False
-            while not stop:
-                stop = True
-                for idx in range(len(candidates_dict[engine])):
-                    if next_item["id"] == candidates_dict[engine][idx]["id"]:
-                        candidates_dict[engine].pop(idx)
-                        stop = False
-                        break
-
-        # maintain non-empty engines
-        engines = [engine for engine in engines if len(candidates_dict[engine]) > 0]
-        weights = [(weights_dict[engine] + EPS) for engine in engines]
-
-        if len(engines) == 0:
+    for result_idx in range(limit):
+        engines = _active_engines(candidate_queues, seen_candidate_ids)
+        if not engines:
             break
 
-    return res
+        engine = fixed_pos.get(result_idx)
+        if engine not in engines:
+            engine = rng.choices(
+                population=engines,
+                weights=_engine_weights(engines, weights_dict),
+            )[0]
+
+        next_item = candidate_queues[engine].popleft().copy()
+        result.append(next_item)
+        seen_candidate_ids.add(next_item["id"])
+
+    return result

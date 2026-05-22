@@ -10,7 +10,6 @@ from telegram.error import TelegramError
 
 from src.database import (
     engine,
-    execute,
     fetch_all,
     fetch_one,
     meme_source,
@@ -18,6 +17,7 @@ from src.database import (
     meme_source_candidate_poll,
     meme_source_candidate_vote,
 )
+from src.storage import source_vote_reports
 from src.storage.constants import MemeSourceStatus, MemeSourceType
 from src.storage.etl import insert_parsed_posts_from_telegram
 from src.storage.moderation import advance_meme_source
@@ -25,6 +25,12 @@ from src.storage.parsers.schemas import TgChannelPostParsingResult
 from src.storage.parsers.tg import TelegramChannelScraper
 from src.tgbot.constants import TELEGRAM_MODERATOR_CHAT_ID
 from src.tgbot.senders.keyboards import source_candidate_vote_keyboard
+
+build_source_vote_report = source_vote_reports.build_source_vote_report
+format_source_vote_report = source_vote_reports.format_source_vote_report
+get_unreported_source_vote = source_vote_reports.get_unreported_source_vote
+mark_source_vote_report_sent = source_vote_reports.mark_source_vote_report_sent
+post_next_day_source_report = source_vote_reports.post_next_day_source_report
 
 POLL_STATUS_DRAFT = "draft"
 POLL_STATUS_OPEN = "open"
@@ -140,112 +146,101 @@ async def _create_or_reuse_prepared_source(
     return await fetch_one(insert_statement)
 
 
-async def prepare_source_candidate(
-    candidate_id: int,
+def _source_is_parsing_enabled(source: dict[str, Any] | None) -> bool:
+    return source is not None and source["status"] == MemeSourceStatus.PARSING_ENABLED.value
+
+
+async def _already_enabled_candidate_result(
+    candidate: dict[str, Any],
+    source: dict[str, Any],
     *,
-    added_by_user_id: int | None = None,
-    posts: list[TgChannelPostParsingResult] | None = None,
-    nposts: int = 20,
+    expected_status: str,
 ) -> dict[str, Any]:
-    candidate = await fetch_one(
-        select(meme_source_candidate).where(meme_source_candidate.c.id == candidate_id)
+    await _mark_candidate(
+        candidate["id"],
+        status=CANDIDATE_STATUS_PROMOTED,
+        promoted_meme_source_id=source["id"],
+        expected_status=expected_status,
     )
-    if candidate is None:
-        return {"status": "not_found", "candidate": None, "source": None}
-    if candidate["status"] == CANDIDATE_STATUS_PREPARED and candidate["promoted_meme_source_id"]:
+    return {"status": "already_enabled", "candidate": candidate, "source": source}
+
+
+async def _prepared_candidate_result(candidate: dict[str, Any]) -> dict[str, Any]:
+    source = None
+    if candidate["promoted_meme_source_id"]:
         source = await fetch_one(
             select(meme_source).where(meme_source.c.id == candidate["promoted_meme_source_id"])
         )
-        if source and source["status"] == MemeSourceStatus.PARSING_ENABLED.value:
-            await _mark_candidate(
-                candidate_id,
-                status=CANDIDATE_STATUS_PROMOTED,
-                promoted_meme_source_id=source["id"],
-                expected_status=CANDIDATE_STATUS_PREPARED,
-            )
-            return {"status": "already_enabled", "candidate": candidate, "source": source}
-        return {"status": "prepared", "candidate": candidate, "source": source}
-    if candidate["status"] != CANDIDATE_STATUS_DISCOVERED:
-        return {"status": candidate["status"], "candidate": candidate, "source": None}
-    if candidate["type"] != MemeSourceType.TELEGRAM.value:
-        await _mark_candidate(
-            candidate_id,
-            status=CANDIDATE_STATUS_DISMISSED,
-            dismissed_reason="daily_source_vote:unsupported_type",
-            expected_status=CANDIDATE_STATUS_DISCOVERED,
+    if _source_is_parsing_enabled(source):
+        return await _already_enabled_candidate_result(
+            candidate,
+            source,
+            expected_status=CANDIDATE_STATUS_PREPARED,
         )
-        return {"status": "unsupported_type", "candidate": candidate, "source": None}
+    return {"status": CANDIDATE_STATUS_PREPARED, "candidate": candidate, "source": source}
 
-    source = await _get_meme_source_by_url(candidate["url"])
-    if source and source["status"] == MemeSourceStatus.PARSING_ENABLED.value:
-        await _mark_candidate(
-            candidate_id,
-            status=CANDIDATE_STATUS_PROMOTED,
-            promoted_meme_source_id=source["id"],
-            expected_status=CANDIDATE_STATUS_DISCOVERED,
-        )
-        return {"status": "already_enabled", "candidate": candidate, "source": source}
 
-    if posts is None:
-        try:
-            posts = await fetch_telegram_candidate_posts(candidate["url"], nposts=nposts)
-        except Exception:
-            return {"status": "prepare_failed", "candidate": candidate, "source": source}
+async def _dismiss_unsupported_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
+    await _mark_candidate(
+        candidate["id"],
+        status=CANDIDATE_STATUS_DISMISSED,
+        dismissed_reason="daily_source_vote:unsupported_type",
+        expected_status=CANDIDATE_STATUS_DISCOVERED,
+    )
+    return {"status": "unsupported_type", "candidate": candidate, "source": None}
 
-    if source is None:
-        source = await _create_or_reuse_prepared_source(candidate, added_by_user_id)
-        if source is None:
-            return {"status": "source_create_failed", "candidate": candidate, "source": None}
-    if source["status"] == MemeSourceStatus.PARSING_ENABLED.value:
-        await _mark_candidate(
-            candidate_id,
-            status=CANDIDATE_STATUS_PROMOTED,
-            promoted_meme_source_id=source["id"],
-            expected_status=CANDIDATE_STATUS_DISCOVERED,
-        )
-        return {"status": "already_enabled", "candidate": candidate, "source": source}
 
+async def _disabled_source_candidate_result(
+    candidate: dict[str, Any],
+    source: dict[str, Any],
+    *,
+    status: str,
+    reason: str,
+    posts_count: int,
+) -> dict[str, Any]:
+    await advance_meme_source(
+        source["id"],
+        moderator_id="source-vote:prepare",
+        status=MemeSourceStatus.PARSING_DISABLED.value,
+        trigger_parse=False,
+    )
+    await _mark_candidate(
+        candidate["id"],
+        status=CANDIDATE_STATUS_DISMISSED,
+        dismissed_reason=reason,
+        promoted_meme_source_id=source["id"],
+        expected_status=CANDIDATE_STATUS_DISCOVERED,
+    )
+    return {
+        "status": status,
+        "candidate": candidate,
+        "source": source,
+        "posts_count": posts_count,
+    }
+
+
+async def _prepare_candidate_with_posts(
+    candidate: dict[str, Any],
+    source: dict[str, Any],
+    posts: list[TgChannelPostParsingResult],
+) -> dict[str, Any]:
     evidence = extract_cyrillic_evidence(posts)
     if not posts:
-        await advance_meme_source(
-            source["id"],
-            moderator_id="source-vote:prepare",
-            status=MemeSourceStatus.PARSING_DISABLED.value,
-            trigger_parse=False,
+        return await _disabled_source_candidate_result(
+            candidate,
+            source,
+            status="no_public_posts",
+            reason="daily_source_vote:no_public_posts",
+            posts_count=0,
         )
-        await _mark_candidate(
-            candidate_id,
-            status=CANDIDATE_STATUS_DISMISSED,
-            dismissed_reason="daily_source_vote:no_public_posts",
-            promoted_meme_source_id=source["id"],
-            expected_status=CANDIDATE_STATUS_DISCOVERED,
-        )
-        return {
-            "status": "no_public_posts",
-            "candidate": candidate,
-            "source": source,
-            "posts_count": 0,
-        }
     if evidence is None:
-        await advance_meme_source(
-            source["id"],
-            moderator_id="source-vote:prepare",
-            status=MemeSourceStatus.PARSING_DISABLED.value,
-            trigger_parse=False,
+        return await _disabled_source_candidate_result(
+            candidate,
+            source,
+            status="non_ru_no_cyrillic",
+            reason="non_ru_no_cyrillic",
+            posts_count=len(posts),
         )
-        await _mark_candidate(
-            candidate_id,
-            status=CANDIDATE_STATUS_DISMISSED,
-            dismissed_reason="non_ru_no_cyrillic",
-            promoted_meme_source_id=source["id"],
-            expected_status=CANDIDATE_STATUS_DISCOVERED,
-        )
-        return {
-            "status": "non_ru_no_cyrillic",
-            "candidate": candidate,
-            "source": source,
-            "posts_count": len(posts),
-        }
 
     await insert_parsed_posts_from_telegram(source["id"], posts, discover_candidates=False)
     source_result = await advance_meme_source(
@@ -255,7 +250,7 @@ async def prepare_source_candidate(
         trigger_parse=False,
     )
     prepared_candidate = await _mark_candidate(
-        candidate_id,
+        candidate["id"],
         status=CANDIDATE_STATUS_PREPARED,
         promoted_meme_source_id=source["id"],
         expected_status=CANDIDATE_STATUS_DISCOVERED,
@@ -268,6 +263,61 @@ async def prepare_source_candidate(
         "posts_count": len(posts),
         "cyrillic_evidence": evidence,
     }
+
+
+async def _ensure_prepared_source(
+    candidate: dict[str, Any],
+    source: dict[str, Any] | None,
+    added_by_user_id: int | None,
+) -> dict[str, Any] | None:
+    if source is not None:
+        return source
+    return await _create_or_reuse_prepared_source(candidate, added_by_user_id)
+
+
+async def prepare_source_candidate(
+    candidate_id: int,
+    *,
+    added_by_user_id: int | None = None,
+    posts: list[TgChannelPostParsingResult] | None = None,
+    nposts: int = 20,
+) -> dict[str, Any]:
+    candidate = await fetch_one(
+        select(meme_source_candidate).where(meme_source_candidate.c.id == candidate_id)
+    )
+    if candidate is None:
+        return {"status": "not_found", "candidate": None, "source": None}
+    if candidate["status"] == CANDIDATE_STATUS_PREPARED:
+        return await _prepared_candidate_result(candidate)
+    if candidate["status"] != CANDIDATE_STATUS_DISCOVERED:
+        return {"status": candidate["status"], "candidate": candidate, "source": None}
+    if candidate["type"] != MemeSourceType.TELEGRAM.value:
+        return await _dismiss_unsupported_candidate(candidate)
+
+    source = await _get_meme_source_by_url(candidate["url"])
+    if _source_is_parsing_enabled(source):
+        return await _already_enabled_candidate_result(
+            candidate,
+            source,
+            expected_status=CANDIDATE_STATUS_DISCOVERED,
+        )
+
+    if posts is None:
+        try:
+            posts = await fetch_telegram_candidate_posts(candidate["url"], nposts=nposts)
+        except Exception:
+            return {"status": "prepare_failed", "candidate": candidate, "source": source}
+
+    source = await _ensure_prepared_source(candidate, source, added_by_user_id)
+    if source is None:
+        return {"status": "source_create_failed", "candidate": candidate, "source": None}
+    if _source_is_parsing_enabled(source):
+        return await _already_enabled_candidate_result(
+            candidate,
+            source,
+            expected_status=CANDIDATE_STATUS_DISCOVERED,
+        )
+    return await _prepare_candidate_with_posts(candidate, source, posts)
 
 
 async def get_source_candidate_vote_counts(poll_id: int) -> dict[str, int]:
@@ -823,110 +873,6 @@ async def post_new_source_candidate_poll(
         return {"status": "poll_create_failed", "candidate": candidate}
 
     return await post_source_candidate_poll_message(bot, poll, now=now, prepared=prepared)
-
-
-async def get_unreported_source_vote(now: datetime | None = None) -> dict[str, Any] | None:
-    now = now or _utcnow()
-    report_before = now - timedelta(hours=20)
-    return await fetch_one(
-        text(
-            """
-            SELECT *
-            FROM meme_source
-            WHERE data ? 'source_vote'
-              AND data->'source_vote' ? 'enabled_at'
-              AND NOT (data->'source_vote' ? 'report_sent_at')
-              AND (data->'source_vote'->>'enabled_at')::timestamp <= :report_before
-            ORDER BY (data->'source_vote'->>'enabled_at')::timestamp ASC
-            LIMIT 1
-            """
-        ),
-        {"report_before": report_before},
-    )
-
-
-async def build_source_vote_report(source: dict[str, Any]) -> dict[str, Any]:
-    enabled_at = datetime.fromisoformat(source["data"]["source_vote"]["enabled_at"])
-    return await fetch_one(
-        text(
-            """
-            SELECT
-                COUNT(m.id) AS memes_created,
-                COUNT(m.id) FILTER (WHERE m.status = 'ok') AS ok_memes,
-                COUNT(m.id) FILTER (WHERE m.status = 'duplicate') AS duplicate_memes,
-                COUNT(m.id) FILTER (WHERE m.status = 'ad') AS ad_memes,
-                COUNT(m.id) FILTER (WHERE m.status = 'rejected') AS rejected_memes,
-                COALESCE(SUM(ms.nlikes), 0) AS likes,
-                COALESCE(SUM(ms.ndislikes), 0) AS dislikes,
-                COUNT(m.id) FILTER (
-                    WHERE COALESCE(ms.nlikes, 0) > COALESCE(ms.ndislikes, 0)
-                ) AS memes_more_likes,
-                COUNT(m.id) FILTER (
-                    WHERE COALESCE(ms.ndislikes, 0) > COALESCE(ms.nlikes, 0)
-                ) AS memes_more_dislikes
-            FROM meme m
-            LEFT JOIN meme_stats ms
-                ON ms.meme_id = m.id
-            WHERE m.meme_source_id = :source_id
-              AND m.created_at >= :enabled_at
-            """
-        ),
-        {"source_id": source["id"], "enabled_at": enabled_at},
-    )
-
-
-def format_source_vote_report(source: dict[str, Any], report: dict[str, Any]) -> str:
-    return "\n".join(
-        [
-            "Отчёт по источнику за первые сутки",
-            "",
-            f"Источник: {source['url']}",
-            f"Статус источника: {source['status']}",
-            f"Мемов создано: {report['memes_created']}",
-            f"OK мемов в рекомендациях: {report['ok_memes']}",
-            f"Лайков: {report['likes']}",
-            f"Дизлайков: {report['dislikes']}",
-            f"Мемов с лайков больше, чем дизлайков: {report['memes_more_likes']}",
-            f"Мемов с дизлайков больше, чем лайков: {report['memes_more_dislikes']}",
-            f"Дубликаты / реклама / отклонено: "
-            f"{report['duplicate_memes']} / {report['ad_memes']} / {report['rejected_memes']}",
-        ]
-    )
-
-
-async def mark_source_vote_report_sent(source_id: int, now: datetime | None = None) -> None:
-    now = now or _utcnow()
-    source = await fetch_one(select(meme_source).where(meme_source.c.id == source_id))
-    if source is None:
-        return
-    data = dict(source.get("data") or {})
-    source_vote = dict(data.get("source_vote") or {})
-    source_vote["report_sent_at"] = now.isoformat()
-    data["source_vote"] = source_vote
-    await execute(
-        meme_source.update()
-        .where(meme_source.c.id == source_id)
-        .values(data=data, updated_at=_utcnow())
-    )
-
-
-async def post_next_day_source_report(
-    bot: Bot,
-    *,
-    now: datetime | None = None,
-) -> dict[str, Any]:
-    now = now or _utcnow()
-    source = await get_unreported_source_vote(now)
-    if source is None:
-        return {"status": "no_report"}
-    report = await build_source_vote_report(source)
-    await bot.send_message(
-        chat_id=TELEGRAM_MODERATOR_CHAT_ID,
-        text=format_source_vote_report(source, report),
-        disable_web_page_preview=True,
-    )
-    await mark_source_vote_report_sent(source["id"], now)
-    return {"status": "reported", "source": source, "report": report}
 
 
 async def advance_daily_source_cycle(
