@@ -23,6 +23,10 @@ KNOWN_LANGUAGES = {
 }
 
 
+def _text_or_empty(value: Any) -> str:
+    return value if isinstance(value, str) else ""
+
+
 async def get_memes_to_describe(limit: int = 30) -> list[dict[str, Any]]:
     """Get image memes without descriptions.
 
@@ -81,9 +85,9 @@ async def save_meme_description(
     existing_ocr: dict[str, Any],
     result: dict[str, Any],
 ) -> dict[str, Any]:
-    ocr_text = result.get("ocr_text", "")
-    description = result.get("description", "")
-    language = result.get("language", "")
+    ocr_text = _text_or_empty(result.get("ocr_text"))
+    description = _text_or_empty(result.get("description"))
+    language = _text_or_empty(result.get("language"))
     model_used = result.get("__model", VISION_MODELS[0])
 
     merged = {
@@ -102,7 +106,7 @@ async def save_meme_description(
         merged["text"] = ocr_text
 
     update_kwargs: dict[str, Any] = {"ocr_result": merged}
-    language_code = language.strip().lower() if isinstance(language, str) else ""
+    language_code = language.strip().lower()
     if language_code in KNOWN_LANGUAGES:
         update_kwargs["language_code"] = language_code
 

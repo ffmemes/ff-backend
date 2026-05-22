@@ -8,7 +8,8 @@ from src.storage.deduplication.models import MIN_OCR_DUPLICATE_TEXT_LENGTH
 
 def ocr_text_from_meme(meme_row: dict[str, Any]) -> str:
     ocr_result = meme_row.get("ocr_result") or {}
-    return ocr_result.get("text") or ocr_result.get("raw_result", {}).get("ocr_text") or ""
+    text_value = ocr_result.get("text") or ocr_result.get("raw_result", {}).get("ocr_text")
+    return text_value if isinstance(text_value, str) else ""
 
 
 async def find_duplicate_by_file_id(meme_id: int, telegram_file_id: str) -> int | None:
@@ -29,7 +30,10 @@ async def find_duplicate_by_file_id(meme_id: int, telegram_file_id: str) -> int 
     return res["id"] if res else None
 
 
-async def find_duplicate_by_ocr_text(meme_id: int, image_text: str) -> int | None:
+async def find_duplicate_by_ocr_text(meme_id: int, image_text: Any) -> int | None:
+    if not isinstance(image_text, str):
+        return None
+
     if len(image_text) < MIN_OCR_DUPLICATE_TEXT_LENGTH:
         return None
 

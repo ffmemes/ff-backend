@@ -12,6 +12,7 @@ from src.storage.deduplication import (
     deduplicate_pending_meme,
     find_duplicate_by_file_id,
     find_duplicate_by_ocr_text,
+    ocr_text_from_meme,
     resolve_duplicate,
     sweep_file_id_duplicates,
 )
@@ -97,6 +98,16 @@ async def test_find_duplicate_by_file_id_prefers_published_original(dedup_setup)
 @pytest.mark.asyncio
 async def test_find_duplicate_by_ocr_text_skips_short_text(dedup_setup):
     assert await find_duplicate_by_ocr_text(10001, "too short") is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("image_text", [None, 123, {"text": "visible meme text"}])
+async def test_find_duplicate_by_ocr_text_skips_non_string_text(image_text):
+    assert await find_duplicate_by_ocr_text(10001, image_text) is None
+
+
+def test_ocr_text_from_meme_skips_non_string_values():
+    assert ocr_text_from_meme({"ocr_result": {"text": None, "raw_result": {"ocr_text": 123}}}) == ""
 
 
 @pytest.mark.asyncio

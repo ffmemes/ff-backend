@@ -7,17 +7,15 @@ from src.flows.storage import describe_memes_repository as repository
 
 
 @pytest.mark.parametrize(
-    "result, expected_raw_language",
+    "result",
     [
-        ({"ocr_text": "visible text", "description": "a meme"}, ""),
-        ({"ocr_text": "visible text", "description": "a meme", "language": None}, None),
-        ({"ocr_text": "visible text", "description": "a meme", "language": 123}, 123),
+        {"ocr_text": "visible text", "description": "a meme"},
+        {"ocr_text": "visible text", "description": "a meme", "language": None},
+        {"ocr_text": None, "description": {"unexpected": "object"}, "language": 123},
     ],
 )
 @pytest.mark.asyncio
-async def test_save_meme_description_ignores_missing_or_non_string_language(
-    monkeypatch, result, expected_raw_language
-):
+async def test_save_meme_description_normalizes_missing_or_non_string_fields(monkeypatch, result):
     fetch_one = AsyncMock(return_value={})
     monkeypatch.setattr(repository, "fetch_one", fetch_one)
     result["__model"] = "test-model:free"
@@ -31,7 +29,9 @@ async def test_save_meme_description_ignores_missing_or_non_string_language(
     update_query = fetch_one.await_args.args[0]
     update_params = update_query.compile(dialect=postgresql.dialect()).params
 
-    assert merged["raw_result"]["language"] == expected_raw_language
+    assert isinstance(merged["text"], str)
+    assert isinstance(merged["description"], str)
+    assert merged["raw_result"]["language"] == ""
     assert "language_code" not in update_params
 
 
