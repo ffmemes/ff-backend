@@ -360,6 +360,7 @@ _SHARE_MAX_QUERY = """
                             (MS.nlikes + MS.ndislikes) * 1.0 / MS.nmemes_sent
                         ))
                       END DESC,
+                    MS.invited_count DESC,
                     M.id
             ) AS base_source_rank
         FROM meme M
@@ -395,6 +396,7 @@ _SHARE_MAX_QUERY = """
                                 (nlikes + ndislikes) * 1.0 / nmemes_sent
                             ))
                           END DESC,
+                        invited_count DESC,
                         id
                 ) AS base_rank
             FROM base
@@ -428,7 +430,7 @@ _SHARE_MAX_QUERY = """
             with_shares.*,
             ROW_NUMBER() OVER (
                 PARTITION BY meme_source_id
-                ORDER BY share_max_score DESC, id
+                ORDER BY share_max_score DESC, invited_count DESC, id
             ) AS source_rank
         FROM (
             SELECT
@@ -475,7 +477,7 @@ _SHARE_MAX_QUERY = """
     SELECT *
     FROM scored
     WHERE source_rank = 1
-    ORDER BY share_max_score DESC, id
+    ORDER BY share_max_score DESC, invited_count DESC, id
     LIMIT :limit
 """
 
