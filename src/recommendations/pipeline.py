@@ -61,6 +61,7 @@ ShadowScorer = Callable[
     [list[Candidate], "RecommendationBatchRequest"],
     Awaitable[Mapping[str, Any]] | Mapping[str, Any],
 ]
+SwallowWarning = tuple[str, tuple[Any, ...]]
 
 
 @dataclass(frozen=True)
@@ -502,50 +503,69 @@ class RecommendationBatchPipeline:
         swallow_errors: bool = False,
         **kwargs: Any,
     ) -> list[Candidate]:
+        return await self._fetch_with_diagnostics(
+            engine,
+            diagnostics,
+            self.retriever.get_candidates(
+                engine,
+                user_id,
+                limit,
+                exclude_mem_ids=exclude_ids,
+                **kwargs,
+            ),
+            span_op="recommendations.engine",
+            kwargs_keys=tuple(sorted(kwargs.keys())),
+            swallow_errors=swallow_errors,
+            swallow_warning=(
+                "recommendation engine %s failed for user %d",
+                (engine, user_id),
+            ),
+        )
+
+    async def _fetch_with_diagnostics(
+        self,
+        source_name: str,
+        diagnostics: RecommendationBatchDiagnostics,
+        candidates_awaitable: Awaitable[list[Candidate]],
+        *,
+        span_op: str,
+        kwargs_keys: tuple[str, ...] = (),
+        swallow_errors: bool = False,
+        swallow_warning: SwallowWarning | None = None,
+    ) -> list[Candidate]:
         started_at = perf_counter()
-        with _start_sentry_span("recommendations.engine", engine) as span:
+        with _start_sentry_span(span_op, source_name) as span:
             try:
-                candidates = await self.retriever.get_candidates(
-                    engine,
-                    user_id,
-                    limit,
-                    exclude_mem_ids=exclude_ids,
-                    **kwargs,
-                )
+                candidates = await candidates_awaitable
             except Exception as error:
                 duration_ms = _elapsed_ms(started_at)
-                diagnostics.engine_runs.append(
-                    EngineRunDiagnostics(
-                        engine=engine,
-                        duration_ms=duration_ms,
-                        candidate_count=0,
-                        kwargs_keys=tuple(sorted(kwargs.keys())),
-                        error_type=type(error).__name__,
-                        error_message=_trim(str(error)),
-                    )
+                _record_engine_run(
+                    diagnostics,
+                    source_name,
+                    duration_ms,
+                    [],
+                    kwargs_keys=kwargs_keys,
+                    error=error,
                 )
-                _set_engine_span_data(span, engine, duration_ms, 0, error)
+                _set_engine_span_data(span, source_name, duration_ms, 0, error)
                 if swallow_errors:
-                    logger.warning(
-                        "recommendation engine %s failed for user %d",
-                        engine,
-                        user_id,
-                        exc_info=True,
-                    )
+                    if swallow_warning is None:
+                        logger.warning("%s failed", source_name, exc_info=True)
+                    else:
+                        message, args = swallow_warning
+                        logger.warning(message, *args, exc_info=True)
                     return []
                 raise
 
             duration_ms = _elapsed_ms(started_at)
-            diagnostics.engine_runs.append(
-                EngineRunDiagnostics(
-                    engine=engine,
-                    duration_ms=duration_ms,
-                    candidate_count=len(candidates),
-                    candidate_ids=_candidate_ids(candidates),
-                    kwargs_keys=tuple(sorted(kwargs.keys())),
-                )
+            _record_engine_run(
+                diagnostics,
+                source_name,
+                duration_ms,
+                candidates,
+                kwargs_keys=kwargs_keys,
             )
-            _set_engine_span_data(span, engine, duration_ms, len(candidates), None)
+            _set_engine_span_data(span, source_name, duration_ms, len(candidates), None)
             return candidates
 
     async def _get_low_sent_candidates(
@@ -558,10 +578,12 @@ class RecommendationBatchPipeline:
         if limit <= 0:
             return []
 
-        if self.low_sent_fetcher is not None:
-            started_at = perf_counter()
-            try:
-                candidates = await self.low_sent_fetcher(
+        low_sent_fetcher = self.low_sent_fetcher
+        if low_sent_fetcher is not None:
+            candidates = await self._fetch_with_diagnostics(
+                "low_sent_pool",
+                diagnostics,
+                low_sent_fetcher(
                     RecommendationBatchRequest(
                         user_id=user_id,
                         limit=limit,
@@ -572,26 +594,8 @@ class RecommendationBatchPipeline:
                     ),
                     limit,
                     exclude_ids,
-                )
-            except Exception as error:
-                diagnostics.engine_runs.append(
-                    EngineRunDiagnostics(
-                        engine="low_sent_pool",
-                        duration_ms=_elapsed_ms(started_at),
-                        candidate_count=0,
-                        error_type=type(error).__name__,
-                        error_message=_trim(str(error)),
-                    )
-                )
-                raise
-
-            diagnostics.engine_runs.append(
-                EngineRunDiagnostics(
-                    engine="low_sent_pool",
-                    duration_ms=_elapsed_ms(started_at),
-                    candidate_count=len(candidates),
-                    candidate_ids=_candidate_ids(candidates),
-                )
+                ),
+                span_op="recommendations.engine",
             )
             diagnostics.low_sent_count = len(candidates)
             return candidates
@@ -634,38 +638,16 @@ class RecommendationBatchPipeline:
         params: Mapping[str, Any],
         diagnostics: RecommendationBatchDiagnostics,
     ) -> list[Candidate]:
-        if self.fetch_all_func is None:
+        fetch_all_func = self.fetch_all_func
+        if fetch_all_func is None:
             raise RuntimeError("fetch_all_func is required for SQL-backed recommendation pools")
 
-        started_at = perf_counter()
-        with _start_sentry_span("recommendations.sql_pool", pool_name) as span:
-            try:
-                candidates = await self.fetch_all_func(text(query), params)
-            except Exception as error:
-                duration_ms = _elapsed_ms(started_at)
-                diagnostics.engine_runs.append(
-                    EngineRunDiagnostics(
-                        engine=pool_name,
-                        duration_ms=duration_ms,
-                        candidate_count=0,
-                        error_type=type(error).__name__,
-                        error_message=_trim(str(error)),
-                    )
-                )
-                _set_engine_span_data(span, pool_name, duration_ms, 0, error)
-                raise
-
-            duration_ms = _elapsed_ms(started_at)
-            diagnostics.engine_runs.append(
-                EngineRunDiagnostics(
-                    engine=pool_name,
-                    duration_ms=duration_ms,
-                    candidate_count=len(candidates),
-                    candidate_ids=_candidate_ids(candidates),
-                )
-            )
-            _set_engine_span_data(span, pool_name, duration_ms, len(candidates), None)
-            return candidates
+        return await self._fetch_with_diagnostics(
+            pool_name,
+            diagnostics,
+            fetch_all_func(text(query), params),
+            span_op="recommendations.sql_pool",
+        )
 
 
 def diversify_candidates_by_source(candidates: list[Candidate]) -> tuple[list[Candidate], int]:
@@ -795,6 +777,28 @@ def _exclude_params(exclude_ids: list[int]) -> dict[str, Any]:
     return {"exclude_meme_ids": exclude_ids}
 
 
+def _record_engine_run(
+    diagnostics: RecommendationBatchDiagnostics,
+    engine: str,
+    duration_ms: int,
+    candidates: Sequence[Mapping[str, Any]],
+    *,
+    kwargs_keys: tuple[str, ...] = (),
+    error: Exception | None = None,
+) -> None:
+    diagnostics.engine_runs.append(
+        EngineRunDiagnostics(
+            engine=engine,
+            duration_ms=duration_ms,
+            candidate_count=len(candidates),
+            candidate_ids=_candidate_ids(candidates),
+            kwargs_keys=kwargs_keys,
+            error_type=None if error is None else type(error).__name__,
+            error_message=None if error is None else _trim(str(error)),
+        )
+    )
+
+
 def _candidate_ids(candidates: Sequence[Mapping[str, Any]]) -> tuple[int, ...]:
     ids: list[int] = []
     for candidate in candidates:
@@ -805,20 +809,14 @@ def _candidate_ids(candidates: Sequence[Mapping[str, Any]]) -> tuple[int, ...]:
 
 
 def _candidate_id(candidate: Mapping[str, Any]) -> Any:
-    try:
-        return candidate.get("id")
-    except AttributeError:
-        return candidate["id"]
+    return candidate.get("id")
 
 
 def _source_key(candidate: Mapping[str, Any]) -> Any:
-    try:
-        source_key = candidate.get("meme_source_id")
-        if source_key is not None:
-            return source_key
-        return candidate.get("source_id")
-    except AttributeError:
-        return None
+    source_key = candidate.get("meme_source_id")
+    if source_key is not None:
+        return source_key
+    return candidate.get("source_id")
 
 
 def _quality_score(candidate: Mapping[str, Any]) -> float | None:
@@ -852,10 +850,7 @@ def _virality_score(candidate: Mapping[str, Any]) -> float | None:
 
 def _first_number(candidate: Mapping[str, Any], keys: tuple[str, ...]) -> float | None:
     for key in keys:
-        try:
-            value = candidate.get(key)
-        except AttributeError:
-            value = None
+        value = candidate.get(key)
         if isinstance(value, (int, float)):
             return float(value)
     return None
