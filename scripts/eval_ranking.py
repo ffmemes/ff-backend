@@ -47,7 +47,7 @@ async def eval_lr_smoothed(conn: asyncpg.Connection, hours: int, min_reactions: 
     """
 
     print(f"\n{'='*60}")
-    print(f"  OFFLINE EVAL: lr_smoothed scoring")
+    print("  OFFLINE EVAL: lr_smoothed scoring")
     print(f"  Test window: last {hours} hours")
     print(f"  Min reactions per user: {min_reactions}")
     print(f"{'='*60}\n")
@@ -171,7 +171,7 @@ async def eval_lr_smoothed(conn: asyncpg.Connection, hours: int, min_reactions: 
     print(f"  Pairwise accuracy:  {pairwise_acc:.1%}")
     print(f"  Avg per-user acc:   {avg_user_acc:.1%}")
     print(f"  Tie rate:           {tie_rate:.1%}")
-    print(f"  Random baseline:    50.0%")
+    print("  Random baseline:    50.0%")
     print()
 
     # Breakdown by user engagement level
@@ -207,7 +207,7 @@ async def eval_engagement_score(conn: asyncpg.Connection, hours: int, min_reacti
     """Evaluate engagement_score as a ranking signal."""
 
     print(f"\n{'='*60}")
-    print(f"  OFFLINE EVAL: engagement_score")
+    print("  OFFLINE EVAL: engagement_score")
     print(f"{'='*60}\n")
 
     t0 = time.time()

@@ -37,6 +37,9 @@ except Exception:  # pragma: no cover - sentry is optional in local tooling
 
 logger = logging.getLogger(__name__)
 
+LOW_SENT_POOL_MIN_REACTIONS_FOR_QUALITY_GATE = 10
+LOW_SENT_POOL_MIN_LIKE_RATE = 0.15
+
 Candidate = dict[str, Any]
 BlendFunc = Callable[
     [
@@ -743,8 +746,19 @@ def _low_sent_query(exclude_ids: list[int]) -> str:
         WHERE 1=1
             AND M.status = 'ok'
             AND R.meme_id IS NULL
+            AND (
+                COALESCE(MS.nlikes, 0) + COALESCE(MS.ndislikes, 0)
+                    < {LOW_SENT_POOL_MIN_REACTIONS_FOR_QUALITY_GATE}
+                OR (
+                    COALESCE(MS.nlikes, 0)::float
+                    / NULLIF(COALESCE(MS.nlikes, 0) + COALESCE(MS.ndislikes, 0), 0)
+                ) >= {LOW_SENT_POOL_MIN_LIKE_RATE}
+            )
             {exclude_meme_ids_sql_filter(exclude_ids)}
-        ORDER BY COALESCE(MS.nmemes_sent, 0), M.id
+        ORDER BY
+            COALESCE(MS.nlikes, 0) + COALESCE(MS.ndislikes, 0),
+            COALESCE(MS.nmemes_sent, 0),
+            M.id
         LIMIT :limit
     """
 

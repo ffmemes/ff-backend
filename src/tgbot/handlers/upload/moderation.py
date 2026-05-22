@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -26,7 +27,11 @@ from src.recommendations.service import create_user_meme_reaction
 from src.stats.meme import calculate_meme_reactions_and_engagement
 from src.stats.meme_source import calculate_meme_source_stats
 from src.storage.constants import MemeStatus, MemeType
-from src.storage.service import find_meme_duplicate, update_meme
+from src.storage.deduplication import (
+    find_duplicate_by_ocr_text,
+    resolve_duplicate,
+)
+from src.storage.service import update_meme
 from src.storage.upload import download_meme_content_from_tg
 from src.tgbot.handlers.treasury.constants import TrxType
 from src.tgbot.handlers.treasury.payments import pay_if_not_paid_with_alert
@@ -66,6 +71,13 @@ def _telegram_download_failure_kind(exc: BadRequest) -> str:
     return "telegram_download_bad_request"
 
 
+@dataclass(frozen=True)
+class UploadAutoReviewDuplicate:
+    meme_id: int
+    duplicate_of: int
+    reason: str
+
+
 async def _notify_uploader(
     bot: Bot,
     meme_upload: dict[str, Any],
@@ -98,7 +110,45 @@ async def _get_uploader_lang(user_id: int) -> str | None:
     return user["interface_lang"] if user else None
 
 
-async def _check_duplicate_via_ocr(meme: dict[str, Any]) -> tuple[dict[str, Any], int | None]:
+def _stored_duplicate_result(meme: dict[str, Any]) -> UploadAutoReviewDuplicate | None:
+    if meme["status"] != MemeStatus.DUPLICATE.value or meme.get("duplicate_of") is None:
+        return None
+    return UploadAutoReviewDuplicate(
+        meme_id=meme["id"],
+        duplicate_of=meme["duplicate_of"],
+        reason="telegram_file_id",
+    )
+
+
+async def _reject_duplicate_upload(
+    bot: Bot,
+    meme_upload: dict[str, Any],
+    duplicate: UploadAutoReviewDuplicate,
+    uploader_lang: str | None,
+) -> None:
+    logging.info(
+        "Uploaded meme %s is a %s duplicate of %s, auto-rejecting",
+        duplicate.meme_id,
+        duplicate.reason,
+        duplicate.duplicate_of,
+    )
+    await create_user_meme_reaction(
+        meme_upload["user_id"],
+        duplicate.duplicate_of,
+        "uploaded_meme",
+        reaction_id=1,
+        reacted_at=datetime.utcnow(),
+    )
+    await _notify_uploader(
+        bot,
+        meme_upload,
+        localizer.t("upload.rejected_duplicate", uploader_lang),
+    )
+
+
+async def _deduplicate_upload_via_ocr(
+    meme: dict[str, Any],
+) -> tuple[dict[str, Any], UploadAutoReviewDuplicate | None]:
     """Describe the meme inline via OpenRouter vision and check for OCR-text duplicates.
 
     Why: describe_memes cron is intentionally slow; for uploads we can't wait — run it synchronously
@@ -106,7 +156,7 @@ async def _check_duplicate_via_ocr(meme: dict[str, Any]) -> tuple[dict[str, Any]
     Non-images skip describe (OCR is image-only).
     Failures (rate limit, model errors, short text) fall through silently — manual review kicks in.
 
-    Returns: (refreshed_meme, duplicate_of_id or None).
+    Returns: (refreshed_meme, duplicate details or None).
     """
     if meme["type"] != MemeType.IMAGE:
         return meme, None
@@ -133,8 +183,16 @@ async def _check_duplicate_via_ocr(meme: dict[str, Any]) -> tuple[dict[str, Any]
     if len(ocr_text) < 12:
         return refreshed, None
 
-    dup_id = await find_meme_duplicate(refreshed["id"], ocr_text)
-    return refreshed, dup_id
+    dup_id = await find_duplicate_by_ocr_text(refreshed["id"], ocr_text)
+    if dup_id is None:
+        return refreshed, None
+
+    resolution = await resolve_duplicate(refreshed["id"], dup_id, reason="upload_ocr_text")
+    return refreshed, UploadAutoReviewDuplicate(
+        meme_id=refreshed["id"],
+        duplicate_of=resolution.original_id,
+        reason=resolution.reason,
+    )
 
 
 async def uploaded_meme_auto_review(
@@ -251,6 +309,10 @@ async def _uploaded_meme_auto_review(
             bot, meme_upload, localizer.t("upload.tg_upload_failed", uploader_lang)
         )
 
+    stored_duplicate = _stored_duplicate_result(meme)
+    if stored_duplicate is not None:
+        return await _reject_duplicate_upload(bot, meme_upload, stored_duplicate, uploader_lang)
+
     logging.info(f"Updating meme {meme['id']} status to WAITING_REVIEW")
     meme = await update_meme(
         meme["id"],
@@ -258,25 +320,9 @@ async def _uploaded_meme_auto_review(
     )
 
     # Inline OCR + trigram dedup. Auto-reject on duplicate, else fall through to manual review.
-    meme, duplicate_of = await _check_duplicate_via_ocr(meme)
-    if duplicate_of is not None:
-        logging.info(f"Meme {meme['id']} is a duplicate of {duplicate_of}, auto-rejecting")
-        await update_meme(
-            meme["id"],
-            status=MemeStatus.DUPLICATE,
-            duplicate_of=duplicate_of,
-        )
-        # Credit the uploader with a like on the original, so it counts as engagement
-        await create_user_meme_reaction(
-            meme_upload["user_id"],
-            duplicate_of,
-            "uploaded_meme",
-            reaction_id=1,
-            reacted_at=datetime.utcnow(),
-        )
-        return await _notify_uploader(
-            bot, meme_upload, localizer.t("upload.rejected_duplicate", uploader_lang)
-        )
+    meme, ocr_duplicate = await _deduplicate_upload_via_ocr(meme)
+    if ocr_duplicate is not None:
+        return await _reject_duplicate_upload(bot, meme_upload, ocr_duplicate, uploader_lang)
 
     return await send_uploaded_meme_to_manual_review(meme, meme_upload, bot)
 

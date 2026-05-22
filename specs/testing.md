@@ -68,7 +68,7 @@
 ### Phase 3: ETL and parsing
 
 **3a. Dedup tests**:
-- find_meme_duplicate() with matching OCR text
+- find_duplicate_by_ocr_text() with matching OCR text
 - Perceptual hash dedup (after implementation)
 
 **3b. ETL integration tests**:

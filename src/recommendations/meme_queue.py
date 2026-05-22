@@ -2,9 +2,11 @@ import logging
 import uuid
 from typing import Any, Optional
 
+from sqlalchemy import text
+
 from src import redis
 from src.config import settings
-from src.database import fetch_all
+from src.database import fetch_all, fetch_one
 from src.recommendations.blender import blend
 from src.recommendations.blender_experiments import (
     MATURE_BLENDER_CONTROL_WEIGHTS,
@@ -26,12 +28,49 @@ from src.tgbot.user_info import get_user_info
 
 async def get_next_meme_for_user(user_id: int) -> MemeData | None:
     queue_key = redis.get_meme_queue_key(user_id)
-    meme_data = await redis.pop_meme_from_queue_by_key(queue_key)
 
-    if not meme_data:
-        return None
+    while True:
+        meme_data = await redis.pop_meme_from_queue_by_key(queue_key)
+        if not meme_data:
+            return None
 
-    return MemeData(**meme_data)
+        try:
+            meme_id = int(meme_data["id"])
+        except (KeyError, TypeError, ValueError):
+            logging.warning(
+                "discarding malformed queued meme payload for user_id=%s payload=%s",
+                user_id,
+                meme_data,
+            )
+            continue
+
+        if await _queued_meme_is_sendable(user_id, meme_id):
+            return MemeData(**meme_data)
+
+        logging.info(
+            "discarding stale queued meme payload for user_id=%s meme_id=%s",
+            user_id,
+            meme_id,
+        )
+
+
+async def _queued_meme_is_sendable(user_id: int, meme_id: int) -> bool:
+    row = await fetch_one(
+        text(
+            """
+            SELECT M.id
+            FROM meme M
+            LEFT JOIN user_meme_reaction R
+                ON R.meme_id = M.id
+                AND R.user_id = :user_id
+            WHERE M.id = :meme_id
+                AND M.status = 'ok'
+                AND R.meme_id IS NULL
+        """
+        ),
+        {"user_id": user_id, "meme_id": meme_id},
+    )
+    return row is not None
 
 
 async def has_memes_in_queue(user_id: int) -> bool:

@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from typing import Any
+from typing import Any, Awaitable, Callable, TypeVar
 
 from sqlalchemy import (
     BigInteger,
@@ -27,7 +27,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from src.config import settings
@@ -40,6 +40,8 @@ from src.storage.constants import (
 )
 
 DATABASE_URL = str(settings.DATABASE_URL)
+
+T = TypeVar("T")
 
 _engine_kwargs: dict = dict(
     connect_args={
@@ -882,3 +884,25 @@ async def execute(
             raise
     # Unreachable — loop always returns or raises
     raise RuntimeError("execute retry loop exhausted without returning")  # pragma: no cover
+
+
+async def run_in_transaction(fn: Callable[[AsyncConnection], Awaitable[T]]) -> T:
+    """Run several DB statements in one transaction with the standard retry policy."""
+    _DEADLOCK_MAX_RETRIES = 2
+    _max_attempts = max(_TRANSIENT_MAX_RETRIES, _DEADLOCK_MAX_RETRIES) + 1
+    _transient_attempts = 0
+
+    for attempt in range(_max_attempts):
+        try:
+            async with engine.begin() as conn:
+                return await fn(conn)
+        except Exception as exc:
+            if _is_transient_connection_error(exc) and _transient_attempts < _TRANSIENT_MAX_RETRIES:
+                await asyncio.sleep(0.025 * (2**_transient_attempts))
+                _transient_attempts += 1
+                continue
+            if _is_deadlock_error(exc) and attempt < _DEADLOCK_MAX_RETRIES:
+                await asyncio.sleep(0.1 * (2**attempt))
+                continue
+            raise
+    raise RuntimeError("transaction retry loop exhausted without returning")  # pragma: no cover

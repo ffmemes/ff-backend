@@ -40,6 +40,21 @@ def test_real_describe_memes_models_are_free() -> None:
     assert result.name == "describe_memes:free_models"
 
 
+def test_describe_memes_models_can_live_in_openrouter_client(tmp_path: Path) -> None:
+    storage = tmp_path / "src" / "flows" / "storage"
+    storage.mkdir(parents=True)
+    (storage / "describe_memes.py").write_text("# orchestration only\n", encoding="utf-8")
+    (storage / "openrouter_vision.py").write_text(
+        'VISION_MODELS = ["qwen/qwen2.5-vl-72b-instruct:free"]\n',
+        encoding="utf-8",
+    )
+
+    result = doctor.check_describe_memes_models(tmp_path)
+
+    assert result.ok is True
+    assert "openrouter_vision.py" in result.detail
+
+
 def test_paperclip_access_adapter_accepts_repo_local_wrapper(tmp_path: Path) -> None:
     skill = tmp_path / ".codex" / "skills" / "paperclip"
     tools = tmp_path / ".codex" / "paperclip-tools"

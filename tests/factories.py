@@ -5,6 +5,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from src.database import (
+    chat_meme_reaction,
     meme,
     meme_source,
     meme_source_candidate,
@@ -13,6 +14,7 @@ from src.database import (
     meme_source_stats,
     meme_stats,
     user,
+    user_deep_link_log,
     user_language,
     user_meme_reaction,
     user_meme_source_stats,
@@ -109,6 +111,7 @@ async def create_meme_stats(
     ndislikes: int = 5,
     nmemes_sent: int = 20,
     lr_smoothed: float = 0.5,
+    engagement_score: float = 0.0,
     age_days: int = 30,
     raw_impr_rank: int = 0,
     sec_to_react: float = 7.0,
@@ -120,13 +123,21 @@ async def create_meme_stats(
         "ndislikes": ndislikes,
         "nmemes_sent": nmemes_sent,
         "lr_smoothed": lr_smoothed,
+        "engagement_score": engagement_score,
         "age_days": age_days,
         "raw_impr_rank": raw_impr_rank,
         "sec_to_react": sec_to_react,
         "invited_count": invited_count,
         "updated_at": FIXED_DT,
     }
-    await conn.execute(insert(meme_stats).values(row).on_conflict_do_nothing())
+    await conn.execute(
+        insert(meme_stats)
+        .values(row)
+        .on_conflict_do_update(
+            index_elements=(meme_stats.c.meme_id,),
+            set_={key: value for key, value in row.items() if key != "meme_id"},
+        )
+    )
     return row
 
 
@@ -229,6 +240,9 @@ async def cleanup_test_data(conn: AsyncConnection) -> None:
     )
     await conn.execute(delete(meme_stats).where(meme_stats.c.meme_id >= TEST_ID_START))
     await conn.execute(
+        delete(user_deep_link_log).where(user_deep_link_log.c.user_id >= TEST_ID_START)
+    )
+    await conn.execute(
         delete(meme_source_stats).where(meme_source_stats.c.meme_source_id >= TEST_ID_START)
     )
     await conn.execute(
@@ -236,6 +250,9 @@ async def cleanup_test_data(conn: AsyncConnection) -> None:
     )
     await conn.execute(
         delete(user_meme_reaction).where(user_meme_reaction.c.user_id >= TEST_ID_START)
+    )
+    await conn.execute(
+        delete(chat_meme_reaction).where(chat_meme_reaction.c.user_id >= TEST_ID_START)
     )
     await conn.execute(delete(user_language).where(user_language.c.user_id >= TEST_ID_START))
     await conn.execute(delete(user_stats).where(user_stats.c.user_id >= TEST_ID_START))
