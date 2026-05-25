@@ -1,4 +1,7 @@
+from unittest.mock import AsyncMock, patch
 from urllib.parse import parse_qs, urlparse
+
+import pytest
 
 from src.tgbot.sharing import (
     MEME_SHARE_BUTTON_INLINE,
@@ -7,6 +10,7 @@ from src.tgbot.sharing import (
     get_meme_inline_query,
     get_meme_share_link,
     get_meme_share_url,
+    get_or_assign_meme_share_button_variant,
     parse_meme_share_deep_link,
 )
 
@@ -61,3 +65,15 @@ def test_build_inline_share_button_prefills_exact_meme_query():
     assert button.switch_inline_query_chosen_chat.allow_user_chats is True
     assert button.switch_inline_query_chosen_chat.allow_group_chats is True
     assert button.switch_inline_query_chosen_chat.allow_channel_chats is True
+
+
+@pytest.mark.asyncio
+async def test_inline_share_variant_is_disabled_by_default():
+    with patch(
+        "src.tgbot.sharing.get_experiment_variant",
+        new_callable=AsyncMock,
+    ) as get_variant:
+        variant = await get_or_assign_meme_share_button_variant(10001)
+
+    assert variant == MEME_SHARE_BUTTON_URL
+    get_variant.assert_not_awaited()

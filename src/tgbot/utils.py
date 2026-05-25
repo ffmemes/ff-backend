@@ -27,10 +27,13 @@ def remove_buttons_with_callback(reply_markup: dict) -> dict:
         for button in row:
             if "callback_data" in button:
                 continue
+            if any(key.startswith("switch_inline_query") for key in button):
+                continue
 
             filtered_buttons.append(button)
 
-        new_keyboard.append(filtered_buttons)
+        if filtered_buttons:
+            new_keyboard.append(filtered_buttons)
 
     reply_markup["inline_keyboard"] = new_keyboard
     return reply_markup

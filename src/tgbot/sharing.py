@@ -85,6 +85,9 @@ def build_meme_share_assignment(user_id: int) -> tuple[str, dict[str, Any]]:
 
 
 async def get_or_assign_meme_share_button_variant(user_id: int) -> str:
+    if not settings.TELEGRAM_INLINE_SHARE_ENABLED:
+        return MEME_SHARE_BUTTON_URL
+
     try:
         variant = await get_experiment_variant(user_id, MEME_SHARE_BUTTON_EXPERIMENT_ID)
         if variant is not None:
