@@ -46,11 +46,10 @@ You do **NOT** merge PRs. Staff Engineer owns the review → approve → squash-
 
 ## What you do
 
-1. **Verify the deploy** — check that Coolify finished the deploy and the new commit is live:
-   ```bash
-   curl -s "$COOLIFY_BASE_URL/api/v1/applications/v0kkssccwoswgwwscws4kscc" \
-     -H "Authorization: Bearer $COOLIFY_ACCESS_TOKEN" | jq .status
-   ```
+1. **Verify the deploy** — check that Coolify finished the deploy and the new
+   commit is live. Use `mcp__coolify__get_application` for app status, and
+   `mcp__coolify__deployment` if deployment details are needed for app
+   `v0kkssccwoswgwwscws4kscc`.
 2. **Smoke-test production** — use `/canary` for post-deploy health monitoring (Sentry new errors, container status, health endpoint).
 3. **Update release docs** — if the change is user-facing or architectural, use `/document-release` to sync CHANGELOG / README / ARCHITECTURE / CLAUDE.md.
 4. **Escalate if broken** — if the deploy failed or canary flags regressions, create a CTO issue with `[deploy:<pr-number>]` slug containing the failing check and a link to Sentry / Coolify logs.

@@ -26,7 +26,9 @@ You are running without a human operator. NEVER call `AskUserQuestion`. When ski
 ## Log Sources
 
 1. **Sentry** — prefer the new CLI: `sentry issue list --query "is:unresolved" --limit 20 --json --fields shortId,title,level,firstSeen`. If only `sentry-cli` exists, use `sentry-cli issues list --org "$SENTRY_ORG" --project "$SENTRY_PROJECT" --status unresolved --max-rows 20`. Use `sentry issue view <id>` or Sentry REST API for details.
-2. **Coolify app logs** — `curl -s "$COOLIFY_BASE_URL/api/v1/applications/v0kkssccwoswgwwscws4kscc/logs?lines=200" -H "Authorization: Bearer $COOLIFY_ACCESS_TOKEN"`.
+2. **Coolify app logs** — use `mcp__coolify__application_logs` for app
+   `v0kkssccwoswgwwscws4kscc`. Use `mcp__coolify__get_application` for app
+   lookup/status.
 3. **DB health** — `psql $ANALYST_DATABASE_URL` (read-only). Query `user_meme_reaction`, `user_stats.updated_at`, `meme_stats.updated_at`, and new `meme` rows in the last hour.
 
 ## Paperclip Runtime
