@@ -24,7 +24,7 @@ async def test_mark_user_blocked_sends_naive_timestamp_to_db(monkeypatch) -> Non
     update_user = AsyncMock(
         return_value={
             "id": 10001,
-            "type": UserType.BLOCKED_BOT.value,
+            "type": UserType.USER.value,
             "blocked_bot_at": datetime(2026, 4, 27, 20, 0, 27),
         }
     )
@@ -48,9 +48,42 @@ async def test_mark_user_blocked_sends_naive_timestamp_to_db(monkeypatch) -> Non
     )
 
     update_user.assert_awaited_once()
+    assert "type" not in update_user.await_args.kwargs
     blocked_bot_at = update_user.await_args.kwargs["blocked_bot_at"]
     assert blocked_bot_at == datetime(2026, 4, 27, 20, 0, 27)
     assert blocked_bot_at.tzinfo is None
+
+
+@pytest.mark.asyncio
+async def test_mark_user_blocked_preserves_admin_type(monkeypatch) -> None:
+    update_user = AsyncMock(
+        return_value={
+            "id": 49820636,
+            "type": UserType.ADMIN.value,
+            "blocked_bot_at": datetime(2026, 4, 27, 20, 0, 27),
+        }
+    )
+    monkeypatch.setattr(
+        service,
+        "get_user_by_id",
+        AsyncMock(return_value={"id": 49820636, "type": UserType.ADMIN.value}),
+    )
+    monkeypatch.setattr(service, "update_user", update_user)
+
+    monkeypatch.setitem(
+        sys.modules,
+        "src.tgbot.user_info",
+        SimpleNamespace(update_user_info_cache=AsyncMock()),
+    )
+
+    await service.mark_user_blocked(
+        user_id=49820636,
+        source="my_chat_member",
+        when=datetime(2026, 4, 27, 20, 0, 27, tzinfo=timezone.utc),
+    )
+
+    update_user.assert_awaited_once()
+    assert update_user.await_args.kwargs == {"blocked_bot_at": datetime(2026, 4, 27, 20, 0, 27)}
 
 
 @pytest.mark.asyncio

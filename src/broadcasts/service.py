@@ -25,6 +25,7 @@ async def get_user_ids_active_minutes_ago(
             id
         FROM "user"
         WHERE 1=1
+            AND blocked_bot_at IS NULL
             AND type NOT IN ('waitlist', 'blocked_bot')
             AND last_active_at BETWEEN
                 NOW() - INTERVAL '{to_minutes_ago} MINUTES'
@@ -51,10 +52,14 @@ async def get_users_to_broadcast_meme_from_tgchannelru(
             AND UMR.meme_id = {meme_id}
         LEFT JOIN user_tg_chat_membership UTCM
             ON UTCM.user_tg_id = UL.user_id
+        JOIN "user" U
+            ON U.id = UL.user_id
         WHERE 1=1
             AND UL.language_code = 'ru'
             AND UMR.user_id IS NULL
             AND UTCM.user_tg_id IS NULL
+            AND U.blocked_bot_at IS NULL
+            AND U.type NOT IN ('waitlist', 'blocked_bot')
     """
 
     return await fetch_all(text(select_query))
@@ -70,9 +75,13 @@ async def get_users_to_broadcast_post_from_tgchannelru():
         FROM user_language UL
         LEFT JOIN user_tg_chat_membership UTCM
             ON UTCM.user_tg_id = UL.user_id
+        JOIN "user" U
+            ON U.id = UL.user_id
         WHERE 1=1
             AND UL.language_code = 'ru'
             AND UTCM.user_tg_id IS NULL
+            AND U.blocked_bot_at IS NULL
+            AND U.type NOT IN ('waitlist', 'blocked_bot')
     """
 
     return await fetch_all(text(select_query))
@@ -82,9 +91,13 @@ async def get_users_with_language(
     language_code: str,
 ):
     select_query = f"""
-        SELECT user_id
-        FROM user_language
-        WHERE language_code = '{language_code}'
+        SELECT UL.user_id
+        FROM user_language UL
+        JOIN "user" U
+            ON U.id = UL.user_id
+        WHERE UL.language_code = '{language_code}'
+            AND U.blocked_bot_at IS NULL
+            AND U.type NOT IN ('waitlist', 'blocked_bot')
     """
     return await fetch_all(text(select_query))
 
@@ -96,6 +109,7 @@ async def get_users_active_more_than_days_ago(
         SELECT id
         FROM "user"
         WHERE last_active_at < NOW() - INTERVAL '{days_ago} DAYS'
+        AND blocked_bot_at IS NULL
         AND type != 'blocked_bot'
     """
     return await fetch_all(text(select_query))
@@ -119,7 +133,8 @@ async def get_all_non_blocked_users() -> list[dict]:
                ) AS language_code
         FROM "user" u
         LEFT JOIN user_tg ut ON ut.id = u.id
-        WHERE u.type NOT IN ('waitlist', 'blocked_bot')
+        WHERE u.blocked_bot_at IS NULL
+          AND u.type NOT IN ('waitlist', 'blocked_bot')
         ORDER BY u.last_active_at DESC
     """
         )
