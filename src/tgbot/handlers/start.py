@@ -4,6 +4,7 @@ from telegram import Bot, Update
 from telegram.ext import ContextTypes
 
 from src.recommendations.meme_queue import clear_meme_queue_for_user
+from src.recommendations.service import user_meme_reaction_exists
 from src.storage.schemas import MemeData
 from src.tgbot.handlers.deep_link import handle_invited_user, handle_shared_meme_reward
 from src.tgbot.handlers.language import (
@@ -111,6 +112,9 @@ async def _send_shared_meme_from_deep_link(
 
     meme_row = await get_shareable_meme_by_id(share_link.meme_id)
     if meme_row is None:
+        return False
+
+    if await user_meme_reaction_exists(user_id, share_link.meme_id):
         return False
 
     await _add_meme_language_from_share_click(user_id, meme_row)
