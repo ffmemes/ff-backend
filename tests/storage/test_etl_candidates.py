@@ -12,6 +12,9 @@ from src.storage.etl import normalize_telegram_channel_url
         ("https://t.me/somechannel/12345", "https://t.me/somechannel"),
         ("https://t.me/s/somechannel/12345", "https://t.me/somechannel"),
         ("http://t.me/somechannel/12345", "https://t.me/somechannel"),
+        ("t.me/somechannel/12345", "https://t.me/somechannel"),
+        ("telegram.me/somechannel/12345", "https://t.me/somechannel"),
+        ("https://telegram.me/somechannel/12345", "https://t.me/somechannel"),
         # Query strings and fragments must collapse onto the canonical form so
         # manual moderator entries dedupe against discovery-pipeline candidates.
         ("https://t.me/somechannel?utm_source=share", "https://t.me/somechannel"),

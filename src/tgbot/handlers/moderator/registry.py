@@ -33,7 +33,7 @@ def add_moderator_handlers(application: Application) -> None:
             ),
             MessageHandler(
                 filters=filters.ChatType.PRIVATE
-                & filters.Regex("^(https://t.me|https://vk.com|https://www.instagram.com)"),
+                & filters.Regex(meme_source.MEME_SOURCE_LINK_REGEXP),
                 callback=meme_source.handle_meme_source_link,
             ),
             CallbackQueryHandler(

@@ -3,8 +3,8 @@ from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 from src.storage.source_voting import record_source_candidate_vote
-from src.tgbot.constants import UserType
 from src.tgbot.handlers.moderator.meme_source import meme_source_admin_pipeline
+from src.tgbot.handlers.moderator.permissions import get_moderator_user_info
 from src.tgbot.logs import log
 from src.tgbot.senders.keyboards import (
     source_candidate_actions_keyboard,
@@ -16,7 +16,6 @@ from src.tgbot.service import (
     list_pending_source_candidates,
     promote_source_candidate,
 )
-from src.tgbot.user_info import get_user_info
 
 _LIST_LIMIT = 20
 
@@ -29,8 +28,8 @@ async def handle_discovered_sources_command(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    user_info = await get_user_info(update.effective_user.id)
-    if not UserType(user_info["type"]).is_moderator:
+    if await get_moderator_user_info(update.effective_user.id) is None:
+        await update.message.reply_text("Only moderators can list source candidates.")
         return
 
     candidates = await list_pending_source_candidates(limit=_LIST_LIMIT)
@@ -55,8 +54,7 @@ async def handle_source_candidate_action(
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
     user_id = update.effective_user.id
-    user_info = await get_user_info(user_id)
-    if not UserType(user_info["type"]).is_moderator:
+    if await get_moderator_user_info(user_id) is None:
         await update.callback_query.answer("🤷‍♀️ Only moderators can act on source candidates 🤷‍♂️")
         return
 
