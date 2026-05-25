@@ -79,9 +79,9 @@ def test_meme_source_status_keyboard_uses_stable_callback_values() -> None:
     assert all(re.match(MEME_SOURCE_SET_STATUS_REGEXP, data) for data in callback_data)
     assert all("MemeSourceStatus." not in data for data in callback_data)
     assert {button.text for button in buttons} == {
-        "➡️ in_moderation",
-        "➡️ parsing_disabled",
-        "➡️ snoozed",
+        "🕓 На модерацию",
+        "⏸ Остановить парсинг",
+        "⛔ Выключить источник",
     }
 
 
@@ -100,10 +100,43 @@ def test_parse_meme_source_status_callback_data_accepts_current_and_legacy_butto
     assert meme_source.parse_meme_source_status_callback_data(callback_data) == expected
 
 
+def test_meme_source_admin_card_is_compact_and_localized_ru() -> None:
+    source = {
+        "id": 203,
+        "url": "https://t.me/cozy_abomination",
+        "type": MemeSourceType.TELEGRAM.value,
+        "language_code": "uk",
+        "added_by": None,
+        "status": MemeSourceStatus.PARSING_ENABLED.value,
+    }
+    stats = {
+        "nlikes": 14257,
+        "ndislikes": 24803,
+        "nmemes_sent_events": 40255,
+        "nmemes_parsed": 3335,
+        "nmemes_sent": 2947,
+        "latest_meme_age": 1,
+    }
+
+    text = (
+        meme_source._get_meme_source_info(source, "ru")
+        + "\n\n"
+        + meme_source._get_meme_source_stats_info(stats, "ru")
+    )
+
+    assert "<b>Источник #203</b> · Telegram · uk" in text
+    assert "<b>Статус:</b> парсинг включён, мемы показываются" in text
+    assert "<b>Добавил:</b> —" in text
+    assert "👍 14 257 · 👎 24 803 · отправок 40 255" in text
+    assert "Мемы: 3 335 собрано · 2 947 показано · свежесть 1 дн." in text
+    assert "memes parsed" not in text
+    assert len([line for line in text.splitlines() if line.strip()]) == 6
+
+
 @pytest.mark.asyncio
 async def test_handle_meme_source_link_refreshes_to_moderator_and_opens_admin_card() -> None:
     update = SimpleNamespace(
-        effective_user=SimpleNamespace(id=1007266539),
+        effective_user=SimpleNamespace(id=1007266539, language_code="ru"),
         message=SimpleNamespace(
             text="please add t.me/Cozy_Abomination/42?single",
             reply_text=AsyncMock(),
@@ -115,7 +148,7 @@ async def test_handle_meme_source_link_refreshes_to_moderator_and_opens_admin_ca
     with (
         patch(
             "src.tgbot.handlers.moderator.meme_source.get_moderator_user_info",
-            new=AsyncMock(return_value={"type": "moderator"}),
+            new=AsyncMock(return_value={"type": "moderator", "interface_lang": "ru"}),
         ),
         patch(
             "src.tgbot.handlers.moderator.meme_source.get_or_create_meme_source",
@@ -131,7 +164,7 @@ async def test_handle_meme_source_link_refreshes_to_moderator_and_opens_admin_ca
     get_or_create.assert_awaited_once()
     assert get_or_create.await_args.kwargs["url"] == "https://t.me/cozy_abomination"
     assert get_or_create.await_args.kwargs["type"] == MemeSourceType.TELEGRAM
-    admin_pipeline.assert_awaited_once_with(source_row, update)
+    admin_pipeline.assert_awaited_once_with(source_row, update, "ru")
     update.message.reply_text.assert_not_awaited()
 
 
@@ -149,4 +182,6 @@ async def test_handle_meme_source_link_tells_non_moderator_why_nothing_happens()
     ):
         await meme_source.handle_meme_source_link(update, context)
 
-    update.message.reply_text.assert_awaited_once_with("Only moderators can manage meme sources.")
+    update.message.reply_text.assert_awaited_once_with(
+        "Только модераторы могут управлять источниками мемов."
+    )

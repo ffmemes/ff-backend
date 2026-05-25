@@ -1,0 +1,140 @@
+moderator.meme_source.only_moderators_manage:
+  en: Only moderators can manage meme sources.
+  ru: Только модераторы могут управлять источниками мемов.
+  uk: Тільки модератори можуть керувати джерелами мемів.
+
+moderator.meme_source.unsupported_source:
+  en: I do not recognize this meme source. Send a Telegram, VK, or Instagram link.
+  ru: Не узнаю этот источник. Пришли ссылку на Telegram, VK или Instagram.
+  uk: Не впізнаю це джерело. Надішли посилання на Telegram, VK або Instagram.
+
+moderator.meme_source.only_moderators_language:
+  en: Only moderators can change the source language.
+  ru: Только модераторы могут менять язык источника.
+  uk: Тільки модератори можуть змінювати мову джерела.
+
+moderator.meme_source.only_moderators_status:
+  en: Only moderators can change the source status.
+  ru: Только модераторы могут менять статус источника.
+  uk: Тільки модератори можуть змінювати статус джерела.
+
+moderator.meme_source.not_found:
+  en: Source not found.
+  ru: Источник не найден.
+  uk: Джерело не знайдено.
+
+moderator.meme_source.not_found_by_id:
+  en: Source #{source_id} not found.
+  ru: Источник #{source_id} не найден.
+  uk: Джерело #{source_id} не знайдено.
+
+moderator.meme_source.invalid_status_action:
+  en: This source action is no longer valid. Send the source link again.
+  ru: Эта кнопка уже неактуальна. Пришли ссылку на источник ещё раз.
+  uk: Ця кнопка вже неактуальна. Надішли посилання на джерело ще раз.
+
+moderator.meme_source.language_updated:
+  en: Language set to {language}.
+  ru: "Язык источника: {language}."
+  uk: "Мова джерела: {language}."
+
+moderator.meme_source.status_updated:
+  en: "Status changed: {status}."
+  ru: "Статус изменён: {status}."
+  uk: "Статус змінено: {status}."
+
+moderator.meme_source.unsnoozed_memes:
+  en: Returned {count} memes from source #{source_id}.
+  ru: Вернул {count} мемов из источника #{source_id}.
+  uk: Повернув {count} мемів із джерела #{source_id}.
+
+moderator.meme_source.snoozed_memes:
+  en: Hidden {count} memes from source #{source_id}.
+  ru: Спрятал {count} мемов из источника #{source_id}.
+  uk: Сховав {count} мемів із джерела #{source_id}.
+
+moderator.meme_source.select_language:
+  en: "Choose the source language:"
+  ru: "Выбери язык источника:"
+  uk: "Обери мову джерела:"
+
+moderator.meme_source.card:
+  en: |-
+    <b>Source #{id}</b> · {type} · {language}
+    {url}
+
+    <b>Status:</b> {status}
+    <b>Added by:</b> {added_by}
+  ru: |-
+    <b>Источник #{id}</b> · {type} · {language}
+    {url}
+
+    <b>Статус:</b> {status}
+    <b>Добавил:</b> {added_by}
+  uk: |-
+    <b>Джерело #{id}</b> · {type} · {language}
+    {url}
+
+    <b>Статус:</b> {status}
+    <b>Додав:</b> {added_by}
+
+moderator.meme_source.stats:
+  en: |-
+    👍 {likes} · 👎 {dislikes} · sends {sent_events}
+    Memes: {parsed} parsed · {sent} shown · latest {latest_age}
+  ru: |-
+    👍 {likes} · 👎 {dislikes} · отправок {sent_events}
+    Мемы: {parsed} собрано · {sent} показано · свежесть {latest_age}
+  uk: |-
+    👍 {likes} · 👎 {dislikes} · відправок {sent_events}
+    Меми: {parsed} зібрано · {sent} показано · свіжість {latest_age}
+
+moderator.meme_source.today:
+  en: today
+  ru: сегодня
+  uk: сьогодні
+
+moderator.meme_source.days_short:
+  en: "{days}d"
+  ru: "{days} дн."
+  uk: "{days} дн."
+
+moderator.meme_source.status.in_moderation:
+  en: in moderation
+  ru: на модерации
+  uk: на модерації
+
+moderator.meme_source.status.parsing_enabled:
+  en: parsing enabled, memes are shown
+  ru: парсинг включён, мемы показываются
+  uk: парсинг увімкнено, меми показуються
+
+moderator.meme_source.status.parsing_disabled:
+  en: parsing paused, old memes can still be shown
+  ru: парсинг на паузе, старые мемы ещё показываются
+  uk: парсинг на паузі, старі меми ще показуються
+
+moderator.meme_source.status.snoozed:
+  en: source disabled, its memes are hidden
+  ru: источник выключен, его мемы скрыты
+  uk: джерело вимкнено, його меми приховані
+
+moderator.meme_source.action.in_moderation:
+  en: 🕓 Send to moderation
+  ru: 🕓 На модерацию
+  uk: 🕓 На модерацію
+
+moderator.meme_source.action.parsing_enabled:
+  en: ✅ Enable parsing
+  ru: ✅ Включить парсинг
+  uk: ✅ Увімкнути парсинг
+
+moderator.meme_source.action.parsing_disabled:
+  en: ⏸ Stop parsing
+  ru: ⏸ Остановить парсинг
+  uk: ⏸ Зупинити парсинг
+
+moderator.meme_source.action.snoozed:
+  en: ⛔ Disable source
+  ru: ⛔ Выключить источник
+  uk: ⛔ Вимкнути джерело
