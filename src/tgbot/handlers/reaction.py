@@ -12,7 +12,9 @@ from src.recommendations.service import (
     update_user_meme_reaction,
 )
 from src.tgbot.handlers.moderator.invite import maybe_send_moderator_invite
+from src.tgbot.handlers.onboarding import onboarding_flow
 from src.tgbot.senders.next_message import next_message
+from src.tgbot.sharing import MEME_REACTION_CONTEXT_ONBOARD
 from src.tgbot.user_info import update_user_info_counters
 
 
@@ -25,7 +27,9 @@ def _fire_and_forget(coro):
 
 async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
-    meme_id, reaction_id = update.callback_query.data[2:].split(":")
+    callback_parts = update.callback_query.data[2:].split(":")
+    meme_id, reaction_id = callback_parts[:2]
+    reaction_context = callback_parts[2] if len(callback_parts) > 2 else None
     logging.info(f"🛜 reaction: user_id={user_id}, meme_id={meme_id}, reaction_id={reaction_id}")
 
     # do that in sync since we'll use counters in next_message
@@ -41,6 +45,9 @@ async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     )
 
     if reaction_is_new:
+        if reaction_context == MEME_REACTION_CONTEXT_ONBOARD:
+            return await onboarding_flow(update, context.bot)
+
         return await next_message(
             context.bot,
             user_id,

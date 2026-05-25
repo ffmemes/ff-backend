@@ -114,6 +114,26 @@ async def get_meme_by_id(
     return await fetch_one(select_statement)
 
 
+async def get_shareable_meme_by_id(id: int) -> dict[str, Any] | None:
+    query = """
+        SELECT
+            M.id,
+            M.type,
+            M.telegram_file_id,
+            M.caption,
+            M.language_code,
+            'share_link' AS recommended_by,
+            COALESCE(MS.nlikes, 0) AS nlikes
+        FROM meme M
+        LEFT JOIN meme_stats MS
+            ON MS.meme_id = M.id
+        WHERE M.id = :id
+            AND M.status = :status
+            AND M.telegram_file_id IS NOT NULL
+    """
+    return await fetch_one(text(query), {"id": id, "status": MemeStatus.OK.value})
+
+
 async def get_or_create_meme_source(
     url: str,
     **kwargs,

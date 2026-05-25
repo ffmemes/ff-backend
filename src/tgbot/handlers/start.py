@@ -1,14 +1,11 @@
 import asyncio
-import re
 
 from telegram import Bot, Update
 from telegram.ext import ContextTypes
 
-from src.tgbot.handlers.deep_link import (
-    LINK_UNDER_MEME_PATTERN,
-    handle_invited_user,
-    handle_shared_meme_reward,
-)
+from src.recommendations.meme_queue import clear_meme_queue_for_user
+from src.storage.schemas import MemeData
+from src.tgbot.handlers.deep_link import handle_invited_user, handle_shared_meme_reward
 from src.tgbot.handlers.language import (
     handle_language_settings,
     init_user_languages_from_tg_user,
@@ -17,13 +14,20 @@ from src.tgbot.handlers.treasury.commands import (
     handle_show_kitchen,
 )
 from src.tgbot.logs import log
+from src.tgbot.senders.meme import send_meme_to_user
 from src.tgbot.senders.next_message import next_message
 from src.tgbot.service import (
+    add_user_language,
     create_or_update_user,
+    get_shareable_meme_by_id,
     get_tg_user_by_id,
     get_user_languages,
     log_user_deep_link,
     save_tg_user,
+)
+from src.tgbot.sharing import (
+    MEME_REACTION_CONTEXT_ONBOARD,
+    parse_meme_share_deep_link,
 )
 from src.tgbot.user_info import update_user_info_cache
 
@@ -42,7 +46,7 @@ async def save_user_data(user_id: int, update: Update, deep_link: str | None) ->
         deep_link=deep_link
         if tg_user is None
         or tg_user["deep_link"] is None
-        or not re.match(LINK_UNDER_MEME_PATTERN, tg_user["deep_link"])
+        or parse_meme_share_deep_link(tg_user["deep_link"]) is None
         else None,
     )
 
@@ -79,6 +83,44 @@ def _is_blocked_acquisition_channel(deep_link: str | None) -> bool:
     if not deep_link:
         return False
     return deep_link in BLOCKED_ACQUISITION_CHANNELS or deep_link.startswith("tapps")
+
+
+async def _add_meme_language_from_share_click(user_id: int, meme_row: dict) -> None:
+    language_code = meme_row.get("language_code")
+    if not language_code:
+        return
+
+    user_languages = await get_user_languages(user_id)
+    if language_code in user_languages:
+        return
+
+    await add_user_language(user_id, language_code)
+    await clear_meme_queue_for_user(user_id)
+    await update_user_info_cache(user_id)
+
+
+async def _send_shared_meme_from_deep_link(
+    bot: Bot,
+    user_id: int,
+    deep_link: str | None,
+    reaction_context: str | None = None,
+) -> bool:
+    share_link = parse_meme_share_deep_link(deep_link)
+    if share_link is None:
+        return False
+
+    meme_row = await get_shareable_meme_by_id(share_link.meme_id)
+    if meme_row is None:
+        return False
+
+    await _add_meme_language_from_share_click(user_id, meme_row)
+    await send_meme_to_user(
+        bot,
+        user_id,
+        MemeData(**meme_row),
+        reaction_context=reaction_context,
+    )
+    return True
 
 
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -133,7 +175,12 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return await handle_wrapped(update, context)
 
     if created:  # new user:
-        await handle_language_settings(update, context)
+        shared_meme_sent = await _send_shared_meme_from_deep_link(
+            context.bot,
+            user_id,
+            deep_link,
+            reaction_context=MEME_REACTION_CONTEXT_ONBOARD,
+        )
 
         await handle_invited_user(
             context.bot,
@@ -141,6 +188,11 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             update.effective_user.name,
             deep_link,
         )
+
+        if shared_meme_sent:
+            return
+
+        await handle_language_settings(update, context)
 
         # handle giveaway after onboarding so user_language rows exist
         if deep_link and deep_link.startswith("giveaway_"):
@@ -153,6 +205,15 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             from src.tgbot.handlers.treasury.giveaway import handle_giveaway
 
             return await handle_giveaway(update, context, deep_link)
+
+        shared_meme_sent = await _send_shared_meme_from_deep_link(
+            context.bot,
+            user_id,
+            deep_link,
+        )
+        if shared_meme_sent:
+            await handle_shared_meme_reward(context.bot, user_id, deep_link)
+            return
 
         await next_message(
             context.bot,

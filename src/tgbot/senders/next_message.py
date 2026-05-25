@@ -17,7 +17,6 @@ from src.tgbot.logs import log
 from src.tgbot.senders.alerts import send_queue_preparing_alert
 from src.tgbot.senders.keyboards import (
     meme_reaction_keyboard,
-    select_referral_button_text,
 )
 from src.tgbot.senders.meme import (
     edit_last_message_with_meme,
@@ -31,7 +30,11 @@ from src.tgbot.senders.popups import (
     maybe_send_first_meme_nudge,
     send_popup,
 )
-from src.tgbot.senders.utils import collect_user_languages, has_russian_language
+from src.tgbot.senders.utils import collect_user_languages
+from src.tgbot.sharing import (
+    get_meme_share_button_text,
+    get_or_assign_meme_share_button_variant,
+)
 from src.tgbot.user_info import get_user_info
 
 logger = logging.getLogger(__name__)
@@ -71,7 +74,6 @@ async def next_message(
 ) -> Message:
     user_info = await get_user_info(user_id)
     languages = await collect_user_languages(user_id, user_info["interface_lang"])
-    has_russian = has_russian_language(languages)
     is_first_meme = (user_info["nmemes_sent"] or 0) == 0
     # TODO: if watched > 30 memes / day show paywall / tasks / donate
 
@@ -98,12 +100,14 @@ async def next_message(
             no_memes_left = True
             break
 
-        referral_button_text = select_referral_button_text(has_russian)
+        referral_button_text = get_meme_share_button_text(user_info["interface_lang"])
+        share_button_variant = await get_or_assign_meme_share_button_variant(user_id)
         logger.debug(
-            "Next meme %s for user %s uses referral button '%s' (languages=%s)",
+            "Next meme %s for user %s uses share button '%s' variant=%s (languages=%s)",
             meme.id,
             user_id,
             referral_button_text,
+            share_button_variant,
             sorted(languages),
         )
         reply_markup = meme_reaction_keyboard(
@@ -111,6 +115,9 @@ async def next_message(
             user_id,
             referral_button_text,
             visible_like_count=await get_visible_meme_like_count(user_id, meme.nlikes),
+            share_button_variant=share_button_variant,
+            interface_lang=user_info["interface_lang"],
+            meme_type=meme.type.value,
         )
         meme.caption = await get_meme_caption_for_user_id(meme, user_id, user_info)
 

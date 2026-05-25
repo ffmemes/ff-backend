@@ -11,6 +11,7 @@ class MemeData(CustomModel):
     type: MemeType
     telegram_file_id: str
     caption: str | None
+    language_code: str | None = None
     recommended_by: str | None = None
     nlikes: int = 0
 

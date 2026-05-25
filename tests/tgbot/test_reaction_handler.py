@@ -35,11 +35,19 @@ async def setup():
         await cleanup_test_data(conn)
 
 
-def _make_update(meme_id: int, reaction_id: int, user_id: int = 10001):
+def _make_update(
+    meme_id: int,
+    reaction_id: int,
+    user_id: int = 10001,
+    reaction_context: str | None = None,
+):
+    data = f"r:{meme_id}:{reaction_id}"
+    if reaction_context:
+        data += f":{reaction_context}"
     return SimpleNamespace(
         effective_user=SimpleNamespace(id=user_id),
         callback_query=SimpleNamespace(
-            data=f"r:{meme_id}:{reaction_id}",
+            data=data,
             message=SimpleNamespace(message_id=999, chat=SimpleNamespace(id=user_id)),
         ),
     )
@@ -72,6 +80,35 @@ async def test_new_reaction_calls_next_message(
     await handle_reaction(update, context)
 
     mock_next.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch(f"{HANDLER_MODULE}.onboarding_flow", new_callable=AsyncMock)
+@patch(f"{HANDLER_MODULE}.next_message", new_callable=AsyncMock)
+@patch(f"{HANDLER_MODULE}.reward_user_for_daily_activity", new_callable=AsyncMock)
+@patch(f"{HANDLER_MODULE}.update_user_last_active_at", new_callable=AsyncMock)
+@patch(f"{HANDLER_MODULE}.maybe_send_moderator_invite", new_callable=AsyncMock)
+@patch(f"{HANDLER_MODULE}.update_user_info_counters", new_callable=AsyncMock)
+async def test_onboard_reaction_context_calls_onboarding(
+    mock_counters,
+    mock_mod_invite,
+    mock_active,
+    mock_reward,
+    mock_next,
+    mock_onboarding,
+    setup,
+):
+    from src.tgbot.handlers.reaction import handle_reaction
+
+    await create_user_meme_reaction(10001, 10001, "share_link")
+    mock_counters.return_value = {"nmemes_sent": 1, "memes_watched_today": 1}
+
+    update = _make_update(meme_id=10001, reaction_id=1, reaction_context="onboard")
+    context = _make_context()
+    await handle_reaction(update, context)
+
+    mock_onboarding.assert_called_once()
+    mock_next.assert_not_called()
 
 
 @pytest.mark.asyncio
