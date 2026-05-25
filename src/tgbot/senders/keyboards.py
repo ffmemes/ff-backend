@@ -9,6 +9,7 @@ from src.tgbot.constants import (
     MEME_BUTTON_CALLBACK_DATA_PATTERN,
     MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA,
     MEME_SOURCE_SET_LANG_PATTERN,
+    MEME_SOURCE_SET_STATUS_PATTERN,
     SOURCE_CANDIDATE_ACTION_PATTERN,
     SOURCE_CANDIDATE_VOTE_PATTERN,
     Reaction,
@@ -124,14 +125,17 @@ def meme_source_language_selection_keyboard(meme_source_id: int):
 
 def meme_source_change_status_keyboard(
     meme_source_id: int,
-    current_status: MemeSourceStatus | None = None,
+    current_status: MemeSourceStatus | str | None = None,
 ):
     return InlineKeyboardMarkup(
         [
             [
                 InlineKeyboardButton(
-                    f"➡️ {status}",
-                    callback_data=f"ms:{meme_source_id}:set_status:{status}",
+                    f"➡️ {status.value}",
+                    callback_data=MEME_SOURCE_SET_STATUS_PATTERN.format(
+                        meme_source_id=meme_source_id,
+                        status=status.value,
+                    ),
                 )
             ]
             for status in MemeSourceStatus
