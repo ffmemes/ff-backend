@@ -1,3 +1,6 @@
+import re
+from dataclasses import dataclass
+
 from telegram import Message, Update
 from telegram.ext import (
     ContextTypes,
@@ -11,7 +14,7 @@ from src.storage.moderation import (
     MemeSourceNotFoundError,
     advance_meme_source,
 )
-from src.tgbot.constants import UserType
+from src.tgbot.handlers.moderator.permissions import get_moderator_user_info
 from src.tgbot.logs import log
 from src.tgbot.senders.keyboards import (
     meme_source_change_status_keyboard,
@@ -22,41 +25,62 @@ from src.tgbot.service import (
     get_meme_source_stats_by_id,
     get_or_create_meme_source,
 )
-from src.tgbot.user_info import get_user_info
+
+MEME_SOURCE_LINK_REGEXP = (
+    r"(?i)(?:https?://)?(?:t\.me|telegram\.me|vk\.com|(?:www\.)?instagram\.com)/[^\s<>()]+"
+)
+
+_MEME_SOURCE_LINK_RE = re.compile(MEME_SOURCE_LINK_REGEXP)
+
+
+@dataclass(frozen=True)
+class MemeSourceLink:
+    url: str
+    type: MemeSourceType
+
+
+def parse_meme_source_link(text: str | None) -> MemeSourceLink | None:
+    if not text:
+        return None
+
+    match = _MEME_SOURCE_LINK_RE.search(text.strip())
+    if match is None:
+        return None
+
+    url = match.group(0).rstrip(".,)")
+    url_lower = url.lower()
+    if url_lower.startswith(("t.me/", "telegram.me/", "vk.com/", "instagram.com/")):
+        url = f"https://{url}"
+
+    normalized_lower = url.lower()
+    if "t.me/" in normalized_lower or "telegram.me/" in normalized_lower:
+        canonical = normalize_telegram_channel_url(url)
+        if canonical is None:
+            return None
+        return MemeSourceLink(url=canonical, type=MemeSourceType.TELEGRAM)
+
+    if "vk.com/" in normalized_lower:
+        return MemeSourceLink(url=url.split("?", 1)[0], type=MemeSourceType.VK)
+
+    if "instagram.com/" in normalized_lower:
+        return MemeSourceLink(url=url.split("?", 1)[0], type=MemeSourceType.INSTAGRAM)
+
+    return None
 
 
 async def handle_meme_source_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user_info = await get_user_info(update.effective_user.id)
-    if not UserType(user_info["type"]).is_moderator:
+    if await get_moderator_user_info(update.effective_user.id) is None:
+        await update.message.reply_text("Only moderators can manage meme sources.")
         return
 
-    url = update.message.text.strip().lower()
-    if "https://t.me/" in url:
-        # Route through the same canonicalizer as the discovery pipeline
-        # so trailing slashes, post ids, and `?utm=...` suffixes collapse onto
-        # the canonical https://t.me/<channel> form. Without this, manual
-        # entries can leave duplicate `discovered` rows in the moderator queue
-        # because list_pending_source_candidates anti-joins on exact url match.
-        canonical = normalize_telegram_channel_url(url)
-        if canonical is None:
-            await update.message.reply_text(
-                "Unsupported telegram URL (private/invite link or unrecognized format)"
-            )
-            return
-        url = canonical
-        meme_source_type = MemeSourceType.TELEGRAM
-    elif "https://vk.com/" in url:
-        meme_source_type = MemeSourceType.VK
-    elif "https://www.instagram.com/" in url:
-        meme_source_type = MemeSourceType.INSTAGRAM
-        url = url.split("?")[0]  # remove query params
-    else:
+    link = parse_meme_source_link(update.message.text)
+    if link is None:
         await update.message.reply_text("Unsupported meme source")
         return
 
     meme_source = await get_or_create_meme_source(
-        url=url,
-        type=meme_source_type,
+        url=link.url,
+        type=link.type,
         status=MemeSourceStatus.IN_MODERATION,
         added_by=update.effective_user.id,
     )
@@ -68,8 +92,10 @@ async def handle_meme_source_language_selection(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
     user_id = update.effective_user.id
-    user_info = await get_user_info(user_id)
-    if not UserType(user_info["type"]).is_moderator:
+    if await get_moderator_user_info(user_id) is None:
+        await update.callback_query.answer(
+            "🤷‍♀️ Only moderators can change meme source language 🤷‍♂️"
+        )  # noqa: E501
         return
 
     args = update.callback_query.data.split(":")
@@ -99,8 +125,7 @@ async def handle_meme_source_change_status(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
     user_id = update.effective_user.id
-    user_info = await get_user_info(user_id)
-    if not UserType(user_info["type"]).is_moderator:
+    if await get_moderator_user_info(user_id) is None:
         await update.callback_query.answer("🤷‍♀️ Only moderators can change meme source status 🤷‍♂️")  # noqa: E501
         return
 

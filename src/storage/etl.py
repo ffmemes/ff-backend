@@ -19,7 +19,10 @@ from src.storage.parsers.schemas import (
     VkGroupPostParsingResult,
 )
 
-_TG_FORWARD_URL_PATTERN = re.compile(r"^https?://t\.me/(?:s/)?([a-zA-Z0-9_]+)(?:/\d+)?/?$")
+_TG_FORWARD_URL_PATTERN = re.compile(
+    r"^(?:https?://)?(?:t\.me|telegram\.me)/(?:s/)?([a-zA-Z0-9_]+)(?:/\d+)?/?$",
+    re.IGNORECASE,
+)
 TG_RECENT_POSTS_WINDOW = 10
 TG_TOP_VIEWED_POSTS_LIMIT = 5
 
