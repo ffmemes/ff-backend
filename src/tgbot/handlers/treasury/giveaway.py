@@ -7,7 +7,7 @@ Example: https://t.me/ffmemesbot?start=giveaway_77
 Only whitelisted campaign IDs are accepted. Users craft arbitrary
 giveaway_* links otherwise and mint unlimited burgers.
 
-Each giveaway campaign is identified by its deep link string.
+Each giveaway campaign is identified by its deep link string and transaction type.
 A user can only claim each giveaway once (enforced by pay_if_not_paid).
 """
 
@@ -19,10 +19,11 @@ from src.tgbot.handlers.treasury.constants import PAYOUTS, TrxType
 from src.tgbot.handlers.treasury.payments import pay_if_not_paid
 from src.tgbot.senders.next_message import next_message
 
-# Whitelist of active giveaway campaign IDs.
+# Whitelist of active giveaway campaign IDs mapped to their readout transaction type.
 # Add new campaigns here before posting the deep link to the channel.
-ACTIVE_GIVEAWAY_CAMPAIGNS = {
-    "giveaway_77",  # launch giveaway: 77 burgers to first clickers
+ACTIVE_GIVEAWAY_CAMPAIGNS: dict[str, TrxType] = {
+    "giveaway_77": TrxType.GIVEAWAY,  # launch giveaway: 77 burgers to first clickers
+    "giveaway_channel_audience_2026_05_25": TrxType.CHANNEL_AUDIENCE_GIVEAWAY,
 }
 
 
@@ -33,7 +34,8 @@ async def handle_giveaway(
 ) -> None:
     user_id = update.effective_user.id
 
-    if deep_link not in ACTIVE_GIVEAWAY_CAMPAIGNS:
+    trx_type = ACTIVE_GIVEAWAY_CAMPAIGNS.get(deep_link)
+    if trx_type is None:
         # Unknown campaign — silently continue to meme feed
         await next_message(
             context.bot,
@@ -43,10 +45,10 @@ async def handle_giveaway(
         )
         return
 
-    amount = PAYOUTS[TrxType.GIVEAWAY]
+    amount = PAYOUTS[trx_type]
 
     # deep_link is the external_id — ensures one claim per campaign per user
-    balance = await pay_if_not_paid(user_id, TrxType.GIVEAWAY, deep_link)
+    balance = await pay_if_not_paid(user_id, trx_type, deep_link)
 
     if balance is not None:
         await context.bot.send_message(

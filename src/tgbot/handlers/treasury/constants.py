@@ -30,6 +30,7 @@ class TrxType(str, Enum):
     BOT_REPLY_PAYMENT = "bot_reply_payment"
 
     GIVEAWAY = "giveaway"
+    CHANNEL_AUDIENCE_GIVEAWAY = "channel_audience_giveaway"
 
 
 TREASURY_USER_ID = 1123681771
@@ -52,6 +53,7 @@ PAYOUTS = {
     TrxType.ACTIVE_IN_CHAT: 5,
     TrxType.BOT_REPLY_PAYMENT: -1,
     TrxType.GIVEAWAY: 77,
+    TrxType.CHANNEL_AUDIENCE_GIVEAWAY: 10,
 }
 
 # TODO: localize
@@ -73,4 +75,5 @@ TRX_TYPE_DESCRIPTIONS = {
     TrxType.ACTIVE_IN_CHAT: "being active in chat",
     TrxType.BOT_REPLY_PAYMENT: "chatting_with_bot",
     TrxType.GIVEAWAY: "channel giveaway",
+    TrxType.CHANNEL_AUDIENCE_GIVEAWAY: "channel audience giveaway",
 }
