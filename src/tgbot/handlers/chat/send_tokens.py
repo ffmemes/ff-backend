@@ -68,7 +68,11 @@ async def send_tokens_to_reply(update: Update, context: ContextTypes.DEFAULT_TYP
         return  # no need to send tokens to yourself
 
     to_user = await get_user_by_id(to_user_id)
-    if not to_user or to_user["type"] == UserType.BLOCKED_BOT:
+    if (
+        not to_user
+        or to_user["blocked_bot_at"] is not None
+        or to_user["type"] == UserType.BLOCKED_BOT
+    ):
         return await _reply_and_delete(
             update.message,
             f"Не вижу {to_user_tg.name} в боте! ай-яй-яй 😿",

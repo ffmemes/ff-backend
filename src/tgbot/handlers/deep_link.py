@@ -48,12 +48,12 @@ was already invited by #{invited_user["inviter_id"]}"""
     # set inviter id
     await update_user(invited_user["id"], inviter_id=invitor_user_id)
 
-    # dont reward if a user blocked the bot
-    if invitor_user["type"] == UserType.BLOCKED_BOT:
+    # Don't reward if the inviter cannot receive the bot notification.
+    if invitor_user["blocked_bot_at"] is not None or invitor_user["type"] == UserType.BLOCKED_BOT:
         return await log(
             f"""
 ❌ {invited_user_name} was invited by #{invitor_user_id}
-but his type is {invitor_user["type"]}
+but his bot access is blocked (type={invitor_user["type"]})
         """
         )
 

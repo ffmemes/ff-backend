@@ -467,9 +467,10 @@ async def mark_user_blocked(
 ) -> dict[str, Any] | None:
     """Mark a user as having blocked the bot.
 
-    Idempotent. Preserves privileged roles (moderator/admin/super_user) —
-    still records blocked_bot_at for retention analysis, but does not
-    demote their type. Invalidates user_info cache on success.
+    Idempotent. Preserves the user's role in `type` and records the Telegram
+    transport state in blocked_bot_at. The legacy `blocked_bot` user type can
+    still exist on old rows, but new block events must not overwrite roles.
+    Invalidates user_info cache on success.
 
     `source` is a free-form label for observability
     ("my_chat_member", "forbidden_send_meme", ...).
@@ -483,7 +484,10 @@ async def mark_user_blocked(
         return None
 
     ts = _blocked_bot_at_timestamp(when)
-    current_type = UserType(current["type"]) if current["type"] else None
+    try:
+        current_type = UserType(current["type"]) if current["type"] else None
+    except ValueError:
+        current_type = None
 
     if current_type and current_type.is_moderator:
         logging.warning(
@@ -493,13 +497,8 @@ async def mark_user_blocked(
             source,
             current_type.value,
         )
-        updated = await update_user(user_id, blocked_bot_at=ts)
-    else:
-        updated = await update_user(
-            user_id,
-            type=UserType.BLOCKED_BOT,
-            blocked_bot_at=ts,
-        )
+
+    updated = await update_user(user_id, blocked_bot_at=ts)
 
     if updated is not None:
         try:

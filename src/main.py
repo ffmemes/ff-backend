@@ -62,7 +62,7 @@ if settings.ENVIRONMENT.is_deployed:
             ),
         ],
         ignore_errors=[
-            "telegram.error.Forbidden",  # handled by error.py → marks user as blocked_bot
+            "telegram.error.Forbidden",  # handled by error.py -> records blocked_bot_at
         ],
         include_local_variables=False,
         before_send=before_send,
