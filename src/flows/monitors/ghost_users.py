@@ -6,7 +6,8 @@ this monitor existed we only learned about ghosts when a friend of
 @ohld complained.
 
 Definition: a ghost is a `user` row created N seconds ago with no
-`user_meme_reaction` row. Two severities, both filtered by
+`user_meme_reaction` row, excluding users who have blocked the bot.
+Two severities, both filtered by
 `user_tg.deep_link` to exclude blocked acquisition channels (where
 silent drop is by design):
 
@@ -71,6 +72,7 @@ def _ghost_count_sql() -> str:
             WHERE u.created_at BETWEEN NOW() - INTERVAL '25 minutes'
                                   AND NOW() - INTERVAL '60 seconds'
               AND u.type NOT IN ('blocked_bot', 'banned', 'waitlist')
+              AND u.blocked_bot_at IS NULL
               AND NOT EXISTS (
                   SELECT 1 FROM user_meme_reaction r WHERE r.user_id = u.id
               )
