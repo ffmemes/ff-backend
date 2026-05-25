@@ -46,7 +46,8 @@ Key tables for analytics:
 
 Telegram bot shares and Telegram channel shares are different signals:
 
-- In-bot share clicks use `s_{sharer_user_id}_{meme_id}` in `user_deep_link_log`.
+- In-bot share clicks use `m_{sharer_user_id}_{meme_id}` in `user_deep_link_log`;
+  legacy rows may still use `s_{sharer_user_id}_{meme_id}`.
 - Channel post deep links use `sc_{meme_id}_{channel}` in `user_deep_link_log`.
 - Telegram channel forwards/views live in `crossposting` and `crossposting_snapshots`, collected by Telethon.
 

@@ -5,7 +5,8 @@
 -- Safety: read-only queries. Keep statement_timeout enabled.
 --
 -- Domain vocabulary:
--- - In-bot share clicks: user_deep_link_log.deep_link LIKE 's_%_%'
+-- - In-bot share clicks: user_deep_link_log.deep_link LIKE 'm_%_%'
+--   (legacy rows may still use 's_%_%')
 -- - Channel deep links: user_deep_link_log.deep_link LIKE 'sc_%_%'
 -- - Channel forwards/views: crossposting + crossposting_snapshots
 --
@@ -186,7 +187,7 @@ parsed_share_clicks AS (
     user_id,
     created_at
   FROM user_deep_link_log
-  WHERE deep_link ~ '^s_[0-9]+_[0-9]+$'
+  WHERE deep_link ~ '^[ms]_[0-9]+_[0-9]+$'
 ),
 share_features AS (
   SELECT

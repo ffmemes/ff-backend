@@ -5,8 +5,8 @@ from datetime import datetime
 from typing import Any, Iterable
 from urllib.parse import parse_qs, urlparse
 
-BOT_DEEP_LINK_REGEXP = re.compile(r"s_\d+_\d+")
-MEME_ID_REGEXP = re.compile(r"s_\d+_(\d+)")
+BOT_DEEP_LINK_REGEXP = re.compile(r"(?:m|s)_\d+_\d+")
+MEME_ID_REGEXP = re.compile(r"(?:m|s)_\d+_(\d+)")
 URL_REGEXP = re.compile(r"https?://\S+")
 
 

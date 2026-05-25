@@ -130,10 +130,10 @@ async def test_calculate_meme_invited_count_excludes_self_clicks(conn: AsyncConn
         insert(user_deep_link_log),
         [
             {"user_id": 1, "deep_link": "s_1_1"},
-            {"user_id": 2, "deep_link": "s_1_1"},
+            {"user_id": 2, "deep_link": "m_1_1"},
             {"user_id": 2, "deep_link": "s_1_1"},
             {"user_id": 3, "deep_link": "s_1_1"},
-            {"user_id": 1, "deep_link": "s_1_2"},
+            {"user_id": 1, "deep_link": "m_1_2"},
         ],
     )
     await conn.commit()

@@ -14,6 +14,17 @@ def _make_message(**kwargs):
 
 def test_extract_meme_id_from_plain_url() -> None:
     message = _make_message(
+        text="https://t.me/ffmemesbot?start=m_111_222",
+        entities=None,
+        caption=None,
+        caption_entities=None,
+    )
+
+    assert extract_meme_id_from_message(message) == 222
+
+
+def test_extract_meme_id_from_legacy_plain_url() -> None:
+    message = _make_message(
         text="https://t.me/ffmemesbot?start=s_111_222",
         entities=None,
         caption=None,
@@ -24,7 +35,7 @@ def test_extract_meme_id_from_plain_url() -> None:
 
 
 def test_extract_meme_id_from_caption_entity() -> None:
-    entity = SimpleNamespace(type="text_link", url="https://t.me/ffmemesbot?start=s_333_444")
+    entity = SimpleNamespace(type="text_link", url="https://t.me/ffmemesbot?start=m_333_444")
     message = _make_message(
         text=None,
         entities=None,

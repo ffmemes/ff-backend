@@ -213,8 +213,8 @@ async def test_new_user_giveaway_branch_inits_languages(cleanup):
 
 @pytest.mark.asyncio
 async def test_new_user_share_link_branch_inits_languages(cleanup):
-    mocks = await _run_handle_start(deep_link="s_12345_678", shared_meme_sent=True)
-    await _assert_universal_side_effects(NEW_USER_ID, expected_deep_link="s_12345_678")
+    mocks = await _run_handle_start(deep_link="m_12345_678", shared_meme_sent=True)
+    await _assert_universal_side_effects(NEW_USER_ID, expected_deep_link="m_12345_678")
     mocks["shared_meme"].assert_called_once()
     assert mocks["shared_meme"].call_args.kwargs["reaction_context"] == "onboard"
     mocks["lang_settings"].assert_not_called()
@@ -255,7 +255,7 @@ async def test_existing_user_share_link_serves_shared_meme(cleanup):
     await _run_handle_start(deep_link=None, user_id=EXISTING_USER_ID)
 
     mocks = await _run_handle_start(
-        deep_link="s_12345_678",
+        deep_link="m_12345_678",
         user_id=EXISTING_USER_ID,
         shared_meme_sent=True,
     )
@@ -267,7 +267,7 @@ async def test_existing_user_share_link_serves_shared_meme(cleanup):
 
 
 @pytest.mark.asyncio
-async def test_existing_user_share_link_with_prior_reaction_serves_next_meme(cleanup):
+async def test_existing_user_share_link_with_prior_reaction_serves_shared_meme(cleanup):
     from src.tgbot.handlers.start import handle_start
 
     await _run_handle_start(deep_link=None, user_id=EXISTING_USER_ID)
@@ -286,6 +286,72 @@ async def test_existing_user_share_link_with_prior_reaction_serves_next_meme(cle
             meme_id=10001,
             reaction_id=1,
             recommended_by="share_link",
+        )
+
+    update = _make_update("m_12345_10001", EXISTING_USER_ID)
+    context = _make_context("m_12345_10001")
+
+    patches = [
+        patch(f"{HANDLER_MODULE}.handle_show_kitchen", new_callable=AsyncMock),
+        patch(f"{HANDLER_MODULE}.handle_language_settings", new_callable=AsyncMock),
+        patch(f"{HANDLER_MODULE}.handle_invited_user", new_callable=AsyncMock),
+        patch(f"{HANDLER_MODULE}.handle_shared_meme_reward", new_callable=AsyncMock),
+        patch(f"{HANDLER_MODULE}.send_meme_to_user", new_callable=AsyncMock),
+        patch(f"{HANDLER_MODULE}.next_message", new_callable=AsyncMock),
+        patch(f"{HANDLER_MODULE}.log_start_event", new_callable=AsyncMock),
+        patch("src.tgbot.handlers.stats.wrapped.handle_wrapped", new_callable=AsyncMock),
+        patch(
+            "src.tgbot.handlers.treasury.giveaway.handle_giveaway",
+            new_callable=AsyncMock,
+        ),
+    ]
+    started = [p.start() for p in patches]
+    try:
+        await handle_start(update, context)
+    finally:
+        for p in patches:
+            p.stop()
+
+    mocks = dict(
+        zip(
+            [
+                "kitchen",
+                "lang_settings",
+                "invited",
+                "shared_reward",
+                "send_meme",
+                "next_message",
+                "log_start",
+                "wrapped",
+                "giveaway",
+            ],
+            started,
+        )
+    )
+    mocks["send_meme"].assert_called_once()
+    sent_meme = mocks["send_meme"].call_args.args[2]
+    assert sent_meme.id == 10001
+    mocks["next_message"].assert_not_called()
+    mocks["shared_reward"].assert_called_once_with(
+        context.bot,
+        EXISTING_USER_ID,
+        "m_12345_10001",
+    )
+
+
+@pytest.mark.asyncio
+async def test_existing_user_legacy_share_link_serves_shared_meme(cleanup):
+    from src.tgbot.handlers.start import handle_start
+
+    await _run_handle_start(deep_link=None, user_id=EXISTING_USER_ID)
+    async with engine.begin() as conn:
+        await create_meme_source(conn, id=10001, language_code="en")
+        await create_meme(
+            conn,
+            id=10001,
+            meme_source_id=10001,
+            language_code="en",
+            telegram_file_id="test_shared_file_id",
         )
 
     update = _make_update("s_12345_10001", EXISTING_USER_ID)
@@ -328,13 +394,9 @@ async def test_existing_user_share_link_with_prior_reaction_serves_next_meme(cle
             started,
         )
     )
-    mocks["send_meme"].assert_not_called()
-    mocks["next_message"].assert_called_once()
-    mocks["shared_reward"].assert_called_once_with(
-        context.bot,
-        EXISTING_USER_ID,
-        "s_12345_10001",
-    )
+    mocks["send_meme"].assert_called_once()
+    assert mocks["send_meme"].call_args.args[2].id == 10001
+    mocks["next_message"].assert_not_called()
 
 
 @pytest.mark.asyncio

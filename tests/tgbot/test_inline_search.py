@@ -32,7 +32,7 @@ def test_build_exact_inline_meme_result_uses_share_deep_link():
 
     assert result.id == "123"
     assert result.photo_file_id == "photo-file-id"
-    assert "start=s_456_123" in result.caption
+    assert "start=m_456_123" in result.caption
 
 
 @pytest.mark.asyncio

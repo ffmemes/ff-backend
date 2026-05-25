@@ -35,7 +35,8 @@ async def get_shared_memes(user_id: int, limit: int) -> list[dict[str, Any]]:
             COUNT(*) invited_users
         FROM user_tg
         WHERE
-            deep_link LIKE 's_{user_id}_%'
+            deep_link LIKE 'm_{user_id}_%'
+            OR deep_link LIKE 's_{user_id}_%'
             -- AND pg_input_is_valid(TRIM(SPLIT_PART(deep_link, '_', 3)), 'INT')
         GROUP BY 1
         ORDER BY 2 DESC

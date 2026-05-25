@@ -13,8 +13,8 @@ from src.tgbot.constants import TELEGRAM_MODERATOR_CHAT_ID
 logger = logging.getLogger(__name__)
 
 # Bot meme deep link embedded in the caption HTML:
-# https://t.me/ffmemesbot?start=s_<user_id>_<meme_id>
-_MEME_DEEP_LINK_RE = re.compile(r"t\.me/ffmemesbot\?start=s_\d+_(\d+)", re.IGNORECASE)
+# https://t.me/ffmemesbot?start=m_<user_id>_<meme_id>
+_MEME_DEEP_LINK_RE = re.compile(r"t\.me/ffmemesbot\?start=(?:m|s)_\d+_(\d+)", re.IGNORECASE)
 
 
 async def handle_mod_chat_meme_forward(msg: Message) -> bool:
@@ -73,7 +73,7 @@ _STATS_QUERY = text(
         END AS source_url,
         (
             SELECT count(*) FROM user_deep_link_log
-            WHERE deep_link LIKE :mid_pattern
+            WHERE deep_link LIKE :mid_pattern OR deep_link LIKE :legacy_mid_pattern
         ) AS clicks
     FROM meme m
     LEFT JOIN (
@@ -100,7 +100,11 @@ _STATS_QUERY = text(
 async def _build_stat_reply(meme_id: int) -> str | None:
     row = await fetch_one(
         _STATS_QUERY,
-        {"mid": meme_id, "mid_pattern": rf"s\_%\_{meme_id}"},
+        {
+            "mid": meme_id,
+            "mid_pattern": rf"m\_%\_{meme_id}",
+            "legacy_mid_pattern": rf"s\_%\_{meme_id}",
+        },
     )
     if not row:
         return None

@@ -14,7 +14,7 @@ from src.tgbot.service import (
 )
 from src.tgbot.sharing import parse_meme_share_deep_link
 
-LINK_UNDER_MEME_PATTERN = r"^s_\d+_\d+$"
+LINK_UNDER_MEME_PATTERN = r"^(?:m|s)_\d+_\d+$"
 
 
 async def handle_invited_user(

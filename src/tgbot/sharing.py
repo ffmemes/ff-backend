@@ -18,8 +18,9 @@ MEME_SHARE_BUTTON_EXPERIMENT_ID = "meme_share_button"
 MEME_SHARE_BUTTON_URL = "url_share"
 MEME_SHARE_BUTTON_INLINE = "inline_query"
 MEME_REACTION_CONTEXT_ONBOARD = "onboard"
+MEME_SHARE_DEEP_LINK_PREFIX = "m"
 
-_SHARE_DEEP_LINK_RE = re.compile(r"^s_(?P<sharer_user_id>\d+)_(?P<meme_id>\d+)$")
+_SHARE_DEEP_LINK_RE = re.compile(r"^(?:m|s)_(?P<sharer_user_id>\d+)_(?P<meme_id>\d+)$")
 
 
 @dataclass(frozen=True)
@@ -43,7 +44,7 @@ def parse_meme_share_deep_link(deep_link: str | None) -> MemeShareDeepLink | Non
 
 
 def get_meme_share_deep_link(user_id: int, meme_id: int) -> str:
-    return f"s_{user_id}_{meme_id}"
+    return f"{MEME_SHARE_DEEP_LINK_PREFIX}_{user_id}_{meme_id}"
 
 
 def get_meme_share_link(user_id: int, meme_id: int) -> str:
@@ -79,7 +80,7 @@ def build_meme_share_assignment(user_id: int) -> tuple[str, dict[str, Any]]:
     variant = MEME_SHARE_BUTTON_URL if bucket == 0 else MEME_SHARE_BUTTON_INLINE
     return variant, {
         "assignment_strategy": "sha256(experiment_id:user_id)%2",
-        "url_share": "t.me/share/url with s_{sharer_user_id}_{meme_id}",
+        "url_share": "t.me/share/url with m_{sharer_user_id}_{meme_id}",
         "inline_query": "switch_inline_query_chosen_chat with #meme_id",
     }
 

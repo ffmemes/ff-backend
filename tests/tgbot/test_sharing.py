@@ -16,12 +16,18 @@ from src.tgbot.sharing import (
 
 
 def test_parse_meme_share_deep_link():
-    parsed = parse_meme_share_deep_link("s_10001_20002")
+    parsed = parse_meme_share_deep_link("m_10001_20002")
 
     assert parsed is not None
     assert parsed.sharer_user_id == 10001
     assert parsed.meme_id == 20002
-    assert parse_meme_share_deep_link("s_10001_20002_extra") is None
+
+    legacy_parsed = parse_meme_share_deep_link("s_10001_20002")
+    assert legacy_parsed is not None
+    assert legacy_parsed.sharer_user_id == 10001
+    assert legacy_parsed.meme_id == 20002
+
+    assert parse_meme_share_deep_link("m_10001_20002_extra") is None
     assert parse_meme_share_deep_link("ir_10001_20002") is None
 
 
@@ -35,6 +41,7 @@ def test_get_meme_share_url_wraps_start_deep_link():
     assert parsed.path == "/share/url"
     assert query["url"] == [get_meme_share_link(10001, 20002)]
     assert query["text"] == ["Check out this meme"]
+    assert "start=m_10001_20002" in query["url"][0]
 
 
 def test_build_url_share_button():

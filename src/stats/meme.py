@@ -386,7 +386,7 @@ async def calculate_meme_raw_impressions_stats() -> None:
 
 async def calculate_meme_invited_count():
     # ruff: noqa: W605
-    # Counts non-self bot starts from in-bot share links (s_{user_id}_{meme_id})
+    # Counts non-self bot starts from in-bot share links (m_{user_id}_{meme_id})
     insert_query = """
         WITH PARSED_SHARE_CLICKS AS (
             SELECT
@@ -396,8 +396,8 @@ async def calculate_meme_invited_count():
             FROM user_deep_link_log
             WHERE
                 deep_link IS NOT NULL
-                AND deep_link LIKE 's\\_%\\_%'
-                AND deep_link ~ '^s_[0-9]+_[0-9]+$'
+                AND deep_link LIKE ANY (ARRAY['m\\_%\\_%', 's\\_%\\_%'])
+                AND deep_link ~ '^[ms]_[0-9]+_[0-9]+$'
         ),
         AFFECTED_MEMES AS (
             SELECT M.id AS meme_id
@@ -444,7 +444,7 @@ async def calculate_channel_invited_count():
     """Count bot starts from channel crosspost links (sc_{meme_id}_{channel}).
 
     Different deep link format from in-bot shares:
-    - Bot shares: s_{user_id}_{meme_id} -> invited_count
+    - Bot shares: m_{user_id}_{meme_id} -> invited_count
     - Channel posts: sc_{meme_id}_{channel} -> channel_invited_count
     """
     # The actual bot_starts metric is computed on-demand via SQL queries in
