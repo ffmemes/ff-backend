@@ -2,6 +2,7 @@ import random
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
+from src import localizer
 from src.storage.constants import (
     MemeSourceStatus,
 )
@@ -126,12 +127,13 @@ def meme_source_language_selection_keyboard(meme_source_id: int):
 def meme_source_change_status_keyboard(
     meme_source_id: int,
     current_status: MemeSourceStatus | str | None = None,
+    lang: str | None = "ru",
 ):
     return InlineKeyboardMarkup(
         [
             [
                 InlineKeyboardButton(
-                    f"➡️ {status.value}",
+                    localizer.t(f"moderator.meme_source.action.{status.value}", lang),
                     callback_data=MEME_SOURCE_SET_STATUS_PATTERN.format(
                         meme_source_id=meme_source_id,
                         status=status.value,
