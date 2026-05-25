@@ -68,6 +68,15 @@ def parse_meme_source_link(text: str | None) -> MemeSourceLink | None:
     return None
 
 
+def parse_meme_source_status_callback_data(data: str) -> tuple[int, str]:
+    _, meme_source_id, _, raw_status = data.split(":", maxsplit=3)
+    if raw_status.startswith("MemeSourceStatus."):
+        status_name = raw_status.split(".", maxsplit=1)[1]
+        return int(meme_source_id), MemeSourceStatus[status_name].value
+
+    return int(meme_source_id), raw_status
+
+
 async def handle_meme_source_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if await get_moderator_user_info(update.effective_user.id) is None:
         await update.message.reply_text("Only moderators can manage meme sources.")
@@ -129,8 +138,11 @@ async def handle_meme_source_change_status(
         await update.callback_query.answer("🤷‍♀️ Only moderators can change meme source status 🤷‍♂️")  # noqa: E501
         return
 
-    args = update.callback_query.data.split(":")
-    meme_source_id, status = int(args[1]), args[3]
+    try:
+        meme_source_id, status = parse_meme_source_status_callback_data(update.callback_query.data)
+    except (IndexError, KeyError, ValueError):
+        await update.callback_query.answer("Invalid meme source status action")
+        return
 
     try:
         # `trigger_parse=False` keeps parse-after-UI ordering: we want the

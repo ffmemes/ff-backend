@@ -51,4 +51,11 @@ service.out_of_memes:
     🚀 आपने जोक्स देख लिए हैं जो हमने आपके लिए तैयार किए हैं! 
     
     कल वापस आइए और अधिक देखें या अधिक भाषाएँ जोड़ें: /lang. 🍔
-  
+
+service.bot_updated:
+  en: |-
+    🔄 The bot was updated. Press /start to continue.
+  ru: |-
+    🔄 Бот обновился. Нажми /start, чтобы продолжить.
+  uk: |-
+    🔄 Бот оновився. Натисни /start, щоб продовжити.

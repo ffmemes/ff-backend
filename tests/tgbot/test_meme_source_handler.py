@@ -1,10 +1,13 @@
+import re
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.storage.constants import MemeSourceType
+from src.storage.constants import MemeSourceStatus, MemeSourceType
+from src.tgbot.constants import MEME_SOURCE_SET_STATUS_REGEXP
 from src.tgbot.handlers.moderator import meme_source
+from src.tgbot.senders.keyboards import meme_source_change_status_keyboard
 
 
 @pytest.mark.parametrize(
@@ -60,6 +63,41 @@ def test_parse_meme_source_link_accepts_common_source_formats(
 )
 def test_parse_meme_source_link_rejects_unsupported_sources(text: str) -> None:
     assert meme_source.parse_meme_source_link(text) is None
+
+
+def test_meme_source_status_keyboard_uses_stable_callback_values() -> None:
+    keyboard = meme_source_change_status_keyboard(
+        meme_source_id=203,
+        current_status=MemeSourceStatus.PARSING_ENABLED.value,
+    )
+
+    buttons = [row[0] for row in keyboard.inline_keyboard]
+    callback_data = [button.callback_data for button in buttons]
+
+    assert "ms:203:set_status:snoozed" in callback_data
+    assert "ms:203:set_status:parsing_enabled" not in callback_data
+    assert all(re.match(MEME_SOURCE_SET_STATUS_REGEXP, data) for data in callback_data)
+    assert all("MemeSourceStatus." not in data for data in callback_data)
+    assert {button.text for button in buttons} == {
+        "➡️ in_moderation",
+        "➡️ parsing_disabled",
+        "➡️ snoozed",
+    }
+
+
+@pytest.mark.parametrize(
+    "callback_data,expected",
+    [
+        ("ms:203:set_status:snoozed", (203, "snoozed")),
+        ("ms:203:set_status:MemeSourceStatus.SNOOZED", (203, "snoozed")),
+    ],
+)
+def test_parse_meme_source_status_callback_data_accepts_current_and_legacy_buttons(
+    callback_data: str,
+    expected: tuple[int, str],
+) -> None:
+    assert re.match(MEME_SOURCE_SET_STATUS_REGEXP, callback_data)
+    assert meme_source.parse_meme_source_status_callback_data(callback_data) == expected
 
 
 @pytest.mark.asyncio

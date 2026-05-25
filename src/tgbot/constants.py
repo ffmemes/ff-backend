@@ -40,7 +40,7 @@ MEME_SOURCE_SET_LANG_PATTERN = "ms:{meme_source_id}:set_lang:{lang_code}"
 MEME_SOURCE_SET_LANG_REGEXP = r"^ms:\d+:set_lang:\w{2}$"
 
 MEME_SOURCE_SET_STATUS_PATTERN = "ms:{meme_source_id}:set_status:{status}"
-MEME_SOURCE_SET_STATUS_REGEXP = r"^ms:\d+:set_status:\w+$"
+MEME_SOURCE_SET_STATUS_REGEXP = r"^ms:\d+:set_status:(?:\w+|MemeSourceStatus\.\w+)$"
 
 # Source-candidate (discovered from forwarded TG posts) approval buttons.
 SOURCE_CANDIDATE_ACTION_PATTERN = "msc:{candidate_id}:{action}"
