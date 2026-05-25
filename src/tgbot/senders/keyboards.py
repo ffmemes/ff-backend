@@ -15,6 +15,7 @@ from src.tgbot.constants import (
     SOURCE_CANDIDATE_VOTE_PATTERN,
     Reaction,
 )
+from src.tgbot.sharing import build_meme_share_button
 
 # IDEA: use sometimes another emoji pair like 🤣/🤮
 
@@ -57,37 +58,53 @@ def meme_reaction_keyboard(
     user_id: int,
     referral_button_text: str,
     visible_like_count: int | None = None,
+    share_button_variant: str | None = None,
+    interface_lang: str | None = None,
+    reaction_context: str | None = None,
+    meme_type: str | None = None,
 ):
     heart = random.choice(HEART_EMOJI)
     like = f"{heart} {visible_like_count}" if visible_like_count is not None else heart
     dislike = "⏬"
     # like, dislike = "👍", "👎"
 
-    return InlineKeyboardMarkup(
-        [
+    def reaction_callback(reaction_id: int) -> str:
+        callback_data = MEME_BUTTON_CALLBACK_DATA_PATTERN.format(
+            meme_id=meme_id,
+            reaction_id=reaction_id,
+        )
+        if reaction_context:
+            callback_data += f":{reaction_context}"
+        return callback_data
+
+    keyboard = []
+    if share_button_variant:
+        keyboard.append(
             [
-                InlineKeyboardButton(
-                    like,
-                    callback_data=MEME_BUTTON_CALLBACK_DATA_PATTERN.format(
-                        meme_id=meme_id, reaction_id=Reaction.LIKE.value
-                    ),
-                ),
-                InlineKeyboardButton(
-                    dislike,
-                    callback_data=MEME_BUTTON_CALLBACK_DATA_PATTERN.format(
-                        meme_id=meme_id, reaction_id=Reaction.DISLIKE.value
-                    ),
-                ),
-            ],
-            # doesn't work: Telegram removes this link
-            #             [
-            #     InlineKeyboardButton(
-            #         referral_button_text,
-            #         url=referral_link,
-            #     ),
-            # ],
+                build_meme_share_button(
+                    meme_id=meme_id,
+                    user_id=user_id,
+                    text=referral_button_text,
+                    variant=share_button_variant,
+                    interface_lang=interface_lang,
+                    meme_type=meme_type,
+                )
+            ]
+        )
+
+    keyboard.append(
+        [
+            InlineKeyboardButton(
+                like,
+                callback_data=reaction_callback(Reaction.LIKE.value),
+            ),
+            InlineKeyboardButton(
+                dislike,
+                callback_data=reaction_callback(Reaction.DISLIKE.value),
+            ),
         ]
     )
+    return InlineKeyboardMarkup(keyboard)
 
 
 def queue_empty_alert_keyboard(emoji: str = "⏳"):

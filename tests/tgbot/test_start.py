@@ -14,12 +14,16 @@ import pytest_asyncio
 from sqlalchemy import delete, select
 from telegram import User
 from telegram.ext import ContextTypes
+from tests.factories import create_meme, create_meme_source, create_reaction
 
 from src.database import (
     engine,
+    meme,
+    meme_source,
     user,
     user_deep_link_log,
     user_language,
+    user_meme_reaction,
     user_tg,
 )
 
@@ -60,17 +64,30 @@ async def _cleanup_user(user_id: int) -> None:
         await conn.execute(
             delete(user_deep_link_log).where(user_deep_link_log.c.user_id == user_id)
         )
+        await conn.execute(
+            delete(user_meme_reaction).where(user_meme_reaction.c.user_id == user_id)
+        )
         await conn.execute(delete(user_language).where(user_language.c.user_id == user_id))
         await conn.execute(delete(user).where(user.c.id == user_id))
         await conn.execute(delete(user_tg).where(user_tg.c.id == user_id))
         await conn.commit()
 
 
+async def _cleanup_shared_meme_fixture() -> None:
+    async with engine.connect() as conn:
+        await conn.execute(delete(user_meme_reaction).where(user_meme_reaction.c.meme_id == 10001))
+        await conn.execute(delete(meme).where(meme.c.id == 10001))
+        await conn.execute(delete(meme_source).where(meme_source.c.id == 10001))
+        await conn.commit()
+
+
 @pytest_asyncio.fixture()
 async def cleanup():
+    await _cleanup_shared_meme_fixture()
     await _cleanup_user(NEW_USER_ID)
     await _cleanup_user(EXISTING_USER_ID)
     yield
+    await _cleanup_shared_meme_fixture()
     await _cleanup_user(NEW_USER_ID)
     await _cleanup_user(EXISTING_USER_ID)
 
@@ -78,13 +95,18 @@ async def cleanup():
 HANDLER_MODULE = "src.tgbot.handlers.start"
 
 
-def _patch_handlers():
+def _patch_handlers(shared_meme_sent: bool = False):
     """Patch every downstream handler so we test orchestration only."""
     return [
         patch(f"{HANDLER_MODULE}.handle_show_kitchen", new_callable=AsyncMock),
         patch(f"{HANDLER_MODULE}.handle_language_settings", new_callable=AsyncMock),
         patch(f"{HANDLER_MODULE}.handle_invited_user", new_callable=AsyncMock),
         patch(f"{HANDLER_MODULE}.handle_shared_meme_reward", new_callable=AsyncMock),
+        patch(
+            f"{HANDLER_MODULE}._send_shared_meme_from_deep_link",
+            new_callable=AsyncMock,
+            return_value=shared_meme_sent,
+        ),
         patch(f"{HANDLER_MODULE}.next_message", new_callable=AsyncMock),
         patch(f"{HANDLER_MODULE}.log_start_event", new_callable=AsyncMock),
         patch("src.tgbot.handlers.stats.wrapped.handle_wrapped", new_callable=AsyncMock),
@@ -116,13 +138,17 @@ async def _assert_universal_side_effects(user_id: int, expected_deep_link: str |
     assert dl_rows[0]._asdict()["deep_link"] == expected_deep_link
 
 
-async def _run_handle_start(deep_link: str | None, user_id: int = NEW_USER_ID):
+async def _run_handle_start(
+    deep_link: str | None,
+    user_id: int = NEW_USER_ID,
+    shared_meme_sent: bool = False,
+):
     from src.tgbot.handlers.start import handle_start
 
     update = _make_update(deep_link, user_id)
     context = _make_context(deep_link)
 
-    patches = _patch_handlers()
+    patches = _patch_handlers(shared_meme_sent=shared_meme_sent)
     started = [p.start() for p in patches]
     try:
         await handle_start(update, context)
@@ -136,6 +162,7 @@ async def _run_handle_start(deep_link: str | None, user_id: int = NEW_USER_ID):
                 "lang_settings",
                 "invited",
                 "shared_reward",
+                "shared_meme",
                 "next_message",
                 "log_start",
                 "wrapped",
@@ -186,9 +213,11 @@ async def test_new_user_giveaway_branch_inits_languages(cleanup):
 
 @pytest.mark.asyncio
 async def test_new_user_share_link_branch_inits_languages(cleanup):
-    mocks = await _run_handle_start(deep_link="s_12345_678")
+    mocks = await _run_handle_start(deep_link="s_12345_678", shared_meme_sent=True)
     await _assert_universal_side_effects(NEW_USER_ID, expected_deep_link="s_12345_678")
-    mocks["lang_settings"].assert_called_once()
+    mocks["shared_meme"].assert_called_once()
+    assert mocks["shared_meme"].call_args.kwargs["reaction_context"] == "onboard"
+    mocks["lang_settings"].assert_not_called()
     mocks["invited"].assert_called_once()
 
 
@@ -219,6 +248,93 @@ async def test_existing_user_no_deep_link_serves_meme(cleanup):
     mocks = await _run_handle_start(deep_link=None, user_id=EXISTING_USER_ID)
     mocks["next_message"].assert_called_once()
     mocks["lang_settings"].assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_existing_user_share_link_serves_shared_meme(cleanup):
+    await _run_handle_start(deep_link=None, user_id=EXISTING_USER_ID)
+
+    mocks = await _run_handle_start(
+        deep_link="s_12345_678",
+        user_id=EXISTING_USER_ID,
+        shared_meme_sent=True,
+    )
+
+    mocks["shared_meme"].assert_called_once()
+    mocks["shared_reward"].assert_called_once()
+    mocks["next_message"].assert_not_called()
+    mocks["lang_settings"].assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_existing_user_share_link_with_prior_reaction_serves_next_meme(cleanup):
+    from src.tgbot.handlers.start import handle_start
+
+    await _run_handle_start(deep_link=None, user_id=EXISTING_USER_ID)
+    async with engine.begin() as conn:
+        await create_meme_source(conn, id=10001, language_code="en")
+        await create_meme(
+            conn,
+            id=10001,
+            meme_source_id=10001,
+            language_code="en",
+            telegram_file_id="test_shared_file_id",
+        )
+        await create_reaction(
+            conn,
+            user_id=EXISTING_USER_ID,
+            meme_id=10001,
+            reaction_id=1,
+            recommended_by="share_link",
+        )
+
+    update = _make_update("s_12345_10001", EXISTING_USER_ID)
+    context = _make_context("s_12345_10001")
+
+    patches = [
+        patch(f"{HANDLER_MODULE}.handle_show_kitchen", new_callable=AsyncMock),
+        patch(f"{HANDLER_MODULE}.handle_language_settings", new_callable=AsyncMock),
+        patch(f"{HANDLER_MODULE}.handle_invited_user", new_callable=AsyncMock),
+        patch(f"{HANDLER_MODULE}.handle_shared_meme_reward", new_callable=AsyncMock),
+        patch(f"{HANDLER_MODULE}.send_meme_to_user", new_callable=AsyncMock),
+        patch(f"{HANDLER_MODULE}.next_message", new_callable=AsyncMock),
+        patch(f"{HANDLER_MODULE}.log_start_event", new_callable=AsyncMock),
+        patch("src.tgbot.handlers.stats.wrapped.handle_wrapped", new_callable=AsyncMock),
+        patch(
+            "src.tgbot.handlers.treasury.giveaway.handle_giveaway",
+            new_callable=AsyncMock,
+        ),
+    ]
+    started = [p.start() for p in patches]
+    try:
+        await handle_start(update, context)
+    finally:
+        for p in patches:
+            p.stop()
+
+    mocks = dict(
+        zip(
+            [
+                "kitchen",
+                "lang_settings",
+                "invited",
+                "shared_reward",
+                "send_meme",
+                "next_message",
+                "log_start",
+                "wrapped",
+                "giveaway",
+            ],
+            started,
+        )
+    )
+    mocks["send_meme"].assert_not_called()
+    mocks["next_message"].assert_called_once()
+    mocks["shared_reward"].assert_called_once_with(
+        context.bot,
+        EXISTING_USER_ID,
+        "s_12345_10001",
+    )
 
 
 @pytest.mark.asyncio

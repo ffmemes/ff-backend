@@ -1,11 +1,38 @@
 import pytest
 
+from src.storage.constants import MemeType
 from src.tgbot import service
-from src.tgbot.handlers.inline import INLINE_SEARCH_RESULT_LIMIT
+from src.tgbot.handlers.inline import (
+    INLINE_SEARCH_RESULT_LIMIT,
+    build_inline_meme_result,
+    parse_exact_meme_inline_query,
+)
 
 
 def test_inline_search_returns_twenty_results():
     assert INLINE_SEARCH_RESULT_LIMIT == 20
+
+
+def test_parse_exact_meme_inline_query():
+    assert parse_exact_meme_inline_query("#123") == 123
+    assert parse_exact_meme_inline_query("#00123") == 123
+    assert parse_exact_meme_inline_query("123") is None
+    assert parse_exact_meme_inline_query("#abc") is None
+
+
+def test_build_exact_inline_meme_result_uses_share_deep_link():
+    result = build_inline_meme_result(
+        {
+            "id": 123,
+            "type": MemeType.IMAGE.value,
+            "telegram_file_id": "photo-file-id",
+        },
+        {"id": 456},
+    )
+
+    assert result.id == "123"
+    assert result.photo_file_id == "photo-file-id"
+    assert "start=s_456_123" in result.caption
 
 
 @pytest.mark.asyncio

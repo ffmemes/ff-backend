@@ -1,4 +1,3 @@
-import re
 from datetime import datetime
 
 from telegram import Bot
@@ -13,8 +12,9 @@ from src.tgbot.service import (
     get_user_by_id,
     update_user,
 )
+from src.tgbot.sharing import parse_meme_share_deep_link
 
-LINK_UNDER_MEME_PATTERN = r"s_\d+_\d+"
+LINK_UNDER_MEME_PATTERN = r"^s_\d+_\d+$"
 
 
 async def handle_invited_user(
@@ -23,11 +23,11 @@ async def handle_invited_user(
     invited_user_name: str,
     deep_link: str | None,
 ):
-    if not deep_link or not re.match(LINK_UNDER_MEME_PATTERN, deep_link):
+    share_link = parse_meme_share_deep_link(deep_link)
+    if share_link is None:
         return
 
-    _, user_id, _ = deep_link.split("_")
-    invitor_user_id = int(user_id)
+    invitor_user_id = share_link.sharer_user_id
 
     # get invitor user
     invitor_user = await get_user_by_id(invitor_user_id)
@@ -81,11 +81,11 @@ async def handle_shared_meme_reward(
     clicked_user_id: int,
     deep_link: str | None,
 ):
-    if not deep_link or not re.match(LINK_UNDER_MEME_PATTERN, deep_link):
+    share_link = parse_meme_share_deep_link(deep_link)
+    if share_link is None:
         return
 
-    _, user_id, _ = deep_link.split("_")
-    invitor_user_id = int(user_id)
+    invitor_user_id = share_link.sharer_user_id
 
     if clicked_user_id == invitor_user_id:
         return  # don't reward clicking on your links

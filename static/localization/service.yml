@@ -59,3 +59,39 @@ service.bot_updated:
     🔄 Бот обновился. Нажми /start, чтобы продолжить.
   uk: |-
     🔄 Бот оновився. Натисни /start, щоб продовжити.
+
+meme.share_button:
+  ru: |-
+    Отправить другу
+  en: |-
+    Send to a friend
+  uk: |-
+    Надіслати другу
+  es: |-
+    Enviar a un amigo
+  pt-br: |-
+    Enviar para um amigo
+  fr: |-
+    Envoyer à un ami
+  it: |-
+    Invia a un amico
+  de: |-
+    An Freund senden
+
+meme.share_text:
+  ru: |-
+    Посмотри мем
+  en: |-
+    Check out this meme
+  uk: |-
+    Подивись мем
+  es: |-
+    Mira este meme
+  pt-br: |-
+    Veja este meme
+  fr: |-
+    Regarde ce meme
+  it: |-
+    Guarda questo meme
+  de: |-
+    Schau dir dieses Meme an

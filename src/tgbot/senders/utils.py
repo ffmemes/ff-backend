@@ -4,8 +4,8 @@ from typing import Iterable
 from telegram import Message, Update
 from telegram.constants import ParseMode
 
-from src.config import settings
 from src.tgbot.service import get_user_languages
+from src.tgbot.sharing import get_meme_share_link
 
 
 def get_random_emoji() -> str:
@@ -71,7 +71,7 @@ def get_random_emoji() -> str:
 
 
 def get_referral_link(user_id: int, meme_id: int) -> str:
-    return f"https://t.me/{settings.TELEGRAM_BOT_USERNAME}?start=s_{user_id}_{meme_id}"
+    return get_meme_share_link(user_id, meme_id)
 
 
 def get_referral_html(user_id: int, meme_id: int) -> str:

@@ -4,6 +4,7 @@ import pytest
 
 from src.tgbot.senders import meme_like_count_experiment as experiment
 from src.tgbot.senders.keyboards import meme_reaction_keyboard
+from src.tgbot.sharing import MEME_SHARE_BUTTON_URL
 
 
 def _button_texts(markup) -> list[str]:
@@ -23,6 +24,22 @@ def test_keyboard_keeps_like_button_plain_without_visible_count(monkeypatch):
     assert _button_texts(markup) == ["❤️", "⏬"]
 
 
+def test_keyboard_renders_share_button_above_reactions(monkeypatch):
+    monkeypatch.setattr("src.tgbot.senders.keyboards.random.choice", lambda hearts: "❤️")
+
+    markup = meme_reaction_keyboard(
+        meme_id=1,
+        user_id=2,
+        referral_button_text="Send to a friend",
+        visible_like_count=None,
+        share_button_variant=MEME_SHARE_BUTTON_URL,
+        interface_lang="en",
+    )
+
+    assert _button_texts(markup) == ["Send to a friend", "❤️", "⏬"]
+    assert markup.inline_keyboard[0][0].url.startswith("https://t.me/share/url?")
+
+
 def test_keyboard_renders_visible_like_count(monkeypatch):
     monkeypatch.setattr("src.tgbot.senders.keyboards.random.choice", lambda hearts: "❤️")
 
@@ -34,6 +51,20 @@ def test_keyboard_renders_visible_like_count(monkeypatch):
     )
 
     assert _button_texts(markup) == ["❤️ 12", "⏬"]
+
+
+def test_keyboard_can_mark_reaction_context(monkeypatch):
+    monkeypatch.setattr("src.tgbot.senders.keyboards.random.choice", lambda hearts: "❤️")
+
+    markup = meme_reaction_keyboard(
+        meme_id=1,
+        user_id=2,
+        referral_button_text="Memes",
+        reaction_context="onboard",
+    )
+
+    assert markup.inline_keyboard[0][0].callback_data == "r:1:1:onboard"
+    assert markup.inline_keyboard[0][1].callback_data == "r:1:2:onboard"
 
 
 def test_like_count_assignment_is_stable():

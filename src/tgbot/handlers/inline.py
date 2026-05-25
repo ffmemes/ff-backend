@@ -1,13 +1,15 @@
 from telegram import (
+    InlineQueryResultCachedGif,
     InlineQueryResultCachedPhoto,
+    InlineQueryResultCachedVideo,
     InlineQueryResultsButton,
     Update,
 )
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
-from src.config import settings
 from src.localizer import t
+from src.storage.constants import MemeType
 from src.tgbot.constants import (
     INLINE_SEARCH_REQUEST_DEEPLINK,
 )
@@ -16,8 +18,10 @@ from src.tgbot.senders.utils import get_random_emoji
 from src.tgbot.service import (
     create_inline_chosen_result_log,
     create_inline_search_log,
+    get_shareable_meme_by_id,
     search_memes_for_inline_query,
 )
+from src.tgbot.sharing import get_meme_share_link
 from src.tgbot.user_info import get_user_info
 
 MIN_SEARCH_QUERY_LENGTH = 3
@@ -27,8 +31,7 @@ INLINE_SEARCH_RESULT_CACHE_SECONDS = 60 * 60 * 12  # 12 hours
 
 
 def get_inline_result_ref_link(user_id: int, meme_id: int):
-    deep_link = f"ir_{user_id}_{meme_id}"  # inline result
-    return f"https://t.me/{settings.TELEGRAM_BOT_USERNAME}?start={deep_link}"
+    return get_meme_share_link(user_id, meme_id)
 
 
 def get_inline_result_caption(meme, user_info):
@@ -40,6 +43,62 @@ def get_inline_result_caption(meme, user_info):
     caption += f"""{emoji} <a href="{ref_link}">Fast Food Memes</a>"""
 
     return caption
+
+
+def parse_exact_meme_inline_query(query: str) -> int | None:
+    if not query.startswith("#"):
+        return None
+
+    meme_id = query[1:]
+    if not meme_id.isdigit():
+        return None
+
+    return int(meme_id)
+
+
+def build_inline_meme_result(meme: dict, user_info: dict):
+    caption = get_inline_result_caption(meme, user_info)
+    meme_type = MemeType(meme["type"])
+    if meme_type == MemeType.IMAGE:
+        return InlineQueryResultCachedPhoto(
+            id=str(meme["id"]),
+            photo_file_id=meme["telegram_file_id"],
+            caption=caption,
+            parse_mode=ParseMode.HTML,
+        )
+    if meme_type == MemeType.VIDEO:
+        return InlineQueryResultCachedVideo(
+            id=str(meme["id"]),
+            video_file_id=meme["telegram_file_id"],
+            title="Fast Food Memes",
+            caption=caption,
+            parse_mode=ParseMode.HTML,
+        )
+    if meme_type == MemeType.ANIMATION:
+        return InlineQueryResultCachedGif(
+            id=str(meme["id"]),
+            gif_file_id=meme["telegram_file_id"],
+            caption=caption,
+            parse_mode=ParseMode.HTML,
+        )
+    return None
+
+
+async def answer_exact_meme_inline_query(update: Update, user_info: dict, meme_id: int) -> None:
+    meme = await get_shareable_meme_by_id(meme_id)
+    result = build_inline_meme_result(meme, user_info) if meme else None
+    results = [result] if result else []
+    await update.inline_query.answer(
+        results,
+        cache_time=INLINE_SEARCH_RESULT_CACHE_SECONDS,
+        is_personal=True,
+    )
+
+    await create_inline_search_log(
+        user_id=update.effective_user.id,
+        query=update.inline_query.query.strip().lower(),
+        chat_type=update.inline_query.chat_type,
+    )
 
 
 async def search_inline(update: Update, _: ContextTypes.DEFAULT_TYPE):
@@ -55,6 +114,10 @@ async def search_inline(update: Update, _: ContextTypes.DEFAULT_TYPE):
         return
 
     query = update.inline_query.query.strip().lower()
+
+    exact_meme_id = parse_exact_meme_inline_query(query)
+    if exact_meme_id is not None:
+        return await answer_exact_meme_inline_query(update, user_info, exact_meme_id)
 
     if len(query) == 0:
         # TODO: show trending / recommended memes
@@ -92,17 +155,13 @@ async def search_inline(update: Update, _: ContextTypes.DEFAULT_TYPE):
         await update.inline_query.answer([], button=no_results_button)
         return
 
-    results = [
-        InlineQueryResultCachedPhoto(
-            id=str(meme["id"]),
-            photo_file_id=meme["telegram_file_id"],
-            caption=get_inline_result_caption(meme, user_info),
-            parse_mode=ParseMode.HTML,
-        )
-        for meme in memes
-    ]
+    results = [result for meme in memes if (result := build_inline_meme_result(meme, user_info))]
 
-    await update.inline_query.answer(results, cache_time=INLINE_SEARCH_RESULT_CACHE_SECONDS)
+    await update.inline_query.answer(
+        results,
+        cache_time=INLINE_SEARCH_RESULT_CACHE_SECONDS,
+        is_personal=True,
+    )
 
     await create_inline_search_log(
         user_id=update.effective_user.id,
