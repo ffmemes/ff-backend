@@ -4,8 +4,8 @@ from typing import Iterable
 from telegram import Message, Update
 from telegram.constants import ParseMode
 
-from src.tgbot.sharing import get_meme_share_link
 from src.tgbot.service import get_user_languages
+from src.tgbot.sharing import get_meme_share_link
 
 
 def get_random_emoji() -> str:

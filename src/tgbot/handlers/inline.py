@@ -157,7 +157,11 @@ async def search_inline(update: Update, _: ContextTypes.DEFAULT_TYPE):
 
     results = [result for meme in memes if (result := build_inline_meme_result(meme, user_info))]
 
-    await update.inline_query.answer(results, cache_time=INLINE_SEARCH_RESULT_CACHE_SECONDS)
+    await update.inline_query.answer(
+        results,
+        cache_time=INLINE_SEARCH_RESULT_CACHE_SECONDS,
+        is_personal=True,
+    )
 
     await create_inline_search_log(
         user_id=update.effective_user.id,
