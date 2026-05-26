@@ -153,6 +153,12 @@ fires before the 10:00 MSK Comms cron), write a second file:
 This file is **Comms Agent's primary input**. It must rank the day's most
 surprising findings so Comms can pick one and turn it into a post.
 
+Comms is optimizing for a public build-in-public channel, not an internal
+metrics dashboard. Rank findings by **editorial usefulness first** and raw
+statistical magnitude second. A 7σ source_id spike is not automatically a good
+post if the public story is "one internal source moved"; a smaller product,
+research, cohort, or user-facing learning can be the better lead.
+
 Format:
 ```markdown
 # Anomalies YYYY-MM-DD
@@ -167,6 +173,11 @@ Format:
 - **Suggested visual**: stat_slide | line_chart | bar_chart | none
 - **HARD BAN risk**: yes | no  (set yes if this is about describe_memes, infra,
   circuit breakers, deploys, a/b tests in progress — Comms will skip these)
+- **Public story score**: 0-5  (5 = a stranger immediately gets why this matters)
+- **Reader payoff**: [what the reader learns, can try, or can laugh at]
+- **Novelty vs last 14 posts**: new | similar | duplicate
+- **Post eligibility**: post-ready | research-only | skip
+- **Suggested framing**: [one casual Russian angle without source_id/internal jargon]
 
 ## Finding 2: ...
 (up to 5-8 findings, ranked strongest first)
@@ -182,15 +193,29 @@ Format:
 - **Unexpected popular content** — a single meme, source, or language doing far
   better than expected
 - **Recurring patterns** — anything that's been weird for 3+ days now
+- **Recent user-facing product changes** — if a shipped change creates a good
+  public story, include it as an `other` finding even when it is not a metric
+  outlier yet. Translate `git log --since="7 days"` / CEO decisions into human
+  language: share button, inline meme search, moderator source voting, upload
+  feedback, giveaways, burger economy, group-chat behavior. Do not list PRs or
+  commits in the finding.
 
 **What NOT to include** (set `HARD BAN risk: yes` and deprioritize):
 - describe_memes coverage dropping (Comms will skip it)
 - circuit breaker trips, flow pauses, deploy issues (firefighting)
 - running A/B tests mid-flight (no conclusive result yet)
+- raw `source_id` movements unless they teach a broader lesson: user uploads
+  suddenly work, moderators found a new content vein, one language/community is
+  behaving differently, or a single meme is broadly funny enough to stand alone.
+- the same public topic family that appeared in the last 14 posts. Mark it
+  `duplicate` and `research-only` unless there is a genuinely new conclusion.
 
 If NO findings cross the 2σ threshold today, still write the file with a
-`# Anomalies YYYY-MM-DD` header and a note: `No strong anomalies today — Comms
-should fall back to B-Historical or D-Engagement categories.`
+`# Anomalies YYYY-MM-DD` header and a short **Editorial fallback slate**:
+2-3 post-ready alternatives from recent product changes, lore, recurring meme
+formats, or research follow-ups. If there is truly nothing, write:
+`No strong anomalies today — Comms should fall back to B-Historical,
+D-Engagement, E-Recurring, or weekly shipped-digest categories.`
 
 ### 9. Log to JSONL
 Append an entry to `experiments/log.jsonl`:

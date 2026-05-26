@@ -73,19 +73,52 @@ beyond that.
 If the file is missing (first run, or cron failed), proceed without it —
 the rotation check still runs against the database.
 
-### Step 1 — Read today's anomaly report (primary input)
+### Step 1 — Build today's editorial slate
 Read `experiments/reports/anomalies-YYYY-MM-DD.md` written by the Analyst agent
-earlier this morning. This file ranks the day's most surprising findings
-(DAU delta, source climbers, like-rate outliers, language shifts, session length
-moves, cohort anomalies). Pick the strongest finding with `Chart-worthy: yes`.
+earlier this morning. This file ranks the day's most surprising findings and
+may include an editorial fallback slate. Do not mechanically publish Finding 1.
+Build a short candidate slate and pick the best public story.
+
+Priority order:
+1. **User-facing product change people can try today** — share button, inline
+   search, upload feedback, source voting, giveaway, burger flow, group-chat
+   behavior.
+2. **Conclusive product/research learning** — what we believed, what the data
+   changed, what we will do differently. No in-flight A/B status updates.
+3. **Build-in-public before/after** — a clear product/process change without
+   infra drama or release-note prose.
+4. **Funny meme/content finding** — meme of the day/week/month, language niche,
+   source/community story that works for a stranger.
+5. **Raw data anomaly** — only if it has a non-obvious public takeaway.
+
+Use Analyst's `Public story score`, `Reader payoff`, `Novelty vs last 14 posts`,
+and `Post eligibility` fields when present. A higher z-score does not beat a
+better public story.
+
+Hard editorial caps:
+- raw source_id/source-burst post: max 1 per 7 days;
+- session-length/North-Star post: max 1 per 10 days;
+- language-share or meme-type gap post: max 1 per 7 days;
+- "fresh meme fast start" / top-meme stat card: max 1 per 7 days per channel.
+
+If all anomalies are duplicates, research-only, hard-ban risky, or just "one
+internal metric moved", use Step 1b fallback even when the anomaly file exists.
 
 If the anomaly file is missing (Analyst failed), fall back to Step 1b.
 
-### Step 1b — Fallback topics (ONLY when anomaly file is missing)
+### Step 1b — Fallback topics
 Pick ONE from:
+- **A-Feature** — a user-facing feature now available in the bot. Explain what
+  a reader can try, not how the implementation works.
 - **B-Historical** — a milestone, throwback, or lore moment from `docs/comms/lore/`
 - **D-Engagement** — a giveaway, CTA, or voting prompt (not more than 1/month)
 - **E-Recurring** — meme of the day from DB (query `meme_stats` ORDER BY lr_smoothed)
+- **E-Weekly digest** — what changed this week in plain language. You may use
+  recent git/Paperclip history only as input, then translate it into product
+  outcomes. No PR numbers, commit hashes, internal agent names, or release-note
+  bullets in the public post.
+- **F-Behind-the-scenes** — how a product mechanism works, explained without
+  infra or stack details.
 
 **Never fall back to topics from the HARD BAN list below.**
 
@@ -145,13 +178,26 @@ Write in the voice: "чуваки, мы тут на данных нашли ст
 explorer, not press release. Make a stranger without infra knowledge find this
 exciting in under 3 seconds.
 
-Structure:
-1. **Hook** (first line): name the surprise. "Интересное: {what} за {timeframe}"
-2. **Number or comparison** (one sentence): the concrete finding, 1-3 numbers max
-3. **Plain-language why** (one-two sentences): explain WHY this might be
-   happening, in words a non-technical friend would understand. No jargon.
-4. **Context or CTA** (optional, one line): what we're going to dig into, or
-   "заходи в @ffmemesbot посмотреть"
+Pick exactly one editorial format before drafting:
+- **Launch**: what users can try now + why it exists.
+- **Learning**: "думали X, данные показали Y, теперь делаем Z".
+- **Artifact**: one meme, screenshot, chart, or user-visible result carries the
+  post.
+- **Behind-the-scenes**: how a bot mechanic works in simple product language.
+- **Digest**: 2-3 things that changed this week, phrased as user/product
+  outcomes.
+- **Anomaly**: a surprising number with a real reader payoff.
+
+Default structure:
+1. **Hook** (first line): name the public surprise or change.
+2. **Concrete evidence**: 1-3 numbers max, or one crisp before/after.
+3. **Plain-language why**: why this matters to a person using or following the bot.
+4. **Context or CTA** (optional): what we're trying next, or "заходи в @ffmemesbot".
+
+Do not repeat the botty template:
+`Интересное: X vs baseline. Похоже Y. На графике Z.`
+Vary the opening, verb, and payoff. If the post still reads like a daily
+analyst card, choose a different format or fallback topic.
 
 **Length cap: ~400 characters of text** (excluding image). Strict.
 
