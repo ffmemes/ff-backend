@@ -10,6 +10,7 @@ from telegram import InlineKeyboardButton, SwitchInlineQueryChosenChat
 from src import localizer
 from src.config import settings
 from src.flows.events import safe_emit
+from src.tgbot.buttons import styled_inline_keyboard_button
 from src.tgbot.service import assign_experiment, get_experiment_variant
 
 logger = logging.getLogger(__name__)
@@ -126,12 +127,13 @@ def build_meme_share_button(
     variant: str,
     interface_lang: str | None,
     meme_type: str | None = None,
+    style: str | None = None,
 ) -> InlineKeyboardButton:
     # Cached inline results are reliable for photos/videos. Animation file IDs
     # may be GIF or MPEG4, so use the URL adapter until we store the subtype.
     supports_exact_inline = meme_type not in {"animation"}
     if variant == MEME_SHARE_BUTTON_INLINE and supports_exact_inline:
-        return InlineKeyboardButton(
+        return styled_inline_keyboard_button(
             text,
             switch_inline_query_chosen_chat=SwitchInlineQueryChosenChat(
                 query=get_meme_inline_query(meme_id),
@@ -140,9 +142,11 @@ def build_meme_share_button(
                 allow_group_chats=True,
                 allow_channel_chats=True,
             ),
+            style=style,
         )
 
-    return InlineKeyboardButton(
+    return styled_inline_keyboard_button(
         text,
         url=get_meme_share_url(user_id, meme_id, interface_lang),
+        style=style,
     )

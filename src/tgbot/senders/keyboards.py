@@ -6,6 +6,10 @@ from src import localizer
 from src.storage.constants import (
     MemeSourceStatus,
 )
+from src.tgbot.buttons import (
+    select_random_inline_keyboard_button_style,
+    styled_inline_keyboard_button,
+)
 from src.tgbot.constants import (
     MEME_BUTTON_CALLBACK_DATA_PATTERN,
     MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA,
@@ -88,19 +92,22 @@ def meme_reaction_keyboard(
                     variant=share_button_variant,
                     interface_lang=interface_lang,
                     meme_type=meme_type,
+                    style=select_random_inline_keyboard_button_style(),
                 )
             ]
         )
 
     keyboard.append(
         [
-            InlineKeyboardButton(
+            styled_inline_keyboard_button(
                 like,
                 callback_data=reaction_callback(Reaction.LIKE.value),
+                style=select_random_inline_keyboard_button_style(),
             ),
-            InlineKeyboardButton(
+            styled_inline_keyboard_button(
                 dislike,
                 callback_data=reaction_callback(Reaction.DISLIKE.value),
+                style=select_random_inline_keyboard_button_style(),
             ),
         ]
     )

@@ -40,6 +40,31 @@ def test_keyboard_renders_share_button_above_reactions(monkeypatch):
     assert markup.inline_keyboard[0][0].url.startswith("https://t.me/share/url?")
 
 
+def test_keyboard_assigns_random_styles_to_buttons_under_meme(monkeypatch):
+    styles = iter(["primary", "success", "danger"])
+
+    monkeypatch.setattr("src.tgbot.senders.keyboards.random.choice", lambda hearts: "❤️")
+    monkeypatch.setattr(
+        "src.tgbot.buttons.random.choices",
+        lambda population, k: [next(styles)],
+    )
+
+    markup = meme_reaction_keyboard(
+        meme_id=1,
+        user_id=2,
+        referral_button_text="Send to a friend",
+        visible_like_count=None,
+        share_button_variant=MEME_SHARE_BUTTON_URL,
+        interface_lang="en",
+    )
+
+    assert [
+        button.to_dict()["style"]
+        for row in markup.inline_keyboard
+        for button in row
+    ] == ["primary", "success", "danger"]
+
+
 def test_keyboard_renders_visible_like_count(monkeypatch):
     monkeypatch.setattr("src.tgbot.senders.keyboards.random.choice", lambda hearts: "❤️")
 
