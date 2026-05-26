@@ -142,7 +142,16 @@ Read `experiments/active/`. For each experiment:
 - Create task for **CTO** to implement
 
 **If there's something worth sharing publicly:**
-- Create a task for Comms Manager with what to announce and why it matters
+- Create a task for Comms Manager with the public angle, reader payoff, and what
+  to avoid. Do not just hand over a raw anomaly.
+- Include whether this is a product update, research learning, meme/content
+  story, engagement CTA, lore, or weekly digest.
+- Do not delegate raw `source_id` movement unless it teaches a broader product
+  lesson. "Source 123 spiked" is internal; "user uploads suddenly produced a
+  meme people loved" can be public.
+- If using `/retro`, git history, or shipped work as the source, frame it as
+  what changed for users or what the team learned. No public PR numbers, commit
+  hashes, release-note bullets, or internal agent coordination details.
 
 ### 5. Weekly Review (Mondays)
 First run the outcome audit:
