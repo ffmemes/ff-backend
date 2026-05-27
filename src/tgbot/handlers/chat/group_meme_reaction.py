@@ -2,11 +2,15 @@ import logging
 
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardMarkup, Update
 from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 from src.database import chat_meme_reaction, execute, fetch_all
+from src.tgbot.buttons import (
+    select_random_inline_keyboard_button_style,
+    styled_inline_keyboard_button,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +25,16 @@ def build_meme_reaction_keyboard(
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton(like_text, callback_data=f"cmr:{meme_id}:1"),
-                InlineKeyboardButton(dislike_text, callback_data=f"cmr:{meme_id}:2"),
+                styled_inline_keyboard_button(
+                    like_text,
+                    callback_data=f"cmr:{meme_id}:1",
+                    style=select_random_inline_keyboard_button_style(),
+                ),
+                styled_inline_keyboard_button(
+                    dislike_text,
+                    callback_data=f"cmr:{meme_id}:2",
+                    style=select_random_inline_keyboard_button_style(),
+                ),
             ]
         ]
     )
