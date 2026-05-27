@@ -58,11 +58,11 @@ def test_keyboard_assigns_random_styles_to_buttons_under_meme(monkeypatch):
         interface_lang="en",
     )
 
-    assert [
-        button.to_dict()["style"]
-        for row in markup.inline_keyboard
-        for button in row
-    ] == ["primary", "success", "danger"]
+    assert [button.to_dict()["style"] for row in markup.inline_keyboard for button in row] == [
+        "primary",
+        "success",
+        "danger",
+    ]
 
 
 def test_keyboard_renders_visible_like_count(monkeypatch):
