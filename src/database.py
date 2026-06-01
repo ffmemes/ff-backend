@@ -617,6 +617,22 @@ channel_daily_stats = Table(
     UniqueConstraint("channel", "date"),
 )
 
+channel_lifecycle_event = Table(
+    "channel_lifecycle_event",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("channel", String, nullable=False),
+    Column("telegram_event_id", BigInteger, nullable=False),
+    Column("telegram_user_id", BigInteger),
+    Column("event_type", String, nullable=False),
+    Column("event_at", DateTime, nullable=False),
+    Column("data", JSONB),
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+    UniqueConstraint("channel", "telegram_event_id"),
+    Index("ix_channel_lifecycle_event_channel_time", "channel", "event_at"),
+    Index("ix_channel_lifecycle_event_user_time", "telegram_user_id", "event_at"),
+)
+
 editorial_posts = Table(
     "editorial_posts",
     metadata,
