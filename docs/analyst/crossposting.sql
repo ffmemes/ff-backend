@@ -9,6 +9,7 @@
 --   (legacy rows may still use 's_%_%')
 -- - Channel deep links: user_deep_link_log.deep_link LIKE 'sc_%_%'
 -- - Channel forwards/views: crossposting + crossposting_snapshots
+-- - Passive lifecycle: channel_lifecycle_event from Telethon admin logs
 --
 -- Reference:
 -- - specs/crossposting-share-optimization-2026-05-18.md
@@ -29,6 +30,53 @@ FROM crossposting_snapshots
 WHERE snapshot_at > now() - interval '7 days'
 GROUP BY channel
 ORDER BY channel;
+
+
+-- =============================================
+-- SECTION: PASSIVE CHANNEL LIFECYCLE DAILY READOUT
+-- =============================================
+-- Joins/leaves are collected from Telegram admin logs and deduped by
+-- (channel, telegram_event_id). Telegram user IDs match user_tg.id when that
+-- channel member has also started the bot.
+
+WITH daily AS (
+  SELECT
+    cle.channel,
+    cle.event_at::date AS date,
+    count(*) FILTER (WHERE cle.event_type = 'join') AS joins,
+    count(*) FILTER (WHERE cle.event_type = 'leave') AS leaves,
+    count(DISTINCT cle.telegram_user_id) FILTER (
+      WHERE cle.event_type = 'join'
+        AND utg.id IS NOT NULL
+    ) AS known_joined_bot_users,
+    count(DISTINCT cle.telegram_user_id) FILTER (
+      WHERE cle.event_type = 'leave'
+        AND utg.id IS NOT NULL
+    ) AS known_left_bot_users,
+    count(DISTINCT cle.telegram_user_id) FILTER (
+      WHERE cle.event_type = 'join'
+        AND u.created_at >= cle.event_at
+        AND u.created_at < cle.event_at + interval '1 day'
+    ) AS new_bot_sessions_within_24h_after_join
+  FROM channel_lifecycle_event cle
+  LEFT JOIN user_tg utg
+    ON utg.id = cle.telegram_user_id
+  LEFT JOIN "user" u
+    ON u.id = utg.id
+  WHERE cle.event_at > now() - interval '30 days'
+  GROUP BY cle.channel, cle.event_at::date
+)
+SELECT
+  channel,
+  date,
+  joins,
+  leaves,
+  joins - leaves AS net_change,
+  known_joined_bot_users,
+  known_left_bot_users,
+  new_bot_sessions_within_24h_after_join
+FROM daily
+ORDER BY date DESC, channel;
 
 
 -- =============================================
