@@ -11,6 +11,8 @@ from src.recommendations.meme_queue import check_queue, get_next_meme_for_user
 from src.tgbot.bot import bot
 from src.tgbot.senders.meme import send_meme_to_user
 
+FIRST_MEME_NUDGE_DRAIN_TIMEOUT_SECONDS = 10
+
 _BROADCAST_FLOW_OPTS = dict(
     retries=1,
     retry_delay_seconds=30,
@@ -19,11 +21,52 @@ _BROADCAST_FLOW_OPTS = dict(
 )
 
 
-async def _send_to_user(user_id: int) -> None:
+async def _send_to_user(
+    user_id: int,
+    first_meme_nudge_tasks: list[asyncio.Task[None]],
+) -> None:
     await check_queue(user_id)
     meme = await get_next_meme_for_user(user_id)
     if meme:
-        await send_meme_to_user(bot, user_id, meme)
+        await send_meme_to_user(
+            bot,
+            user_id,
+            meme,
+            first_meme_nudge_tasks=first_meme_nudge_tasks,
+        )
+
+
+async def _drain_first_meme_nudge_tasks(
+    tasks: list[asyncio.Task[None]],
+    logger,
+) -> None:
+    if not tasks:
+        return
+
+    done, pending = await asyncio.wait(
+        tasks,
+        timeout=FIRST_MEME_NUDGE_DRAIN_TIMEOUT_SECONDS,
+    )
+    if pending:
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
+        logger.warning(
+            "Timed out sending %s first-meme nudge(s); released leases for retry",
+            len(pending),
+        )
+
+    for task in done:
+        if task.cancelled():
+            continue
+        exc = task.exception()
+        if exc is not None:
+            logger.warning(
+                "Failed to send first-meme nudge after broadcast meme delivery",
+                exc_info=(type(exc), exc, exc.__traceback__),
+            )
+
+    tasks.clear()
 
 
 async def broadcast_next_meme_to_users(user_ids: list[int]):
@@ -31,13 +74,18 @@ async def broadcast_next_meme_to_users(user_ids: list[int]):
     logger.info(f"Going to sent next meme to {len(user_ids)} users")
 
     for user_id in user_ids:
+        first_meme_nudge_tasks: list[asyncio.Task[None]] = []
         try:
-            await asyncio.wait_for(_send_to_user(user_id), timeout=20)
+            await asyncio.wait_for(
+                _send_to_user(user_id, first_meme_nudge_tasks),
+                timeout=20,
+            )
             logger.info(f"Sent meme to #{user_id}")
         except asyncio.TimeoutError:
             logger.warning(f"Timed out processing user #{user_id} (>20s), skipping")
         except Exception:
             logger.warning(f"Failed to send meme to #{user_id}", exc_info=True)
+        await _drain_first_meme_nudge_tasks(first_meme_nudge_tasks, logger)
         await asyncio.sleep(0.2)  # flood control
 
 
