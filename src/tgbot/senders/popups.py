@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import Callable
 
@@ -252,8 +253,7 @@ async def maybe_send_first_meme_nudge(user_id: int, user_info: dict) -> None:
     # Treatment-only sender. Caller is expected to have already invoked
     # get_or_assign_first_meme_nudge_variant synchronously (in the meme
     # delivery path, before create_user_meme_reaction) so the cohort row
-    # is locked in. Safe to dispatch as a background asyncio task — only
-    # the slow Telegram I/O lives here.
+    # is locked in.
     variant = await get_experiment_variant(user_id, FIRST_MEME_NUDGE_EXPERIMENT_ID)
     if variant != "treatment":
         return
@@ -277,6 +277,12 @@ async def maybe_send_first_meme_nudge(user_id: int, user_info: dict) -> None:
         # user can't receive messages anyway, and nmemes_sent will advance past 0
         # so this code path won't re-enter for this user.
         return
+    except asyncio.CancelledError:
+        # Broadcast callers may wrap direct sends in asyncio.wait_for. If that
+        # cancellation lands after the lease insert but before Telegram confirms
+        # delivery, release the lease so a later retry can send the nudge.
+        await delete_user_popup_log(user_id, FIRST_MEME_NUDGE_POPUP_ID)
+        raise
     except TelegramError as exc:
         # Transient delivery failure (timeout, rate-limit, etc.). Release the
         # lease so a future meme #1 attempt can re-fire the nudge.

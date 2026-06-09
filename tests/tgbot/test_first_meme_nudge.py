@@ -14,6 +14,7 @@ from src.database import (
     experiment_assignment,
     user,
 )
+from src.tgbot.senders import popups
 from src.tgbot.senders.popups import (
     FIRST_MEME_NUDGE_EXPERIMENT_ID,
     FIRST_MEME_NUDGE_POPUP_ID,
@@ -147,6 +148,22 @@ async def test_send_failure_releases_lease(setup):
 
     ok_bot.send_message.assert_called_once()
     assert await user_popup_already_sent(TREATMENT_USER_ID, FIRST_MEME_NUDGE_POPUP_ID)
+
+
+@pytest.mark.asyncio
+async def test_send_cancellation_releases_lease(monkeypatch):
+    delete_user_popup_log = AsyncMock()
+    monkeypatch.setattr(popups, "get_experiment_variant", AsyncMock(return_value="treatment"))
+    monkeypatch.setattr(popups, "create_user_popup_log", AsyncMock(return_value=True))
+    monkeypatch.setattr(popups, "delete_user_popup_log", delete_user_popup_log)
+
+    cancelled_bot = _mock_bot(AsyncMock(side_effect=asyncio.CancelledError))
+    monkeypatch.setattr(popups, "bot", cancelled_bot)
+
+    with pytest.raises(asyncio.CancelledError):
+        await maybe_send_first_meme_nudge(TREATMENT_USER_ID, _user_info("en"))
+
+    delete_user_popup_log.assert_awaited_once_with(TREATMENT_USER_ID, FIRST_MEME_NUDGE_POPUP_ID)
 
 
 @pytest.mark.asyncio
