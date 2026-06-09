@@ -5,6 +5,7 @@ from telegram.error import BadRequest, NetworkError
 
 from src.storage.constants import MemeType
 from src.storage.schemas import MemeData
+from src.tgbot.senders import meme as meme_sender
 from src.tgbot.senders.meme import edit_last_message_with_meme, send_new_message_with_meme
 
 
@@ -82,3 +83,89 @@ async def test_send_new_message_does_not_retry_ambiguous_transport_error(monkeyp
 
     assert bot.send_photo_calls == 1
     sleep.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_send_meme_to_user_schedules_first_meme_nudge_before_reaction(monkeypatch):
+    calls: list[str] = []
+    scheduled = []
+
+    async def assign_nudge(_user_id: int) -> str:
+        calls.append("assign_nudge")
+        return "treatment"
+
+    async def create_reaction(*_args):
+        calls.append("create_reaction")
+
+    def create_task(coro):
+        scheduled.append(coro)
+        coro.close()
+
+    monkeypatch.setattr(
+        meme_sender,
+        "get_user_info",
+        AsyncMock(return_value={"interface_lang": "en", "nmemes_sent": 0}),
+    )
+    monkeypatch.setattr(meme_sender, "collect_user_languages", AsyncMock(return_value={"en"}))
+    monkeypatch.setattr(meme_sender, "get_meme_share_button_text", lambda _lang: "Share")
+    monkeypatch.setattr(
+        meme_sender,
+        "get_or_assign_meme_share_button_variant",
+        AsyncMock(return_value="url_share"),
+    )
+    monkeypatch.setattr(meme_sender, "get_visible_meme_like_count", AsyncMock(return_value=0))
+    monkeypatch.setattr(
+        meme_sender,
+        "meme_reaction_keyboard",
+        lambda *_args, **_kwargs: object(),
+    )
+    monkeypatch.setattr(
+        meme_sender,
+        "get_meme_caption_for_user_id",
+        AsyncMock(return_value="<b>caption</b>"),
+    )
+    monkeypatch.setattr(meme_sender, "send_new_message_with_meme", AsyncMock())
+    monkeypatch.setattr(meme_sender, "get_or_assign_first_meme_nudge_variant", assign_nudge)
+    monkeypatch.setattr(meme_sender, "create_user_meme_reaction", create_reaction)
+    monkeypatch.setattr(meme_sender, "maybe_send_first_meme_nudge", AsyncMock())
+    monkeypatch.setattr(meme_sender.asyncio, "create_task", create_task)
+
+    await meme_sender.send_meme_to_user(bot=object(), user_id=12001, meme=_meme())
+
+    assert calls == ["assign_nudge", "create_reaction"]
+    assert len(scheduled) == 1
+
+
+@pytest.mark.asyncio
+async def test_send_meme_to_user_skips_first_meme_nudge_for_returning_user(monkeypatch):
+    monkeypatch.setattr(
+        meme_sender,
+        "get_user_info",
+        AsyncMock(return_value={"interface_lang": "en", "nmemes_sent": 2}),
+    )
+    monkeypatch.setattr(meme_sender, "collect_user_languages", AsyncMock(return_value={"en"}))
+    monkeypatch.setattr(meme_sender, "get_meme_share_button_text", lambda _lang: "Share")
+    monkeypatch.setattr(
+        meme_sender,
+        "get_or_assign_meme_share_button_variant",
+        AsyncMock(return_value="url_share"),
+    )
+    monkeypatch.setattr(meme_sender, "get_visible_meme_like_count", AsyncMock(return_value=0))
+    monkeypatch.setattr(
+        meme_sender,
+        "meme_reaction_keyboard",
+        lambda *_args, **_kwargs: object(),
+    )
+    monkeypatch.setattr(
+        meme_sender,
+        "get_meme_caption_for_user_id",
+        AsyncMock(return_value="<b>caption</b>"),
+    )
+    monkeypatch.setattr(meme_sender, "send_new_message_with_meme", AsyncMock())
+    assign_nudge = AsyncMock()
+    monkeypatch.setattr(meme_sender, "get_or_assign_first_meme_nudge_variant", assign_nudge)
+    monkeypatch.setattr(meme_sender, "create_user_meme_reaction", AsyncMock())
+
+    await meme_sender.send_meme_to_user(bot=object(), user_id=12001, meme=_meme())
+
+    assign_nudge.assert_not_awaited()
