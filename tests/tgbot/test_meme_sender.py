@@ -86,9 +86,8 @@ async def test_send_new_message_does_not_retry_ambiguous_transport_error(monkeyp
 
 
 @pytest.mark.asyncio
-async def test_send_meme_to_user_schedules_first_meme_nudge_before_reaction(monkeypatch):
+async def test_send_meme_to_user_awaits_first_meme_nudge_after_reaction(monkeypatch):
     calls: list[str] = []
-    scheduled = []
 
     async def assign_nudge(_user_id: int) -> str:
         calls.append("assign_nudge")
@@ -97,9 +96,8 @@ async def test_send_meme_to_user_schedules_first_meme_nudge_before_reaction(monk
     async def create_reaction(*_args):
         calls.append("create_reaction")
 
-    def create_task(coro):
-        scheduled.append(coro)
-        coro.close()
+    async def send_nudge(*_args):
+        calls.append("send_nudge")
 
     monkeypatch.setattr(
         meme_sender,
@@ -127,13 +125,11 @@ async def test_send_meme_to_user_schedules_first_meme_nudge_before_reaction(monk
     monkeypatch.setattr(meme_sender, "send_new_message_with_meme", AsyncMock())
     monkeypatch.setattr(meme_sender, "get_or_assign_first_meme_nudge_variant", assign_nudge)
     monkeypatch.setattr(meme_sender, "create_user_meme_reaction", create_reaction)
-    monkeypatch.setattr(meme_sender, "maybe_send_first_meme_nudge", AsyncMock())
-    monkeypatch.setattr(meme_sender.asyncio, "create_task", create_task)
+    monkeypatch.setattr(meme_sender, "maybe_send_first_meme_nudge", send_nudge)
 
     await meme_sender.send_meme_to_user(bot=object(), user_id=12001, meme=_meme())
 
-    assert calls == ["assign_nudge", "create_reaction"]
-    assert len(scheduled) == 1
+    assert calls == ["assign_nudge", "create_reaction", "send_nudge"]
 
 
 @pytest.mark.asyncio

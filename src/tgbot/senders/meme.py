@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from typing import Tuple
 
@@ -76,7 +75,7 @@ async def send_meme_to_user(
 
     await create_user_meme_reaction(user_id, meme.id, meme.recommended_by or "direct")
     if nudge_variant == "treatment":
-        asyncio.create_task(maybe_send_first_meme_nudge(user_id, user_info))
+        await maybe_send_first_meme_nudge(user_id, user_info)
 
 
 def get_input_media(
