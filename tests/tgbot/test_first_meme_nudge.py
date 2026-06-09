@@ -18,6 +18,7 @@ from src.tgbot.senders import popups
 from src.tgbot.senders.popups import (
     FIRST_MEME_NUDGE_EXPERIMENT_ID,
     FIRST_MEME_NUDGE_POPUP_ID,
+    get_first_meme_nudge_variant_to_send,
     get_or_assign_first_meme_nudge_variant,
     maybe_send_first_meme_nudge,
 )
@@ -223,6 +224,37 @@ async def test_assignment_helper_is_idempotent(setup):
         )
         rows = result.fetchall()
     assert len(rows) == 1
+
+
+@pytest.mark.asyncio
+async def test_delivery_helper_retries_only_existing_treatment_assignment(monkeypatch):
+    assign_variant = AsyncMock(return_value="treatment")
+    popup_sent = AsyncMock(return_value=False)
+    get_variant = AsyncMock(return_value=None)
+    monkeypatch.setattr(popups, "get_or_assign_first_meme_nudge_variant", assign_variant)
+    monkeypatch.setattr(popups, "user_popup_already_sent", popup_sent)
+    monkeypatch.setattr(popups, "get_experiment_variant", get_variant)
+
+    assert (
+        await get_first_meme_nudge_variant_to_send(TREATMENT_USER_ID, is_first_meme=True)
+        == "treatment"
+    )
+    assign_variant.assert_awaited_once_with(TREATMENT_USER_ID)
+
+    assert await get_first_meme_nudge_variant_to_send(CONTROL_USER_ID, is_first_meme=False) is None
+    assign_variant.assert_awaited_once()
+    get_variant.assert_awaited_once_with(CONTROL_USER_ID, FIRST_MEME_NUDGE_EXPERIMENT_ID)
+
+    get_variant.return_value = "treatment"
+    assert (
+        await get_first_meme_nudge_variant_to_send(TREATMENT_USER_ID, is_first_meme=False)
+        == "treatment"
+    )
+
+    popup_sent.return_value = True
+    assert (
+        await get_first_meme_nudge_variant_to_send(TREATMENT_USER_ID, is_first_meme=False) is None
+    )
 
 
 @pytest.mark.asyncio

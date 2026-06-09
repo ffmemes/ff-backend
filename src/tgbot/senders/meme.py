@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Tuple
 
@@ -22,7 +23,7 @@ from src.tgbot.senders.keyboards import (
 from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
 from src.tgbot.senders.meme_like_count_experiment import get_visible_meme_like_count
 from src.tgbot.senders.popups import (
-    get_or_assign_first_meme_nudge_variant,
+    get_first_meme_nudge_variant_to_send,
     maybe_send_first_meme_nudge,
 )
 from src.tgbot.senders.utils import collect_user_languages
@@ -42,6 +43,7 @@ async def send_meme_to_user(
     user_id: int,
     meme: MemeData,
     reaction_context: str | None = None,
+    first_meme_nudge_tasks: list[asyncio.Task[None]] | None = None,
 ):
     user_info = await get_user_info(user_id)
     languages = await collect_user_languages(user_id, user_info["interface_lang"])
@@ -69,13 +71,18 @@ async def send_meme_to_user(
     meme.caption = await get_meme_caption_for_user_id(meme, user_id, user_info)
 
     await send_new_message_with_meme(bot, user_id, meme, reply_markup)
-    nudge_variant: str | None = None
-    if is_first_meme:
-        nudge_variant = await get_or_assign_first_meme_nudge_variant(user_id)
+    nudge_variant = await get_first_meme_nudge_variant_to_send(
+        user_id,
+        is_first_meme=is_first_meme,
+    )
 
     await create_user_meme_reaction(user_id, meme.id, meme.recommended_by or "direct")
     if nudge_variant == "treatment":
-        await maybe_send_first_meme_nudge(user_id, user_info)
+        nudge_task = asyncio.create_task(maybe_send_first_meme_nudge(user_id, user_info))
+        if first_meme_nudge_tasks is None:
+            await nudge_task
+        else:
+            first_meme_nudge_tasks.append(nudge_task)
 
 
 def get_input_media(

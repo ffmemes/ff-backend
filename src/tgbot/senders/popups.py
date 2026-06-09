@@ -249,11 +249,27 @@ async def get_or_assign_first_meme_nudge_variant(user_id: int) -> str | None:
     return proposed
 
 
+async def get_first_meme_nudge_variant_to_send(
+    user_id: int,
+    *,
+    is_first_meme: bool,
+) -> str | None:
+    if is_first_meme:
+        return await get_or_assign_first_meme_nudge_variant(user_id)
+
+    if await user_popup_already_sent(user_id, FIRST_MEME_NUDGE_POPUP_ID):
+        return None
+
+    variant = await get_experiment_variant(user_id, FIRST_MEME_NUDGE_EXPERIMENT_ID)
+    if variant == "treatment":
+        return variant
+    return None
+
+
 async def maybe_send_first_meme_nudge(user_id: int, user_info: dict) -> None:
-    # Treatment-only sender. Caller is expected to have already invoked
-    # get_or_assign_first_meme_nudge_variant synchronously (in the meme
-    # delivery path, before create_user_meme_reaction) so the cohort row
-    # is locked in.
+    # Treatment-only sender. First-meme callers must assign synchronously before
+    # create_user_meme_reaction; later callers may retry only if that assignment
+    # already exists and the popup log is still missing.
     variant = await get_experiment_variant(user_id, FIRST_MEME_NUDGE_EXPERIMENT_ID)
     if variant != "treatment":
         return
