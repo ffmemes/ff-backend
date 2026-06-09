@@ -87,7 +87,7 @@ async def test_send_new_message_does_not_retry_ambiguous_transport_error(monkeyp
 
 
 @pytest.mark.asyncio
-async def test_send_meme_to_user_awaits_first_meme_nudge_after_reaction(monkeypatch):
+async def test_send_meme_to_user_assigns_first_meme_nudge_before_delivery(monkeypatch):
     calls: list[str] = []
 
     async def first_meme_nudge_variant(_user_id: int, *, is_first_meme: bool) -> str:
@@ -100,6 +100,9 @@ async def test_send_meme_to_user_awaits_first_meme_nudge_after_reaction(monkeypa
 
     async def send_nudge(*_args):
         calls.append("send_nudge")
+
+    async def send_meme(*_args):
+        calls.append("send_meme")
 
     monkeypatch.setattr(
         meme_sender,
@@ -124,7 +127,7 @@ async def test_send_meme_to_user_awaits_first_meme_nudge_after_reaction(monkeypa
         "get_meme_caption_for_user_id",
         AsyncMock(return_value="<b>caption</b>"),
     )
-    monkeypatch.setattr(meme_sender, "send_new_message_with_meme", AsyncMock())
+    monkeypatch.setattr(meme_sender, "send_new_message_with_meme", send_meme)
     monkeypatch.setattr(
         meme_sender,
         "get_first_meme_nudge_variant_to_send",
@@ -135,7 +138,69 @@ async def test_send_meme_to_user_awaits_first_meme_nudge_after_reaction(monkeypa
 
     await meme_sender.send_meme_to_user(bot=object(), user_id=12001, meme=_meme())
 
-    assert calls == ["assign_nudge", "create_reaction", "send_nudge"]
+    assert calls == ["assign_nudge", "send_meme", "create_reaction", "send_nudge"]
+
+
+@pytest.mark.asyncio
+async def test_send_meme_to_user_records_delivery_before_cancellation(monkeypatch):
+    calls: list[str] = []
+    reaction_started = asyncio.Event()
+    reaction_can_finish = asyncio.Event()
+
+    async def create_reaction(*_args):
+        calls.append("create_reaction_started")
+        reaction_started.set()
+        await reaction_can_finish.wait()
+        calls.append("create_reaction_finished")
+
+    async def send_meme(*_args):
+        calls.append("send_meme")
+
+    monkeypatch.setattr(
+        meme_sender,
+        "get_user_info",
+        AsyncMock(return_value={"interface_lang": "en", "nmemes_sent": 0}),
+    )
+    monkeypatch.setattr(meme_sender, "collect_user_languages", AsyncMock(return_value={"en"}))
+    monkeypatch.setattr(meme_sender, "get_meme_share_button_text", lambda _lang: "Share")
+    monkeypatch.setattr(
+        meme_sender,
+        "get_or_assign_meme_share_button_variant",
+        AsyncMock(return_value="url_share"),
+    )
+    monkeypatch.setattr(meme_sender, "get_visible_meme_like_count", AsyncMock(return_value=0))
+    monkeypatch.setattr(
+        meme_sender,
+        "meme_reaction_keyboard",
+        lambda *_args, **_kwargs: object(),
+    )
+    monkeypatch.setattr(
+        meme_sender,
+        "get_meme_caption_for_user_id",
+        AsyncMock(return_value="<b>caption</b>"),
+    )
+    monkeypatch.setattr(meme_sender, "send_new_message_with_meme", send_meme)
+    monkeypatch.setattr(
+        meme_sender,
+        "get_first_meme_nudge_variant_to_send",
+        AsyncMock(return_value=None),
+    )
+    monkeypatch.setattr(meme_sender, "create_user_meme_reaction", create_reaction)
+
+    send_task = asyncio.create_task(
+        meme_sender.send_meme_to_user(bot=object(), user_id=12001, meme=_meme())
+    )
+    await reaction_started.wait()
+
+    send_task.cancel()
+    await asyncio.sleep(0)
+    assert not send_task.done()
+
+    reaction_can_finish.set()
+    with pytest.raises(asyncio.CancelledError):
+        await send_task
+
+    assert calls == ["send_meme", "create_reaction_started", "create_reaction_finished"]
 
 
 @pytest.mark.asyncio
