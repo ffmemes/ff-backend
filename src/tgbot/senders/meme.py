@@ -94,8 +94,32 @@ async def _record_delivered_meme_reaction(user_id: int, meme: MemeData) -> None:
     try:
         await asyncio.shield(reaction_task)
     except asyncio.CancelledError:
-        await reaction_task
+        reaction_task.add_done_callback(
+            lambda task: _log_delivered_meme_reaction_result(task, user_id, meme.id)
+        )
         raise
+
+
+def _log_delivered_meme_reaction_result(
+    task: asyncio.Task[None],
+    user_id: int,
+    meme_id: int,
+) -> None:
+    try:
+        task.result()
+    except asyncio.CancelledError:
+        logger.warning(
+            "Delivered meme reaction recording was cancelled for user %s meme %s",
+            user_id,
+            meme_id,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Failed to record delivered meme reaction for user %s meme %s after cancellation",
+            user_id,
+            meme_id,
+            exc_info=(type(exc), exc, exc.__traceback__),
+        )
 
 
 def get_input_media(

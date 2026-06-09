@@ -142,9 +142,10 @@ async def test_send_meme_to_user_assigns_first_meme_nudge_before_delivery(monkey
 
 
 @pytest.mark.asyncio
-async def test_send_meme_to_user_records_delivery_before_cancellation(monkeypatch):
+async def test_send_meme_to_user_continues_recording_after_cancellation(monkeypatch):
     calls: list[str] = []
     reaction_started = asyncio.Event()
+    reaction_finished = asyncio.Event()
     reaction_can_finish = asyncio.Event()
 
     async def create_reaction(*_args):
@@ -152,6 +153,7 @@ async def test_send_meme_to_user_records_delivery_before_cancellation(monkeypatc
         reaction_started.set()
         await reaction_can_finish.wait()
         calls.append("create_reaction_finished")
+        reaction_finished.set()
 
     async def send_meme(*_args):
         calls.append("send_meme")
@@ -193,12 +195,13 @@ async def test_send_meme_to_user_records_delivery_before_cancellation(monkeypatc
     await reaction_started.wait()
 
     send_task.cancel()
-    await asyncio.sleep(0)
-    assert not send_task.done()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(send_task, timeout=0.1)
+
+    assert calls == ["send_meme", "create_reaction_started"]
 
     reaction_can_finish.set()
-    with pytest.raises(asyncio.CancelledError):
-        await send_task
+    await asyncio.wait_for(reaction_finished.wait(), timeout=0.1)
 
     assert calls == ["send_meme", "create_reaction_started", "create_reaction_finished"]
 
