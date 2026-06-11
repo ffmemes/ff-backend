@@ -87,7 +87,7 @@ async def test_send_new_message_does_not_retry_ambiguous_transport_error(monkeyp
 
 
 @pytest.mark.asyncio
-async def test_send_meme_to_user_assigns_first_meme_nudge_before_delivery(monkeypatch):
+async def test_send_meme_to_user_assigns_first_meme_nudge_after_delivery(monkeypatch):
     calls: list[str] = []
 
     async def first_meme_nudge_variant(_user_id: int, *, is_first_meme: bool) -> str:
@@ -138,7 +138,56 @@ async def test_send_meme_to_user_assigns_first_meme_nudge_before_delivery(monkey
 
     await meme_sender.send_meme_to_user(bot=object(), user_id=12001, meme=_meme())
 
-    assert calls == ["assign_nudge", "send_meme", "create_reaction", "send_nudge"]
+    assert calls == ["send_meme", "assign_nudge", "create_reaction", "send_nudge"]
+
+
+@pytest.mark.asyncio
+async def test_send_meme_to_user_does_not_assign_first_meme_nudge_on_failed_delivery(monkeypatch):
+    nudge_variant = AsyncMock(return_value="treatment")
+    create_reaction = AsyncMock()
+    send_nudge = AsyncMock()
+
+    async def send_meme(*_args):
+        raise NetworkError("All connection attempts failed")
+
+    monkeypatch.setattr(
+        meme_sender,
+        "get_user_info",
+        AsyncMock(return_value={"interface_lang": "en", "nmemes_sent": 0}),
+    )
+    monkeypatch.setattr(meme_sender, "collect_user_languages", AsyncMock(return_value={"en"}))
+    monkeypatch.setattr(meme_sender, "get_meme_share_button_text", lambda _lang: "Share")
+    monkeypatch.setattr(
+        meme_sender,
+        "get_or_assign_meme_share_button_variant",
+        AsyncMock(return_value="url_share"),
+    )
+    monkeypatch.setattr(meme_sender, "get_visible_meme_like_count", AsyncMock(return_value=0))
+    monkeypatch.setattr(
+        meme_sender,
+        "meme_reaction_keyboard",
+        lambda *_args, **_kwargs: object(),
+    )
+    monkeypatch.setattr(
+        meme_sender,
+        "get_meme_caption_for_user_id",
+        AsyncMock(return_value="<b>caption</b>"),
+    )
+    monkeypatch.setattr(meme_sender, "send_new_message_with_meme", send_meme)
+    monkeypatch.setattr(
+        meme_sender,
+        "get_first_meme_nudge_variant_to_send",
+        nudge_variant,
+    )
+    monkeypatch.setattr(meme_sender, "create_user_meme_reaction", create_reaction)
+    monkeypatch.setattr(meme_sender, "maybe_send_first_meme_nudge", send_nudge)
+
+    with pytest.raises(NetworkError):
+        await meme_sender.send_meme_to_user(bot=object(), user_id=12001, meme=_meme())
+
+    nudge_variant.assert_not_awaited()
+    create_reaction.assert_not_awaited()
+    send_nudge.assert_not_awaited()
 
 
 @pytest.mark.asyncio

@@ -70,12 +70,11 @@ async def send_meme_to_user(
     )
     meme.caption = await get_meme_caption_for_user_id(meme, user_id, user_info)
 
+    await send_new_message_with_meme(bot, user_id, meme, reply_markup)
     nudge_variant = await get_first_meme_nudge_variant_to_send(
         user_id,
         is_first_meme=is_first_meme,
     )
-
-    await send_new_message_with_meme(bot, user_id, meme, reply_markup)
     await _record_delivered_meme_reaction(user_id, meme)
     if nudge_variant == "treatment":
         nudge_task = asyncio.create_task(maybe_send_first_meme_nudge(user_id, user_info))

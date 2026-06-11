@@ -45,8 +45,10 @@ async def test_broadcast_drain_timeout_keeps_first_meme_nudge_lease(monkeypatch)
 
     await broadcast_meme._drain_first_meme_nudge_tasks([task], logger)
 
-    assert task.cancelled()
+    assert not task.done()
     logger.warning.assert_called_once_with(
-        "Timed out sending %s first-meme nudge(s); kept leases to avoid duplicate nudges",
+        "Timed out waiting for %s first-meme nudge(s); left in-flight sends running",
         1,
     )
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)

@@ -49,24 +49,30 @@ async def _drain_first_meme_nudge_tasks(
     )
     if pending:
         for task in pending:
-            task.cancel()
-        await asyncio.gather(*pending, return_exceptions=True)
+            task.add_done_callback(
+                lambda done_task: _log_first_meme_nudge_task_result(done_task, logger)
+            )
         logger.warning(
-            "Timed out sending %s first-meme nudge(s); kept leases to avoid duplicate nudges",
+            "Timed out waiting for %s first-meme nudge(s); left in-flight sends running",
             len(pending),
         )
 
     for task in done:
-        if task.cancelled():
-            continue
-        exc = task.exception()
-        if exc is not None:
-            logger.warning(
-                "Failed to send first-meme nudge after broadcast meme delivery",
-                exc_info=(type(exc), exc, exc.__traceback__),
-            )
+        _log_first_meme_nudge_task_result(task, logger)
 
     tasks.clear()
+
+
+def _log_first_meme_nudge_task_result(task: asyncio.Task[None], logger) -> None:
+    if task.cancelled():
+        return
+
+    exc = task.exception()
+    if exc is not None:
+        logger.warning(
+            "Failed to send first-meme nudge after broadcast meme delivery",
+            exc_info=(type(exc), exc, exc.__traceback__),
+        )
 
 
 async def broadcast_next_meme_to_users(user_ids: list[int]):
