@@ -70,7 +70,36 @@ async def send_meme_to_user(
     )
     meme.caption = await get_meme_caption_for_user_id(meme, user_id, user_info)
 
-    await send_new_message_with_meme(bot, user_id, meme, reply_markup)
+    sent_message = await send_new_message_with_meme(bot, user_id, meme, reply_markup)
+    if sent_message is None:
+        return
+
+    delivery_task = asyncio.create_task(
+        _complete_direct_meme_delivery(
+            user_id,
+            meme,
+            user_info,
+            is_first_meme=is_first_meme,
+            first_meme_nudge_tasks=first_meme_nudge_tasks,
+        )
+    )
+    try:
+        await asyncio.shield(delivery_task)
+    except asyncio.CancelledError:
+        delivery_task.add_done_callback(
+            lambda task: _log_direct_meme_delivery_result(task, user_id, meme.id)
+        )
+        raise
+
+
+async def _complete_direct_meme_delivery(
+    user_id: int,
+    meme: MemeData,
+    user_info: dict,
+    *,
+    is_first_meme: bool,
+    first_meme_nudge_tasks: list[asyncio.Task[None]] | None,
+) -> None:
     nudge_variant = await get_first_meme_nudge_variant_to_send(
         user_id,
         is_first_meme=is_first_meme,
@@ -82,6 +111,28 @@ async def send_meme_to_user(
             await nudge_task
         else:
             first_meme_nudge_tasks.append(nudge_task)
+
+
+def _log_direct_meme_delivery_result(
+    task: asyncio.Task[None],
+    user_id: int,
+    meme_id: int,
+) -> None:
+    try:
+        task.result()
+    except asyncio.CancelledError:
+        logger.warning(
+            "Post-delivery work was cancelled for user %s meme %s",
+            user_id,
+            meme_id,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Failed to complete post-delivery work for user %s meme %s after cancellation",
+            user_id,
+            meme_id,
+            exc_info=(type(exc), exc, exc.__traceback__),
+        )
 
 
 async def _record_delivered_meme_reaction(user_id: int, meme: MemeData) -> None:
@@ -178,7 +229,7 @@ async def send_new_message_with_meme(
     user_id: int,
     meme: MemeData,
     reply_markup: InlineKeyboardMarkup | None = None,
-) -> Message:
+) -> Message | None:
     async def _do_send(parse_mode):
         if meme.type == MemeType.IMAGE:
             return await bot.send_photo(
