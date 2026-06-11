@@ -26,18 +26,16 @@ class _FirstMemeNudgeTaskList(list[asyncio.Task[None]]):
         super().__init__()
         self._logger = logger
         self._closed = False
+        self._late_observers: set[asyncio.Task[None]] = set()
 
     def append(self, task: asyncio.Task[None]) -> None:
         if self._closed:
-            task.add_done_callback(
-                lambda done_task: _log_first_meme_nudge_task_result(
-                    done_task,
-                    self._logger,
-                )
-            )
+            observer = asyncio.create_task(_observe_first_meme_nudge_task(task, self._logger))
+            self._late_observers.add(observer)
+            observer.add_done_callback(self._late_observers.discard)
             self._logger.warning(
                 "Registered first-meme nudge task after broadcast drain; "
-                "left in-flight send running"
+                "observing in-flight send to completion"
             )
             return
 
@@ -119,6 +117,20 @@ def _log_first_meme_nudge_task_result(task: asyncio.Task[None], logger) -> None:
             "Failed to send first-meme nudge after broadcast meme delivery",
             exc_info=(type(exc), exc, exc.__traceback__),
         )
+
+
+async def _observe_first_meme_nudge_task(task: asyncio.Task[None], logger) -> None:
+    try:
+        await asyncio.shield(task)
+    except asyncio.CancelledError:
+        task.add_done_callback(
+            lambda done_task: _log_first_meme_nudge_task_result(done_task, logger)
+        )
+        raise
+    except Exception:
+        pass
+
+    _log_first_meme_nudge_task_result(task, logger)
 
 
 async def broadcast_next_meme_to_users(user_ids: list[int]):

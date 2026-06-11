@@ -83,6 +83,8 @@ async def send_meme_to_user(
             first_meme_nudge_tasks=first_meme_nudge_tasks,
         )
     )
+    if first_meme_nudge_tasks is not None:
+        first_meme_nudge_tasks.append(delivery_task)
     try:
         await asyncio.shield(delivery_task)
     except asyncio.CancelledError:
@@ -100,11 +102,26 @@ async def _complete_direct_meme_delivery(
     is_first_meme: bool,
     first_meme_nudge_tasks: list[asyncio.Task[None]] | None,
 ) -> None:
+    nudge_assignment_error: Exception | None = None
+    try:
+        nudge_variant = await get_first_meme_nudge_variant_to_send(
+            user_id,
+            is_first_meme=is_first_meme,
+        )
+    except Exception as exc:
+        nudge_variant = None
+        nudge_assignment_error = exc
+        logger.warning(
+            "Failed to assign first-meme nudge before recording delivered meme for user %s meme %s",
+            user_id,
+            meme.id,
+            exc_info=(type(exc), exc, exc.__traceback__),
+        )
+
     await _record_delivered_meme_reaction(user_id, meme)
-    nudge_variant = await get_first_meme_nudge_variant_to_send(
-        user_id,
-        is_first_meme=is_first_meme,
-    )
+    if nudge_assignment_error is not None:
+        raise nudge_assignment_error
+
     if nudge_variant == "treatment":
         nudge_task = asyncio.create_task(maybe_send_first_meme_nudge(user_id, user_info))
         if first_meme_nudge_tasks is None:

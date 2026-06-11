@@ -139,7 +139,7 @@ async def test_send_meme_to_user_assigns_first_meme_nudge_after_delivery(monkeyp
 
     await meme_sender.send_meme_to_user(bot=object(), user_id=12001, meme=_meme())
 
-    assert calls == ["send_meme", "create_reaction", "assign_nudge", "send_nudge"]
+    assert calls == ["send_meme", "assign_nudge", "create_reaction", "send_nudge"]
 
 
 @pytest.mark.asyncio
@@ -239,7 +239,7 @@ async def test_send_meme_to_user_does_not_assign_first_meme_nudge_on_rejected_de
 
 
 @pytest.mark.asyncio
-async def test_send_meme_to_user_records_delivery_before_nudge_assignment_error(
+async def test_send_meme_to_user_records_delivery_after_nudge_assignment_error(
     monkeypatch,
 ):
     calls: list[str] = []
@@ -290,7 +290,7 @@ async def test_send_meme_to_user_records_delivery_before_nudge_assignment_error(
     with pytest.raises(RuntimeError, match="experiment storage unavailable"):
         await meme_sender.send_meme_to_user(bot=object(), user_id=12001, meme=_meme())
 
-    assert calls == ["send_meme", "create_reaction", "assign_nudge"]
+    assert calls == ["send_meme", "assign_nudge", "create_reaction"]
 
 
 @pytest.mark.asyncio
@@ -367,6 +367,7 @@ async def test_send_meme_to_user_continues_post_delivery_after_nudge_assignment_
     nudge_assignment_started = asyncio.Event()
     nudge_assignment_finished = asyncio.Event()
     nudge_assignment_can_finish = asyncio.Event()
+    reaction_finished = asyncio.Event()
 
     async def first_meme_nudge_variant(_user_id: int, *, is_first_meme: bool) -> None:
         assert is_first_meme is True
@@ -379,6 +380,7 @@ async def test_send_meme_to_user_continues_post_delivery_after_nudge_assignment_
 
     async def create_reaction(*_args):
         calls.append("create_reaction")
+        reaction_finished.set()
 
     async def send_meme(*_args):
         calls.append("send_meme")
@@ -424,16 +426,17 @@ async def test_send_meme_to_user_continues_post_delivery_after_nudge_assignment_
     with pytest.raises(asyncio.CancelledError):
         await asyncio.wait_for(send_task, timeout=0.1)
 
-    assert calls == ["send_meme", "create_reaction", "assign_nudge_started"]
+    assert calls == ["send_meme", "assign_nudge_started"]
 
     nudge_assignment_can_finish.set()
     await asyncio.wait_for(nudge_assignment_finished.wait(), timeout=0.1)
+    await asyncio.wait_for(reaction_finished.wait(), timeout=0.1)
 
     assert calls == [
         "send_meme",
-        "create_reaction",
         "assign_nudge_started",
         "assign_nudge_finished",
+        "create_reaction",
     ]
 
 
@@ -499,15 +502,16 @@ async def test_send_meme_to_user_can_defer_first_meme_nudge_after_reaction(monke
     )
     await asyncio.sleep(0)
 
-    assert calls == ["create_reaction", "assign_nudge", "send_nudge_started"]
-    assert len(nudge_tasks) == 1
-    assert not nudge_tasks[0].done()
+    assert calls == ["assign_nudge", "create_reaction", "send_nudge_started"]
+    assert len(nudge_tasks) == 2
+    assert nudge_tasks[0].done()
+    assert not nudge_tasks[1].done()
 
     nudge_can_finish.set()
-    await nudge_tasks[0]
+    await nudge_tasks[1]
     assert calls == [
-        "create_reaction",
         "assign_nudge",
+        "create_reaction",
         "send_nudge_started",
         "send_nudge_finished",
     ]
@@ -562,7 +566,7 @@ async def test_send_meme_to_user_retries_assigned_undelivered_nudge(monkeypatch)
 
     await meme_sender.send_meme_to_user(bot=object(), user_id=12001, meme=_meme())
 
-    assert calls == ["create_reaction", "pending_nudge", "send_nudge"]
+    assert calls == ["pending_nudge", "create_reaction", "send_nudge"]
 
 
 @pytest.mark.asyncio
