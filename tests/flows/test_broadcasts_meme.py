@@ -32,3 +32,21 @@ async def test_broadcast_drains_deferred_first_meme_nudge(monkeypatch):
     nudge_can_finish.set()
     await asyncio.wait_for(broadcast_task, timeout=0.2)
     logger.info.assert_any_call("Sent meme to #12001")
+
+
+@pytest.mark.asyncio
+async def test_broadcast_drain_timeout_keeps_first_meme_nudge_lease(monkeypatch):
+    async def nudge_task() -> None:
+        await asyncio.Event().wait()
+
+    task = asyncio.create_task(nudge_task())
+    logger = MagicMock()
+    monkeypatch.setattr(broadcast_meme, "FIRST_MEME_NUDGE_DRAIN_TIMEOUT_SECONDS", 0.001)
+
+    await broadcast_meme._drain_first_meme_nudge_tasks([task], logger)
+
+    assert task.cancelled()
+    logger.warning.assert_called_once_with(
+        "Timed out sending %s first-meme nudge(s); kept leases to avoid duplicate nudges",
+        1,
+    )

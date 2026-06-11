@@ -295,9 +295,9 @@ async def maybe_send_first_meme_nudge(user_id: int, user_info: dict) -> None:
         return
     except asyncio.CancelledError:
         # Broadcast callers may wrap direct sends in asyncio.wait_for. If that
-        # cancellation lands after the lease insert but before Telegram confirms
-        # delivery, release the lease so a later retry can send the nudge.
-        await delete_user_popup_log(user_id, FIRST_MEME_NUDGE_POPUP_ID)
+        # cancellation lands after the lease insert, the Telegram send outcome
+        # is ambiguous. Keep the lease so a later retry cannot duplicate a
+        # nudge Telegram may already have accepted.
         raise
     except TelegramError as exc:
         # Transient delivery failure (timeout, rate-limit, etc.). Release the

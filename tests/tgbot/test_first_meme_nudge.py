@@ -152,7 +152,7 @@ async def test_send_failure_releases_lease(setup):
 
 
 @pytest.mark.asyncio
-async def test_send_cancellation_releases_lease(monkeypatch):
+async def test_send_cancellation_keeps_lease(monkeypatch):
     delete_user_popup_log = AsyncMock()
     monkeypatch.setattr(popups, "get_experiment_variant", AsyncMock(return_value="treatment"))
     monkeypatch.setattr(popups, "create_user_popup_log", AsyncMock(return_value=True))
@@ -164,7 +164,7 @@ async def test_send_cancellation_releases_lease(monkeypatch):
     with pytest.raises(asyncio.CancelledError):
         await maybe_send_first_meme_nudge(TREATMENT_USER_ID, _user_info("en"))
 
-    delete_user_popup_log.assert_awaited_once_with(TREATMENT_USER_ID, FIRST_MEME_NUDGE_POPUP_ID)
+    delete_user_popup_log.assert_not_awaited()
 
 
 @pytest.mark.asyncio

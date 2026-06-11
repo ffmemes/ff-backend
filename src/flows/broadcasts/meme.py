@@ -52,7 +52,7 @@ async def _drain_first_meme_nudge_tasks(
             task.cancel()
         await asyncio.gather(*pending, return_exceptions=True)
         logger.warning(
-            "Timed out sending %s first-meme nudge(s); released leases for retry",
+            "Timed out sending %s first-meme nudge(s); kept leases to avoid duplicate nudges",
             len(pending),
         )
 
