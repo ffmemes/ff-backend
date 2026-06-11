@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Tuple
 
@@ -21,6 +22,10 @@ from src.tgbot.senders.keyboards import (
 )
 from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
 from src.tgbot.senders.meme_like_count_experiment import get_visible_meme_like_count
+from src.tgbot.senders.popups import (
+    get_first_meme_nudge_variant_to_send,
+    maybe_send_first_meme_nudge,
+)
 from src.tgbot.senders.utils import collect_user_languages
 from src.tgbot.service import mark_user_blocked
 from src.tgbot.sharing import (
@@ -38,9 +43,11 @@ async def send_meme_to_user(
     user_id: int,
     meme: MemeData,
     reaction_context: str | None = None,
+    first_meme_nudge_tasks: list[asyncio.Task[None]] | None = None,
 ):
     user_info = await get_user_info(user_id)
     languages = await collect_user_languages(user_id, user_info["interface_lang"])
+    is_first_meme = (user_info["nmemes_sent"] or 0) == 0
     referral_button_text = get_meme_share_button_text(user_info["interface_lang"])
     share_button_variant = await get_or_assign_meme_share_button_variant(user_id)
     logger.debug(
@@ -63,8 +70,56 @@ async def send_meme_to_user(
     )
     meme.caption = await get_meme_caption_for_user_id(meme, user_id, user_info)
 
+    nudge_variant = await get_first_meme_nudge_variant_to_send(
+        user_id,
+        is_first_meme=is_first_meme,
+    )
+
     await send_new_message_with_meme(bot, user_id, meme, reply_markup)
-    await create_user_meme_reaction(user_id, meme.id, meme.recommended_by or "direct")
+    await _record_delivered_meme_reaction(user_id, meme)
+    if nudge_variant == "treatment":
+        nudge_task = asyncio.create_task(maybe_send_first_meme_nudge(user_id, user_info))
+        if first_meme_nudge_tasks is None:
+            await nudge_task
+        else:
+            first_meme_nudge_tasks.append(nudge_task)
+
+
+async def _record_delivered_meme_reaction(user_id: int, meme: MemeData) -> None:
+    # Once Telegram accepts a direct send, cancellation must not skip the row
+    # that lets reaction callbacks and recommendation dedupe find that delivery.
+    reaction_task = asyncio.create_task(
+        create_user_meme_reaction(user_id, meme.id, meme.recommended_by or "direct")
+    )
+    try:
+        await asyncio.shield(reaction_task)
+    except asyncio.CancelledError:
+        reaction_task.add_done_callback(
+            lambda task: _log_delivered_meme_reaction_result(task, user_id, meme.id)
+        )
+        raise
+
+
+def _log_delivered_meme_reaction_result(
+    task: asyncio.Task[None],
+    user_id: int,
+    meme_id: int,
+) -> None:
+    try:
+        task.result()
+    except asyncio.CancelledError:
+        logger.warning(
+            "Delivered meme reaction recording was cancelled for user %s meme %s",
+            user_id,
+            meme_id,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Failed to record delivered meme reaction for user %s meme %s after cancellation",
+            user_id,
+            meme_id,
+            exc_info=(type(exc), exc, exc.__traceback__),
+        )
 
 
 def get_input_media(
