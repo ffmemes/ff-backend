@@ -21,6 +21,32 @@ _BROADCAST_FLOW_OPTS = dict(
 )
 
 
+class _FirstMemeNudgeTaskList(list[asyncio.Task[None]]):
+    def __init__(self, logger):
+        super().__init__()
+        self._logger = logger
+        self._closed = False
+
+    def append(self, task: asyncio.Task[None]) -> None:
+        if self._closed:
+            task.add_done_callback(
+                lambda done_task: _log_first_meme_nudge_task_result(
+                    done_task,
+                    self._logger,
+                )
+            )
+            self._logger.warning(
+                "Registered first-meme nudge task after broadcast drain; "
+                "left in-flight send running"
+            )
+            return
+
+        super().append(task)
+
+    def close(self) -> None:
+        self._closed = True
+
+
 async def _send_to_user(
     user_id: int,
     first_meme_nudge_tasks: list[asyncio.Task[None]],
@@ -40,27 +66,47 @@ async def _drain_first_meme_nudge_tasks(
     tasks: list[asyncio.Task[None]],
     logger,
 ) -> None:
-    if not tasks:
-        return
+    try:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + FIRST_MEME_NUDGE_DRAIN_TIMEOUT_SECONDS
 
-    done, pending = await asyncio.wait(
-        tasks,
-        timeout=FIRST_MEME_NUDGE_DRAIN_TIMEOUT_SECONDS,
-    )
-    if pending:
-        for task in pending:
-            task.add_done_callback(
-                lambda done_task: _log_first_meme_nudge_task_result(done_task, logger)
-            )
-        logger.warning(
-            "Timed out waiting for %s first-meme nudge(s); left in-flight sends running",
-            len(pending),
-        )
+        while tasks:
+            current_tasks = list(tasks)
+            tasks.clear()
+            timeout = max(0, deadline - loop.time())
 
-    for task in done:
-        _log_first_meme_nudge_task_result(task, logger)
+            if timeout == 0:
+                done: set[asyncio.Task[None]] = set()
+                pending = set(current_tasks)
+            else:
+                done, pending = await asyncio.wait(
+                    current_tasks,
+                    timeout=timeout,
+                )
 
-    tasks.clear()
+            for task in done:
+                _log_first_meme_nudge_task_result(task, logger)
+
+            if pending:
+                timed_out_tasks = set(pending)
+                timed_out_tasks.update(tasks)
+                tasks.clear()
+                for task in timed_out_tasks:
+                    task.add_done_callback(
+                        lambda done_task: _log_first_meme_nudge_task_result(
+                            done_task,
+                            logger,
+                        )
+                    )
+                logger.warning(
+                    "Timed out waiting for %s first-meme nudge(s); left in-flight sends running",
+                    len(timed_out_tasks),
+                )
+                return
+    finally:
+        close = getattr(tasks, "close", None)
+        if close is not None:
+            close()
 
 
 def _log_first_meme_nudge_task_result(task: asyncio.Task[None], logger) -> None:
@@ -80,7 +126,7 @@ async def broadcast_next_meme_to_users(user_ids: list[int]):
     logger.info(f"Going to sent next meme to {len(user_ids)} users")
 
     for user_id in user_ids:
-        first_meme_nudge_tasks: list[asyncio.Task[None]] = []
+        first_meme_nudge_tasks: list[asyncio.Task[None]] = _FirstMemeNudgeTaskList(logger)
         try:
             await asyncio.wait_for(
                 _send_to_user(user_id, first_meme_nudge_tasks),

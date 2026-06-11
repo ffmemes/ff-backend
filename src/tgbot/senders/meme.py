@@ -100,11 +100,11 @@ async def _complete_direct_meme_delivery(
     is_first_meme: bool,
     first_meme_nudge_tasks: list[asyncio.Task[None]] | None,
 ) -> None:
+    await _record_delivered_meme_reaction(user_id, meme)
     nudge_variant = await get_first_meme_nudge_variant_to_send(
         user_id,
         is_first_meme=is_first_meme,
     )
-    await _record_delivered_meme_reaction(user_id, meme)
     if nudge_variant == "treatment":
         nudge_task = asyncio.create_task(maybe_send_first_meme_nudge(user_id, user_info))
         if first_meme_nudge_tasks is None:
