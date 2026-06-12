@@ -134,6 +134,7 @@ class RecommendationBatchDiagnostics:
     user_type: str | None
     queue_len_before: int
     exclude_count: int
+    cold_start_nsessions_gate_enabled: bool = False
     diagnostics_sample_rate: float = 0.01
     maturity_stage: str | None = None
     duration_ms: int = 0
@@ -175,6 +176,7 @@ class RecommendationBatchDiagnostics:
             "limit": self.limit,
             "nmemes_sent": self.nmemes_sent,
             "nsessions": self.nsessions,
+            "cold_start_nsessions_gate_enabled": self.cold_start_nsessions_gate_enabled,
             "queue_len_before": self.queue_len_before,
             "exclude_count": self.exclude_count,
             "selected_count": self.selected_count,
@@ -284,6 +286,7 @@ class RecommendationBatchPipeline:
             user_type=request.user_type,
             queue_len_before=len(request.meme_ids_in_queue),
             exclude_count=len(request.meme_ids_in_queue),
+            cold_start_nsessions_gate_enabled=request.cold_start_nsessions_gate_enabled,
             diagnostics_sample_rate=request.diagnostics_sample_rate,
             source_diversity_enabled=request.source_diversity_enabled,
             shadow_scoring_enabled=request.shadow_scoring_enabled,

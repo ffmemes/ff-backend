@@ -14,9 +14,11 @@ from src.database import (
     experiment_assignment,
     user,
 )
+from src.tgbot.senders import popups
 from src.tgbot.senders.popups import (
     FIRST_MEME_NUDGE_EXPERIMENT_ID,
     FIRST_MEME_NUDGE_POPUP_ID,
+    get_first_meme_nudge_variant_to_send,
     get_or_assign_first_meme_nudge_variant,
     maybe_send_first_meme_nudge,
 )
@@ -150,6 +152,22 @@ async def test_send_failure_releases_lease(setup):
 
 
 @pytest.mark.asyncio
+async def test_send_cancellation_keeps_lease(monkeypatch):
+    delete_user_popup_log = AsyncMock()
+    monkeypatch.setattr(popups, "get_experiment_variant", AsyncMock(return_value="treatment"))
+    monkeypatch.setattr(popups, "create_user_popup_log", AsyncMock(return_value=True))
+    monkeypatch.setattr(popups, "delete_user_popup_log", delete_user_popup_log)
+
+    cancelled_bot = _mock_bot(AsyncMock(side_effect=asyncio.CancelledError))
+    monkeypatch.setattr(popups, "bot", cancelled_bot)
+
+    with pytest.raises(asyncio.CancelledError):
+        await maybe_send_first_meme_nudge(TREATMENT_USER_ID, _user_info("en"))
+
+    delete_user_popup_log.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_existing_popup_log_short_circuits(setup):
     # Simulate a backfill / prior run that already logged the nudge.
     await create_user_popup_log(TREATMENT_USER_ID, FIRST_MEME_NUDGE_POPUP_ID)
@@ -206,6 +224,37 @@ async def test_assignment_helper_is_idempotent(setup):
         )
         rows = result.fetchall()
     assert len(rows) == 1
+
+
+@pytest.mark.asyncio
+async def test_delivery_helper_retries_only_existing_treatment_assignment(monkeypatch):
+    assign_variant = AsyncMock(return_value="treatment")
+    popup_sent = AsyncMock(return_value=False)
+    get_variant = AsyncMock(return_value=None)
+    monkeypatch.setattr(popups, "get_or_assign_first_meme_nudge_variant", assign_variant)
+    monkeypatch.setattr(popups, "user_popup_already_sent", popup_sent)
+    monkeypatch.setattr(popups, "get_experiment_variant", get_variant)
+
+    assert (
+        await get_first_meme_nudge_variant_to_send(TREATMENT_USER_ID, is_first_meme=True)
+        == "treatment"
+    )
+    assign_variant.assert_awaited_once_with(TREATMENT_USER_ID)
+
+    assert await get_first_meme_nudge_variant_to_send(CONTROL_USER_ID, is_first_meme=False) is None
+    assign_variant.assert_awaited_once()
+    get_variant.assert_awaited_once_with(CONTROL_USER_ID, FIRST_MEME_NUDGE_EXPERIMENT_ID)
+
+    get_variant.return_value = "treatment"
+    assert (
+        await get_first_meme_nudge_variant_to_send(TREATMENT_USER_ID, is_first_meme=False)
+        == "treatment"
+    )
+
+    popup_sent.return_value = True
+    assert (
+        await get_first_meme_nudge_variant_to_send(TREATMENT_USER_ID, is_first_meme=False) is None
+    )
 
 
 @pytest.mark.asyncio
