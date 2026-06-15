@@ -286,6 +286,34 @@ def test_skill_preflight_only_fails_for_unknown_desired_skill(
     assert "desired skill(s) not in Paperclip catalog" in captured.err
 
 
+def test_skill_preflight_only_fails_for_stale_desired_skill(
+    sync_module, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    def fake_api(method, path, body=None):
+        if path.endswith("/agents"):
+            return [
+                {
+                    "id": "agent-id",
+                    "urlKey": "alpha",
+                    "adapterConfig": {"paperclipSkillSync": {"desiredSkills": []}},
+                }
+            ]
+        if path.endswith("/skills"):
+            return [
+                {"path": "garrytan/gstack/browse", "compatibility": "incompatible"},
+                {"path": "paperclipai/paperclip/paperclip", "compatibility": "compatible"},
+            ]
+        raise AssertionError(f"unexpected API call in skills-only mode: {path}")
+
+    monkeypatch.setattr(sync_module, "api", fake_api)
+    monkeypatch.setattr(sync_module, "SKILL_PREFLIGHT_ONLY", True)
+
+    assert sync_module.main() == 1
+    captured = capsys.readouterr()
+    assert "stale_desired_skills" in captured.out
+    assert "desired skill(s) incompatible with Paperclip catalog" in captured.err
+
+
 def test_skill_preflight_only_fails_when_catalog_validation_skipped(
     sync_module, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
 ) -> None:

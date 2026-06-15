@@ -464,6 +464,18 @@ def main() -> int:
         if SKILL_PREFLIGHT_ONLY or not DRY:
             return 1
 
+    if preflight["stale_desired_skills"]:
+        print(
+            f"  ERROR {preflight['stale_count']} desired skill(s) incompatible "
+            "with Paperclip catalog: "
+            f"{preflight['stale_desired_skills']}",
+            file=sys.stderr,
+        )
+        # Block apply and skills-only preflight; in a full dry-run, keep going
+        # so operators see the complete diff.
+        if SKILL_PREFLIGHT_ONLY or not DRY:
+            return 1
+
     if SKILL_PREFLIGHT_ONLY and str(preflight["catalog_validation"]).startswith("skipped"):
         print(
             "  ERROR skill catalog validation skipped; refusing to pass skills-only preflight",
