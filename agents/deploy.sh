@@ -131,13 +131,17 @@ COMPANY_ID="$COMPANY_ID" SCRIPT_DIR="$SCRIPT_DIR" DRY_RUN="$DRY_RUN" \
 }
 
 echo
-if [[ $SKILL_PREFLIGHT_ONLY -eq 1 ]]; then
+if [[ $errors -gt 0 ]]; then
+  if [[ $SKILL_PREFLIGHT_ONLY -eq 1 ]]; then
+    echo "Skill preflight failed with $errors error(s)."
+  else
+    echo "Synced $synced_files files; $errors errors during apply."
+  fi
+  exit 1
+elif [[ $SKILL_PREFLIGHT_ONLY -eq 1 ]]; then
   echo "Skill preflight complete."
 elif [[ $DRY_RUN -eq 1 ]]; then
   echo "Dry-run complete. Re-run without --dry-run to apply."
-elif [[ $errors -gt 0 ]]; then
-  echo "Synced $synced_files files; $errors errors during apply."
-  exit 1
 else
   echo "Synced $synced_files files. Changes take effect on next agent wake."
 fi

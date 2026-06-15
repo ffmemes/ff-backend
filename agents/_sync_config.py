@@ -449,9 +449,9 @@ def main() -> int:
             f"{preflight['unknown_desired_skills']}",
             file=sys.stderr,
         )
-        # Block apply; surface in dry-run as a failure marker but keep going so
-        # operators see the full diff.
-        if not DRY:
+        # Block apply and skills-only preflight; in a full dry-run, keep going
+        # so operators see the complete diff.
+        if SKILL_PREFLIGHT_ONLY or not DRY:
             return 1
 
     if SKILL_PREFLIGHT_ONLY:

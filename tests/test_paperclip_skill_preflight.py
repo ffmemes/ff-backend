@@ -11,6 +11,7 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import os
+import subprocess
 import sys
 import urllib.error
 from pathlib import Path
@@ -228,6 +229,86 @@ def test_skill_preflight_only_skips_secret_and_routine_calls(
     assert "Skill catalog preflight" in out
     assert not any(path.endswith("/secrets") for path in calls)
     assert not any(path.endswith("/routines") for path in calls)
+
+
+def test_skill_preflight_only_fails_for_unknown_desired_skill(
+    sync_module, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    def fake_api(method, path, body=None):
+        if path.endswith("/agents"):
+            return [
+                {
+                    "id": "agent-id",
+                    "urlKey": "alpha",
+                    "adapterConfig": {"paperclipSkillSync": {"desiredSkills": []}},
+                }
+            ]
+        if path.endswith("/skills"):
+            return [{"path": "garrytan/gstack/browse"}]
+        raise AssertionError(f"unexpected API call in skills-only mode: {path}")
+
+    monkeypatch.setattr(sync_module, "api", fake_api)
+    monkeypatch.setattr(sync_module, "SKILL_PREFLIGHT_ONLY", True)
+
+    assert sync_module.main() == 1
+    captured = capsys.readouterr()
+    assert "unknown_desired_skills" in captured.out
+    assert "desired skill(s) not in Paperclip catalog" in captured.err
+
+
+def test_deploy_skill_preflight_propagates_config_sync_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    curl = bin_dir / "curl"
+    curl.write_text(
+        """#!/usr/bin/env bash
+set -euo pipefail
+body=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o)
+      body="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+printf '[]' > "$body"
+printf '200'
+""",
+        encoding="utf-8",
+    )
+    curl.chmod(0o755)
+    python = bin_dir / "python3"
+    python.write_text(
+        """#!/usr/bin/env bash
+exit 1
+""",
+        encoding="utf-8",
+    )
+    python.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ['PATH']}")
+
+    result = subprocess.run(
+        ["bash", str(REPO_ROOT / "agents" / "deploy.sh"), "--skill-preflight"],
+        env={
+            **os.environ,
+            "PAPERCLIP_URL": "https://example.test",
+            "PAPERCLIP_API_KEY": "test-key",
+        },
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "Config sync failed." in result.stderr
+    assert "Skill preflight failed with 1 error(s)." in result.stdout
+    assert "Skill preflight complete." not in result.stdout
 
 
 def test_routine_patch_payload_includes_latest_revision_id(sync_module) -> None:
