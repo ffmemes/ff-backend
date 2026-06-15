@@ -6,7 +6,8 @@ and per-agent `AGENTS.md` frontmatter, compares with prod via Paperclip API,
 PATCHes only agents whose config actually drifted, and uses Paperclip's native
 skills sync endpoint for desired skill assignment.
 
-Env: PAPERCLIP_URL, PAPERCLIP_API_KEY, COMPANY_ID, SCRIPT_DIR, DRY_RUN.
+Env: PAPERCLIP_URL, PAPERCLIP_API_KEY, COMPANY_ID, SCRIPT_DIR, DRY_RUN,
+SKILL_PREFLIGHT_ONLY.
 """
 
 import os
@@ -28,6 +29,7 @@ KEY = os.environ["PAPERCLIP_API_KEY"]
 COMPANY = os.environ["COMPANY_ID"]
 SCRIPT_DIR = os.environ["SCRIPT_DIR"]
 DRY = os.environ.get("DRY_RUN", "0") == "1"
+SKILL_PREFLIGHT_ONLY = os.environ.get("SKILL_PREFLIGHT_ONLY", "0") == "1"
 
 _client = PaperclipClient(URL, KEY, user_agent="ffmemes-deploy.sh/1.0")
 
@@ -73,24 +75,24 @@ def sync_skills(agent_id: str, desired_skills: list[str]):
     )
 
 
-def fetch_skill_catalog() -> tuple[set[str], str]:
+def fetch_skill_catalog() -> tuple[dict[str, dict], str]:
     """Best-effort fetch of the company skill catalog.
 
-    Returns (catalog_paths, status). `status` is a short label suitable for
-    inclusion in the dry-run summary; `catalog_paths` is empty when the
+    Returns (catalog_by_path, status). `status` is a short label suitable for
+    inclusion in the dry-run summary; `catalog_by_path` is empty when the
     catalog couldn't be retrieved.
     """
     try:
         catalog = api("GET", f"/api/companies/{COMPANY}/skills")
     except urllib.error.HTTPError as e:
-        return set(), f"skipped (HTTP {e.code})"
+        return {}, f"skipped (HTTP {e.code})"
     except Exception as e:  # network / decode / other transport errors
-        return set(), f"skipped ({type(e).__name__})"
+        return {}, f"skipped ({type(e).__name__})"
 
     if not isinstance(catalog, list):
-        return set(), f"skipped (unexpected shape {type(catalog).__name__})"
+        return {}, f"skipped (unexpected shape {type(catalog).__name__})"
 
-    paths: set[str] = set()
+    by_path: dict[str, dict] = {}
     for entry in catalog:
         if not isinstance(entry, dict):
             continue
@@ -100,8 +102,8 @@ def fetch_skill_catalog() -> tuple[set[str], str]:
             entry.get("path") or entry.get("key") or entry.get("urlKey") or entry.get("slug")
         )
         if isinstance(candidate, str) and candidate:
-            paths.add(candidate)
-    return paths, f"ok ({len(paths)} skills)" if paths else "skipped (empty catalog)"
+            by_path[candidate] = entry
+    return by_path, f"ok ({len(by_path)} skills)" if by_path else "skipped (empty catalog)"
 
 
 def compute_desired_skills(
@@ -131,7 +133,8 @@ def preflight_skills(
 
     Runs before the per-agent skill assignment sync. Surfaces:
     - upstream source/ref (from manifest, no secrets)
-    - checked / updated / removed / failed counts across all in-prod agents
+    - checked_count / updated_count / failed_count / stale_count /
+      removed_count across all in-prod agents
     - update_method
     - catalog validation status (best-effort; skipped when catalog endpoint
       is unavailable)
@@ -156,23 +159,30 @@ def preflight_skills(
         removed_total += len(gone)
         all_desired.update(target_skills)
 
-    catalog_paths, catalog_status = fetch_skill_catalog()
+    catalog_by_path, catalog_status = fetch_skill_catalog()
     unknown: list[str] = []
-    if catalog_paths:
+    stale: list[str] = []
+    if catalog_by_path:
         for skill in sorted(all_desired):
             # paperclipai/* skills are preserved as-is from current adapterConfig;
             # if not in the live catalog, surface them too — that's exactly the
             # "unknown desired skill" case the verification asks about.
-            if skill not in catalog_paths:
+            entry = catalog_by_path.get(skill)
+            if entry is None:
                 unknown.append(skill)
+                continue
+            compatibility = entry.get("compatibility")
+            if isinstance(compatibility, str) and compatibility != "compatible":
+                stale.append(skill)
 
     state = {
         "upstream_source": source,
         "upstream_ref": ref,
-        "checked": len(all_desired),
-        "updated": updated_total,
-        "removed": removed_total,
-        "failed": len(unknown),
+        "checked_count": len(all_desired),
+        "updated_count": updated_total,
+        "failed_count": len(unknown),
+        "stale_count": len(stale),
+        "removed_count": removed_total,
         "update_method": update_method_label,
         "catalog_validation": catalog_status,
     }
@@ -183,8 +193,10 @@ def preflight_skills(
         print(f"  {k}: {v}")
     if unknown:
         print(f"  unknown_desired_skills: {unknown}")
+    if stale:
+        print(f"  stale_desired_skills: {stale}")
 
-    return {**state, "unknown_desired_skills": unknown}
+    return {**state, "unknown_desired_skills": unknown, "stale_desired_skills": stale}
 
 
 def load_secret_ids() -> dict[str, str]:
@@ -439,6 +451,41 @@ def main() -> int:
         )
         return 1
     by_slug = {a["urlKey"]: a for a in agents_list}
+
+    preflight = preflight_skills(by_slug, manifest)
+    if preflight["unknown_desired_skills"]:
+        print(
+            f"  ERROR {preflight['failed_count']} desired skill(s) not in Paperclip catalog: "
+            f"{preflight['unknown_desired_skills']}",
+            file=sys.stderr,
+        )
+        # Block apply and skills-only preflight; in a full dry-run, keep going
+        # so operators see the complete diff.
+        if SKILL_PREFLIGHT_ONLY or not DRY:
+            return 1
+
+    if preflight["stale_desired_skills"]:
+        print(
+            f"  ERROR {preflight['stale_count']} desired skill(s) incompatible "
+            "with Paperclip catalog: "
+            f"{preflight['stale_desired_skills']}",
+            file=sys.stderr,
+        )
+        # Block apply and skills-only preflight; in a full dry-run, keep going
+        # so operators see the complete diff.
+        if SKILL_PREFLIGHT_ONLY or not DRY:
+            return 1
+
+    if SKILL_PREFLIGHT_ONLY and str(preflight["catalog_validation"]).startswith("skipped"):
+        print(
+            "  ERROR skill catalog validation skipped; refusing to pass skills-only preflight",
+            file=sys.stderr,
+        )
+        return 1
+
+    if SKILL_PREFLIGHT_ONLY:
+        return 0
+
     try:
         secret_ids = load_secret_ids()
     except ConfigError as exc:
@@ -460,18 +507,6 @@ def main() -> int:
     if env_failed:
         print("  ERROR env preflight failed; no agent config changes applied", file=sys.stderr)
         return 1
-
-    preflight = preflight_skills(by_slug, manifest)
-    if preflight["unknown_desired_skills"]:
-        print(
-            f"  ERROR {preflight['failed']} desired skill(s) not in Paperclip catalog: "
-            f"{preflight['unknown_desired_skills']}",
-            file=sys.stderr,
-        )
-        # Block apply; surface in dry-run as a failure marker but keep going so
-        # operators see the full diff.
-        if not DRY:
-            return 1
 
     patched = 0
     skipped = 0

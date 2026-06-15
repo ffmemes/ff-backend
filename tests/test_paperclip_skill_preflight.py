@@ -11,6 +11,7 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import os
+import subprocess
 import sys
 import urllib.error
 from pathlib import Path
@@ -30,6 +31,17 @@ def sync_module(tmp_path: Path) -> Iterator:
     (script_dir / "alpha").mkdir(parents=True)
     (script_dir / "alpha" / "AGENTS.md").write_text(
         "---\nname: Alpha\nskills:\n  - browse\n  - paperclip\n---\n# Alpha\n",
+        encoding="utf-8",
+    )
+    (script_dir / ".paperclip.yaml").write_text(
+        """
+skills:
+  source: https://github.com/garrytan/gstack
+  ref: main
+  update_method: paperclip_skill_sync
+agents:
+  alpha: {}
+""".lstrip(),
         encoding="utf-8",
     )
 
@@ -99,13 +111,22 @@ def test_preflight_emits_required_keys(
 
     assert state["upstream_source"] == "https://github.com/garrytan/gstack"
     assert state["upstream_ref"] == "v1.2.3"
-    assert state["checked"] == 2
-    assert state["updated"] == 2  # browse + paperclip newly added
-    assert state["removed"] == 0
-    assert state["failed"] == 0
+    assert state["checked_count"] == 2
+    assert state["updated_count"] == 2  # browse + paperclip newly added
+    assert state["failed_count"] == 0
+    assert state["stale_count"] == 0
+    assert state["removed_count"] == 0
     assert state["update_method"] == "paperclip_skill_sync"
     # Required keys must be in stdout for operator visibility.
-    for key in ("upstream_ref", "checked", "updated", "removed", "failed", "update_method"):
+    for key in (
+        "upstream_ref",
+        "checked_count",
+        "updated_count",
+        "failed_count",
+        "stale_count",
+        "removed_count",
+        "update_method",
+    ):
         assert key in out
 
 
@@ -127,9 +148,30 @@ def test_preflight_flags_unknown_desired_skill(
     }
     state = sync_module.preflight_skills(by_slug, manifest)
     out = capsys.readouterr().out
-    assert state["failed"] == 1
+    assert state["failed_count"] == 1
     assert state["unknown_desired_skills"] == ["paperclipai/paperclip/paperclip"]
     assert "unknown_desired_skills" in out
+
+
+def test_preflight_flags_incompatible_catalog_entry(
+    sync_module, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    monkeypatch.setattr(
+        sync_module,
+        "api",
+        lambda method, path, body=None: [
+            {"path": "garrytan/gstack/browse", "compatibility": "incompatible"},
+            {"path": "paperclipai/paperclip/paperclip", "compatibility": "compatible"},
+        ],
+    )
+    by_slug = _by_slug_with_skills("alpha", [])
+    manifest = {"skills": {"ref": "main"}, "agents": {"alpha": {}}}
+    state = sync_module.preflight_skills(by_slug, manifest)
+    out = capsys.readouterr().out
+    assert state["failed_count"] == 0
+    assert state["stale_count"] == 1
+    assert state["stale_desired_skills"] == ["garrytan/gstack/browse"]
+    assert "stale_desired_skills" in out
 
 
 def test_preflight_skips_validation_when_catalog_unreachable(
@@ -143,7 +185,7 @@ def test_preflight_skips_validation_when_catalog_unreachable(
     manifest = {"skills": {"ref": "main"}, "agents": {"alpha": {}}}
     state = sync_module.preflight_skills(by_slug, manifest)
     out = capsys.readouterr().out
-    assert state["failed"] == 0
+    assert state["failed_count"] == 0
     assert state["catalog_validation"].startswith("skipped")
     assert "skipped" in out
 
@@ -171,9 +213,9 @@ def test_preflight_counts_removals(sync_module, monkeypatch: pytest.MonkeyPatch)
     )
     manifest = {"skills": {"ref": "main"}, "agents": {"alpha": {}}}
     state = sync_module.preflight_skills(by_slug, manifest)
-    assert state["updated"] == 0  # both target skills already present
-    assert state["removed"] == 1
-    assert state["failed"] == 0
+    assert state["updated_count"] == 0  # both target skills already present
+    assert state["removed_count"] == 1
+    assert state["failed_count"] == 0
 
 
 def test_preflight_unpinned_ref_label(
@@ -185,6 +227,171 @@ def test_preflight_unpinned_ref_label(
     state = sync_module.preflight_skills(by_slug, manifest)
     capsys.readouterr()
     assert state["upstream_ref"] == "unpinned"
+
+
+def test_skill_preflight_only_skips_secret_and_routine_calls(
+    sync_module, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    calls: list[str] = []
+
+    def fake_api(method, path, body=None):
+        calls.append(path)
+        if path.endswith("/agents"):
+            return [
+                {
+                    "id": "agent-id",
+                    "urlKey": "alpha",
+                    "adapterConfig": {"paperclipSkillSync": {"desiredSkills": []}},
+                }
+            ]
+        if path.endswith("/skills"):
+            return [
+                {"path": "garrytan/gstack/browse"},
+                {"path": "paperclipai/paperclip/paperclip"},
+            ]
+        raise AssertionError(f"unexpected API call in skills-only mode: {path}")
+
+    monkeypatch.setattr(sync_module, "api", fake_api)
+    monkeypatch.setattr(sync_module, "SKILL_PREFLIGHT_ONLY", True)
+
+    assert sync_module.main() == 0
+    out = capsys.readouterr().out
+    assert "Skill catalog preflight" in out
+    assert not any(path.endswith("/secrets") for path in calls)
+    assert not any(path.endswith("/routines") for path in calls)
+
+
+def test_skill_preflight_only_fails_for_unknown_desired_skill(
+    sync_module, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    def fake_api(method, path, body=None):
+        if path.endswith("/agents"):
+            return [
+                {
+                    "id": "agent-id",
+                    "urlKey": "alpha",
+                    "adapterConfig": {"paperclipSkillSync": {"desiredSkills": []}},
+                }
+            ]
+        if path.endswith("/skills"):
+            return [{"path": "garrytan/gstack/browse"}]
+        raise AssertionError(f"unexpected API call in skills-only mode: {path}")
+
+    monkeypatch.setattr(sync_module, "api", fake_api)
+    monkeypatch.setattr(sync_module, "SKILL_PREFLIGHT_ONLY", True)
+
+    assert sync_module.main() == 1
+    captured = capsys.readouterr()
+    assert "unknown_desired_skills" in captured.out
+    assert "desired skill(s) not in Paperclip catalog" in captured.err
+
+
+def test_skill_preflight_only_fails_for_stale_desired_skill(
+    sync_module, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    def fake_api(method, path, body=None):
+        if path.endswith("/agents"):
+            return [
+                {
+                    "id": "agent-id",
+                    "urlKey": "alpha",
+                    "adapterConfig": {"paperclipSkillSync": {"desiredSkills": []}},
+                }
+            ]
+        if path.endswith("/skills"):
+            return [
+                {"path": "garrytan/gstack/browse", "compatibility": "incompatible"},
+                {"path": "paperclipai/paperclip/paperclip", "compatibility": "compatible"},
+            ]
+        raise AssertionError(f"unexpected API call in skills-only mode: {path}")
+
+    monkeypatch.setattr(sync_module, "api", fake_api)
+    monkeypatch.setattr(sync_module, "SKILL_PREFLIGHT_ONLY", True)
+
+    assert sync_module.main() == 1
+    captured = capsys.readouterr()
+    assert "stale_desired_skills" in captured.out
+    assert "desired skill(s) incompatible with Paperclip catalog" in captured.err
+
+
+def test_skill_preflight_only_fails_when_catalog_validation_skipped(
+    sync_module, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    def fake_api(method, path, body=None):
+        if path.endswith("/agents"):
+            return [
+                {
+                    "id": "agent-id",
+                    "urlKey": "alpha",
+                    "adapterConfig": {"paperclipSkillSync": {"desiredSkills": []}},
+                }
+            ]
+        if path.endswith("/skills"):
+            return []
+        raise AssertionError(f"unexpected API call in skills-only mode: {path}")
+
+    monkeypatch.setattr(sync_module, "api", fake_api)
+    monkeypatch.setattr(sync_module, "SKILL_PREFLIGHT_ONLY", True)
+
+    assert sync_module.main() == 1
+    captured = capsys.readouterr()
+    assert "catalog_validation: skipped (empty catalog)" in captured.out
+    assert "skill catalog validation skipped" in captured.err
+
+
+def test_deploy_skill_preflight_propagates_config_sync_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    curl = bin_dir / "curl"
+    curl.write_text(
+        """#!/usr/bin/env bash
+set -euo pipefail
+body=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o)
+      body="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+printf '[]' > "$body"
+printf '200'
+""",
+        encoding="utf-8",
+    )
+    curl.chmod(0o755)
+    python = bin_dir / "python3"
+    python.write_text(
+        """#!/usr/bin/env bash
+exit 1
+""",
+        encoding="utf-8",
+    )
+    python.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ['PATH']}")
+
+    result = subprocess.run(
+        ["bash", str(REPO_ROOT / "agents" / "deploy.sh"), "--skill-preflight"],
+        env={
+            **os.environ,
+            "PAPERCLIP_URL": "https://example.test",
+            "PAPERCLIP_API_KEY": "test-key",
+        },
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "Config sync failed." in result.stderr
+    assert "Skill preflight failed with 1 error(s)." in result.stderr
+    assert "Skill preflight complete." not in result.stdout
 
 
 def test_routine_patch_payload_includes_latest_revision_id(sync_module) -> None:

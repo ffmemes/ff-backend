@@ -98,9 +98,10 @@ Do not use `company import` to update existing prod agents; the safe import
 route does not replace existing agents.
 
 The deploy dry-run prints a `Skill catalog preflight` block with the upstream
-gstack `source`/`ref`, `checked` / `updated` / `removed` / `failed` counts, and
-the `update_method`. A non-zero `failed` (unknown desired skills) blocks an
-apply pass — pin the right `ref` in `agents/.paperclip.yaml` before re-running.
+gstack `source`/`ref`, `checked_count` / `updated_count` / `failed_count` /
+`stale_count` / `removed_count`, and the `update_method`. A non-zero
+`failed_count` (unknown desired skills) blocks an apply pass — pin the right
+`ref` in `agents/.paperclip.yaml` before re-running.
 
 See [Paperclip](https://paperclip.ing) for more information.
 
