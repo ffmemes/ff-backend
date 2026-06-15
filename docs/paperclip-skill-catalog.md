@@ -27,16 +27,17 @@ script runs a preflight before issuing any per-agent sync:
 Skill catalog preflight (dry-run):
   upstream_source: https://github.com/garrytan/gstack
   upstream_ref: <ref>
-  checked: <N>
-  updated: <added>
-  removed: <gone>
-  failed: <unknown desired skills>
+  checked_count: <N>
+  updated_count: <added>
+  failed_count: <unknown desired skills>
+  stale_count: <incompatible catalog entries>
+  removed_count: <gone>
   update_method: POST /api/agents/<id>/skills/sync (per-agent)
   catalog_validation: <ok|skipped (...)>
 ```
 
-When `failed > 0`, the apply pass is blocked. `dry-run` still completes so the
-operator sees the full diff and the unknown skill names.
+When `failed_count > 0`, the apply pass is blocked. `dry-run` still completes
+so the operator sees the full diff and the unknown skill names.
 
 ## Team-mode (gstack) decision: docs-only
 
@@ -64,7 +65,7 @@ repo clean.
 
 ## When to bump `skills.ref`
 
-1. Run `agents/deploy.sh --dry-run`. Confirm `failed: 0`.
+1. Run `agents/deploy.sh --dry-run`. Confirm `failed_count: 0`.
 2. If a desired skill is missing upstream, either add it to gstack (PR
    garrytan/gstack) or remove the frontmatter entry.
 3. Bump `skills.ref` in `agents/.paperclip.yaml` and re-run dry-run. Apply

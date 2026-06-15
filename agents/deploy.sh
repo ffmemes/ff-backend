@@ -133,9 +133,11 @@ COMPANY_ID="$COMPANY_ID" SCRIPT_DIR="$SCRIPT_DIR" DRY_RUN="$DRY_RUN" \
 echo
 if [[ $errors -gt 0 ]]; then
   if [[ $SKILL_PREFLIGHT_ONLY -eq 1 ]]; then
-    echo "Skill preflight failed with $errors error(s)."
+    echo "Skill preflight failed with $errors error(s)." >&2
+  elif [[ $DRY_RUN -eq 1 ]]; then
+    echo "Dry-run failed with $errors error(s)." >&2
   else
-    echo "Synced $synced_files files; $errors errors during apply."
+    echo "Synced $synced_files files; $errors errors during apply." >&2
   fi
   exit 1
 elif [[ $SKILL_PREFLIGHT_ONLY -eq 1 ]]; then

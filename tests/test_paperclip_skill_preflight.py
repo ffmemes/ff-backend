@@ -111,13 +111,22 @@ def test_preflight_emits_required_keys(
 
     assert state["upstream_source"] == "https://github.com/garrytan/gstack"
     assert state["upstream_ref"] == "v1.2.3"
-    assert state["checked"] == 2
-    assert state["updated"] == 2  # browse + paperclip newly added
-    assert state["removed"] == 0
-    assert state["failed"] == 0
+    assert state["checked_count"] == 2
+    assert state["updated_count"] == 2  # browse + paperclip newly added
+    assert state["failed_count"] == 0
+    assert state["stale_count"] == 0
+    assert state["removed_count"] == 0
     assert state["update_method"] == "paperclip_skill_sync"
     # Required keys must be in stdout for operator visibility.
-    for key in ("upstream_ref", "checked", "updated", "removed", "failed", "update_method"):
+    for key in (
+        "upstream_ref",
+        "checked_count",
+        "updated_count",
+        "failed_count",
+        "stale_count",
+        "removed_count",
+        "update_method",
+    ):
         assert key in out
 
 
@@ -139,9 +148,30 @@ def test_preflight_flags_unknown_desired_skill(
     }
     state = sync_module.preflight_skills(by_slug, manifest)
     out = capsys.readouterr().out
-    assert state["failed"] == 1
+    assert state["failed_count"] == 1
     assert state["unknown_desired_skills"] == ["paperclipai/paperclip/paperclip"]
     assert "unknown_desired_skills" in out
+
+
+def test_preflight_flags_incompatible_catalog_entry(
+    sync_module, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    monkeypatch.setattr(
+        sync_module,
+        "api",
+        lambda method, path, body=None: [
+            {"path": "garrytan/gstack/browse", "compatibility": "incompatible"},
+            {"path": "paperclipai/paperclip/paperclip", "compatibility": "compatible"},
+        ],
+    )
+    by_slug = _by_slug_with_skills("alpha", [])
+    manifest = {"skills": {"ref": "main"}, "agents": {"alpha": {}}}
+    state = sync_module.preflight_skills(by_slug, manifest)
+    out = capsys.readouterr().out
+    assert state["failed_count"] == 0
+    assert state["stale_count"] == 1
+    assert state["stale_desired_skills"] == ["garrytan/gstack/browse"]
+    assert "stale_desired_skills" in out
 
 
 def test_preflight_skips_validation_when_catalog_unreachable(
@@ -155,7 +185,7 @@ def test_preflight_skips_validation_when_catalog_unreachable(
     manifest = {"skills": {"ref": "main"}, "agents": {"alpha": {}}}
     state = sync_module.preflight_skills(by_slug, manifest)
     out = capsys.readouterr().out
-    assert state["failed"] == 0
+    assert state["failed_count"] == 0
     assert state["catalog_validation"].startswith("skipped")
     assert "skipped" in out
 
@@ -183,9 +213,9 @@ def test_preflight_counts_removals(sync_module, monkeypatch: pytest.MonkeyPatch)
     )
     manifest = {"skills": {"ref": "main"}, "agents": {"alpha": {}}}
     state = sync_module.preflight_skills(by_slug, manifest)
-    assert state["updated"] == 0  # both target skills already present
-    assert state["removed"] == 1
-    assert state["failed"] == 0
+    assert state["updated_count"] == 0  # both target skills already present
+    assert state["removed_count"] == 1
+    assert state["failed_count"] == 0
 
 
 def test_preflight_unpinned_ref_label(
@@ -307,7 +337,7 @@ exit 1
 
     assert result.returncode == 1
     assert "Config sync failed." in result.stderr
-    assert "Skill preflight failed with 1 error(s)." in result.stdout
+    assert "Skill preflight failed with 1 error(s)." in result.stderr
     assert "Skill preflight complete." not in result.stdout
 
 
