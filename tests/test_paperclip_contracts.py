@@ -144,6 +144,12 @@ def test_published_evidence_accepts_public_channel_permalink():
     assert nested_state(text, slug="post") == "published"
 
 
+def test_published_evidence_accepts_newline_before_public_channel_permalink():
+    text = "Published:\nhttps://t.me/ffmemes/262"
+    assert has_published_evidence(text) is True
+    assert nested_state(text, slug="post") == "published"
+
+
 def test_published_evidence_accepts_published_archive_path():
     text = "published_archive=docs/comms/published/2026-06-15-text-heavy-memes.md"
     assert has_published_evidence(text) is True

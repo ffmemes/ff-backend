@@ -136,11 +136,11 @@ PUBLISHED_OUTCOME_MARKERS: tuple[re.Pattern[str], ...] = (
 PUBLISHED_LINK_MARKERS: tuple[re.Pattern[str], ...] = (
     re.compile(
         r"\b(?:published|posted|publication|channel preview confirmed)"
-        r"[^\n]{0,200}\bhttps?://t\.me/ffmemes/\d+\b",
+        r"[\s\S]{0,200}\bhttps?://t\.me/ffmemes/\d+\b",
         re.IGNORECASE,
     ),
     re.compile(
-        r"\bhttps?://t\.me/ffmemes/\d+\b[^\n]{0,200}"
+        r"\bhttps?://t\.me/ffmemes/\d+\b[\s\S]{0,200}"
         r"\b(?:published|posted|publication|channel preview confirmed)\b",
         re.IGNORECASE,
     ),

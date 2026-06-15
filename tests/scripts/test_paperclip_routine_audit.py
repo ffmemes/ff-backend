@@ -191,6 +191,15 @@ def test_daily_channel_post_telegram_permalink_counts_as_published():
     assert "approved_without_publish_marker" not in flags
 
 
+def test_daily_channel_post_newline_telegram_permalink_counts_as_published():
+    issue = {"title": "[post:2026-06-15-text-heavy-memes] Daily Channel Post", "description": ""}
+    comments = [{"body": ("decision=approved_to_publish\nPublished:\nhttps://t.me/ffmemes/262")}]
+
+    flags, _latest = audit.classify_issue(issue, comments)
+
+    assert "approved_without_publish_marker" not in flags
+
+
 def test_daily_channel_post_published_archive_counts_as_published():
     issue = {"title": "[post:2026-06-15-text-heavy-memes] Daily Channel Post", "description": ""}
     comments = [
