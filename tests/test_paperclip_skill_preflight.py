@@ -10,10 +10,14 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import json
 import os
+import shutil
 import subprocess
 import sys
+import threading
 import urllib.error
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Iterator
 
@@ -389,6 +393,98 @@ exit 1
     )
 
     assert result.returncode == 1
+    assert "Config sync failed." in result.stderr
+    assert "Skill preflight failed with 1 error(s)." in result.stderr
+    assert "Skill preflight complete." not in result.stdout
+
+
+def test_deploy_skill_preflight_fails_for_stale_desired_skill(tmp_path: Path) -> None:
+    script_dir = tmp_path / "agents"
+    script_dir.mkdir()
+    shutil.copy(REPO_ROOT / "agents" / "deploy.sh", script_dir / "deploy.sh")
+    shutil.copy(REPO_ROOT / "agents" / "_sync_config.py", script_dir / "_sync_config.py")
+    (script_dir / "deploy.sh").chmod(0o755)
+    (script_dir / "alpha").mkdir()
+    (script_dir / "alpha" / "AGENTS.md").write_text(
+        "---\nname: Alpha\nskills:\n  - browse\n  - paperclip\n---\n# Alpha\n",
+        encoding="utf-8",
+    )
+    (script_dir / ".paperclip.yaml").write_text(
+        """
+skills:
+  source: https://github.com/garrytan/gstack
+  ref: main
+  update_method: paperclip_skill_sync
+agents:
+  alpha: {}
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    scripts_dir = tmp_path / "scripts"
+    scripts_dir.mkdir()
+    shutil.copy(REPO_ROOT / "scripts" / "paperclip_http.py", scripts_dir / "paperclip_http.py")
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            if self.path.endswith("/agents"):
+                self._send_json(
+                    [
+                        {
+                            "id": "agent-id",
+                            "urlKey": "alpha",
+                            "adapterConfig": {"paperclipSkillSync": {"desiredSkills": []}},
+                        }
+                    ]
+                )
+                return
+            if self.path.endswith("/skills"):
+                self._send_json(
+                    [
+                        {"path": "garrytan/gstack/browse", "compatibility": "incompatible"},
+                        {
+                            "path": "paperclipai/paperclip/paperclip",
+                            "compatibility": "compatible",
+                        },
+                    ]
+                )
+                return
+            self.send_response(404)
+            self.end_headers()
+
+        def _send_json(self, payload: object) -> None:
+            body = json.dumps(payload).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, fmt: str, *args: object) -> None:
+            return
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        result = subprocess.run(
+            ["bash", str(script_dir / "deploy.sh"), "--skill-preflight"],
+            env={
+                **os.environ,
+                "PAPERCLIP_URL": f"http://127.0.0.1:{server.server_port}",
+                "PAPERCLIP_API_KEY": "test-key",
+            },
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    finally:
+        server.shutdown()
+        thread.join()
+
+    assert result.returncode == 1
+    assert "stale_desired_skills" in result.stdout
+    assert "desired skill(s) incompatible with Paperclip catalog" in result.stderr
     assert "Config sync failed." in result.stderr
     assert "Skill preflight failed with 1 error(s)." in result.stderr
     assert "Skill preflight complete." not in result.stdout
