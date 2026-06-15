@@ -175,6 +175,85 @@ def test_daily_channel_post_parent_is_green_when_linked_post_is_published():
     assert rows[0]["referencedPostIssues"][0]["nestedState"] == "published"
 
 
+def test_daily_channel_post_parent_stays_flagged_with_mixed_referenced_posts():
+    parent = {
+        "id": "parent-id",
+        "identifier": "FFM-1558",
+        "title": "Daily Channel Post",
+        "status": "done",
+        "description": "Linked drafts: FFM-1559 and FFM-1560.",
+    }
+    published_child = {
+        "id": "published-child-id",
+        "identifier": "FFM-1559",
+        "title": "[post:2026-06-15-text-heavy-memes] Text-heavy memes beat no-text images",
+        "status": "done",
+        "description": "",
+        "assigneeAgentId": "comms-agent",
+        "updatedAt": "2026-06-15T12:00:00Z",
+    }
+    approved_child = {
+        "id": "approved-child-id",
+        "identifier": "FFM-1560",
+        "title": "[post:2026-06-15-reactions-lore] Reaction lore",
+        "status": "done",
+        "description": "",
+        "assigneeAgentId": "comms-agent",
+        "updatedAt": "2026-06-15T12:30:00Z",
+    }
+    routes = {
+        "/api/companies/company-id/routines": [
+            {
+                "id": "routine-id",
+                "status": "active",
+                "title": "Daily Channel Post",
+                "lastRun": {
+                    "status": "completed",
+                    "linkedIssueId": "parent-id",
+                    "linkedIssue": {
+                        "identifier": "FFM-1558",
+                        "title": "Daily Channel Post",
+                        "status": "done",
+                    },
+                },
+            }
+        ],
+        "/api/issues/parent-id": parent,
+        ("/api/issues/parent-id/comments", (("limit", "100"),)): [
+            {
+                "body": (
+                    "decision=approved_to_publish before publishing.\n"
+                    "Linked drafts: FFM-1559 and FFM-1560."
+                )
+            }
+        ],
+        ("/api/issues/parent-id/interactions", (("limit", "100"),)): [],
+        "/api/issues/FFM-1559": published_child,
+        ("/api/issues/published-child-id/comments", (("limit", "100"),)): [
+            {
+                "body": (
+                    "outcome=published channel=ffmemes telegram_message_id=262 editorial_post_id=30"
+                )
+            }
+        ],
+        ("/api/issues/published-child-id/interactions", (("limit", "100"),)): [],
+        "/api/issues/FFM-1560": approved_child,
+        ("/api/issues/approved-child-id/comments", (("limit", "100"),)): [
+            {"body": "decision=approved_to_publish\ndraft_revision=2"}
+        ],
+        ("/api/issues/approved-child-id/interactions", (("limit", "100"),)): [],
+    }
+
+    rows = audit.audit_routines(FakePaperclip(routes), "company-id", "comms")
+
+    assert "approved_without_publish_marker" in rows[0]["flags"]
+    assert "parent_done_child_non_terminal" not in rows[0]["flags"]
+    assert [ref["nestedState"] for ref in rows[0]["referencedPostIssues"]] == [
+        "published",
+        "approved_unpublished",
+    ]
+
+
 def test_daily_channel_post_telegram_permalink_counts_as_published():
     issue = {"title": "[post:2026-06-15-text-heavy-memes] Daily Channel Post", "description": ""}
     comments = [

@@ -35,6 +35,7 @@ if str(SCRIPT_DIR) not in sys.path:
 try:
     from paperclip_contracts import (
         has_published_evidence,
+        is_terminal_nested_state,
         issue_slug,
         nested_state,
         parent_child_status_violation,
@@ -49,6 +50,7 @@ try:
 except ModuleNotFoundError:
     from scripts.paperclip_contracts import (
         has_published_evidence,
+        is_terminal_nested_state,
         issue_slug,
         nested_state,
         parent_child_status_violation,
@@ -519,7 +521,7 @@ def audit_routines(client: Paperclip, company_id: str, focus: str) -> list[dict[
         refs = referenced_post_issues(client, issue or {}, comments)
         if refs:
             row["referencedPostIssues"] = refs
-            if any(ref.get("nestedState") == "published" for ref in refs):
+            if all(is_terminal_nested_state(ref.get("nestedState") or "") for ref in refs):
                 row["flags"] = [
                     flag for flag in row["flags"] if flag != "approved_without_publish_marker"
                 ]
