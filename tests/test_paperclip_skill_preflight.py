@@ -32,6 +32,17 @@ def sync_module(tmp_path: Path) -> Iterator:
         "---\nname: Alpha\nskills:\n  - browse\n  - paperclip\n---\n# Alpha\n",
         encoding="utf-8",
     )
+    (script_dir / ".paperclip.yaml").write_text(
+        """
+skills:
+  source: https://github.com/garrytan/gstack
+  ref: main
+  update_method: paperclip_skill_sync
+agents:
+  alpha: {}
+""".lstrip(),
+        encoding="utf-8",
+    )
 
     env = {
         "PAPERCLIP_URL": "https://example.test",
@@ -185,6 +196,38 @@ def test_preflight_unpinned_ref_label(
     state = sync_module.preflight_skills(by_slug, manifest)
     capsys.readouterr()
     assert state["upstream_ref"] == "unpinned"
+
+
+def test_skill_preflight_only_skips_secret_and_routine_calls(
+    sync_module, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    calls: list[str] = []
+
+    def fake_api(method, path, body=None):
+        calls.append(path)
+        if path.endswith("/agents"):
+            return [
+                {
+                    "id": "agent-id",
+                    "urlKey": "alpha",
+                    "adapterConfig": {"paperclipSkillSync": {"desiredSkills": []}},
+                }
+            ]
+        if path.endswith("/skills"):
+            return [
+                {"path": "garrytan/gstack/browse"},
+                {"path": "paperclipai/paperclip/paperclip"},
+            ]
+        raise AssertionError(f"unexpected API call in skills-only mode: {path}")
+
+    monkeypatch.setattr(sync_module, "api", fake_api)
+    monkeypatch.setattr(sync_module, "SKILL_PREFLIGHT_ONLY", True)
+
+    assert sync_module.main() == 0
+    out = capsys.readouterr().out
+    assert "Skill catalog preflight" in out
+    assert not any(path.endswith("/secrets") for path in calls)
+    assert not any(path.endswith("/routines") for path in calls)
 
 
 def test_routine_patch_payload_includes_latest_revision_id(sync_module) -> None:

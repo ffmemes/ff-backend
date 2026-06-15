@@ -6,7 +6,8 @@ and per-agent `AGENTS.md` frontmatter, compares with prod via Paperclip API,
 PATCHes only agents whose config actually drifted, and uses Paperclip's native
 skills sync endpoint for desired skill assignment.
 
-Env: PAPERCLIP_URL, PAPERCLIP_API_KEY, COMPANY_ID, SCRIPT_DIR, DRY_RUN.
+Env: PAPERCLIP_URL, PAPERCLIP_API_KEY, COMPANY_ID, SCRIPT_DIR, DRY_RUN,
+SKILL_PREFLIGHT_ONLY.
 """
 
 import os
@@ -28,6 +29,7 @@ KEY = os.environ["PAPERCLIP_API_KEY"]
 COMPANY = os.environ["COMPANY_ID"]
 SCRIPT_DIR = os.environ["SCRIPT_DIR"]
 DRY = os.environ.get("DRY_RUN", "0") == "1"
+SKILL_PREFLIGHT_ONLY = os.environ.get("SKILL_PREFLIGHT_ONLY", "0") == "1"
 
 _client = PaperclipClient(URL, KEY, user_agent="ffmemes-deploy.sh/1.0")
 
@@ -439,6 +441,22 @@ def main() -> int:
         )
         return 1
     by_slug = {a["urlKey"]: a for a in agents_list}
+
+    preflight = preflight_skills(by_slug, manifest)
+    if preflight["unknown_desired_skills"]:
+        print(
+            f"  ERROR {preflight['failed']} desired skill(s) not in Paperclip catalog: "
+            f"{preflight['unknown_desired_skills']}",
+            file=sys.stderr,
+        )
+        # Block apply; surface in dry-run as a failure marker but keep going so
+        # operators see the full diff.
+        if not DRY:
+            return 1
+
+    if SKILL_PREFLIGHT_ONLY:
+        return 0
+
     try:
         secret_ids = load_secret_ids()
     except ConfigError as exc:
@@ -460,18 +478,6 @@ def main() -> int:
     if env_failed:
         print("  ERROR env preflight failed; no agent config changes applied", file=sys.stderr)
         return 1
-
-    preflight = preflight_skills(by_slug, manifest)
-    if preflight["unknown_desired_skills"]:
-        print(
-            f"  ERROR {preflight['failed']} desired skill(s) not in Paperclip catalog: "
-            f"{preflight['unknown_desired_skills']}",
-            file=sys.stderr,
-        )
-        # Block apply; surface in dry-run as a failure marker but keep going so
-        # operators see the full diff.
-        if not DRY:
-            return 1
 
     patched = 0
     skipped = 0
