@@ -23,6 +23,20 @@ def load_audit_module():
 audit = load_audit_module()
 
 
+class FakePaperclip:
+    def __init__(self, routes):
+        self.routes = routes
+
+    def get(self, path, query=None):
+        key = (path, tuple(sorted((query or {}).items())))
+        if key in self.routes:
+            return self.routes[key]
+        if path in self.routes:
+            return self.routes[path]
+        msg = f"missing fake route: {path} {query}"
+        raise AssertionError(msg)
+
+
 def test_pr_review_approval_comment_does_not_require_publish_markers():
     issue = {"title": "[pr:241] Review", "description": ""}
     comments = [
@@ -84,6 +98,113 @@ def test_daily_channel_post_approval_still_requires_publish_markers():
     flags, _latest = audit.classify_issue(issue, comments)
 
     assert "approved_without_publish_marker" in flags
+
+
+def test_daily_channel_post_parent_static_approval_instruction_is_not_live_approval():
+    issue = {
+        "title": "Daily Channel Post",
+        "description": (
+            "Publication gate: requires CEO-authored issue update containing "
+            "decision=approved_to_publish before publishing."
+        ),
+    }
+    comments = [{"body": "outcome=draft_created; draft issue FFM-1559 was created."}]
+
+    flags, _latest = audit.classify_issue(issue, comments)
+
+    assert "approved_without_publish_marker" not in flags
+
+
+def test_daily_channel_post_parent_is_green_when_linked_post_is_published():
+    parent = {
+        "id": "parent-id",
+        "identifier": "FFM-1558",
+        "title": "Daily Channel Post",
+        "status": "done",
+        "description": (
+            "Publication gate: requires CEO-authored issue update containing "
+            "decision=approved_to_publish before publishing.\n"
+            "Linked draft: FFM-1559."
+        ),
+    }
+    child = {
+        "id": "child-id",
+        "identifier": "FFM-1559",
+        "title": "[post:2026-06-15-text-heavy-memes] Text-heavy memes beat no-text images",
+        "status": "done",
+        "description": "",
+        "assigneeAgentId": "comms-agent",
+        "updatedAt": "2026-06-15T12:00:00Z",
+    }
+    routes = {
+        "/api/companies/company-id/routines": [
+            {
+                "id": "routine-id",
+                "status": "active",
+                "title": "Daily Channel Post",
+                "lastRun": {
+                    "status": "completed",
+                    "linkedIssueId": "parent-id",
+                    "linkedIssue": {
+                        "identifier": "FFM-1558",
+                        "title": "Daily Channel Post",
+                        "status": "done",
+                    },
+                },
+            }
+        ],
+        "/api/issues/parent-id": parent,
+        ("/api/issues/parent-id/comments", (("limit", "100"),)): [
+            {"body": "outcome=draft_created; draft issue FFM-1559 was created."}
+        ],
+        ("/api/issues/parent-id/interactions", (("limit", "100"),)): [],
+        "/api/issues/FFM-1559": child,
+        ("/api/issues/child-id/comments", (("limit", "100"),)): [
+            {
+                "body": (
+                    "outcome=published channel=ffmemes telegram_message_id=262 editorial_post_id=30"
+                )
+            }
+        ],
+        ("/api/issues/child-id/interactions", (("limit", "100"),)): [],
+    }
+
+    rows = audit.audit_routines(FakePaperclip(routes), "company-id", "comms")
+
+    assert rows[0]["flags"] == []
+    assert rows[0]["referencedPostIssues"][0]["nestedState"] == "published"
+
+
+def test_daily_channel_post_telegram_permalink_counts_as_published():
+    issue = {"title": "[post:2026-06-15-text-heavy-memes] Daily Channel Post", "description": ""}
+    comments = [
+        {
+            "body": (
+                "decision=approved_to_publish\n"
+                "Public channel preview confirmed the published post at https://t.me/ffmemes/262."
+            )
+        }
+    ]
+
+    flags, _latest = audit.classify_issue(issue, comments)
+
+    assert "approved_without_publish_marker" not in flags
+
+
+def test_daily_channel_post_published_archive_counts_as_published():
+    issue = {"title": "[post:2026-06-15-text-heavy-memes] Daily Channel Post", "description": ""}
+    comments = [
+        {
+            "body": (
+                "decision=approved_to_publish\n"
+                "published_archive=docs/comms/published/2026-06-15-text-heavy-memes.md"
+            )
+        }
+    ]
+
+    flags, _latest = audit.classify_issue(issue, comments)
+
+    assert "approved_without_publish_marker" not in flags
 
 
 def test_freeform_approval_comment_is_not_publish_approval_signal():
