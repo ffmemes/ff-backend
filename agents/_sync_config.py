@@ -464,6 +464,13 @@ def main() -> int:
         if SKILL_PREFLIGHT_ONLY or not DRY:
             return 1
 
+    if SKILL_PREFLIGHT_ONLY and str(preflight["catalog_validation"]).startswith("skipped"):
+        print(
+            "  ERROR skill catalog validation skipped; refusing to pass skills-only preflight",
+            file=sys.stderr,
+        )
+        return 1
+
     if SKILL_PREFLIGHT_ONLY:
         return 0
 

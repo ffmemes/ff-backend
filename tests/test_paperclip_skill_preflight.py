@@ -286,6 +286,31 @@ def test_skill_preflight_only_fails_for_unknown_desired_skill(
     assert "desired skill(s) not in Paperclip catalog" in captured.err
 
 
+def test_skill_preflight_only_fails_when_catalog_validation_skipped(
+    sync_module, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    def fake_api(method, path, body=None):
+        if path.endswith("/agents"):
+            return [
+                {
+                    "id": "agent-id",
+                    "urlKey": "alpha",
+                    "adapterConfig": {"paperclipSkillSync": {"desiredSkills": []}},
+                }
+            ]
+        if path.endswith("/skills"):
+            return []
+        raise AssertionError(f"unexpected API call in skills-only mode: {path}")
+
+    monkeypatch.setattr(sync_module, "api", fake_api)
+    monkeypatch.setattr(sync_module, "SKILL_PREFLIGHT_ONLY", True)
+
+    assert sync_module.main() == 1
+    captured = capsys.readouterr()
+    assert "catalog_validation: skipped (empty catalog)" in captured.out
+    assert "skill catalog validation skipped" in captured.err
+
+
 def test_deploy_skill_preflight_propagates_config_sync_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
