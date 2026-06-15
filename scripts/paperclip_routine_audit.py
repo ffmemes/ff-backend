@@ -34,9 +34,8 @@ if str(SCRIPT_DIR) not in sys.path:
 
 try:
     from paperclip_contracts import (
-        PUBLISHED_MARKERS as PUBLISHED_MARKER_PATTERNS,
-    )
-    from paperclip_contracts import (
+        has_published_evidence,
+        is_terminal_nested_state,
         issue_slug,
         nested_state,
         parent_child_status_violation,
@@ -50,9 +49,8 @@ try:
     )
 except ModuleNotFoundError:
     from scripts.paperclip_contracts import (
-        PUBLISHED_MARKERS as PUBLISHED_MARKER_PATTERNS,
-    )
-    from scripts.paperclip_contracts import (
+        has_published_evidence,
+        is_terminal_nested_state,
         issue_slug,
         nested_state,
         parent_child_status_violation,
@@ -340,7 +338,8 @@ def classify_issue(
     interactions: list[dict[str, Any]] | None = None,
     interactions_degraded: bool = False,
 ) -> tuple[list[str], str]:
-    text = "\n".join([issue.get("description") or ""] + [c.get("body") or "" for c in comments])
+    comment_text = "\n".join(c.get("body") or "" for c in comments)
+    text = "\n".join([issue.get("description") or "", comment_text])
     lower = text.lower()
     title = (issue.get("title") or "").lower()
     flags: list[str] = []
@@ -364,12 +363,14 @@ def classify_issue(
     # often mention approvals, posts, or prior watchdog flags while summarizing
     # their work; those must not inherit the channel-publication contract.
     is_publish_flow = title.startswith("[post:") or "daily channel post" in title
+    approval_text = text if title.startswith("[post:") else comment_text
+    approval_lower = approval_text.lower()
     has_approval_signal = (
-        "decision=approved_to_publish" in lower
-        or "approved_to_publish" in lower
+        "decision=approved_to_publish" in approval_lower
+        or "approved_to_publish" in approval_lower
         or has_accepted_confirmation(interactions or [])
     )
-    has_publish_marker = all(pattern.search(text) for pattern in PUBLISHED_MARKER_PATTERNS)
+    has_publish_marker = has_published_evidence(text)
     if is_publish_flow and has_approval_signal and not has_publish_marker:
         flags.append("approved_without_publish_marker")
     elif is_publish_flow and interactions_degraded and not has_publish_marker:
@@ -520,6 +521,10 @@ def audit_routines(client: Paperclip, company_id: str, focus: str) -> list[dict[
         refs = referenced_post_issues(client, issue or {}, comments)
         if refs:
             row["referencedPostIssues"] = refs
+            if all(is_terminal_nested_state(ref.get("nestedState") or "") for ref in refs):
+                row["flags"] = [
+                    flag for flag in row["flags"] if flag != "approved_without_publish_marker"
+                ]
             # Parent cannot be reported green while a referenced child is
             # non-terminal. Surface the child identifiers explicitly so
             # downstream consumers can route them.

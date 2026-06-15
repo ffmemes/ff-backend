@@ -29,6 +29,7 @@ from paperclip_contracts import (  # noqa: E402
     OUTCOME_ALIASES,
     agent_workflow_invariant_violations,
     canonical_action,
+    has_published_evidence,
     is_decision_action,
     is_outcome_action,
     issue_slug,
@@ -131,6 +132,27 @@ def test_is_outcome_and_decision_helpers_agree_with_canonical():
 
 def test_nested_state_published_terminal():
     text = "Posted to channel.\noutcome=published telegram_message_id=42 editorial_post_id=ep-9"
+    assert nested_state(text, slug="post") == "published"
+
+
+def test_published_evidence_accepts_public_channel_permalink():
+    text = (
+        "Public channel preview confirmed the post at https://t.me/ffmemes/262; "
+        "the linked issue can now close."
+    )
+    assert has_published_evidence(text) is True
+    assert nested_state(text, slug="post") == "published"
+
+
+def test_published_evidence_accepts_newline_before_public_channel_permalink():
+    text = "Published:\nhttps://t.me/ffmemes/262"
+    assert has_published_evidence(text) is True
+    assert nested_state(text, slug="post") == "published"
+
+
+def test_published_evidence_accepts_published_archive_path():
+    text = "published_archive=docs/comms/published/2026-06-15-text-heavy-memes.md"
+    assert has_published_evidence(text) is True
     assert nested_state(text, slug="post") == "published"
 
 

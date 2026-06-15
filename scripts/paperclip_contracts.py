@@ -129,6 +129,28 @@ PUBLISHED_MARKERS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\b(?:telegram_message_id|telegram message id)\b", re.IGNORECASE),
 )
 
+PUBLISHED_OUTCOME_MARKERS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"\boutcome\s*=\s*(?:daily_channel_post|post_published)\b", re.IGNORECASE),
+)
+
+PUBLISHED_LINK_MARKERS: tuple[re.Pattern[str], ...] = (
+    re.compile(
+        r"\b(?:published|posted|publication|channel preview confirmed)"
+        r"[\s\S]{0,200}\bhttps?://t\.me/ffmemes/\d+\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bhttps?://t\.me/ffmemes/\d+\b[\s\S]{0,200}"
+        r"\b(?:published|posted|publication|channel preview confirmed)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:published_archive|archive_path|published\s+archive|archived\s+at)"
+        r"\s*[:=]?\s*`?docs/comms/published/[\w.-]+\.md\b",
+        re.IGNORECASE,
+    ),
+)
+
 # Intermediate approval signals. New Comms drafts use a CEO-authored
 # `decision=approved_to_publish` marker bound to the reviewed draft revision.
 # `APPROVED_TO_PUBLISH` remains a legacy fallback for old drafts.
@@ -189,6 +211,15 @@ def _all(patterns: Iterable[re.Pattern[str]], text: str) -> bool:
     return all(p.search(text) for p in patterns)
 
 
+def has_published_evidence(text: str) -> bool:
+    """Return True when post text contains terminal publication evidence."""
+    return (
+        _all(PUBLISHED_MARKERS, text)
+        or _any(PUBLISHED_OUTCOME_MARKERS, text)
+        or _any(PUBLISHED_LINK_MARKERS, text)
+    )
+
+
 def nested_state(text: str, *, slug: str | None = None) -> str:
     """Classify a child issue's text into one of `NESTED_STATES`.
 
@@ -197,7 +228,7 @@ def nested_state(text: str, *, slug: str | None = None) -> str:
     `[post:...]` issues and `unknown` otherwise. That keeps the
     parent-cannot-be-green-with-non-terminal-child rule conservative.
     """
-    if _all(PUBLISHED_MARKERS, text):
+    if has_published_evidence(text):
         return "published"
     if _any(MERGED_WITHOUT_CLOSE_MARKERS, text):
         return "merged_without_close"
