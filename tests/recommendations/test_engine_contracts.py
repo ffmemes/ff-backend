@@ -61,7 +61,13 @@ async def base_data():
             conn, user_id=10001, meme_id=10011, reaction_id=1, sent_at=recent, reacted_at=recent
         )
 
-        # meme_stats for all ok memes (10001-10008, 10011)
+        # 1 recently sent but unreacted meme for user 10001.
+        await create_meme(conn, id=10012, meme_source_id=SOURCE_TELEGRAM)
+        await create_reaction(
+            conn, user_id=10001, meme_id=10012, reaction_id=None, sent_at=recent, reacted_at=None
+        )
+
+        # meme_stats for all ok memes (10001-10008, 10011-10012)
         stats_defaults = dict(
             nlikes=15,
             ndislikes=5,
@@ -72,7 +78,7 @@ async def base_data():
             invited_count=3,
             sec_to_react=6.0,
         )
-        for mid in list(range(10001, 10009)) + [10011]:
+        for mid in list(range(10001, 10009)) + [10011, 10012]:
             await create_meme_stats(conn, meme_id=mid, **stats_defaults)
 
         # meme_source_stats
@@ -137,6 +143,14 @@ async def test_excludes_reacted_memes(base_data, engine_name):
     results = await retriever.get_candidates(engine_name, USER_ID, limit=50)
     result_ids = {r["id"] for r in results}
     assert 10011 not in result_ids, f"{engine_name} returned already-reacted meme"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("engine_name", ALL_TESTABLE_ENGINES)
+async def test_excludes_recently_sent_unreacted_memes(base_data, engine_name):
+    results = await retriever.get_candidates(engine_name, USER_ID, limit=50)
+    result_ids = {r["id"] for r in results}
+    assert 10012 not in result_ids, f"{engine_name} returned recently sent unreacted meme"
 
 
 @pytest.mark.asyncio

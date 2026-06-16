@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 GOAT_MIN_REACTIONS = 10  # (nlikes + ndislikes) — enough statistical signal
 GOAT_MIN_LR = 0.20  # lr_smoothed — minimum proven like rate
 GOAT_MIN_AGE_DAYS = 3  # days since created_at — must have aged enough to accumulate reactions
+GOAT_RECENTLY_SENT_WINDOW_DAYS = 30
 TEXT_LIGHT_MAX_OCR_WORDS = 30
 
 _OCR_TEXT_SQL = "trim(coalesce(M.ocr_result->>'text', M.ocr_result->'raw_result'->>'ocr_text', ''))"
@@ -325,7 +326,7 @@ async def goat(
                     SELECT 1 FROM user_meme_reaction umr
                     WHERE umr.user_id = :user_id
                       AND umr.meme_id = M.id
-                      AND umr.reacted_at > NOW() - INTERVAL '30 days'
+                      AND umr.sent_at > NOW() - INTERVAL '{GOAT_RECENTLY_SENT_WINDOW_DAYS} days'
                 )
         )
 
