@@ -326,7 +326,7 @@ async def goat(
                     SELECT 1 FROM user_meme_reaction umr
                     WHERE umr.user_id = :user_id
                       AND umr.meme_id = M.id
-                      AND umr.sent_at > NOW() - INTERVAL '{GOAT_RECENTLY_SENT_WINDOW_DAYS} days'
+                      AND umr.sent_at > NOW() - (:goat_recently_sent_window_days * INTERVAL '1 day')
                 )
         )
 
@@ -348,7 +348,15 @@ async def goat(
         ORDER BY SCORES.score DESC NULLS LAST
         LIMIT :limit
     """
-    return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
+    return await fetch_all(
+        text(query),
+        _build_params(
+            user_id,
+            limit,
+            exclude_meme_ids,
+            goat_recently_sent_window_days=GOAT_RECENTLY_SENT_WINDOW_DAYS,
+        ),
+    )
 
 
 async def get_recently_liked(
