@@ -68,44 +68,45 @@ onboarding.welcome_message:
 
 onboarding.invitation_successful_alert:
   en: |-
-    👏 Your friend {invited_user_name} just joined the bot!
-    Keep sharing memes from the bot and earn tokens 🍔 /b
+    👏 {invited_user_name} joined the bot. +{reward_amount} 🍔
+    Balance: {balance} 🍔
   ru: |-
-    🎉 Твой друг {invited_user_name} теперь тоже с нами.
-    Продолжай делиться мемами из бота и зарабатывай токены 🍔 /b
+    🎉 кореш {invited_user_name} в боте
+    тебе капнуло +{reward_amount} 🍔
+    баланс: {balance} 🍔
   uk: |-
-    🎉 Твій друг {invited_user_name} тепер теж з нами.
-    Продовжуй ділитися мемами з бота і заробляй токени 🍔 /b
+    🎉 {invited_user_name} у боті. +{reward_amount} 🍔
+    Баланс: {balance} 🍔
   es: |-
-    🎉 ¡Tu amigo {invited_user_name} acaba de unirse al bot!
-    Sigue compartiendo memes del bot y gana tokens 🍔 /b
+    🎉 {invited_user_name} se unió al bot. +{reward_amount} 🍔
+    Saldo: {balance} 🍔
   pt-br: |-
-    🎉 Seu amigo {invited_user_name} acabou de se juntar ao bot!
-    Continue compartilhando memes do bot e ganhe tokens 🍔 /b
+    🎉 {invited_user_name} entrou no bot. +{reward_amount} 🍔
+    Saldo: {balance} 🍔
   fr: |-
-    🎉 Votre ami {invited_user_name} vient de rejoindre le bot !
-    Continuez à partager des memes du bot et gagnez des jetons 🍔 /b
+    🎉 {invited_user_name} a rejoint le bot. +{reward_amount} 🍔
+    Solde: {balance} 🍔
   it: |-
-    🎉 Il tuo amico {invited_user_name} si è appena unito al bot!
-    Continua a condividere meme dal bot e guadagna token 🍔 /b
+    🎉 {invited_user_name} si è unito al bot. +{reward_amount} 🍔
+    Saldo: {balance} 🍔
   de: |-
-    👏 Dein Freund {invited_user_name} ist gerade dem Bot beigetreten!
-    Teile weiterhin Memes aus dem Bot und verdiene Token 🍔 /b
+    👏 {invited_user_name} ist im Bot. +{reward_amount} 🍔
+    Kontostand: {balance} 🍔
   uz: |-
-    🎉 Sizning do'stingiz {invited_user_name} hozir ham botda!
-    Botdan mamlakatlar ulashing va tokenlar olishingiz mumkin 🍔 /b
+    🎉 {invited_user_name} botga qo'shildi. +{reward_amount} 🍔
+    Balans: {balance} 🍔
   fa: |-
-    👏 دوست شما {invited_user_name} به تازگی به ربات پیوست!
-    ادامه دادن به اشتراک گذاری میمز از ربات و کسب توکن‌ها 🍔 /b
+    👏 {invited_user_name} به ربات پیوست! +{reward_amount} 🍔
+    موجودی: {balance} 🍔
   ar: |-
-    👏 صديقك {invited_user_name} انضم للتو إلى البوت!
-    استمر في مشاركة الميمز من البوت واكسب الرموز 🍔 /b
+    👏 {invited_user_name} انضم إلى البوت. +{reward_amount} 🍔
+    الرصيد: {balance} 🍔
   tr: |-
-    👏 Arkadaşın {invited_user_name} botumuza katıldı!
-    Botun memelerini paylaşmaya devam edin ve token kazanın 🍔 /b
+    👏 {invited_user_name} bota katıldı. +{reward_amount} 🍔
+    Bakiye: {balance} 🍔
   hi: |-
-    👏 आपका दोस्त {invited_user_name} अभी बॉट में शामिल हुआ है!
-    बॉट से मीम साझा करना जारी रखें और टोकन कमाएं 🍔 /b
+    👏 {invited_user_name} बॉट में शामिल हुआ. +{reward_amount} 🍔
+    बैलेंस: {balance} 🍔
 
 
 onboarding.invited_by_admin:

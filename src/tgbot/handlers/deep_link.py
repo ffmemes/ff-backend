@@ -3,8 +3,8 @@ from datetime import datetime
 from telegram import Bot
 
 from src.tgbot.constants import UserType
-from src.tgbot.handlers.treasury.constants import TrxType
-from src.tgbot.handlers.treasury.payments import pay_if_not_paid_with_alert
+from src.tgbot.handlers.treasury.constants import PAYOUTS, TrxType
+from src.tgbot.handlers.treasury.payments import pay_if_not_paid, pay_if_not_paid_with_alert
 from src.tgbot.logs import log
 from src.tgbot.senders.invite import send_successfull_invitation_alert
 from src.tgbot.service import (
@@ -64,16 +64,21 @@ but his bot access is blocked (type={invitor_user["type"]})
         else TrxType.USER_INVITER
     )
 
-    paid = await pay_if_not_paid_with_alert(
-        bot,
+    balance = await pay_if_not_paid(
         invitor_user_id,
         trx_type,
         external_id=str(invited_user["id"]),
     )
 
-    if paid:
-        await send_successfull_invitation_alert(invitor_user_id, invited_user_name)
-        await log(f"🤝 #{invitor_user_id} invited {invited_user_name}")
+    if balance is not None:
+        reward_amount = PAYOUTS[trx_type]
+        await send_successfull_invitation_alert(
+            invitor_user_id,
+            invited_user_name,
+            balance=balance,
+            reward_amount=reward_amount,
+        )
+        await log(f"🤝 #{invitor_user_id} invited {invited_user_name}: +{reward_amount} 🍔")
 
 
 async def handle_shared_meme_reward(
