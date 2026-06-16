@@ -1,8 +1,8 @@
 """
 Channel post stats collector via Telethon.
 
-Reads views, forwards, reactions from @fastfoodmemes and @fast_food_memes
-channel posts. Stores time-series snapshots for analysis.
+Reads views, forwards, reactions from @ffmemes, @fastfoodmemes, and
+@fast_food_memes channel posts. Stores time-series snapshots for analysis.
 
 Runs every 6 hours via Prefect cron (registered in serve_flows.py).
 
@@ -42,6 +42,7 @@ logger = logging.getLogger(__name__)
 
 # Channel usernames (without @)
 CHANNELS = {
+    "ffmemes": "ffmemes",
     "tgchannelru": "fastfoodmemes",
     "tgchannelen": "fast_food_memes",
 }

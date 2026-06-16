@@ -56,8 +56,16 @@ into the moderator chat.
 **Daily routine** (cron: `0 7 * * *` / 10:00 MSK):
 
 ### Step 0 — Read yesterday's channel performance
-Read `experiments/reports/channel-stats-YYYY-MM-DD.md` (regenerated at 06:55
-UTC by the `Write Channel Stats Report` Prefect deployment). It contains:
+Pick the target channel first. Default to `channel="ffmemes"` for product,
+process, and build-in-public posts. Read the matching channel-specific stats
+file:
+
+- `experiments/reports/channel-stats-ffmemes-YYYY-MM-DD.md` for @ffmemes
+- `experiments/reports/channel-stats-ru-YYYY-MM-DD.md` for @fastfoodmemes
+- `experiments/reports/channel-stats-en-YYYY-MM-DD.md` for @fast_food_memes
+
+The @ffmemes file is regenerated at 06:55 UTC by the
+`Write Channel Stats Report` Prefect deployment. It contains:
 
 - Median views across the last 30 days of editorial posts
 - Top 5 and weakest 3 posts with category/entity
@@ -70,14 +78,43 @@ canonical topic families from the last 14 posts are enforced by code as a hard
 rotation check (see "Posting" below), but you should also aim for variety
 beyond that.
 
-If the file is missing (first run, or cron failed), proceed without it —
-the rotation check still runs against the database.
+If the file is missing or older than today's date, run the DB fallback directly:
+call `src.comms.performance.write_channel_stats_report(channel="ffmemes")`
+for @ffmemes, or the matching channel slug for the target channel, then read the
+fresh file it returns. If both the file and DB fallback fail, do not publish a
+C/Data or anomaly post. Use a non-data fallback (A-Feature, B-Historical,
+F-Behind-the-scenes) only if it does not depend on performance stats; otherwise
+block the draft with a clear Paperclip comment.
+
+Also read the `Stats freshness:` line. If it is `stale`, block C/Data and raw
+anomaly posts. A stale stats file may still inform non-data fallback rotation,
+but the draft must record `fallback_reason=stale_channel_stats`.
 
 ### Step 1 — Build today's editorial slate
 Read `experiments/reports/anomalies-YYYY-MM-DD.md` written by the Analyst agent
 earlier this morning. This file ranks the day's most surprising findings and
 may include an editorial fallback slate. Do not mechanically publish Finding 1.
 Build a short candidate slate and pick the best public story.
+
+Always write down a slate of 3 candidates before drafting:
+- candidate topic and target channel;
+- source: anomaly finding, shipped feature, lore, DB fallback, or weekly digest;
+- why a stranger would care;
+- why it is not a repeat of the last 14 post families;
+- visual plan.
+
+Candidate filter:
+- `Post eligibility: post-ready`;
+- `HARD BAN risk: no`;
+- `Novelty vs last 14 posts: new`;
+- `Public story score >= 4` OR the candidate is a shipped user-facing feature
+  people can try today;
+- explicit `Reader payoff`.
+
+Reject candidates that are raw/internal metric cards, infra-only, or "chart says
+X vs baseline" without a reader payoff. `Chart-worthy: yes` never rescues a weak
+story. If fewer than 2 candidates survive, use Step 1b fallback instead of
+forcing a weak anomaly.
 
 Priority order:
 1. **User-facing product change people can try today** — share button, inline
@@ -126,7 +163,7 @@ Pick ONE from:
 Read the last 14 posts from the channel:
 ```python
 from src.comms.channel_history import get_last_n_posts
-recent = await get_last_n_posts(n=14)
+recent = await get_last_n_posts(n=14, channel="ffmemes")
 ```
 Extract the topic/entity of each. Your next post MUST differ from recent posts
 on the actual topic family, not just on a new slug. For example,
@@ -136,8 +173,9 @@ anomaly if the reader would experience it as "another post about the same
 metric/source/feature".
 
 If `get_last_n_posts` returns `[]` (Telethon misconfigured / session expired),
-log a warning to `$ADMIN_LOGS_CHAT_ID` and proceed without rotation — failing
-closed would block the channel.
+log a warning to `$ADMIN_LOGS_CHAT_ID`, then use the channel stats report and
+`docs/comms/published/` as the rotation source. Do not silently proceed with no
+rotation evidence.
 
 ### Step 2b — Draft backlog check
 Before creating a new `[post:...]` issue, search Paperclip for open or blocked
@@ -199,7 +237,9 @@ Do not repeat the botty template:
 Vary the opening, verb, and payoff. If the post still reads like a daily
 analyst card, choose a different format or fallback topic.
 
-**Length cap: ~400 characters of text** (excluding image). Strict.
+**Length cap: 250-400 visible characters, max 6 short lines** (excluding image).
+Strict. If a detail needs more room, the topic is probably not a Telegram post
+or belongs in one short `<blockquote>`.
 
 ### Step 5 — Stranger test
 Before posting, ask yourself: "Would a random person who doesn't know anything
@@ -215,9 +255,16 @@ For exact data, use `src/comms/visuals.py` primitives ONLY. Do not write raw mat
 - Pie charts, 3D, dual-axis → banned
 
 These primitives return PNG bytes. Pass them directly as `photo_bytes=png` to
-`publish_editorial_post`. Under Codex subscription-only runtime, do not use
-`OPENAI_API_KEY` or GPT image generation inside this agent. If editorial art is
-required, create a CEO/ops task for a separate non-Codex image pipeline.
+`publish_editorial_post`.
+
+For non-data editorial art, prefer a generated visual only when the runtime has
+a first-class Codex/image-generation tool that returns an attachable PNG without
+`OPENAI_API_KEY`. Do not bind or use `OPENAI_API_KEY` in a `codex_local` agent.
+If the Paperclip runtime does not expose image generation, create a short
+`[visual:YYYY-MM-DD-slug]` Paperclip task for an interactive Codex operator to
+generate the image and attach the PNG to the draft. After the PNG exists,
+inspect it and publish via `photo_bytes=image_bytes`. Never stage generated
+art in the moderator chat.
 
 See `docs/comms/brand-guide.md` for the full decision tree and constraints.
 
@@ -282,7 +329,8 @@ Style reference: https://github.com/ohld/dania-zip (read the USAGE RULES section
 - Hook first — first 1-2 lines grab attention
 - Emoji bullets only (structural, not decorative). Max 1-3 per post
 - One thought per line. Short sentences
-- Max 15-25 lines. Cut aggressively — 4 strong points beats 6 diluted
+- Max 6 short lines for channel posts. Cut aggressively — one strong idea beats
+  a diluted mini-report
 - Shows process, not just result: "Стали рисерчить", "Собрали данные"
 - Casual, like talking to a friend who codes
 - Never corporate, never dry
@@ -631,5 +679,5 @@ curl -s -X POST "https://api.telegram.org/bot${FFMEMES_PROD_TELEGRAM_BOT_TOKEN}/
 - Do NOT commit secrets to git
 - Do NOT post text-only — always include a visual
 - Do NOT use corporate language or greetings
-- Do NOT exceed ~400 visible characters of post text — cut aggressively, put
-  long detail in `<blockquote>`
+- Do NOT exceed 250-400 visible characters or 6 short lines — cut aggressively,
+  put only genuinely useful detail in one short `<blockquote>`

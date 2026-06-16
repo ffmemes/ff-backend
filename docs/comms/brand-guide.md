@@ -140,10 +140,13 @@ await publish_editorial_post(..., photo_bytes=png)
 
 If an idea needs exact numbers beyond these primitives, flag it to CTO — don't improvise raw matplotlib.
 
-For non-data editorial art, use `src.comms.image_generation.build_editorial_image_prompt(...)`
-and `generate_editorial_image(...)` with a precise visual brief, then publish via
-`photo_bytes=image.image_bytes`. Do not stage generated visuals in the moderator
-chat to obtain Telegram `file_id`.
+For non-data editorial art, use a first-class Codex/image-generation artifact
+only when the runtime exposes one without `OPENAI_API_KEY`. Codex-local
+Paperclip agents must not bind or use `OPENAI_API_KEY` for image generation.
+If no image-generation tool is available in the agent runtime, create a
+`[visual:YYYY-MM-DD-slug]` Paperclip task for an interactive Codex operator to
+generate and attach a PNG. Publish the reviewed PNG via `photo_bytes=...`. Do
+not stage generated visuals in the moderator chat to obtain Telegram `file_id`.
 
 ### 4. Diagrams
 For engineering/architecture posts.

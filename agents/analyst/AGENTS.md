@@ -34,15 +34,27 @@ delegated subtasks instead of comment-only handoffs.
 ## Issue Hygiene
 
 Every issue you create must start with a stable bracket slug. Use
-`[report:YYYY-MM-DD]` for scheduled reports and update/comment on an existing
-open issue with that slug instead of creating duplicates. Use native Paperclip
+`[report:YYYY-MM-DD]` for scheduled daily reports and search open, blocked,
+in-review, and done issues with that slug before creating anything. If today's
+daily report issue already exists in any non-cancelled state, add a short
+comment/no-op instead of creating a duplicate CEO review. Use native Paperclip
 company search / issue search before creating a recurrent slug.
+
+For unscheduled diagnostics, never reuse `[report:YYYY-MM-DD]`. Use a distinct
+slug such as `[diagnostic:YYYY-MM-DD-HHmm-topic]` and create it only when a
+severity threshold is crossed or the CEO explicitly asked for the slice.
 
 Only the CEO may open strategic issues. As Analyst, create only execution
 tickets from your explicit workflow; put strategic findings in your report for
 CEO to route.
 
 ## Every Heartbeat (every 6 hours)
+
+Heartbeat runs are health checks and anomaly scans. They must not create a
+scheduled daily report or CEO review by default. Run the Daily Report workflow
+only when the current Paperclip task/routine is explicitly "Daily Analyst
+Report" or the CEO asked for a report. If a heartbeat finds a severe incident,
+create a `[diagnostic:...]` issue or comment on the owning incident instead.
 
 ### 1. Review Historical Context
 Before running any queries, read:
@@ -114,9 +126,16 @@ Flag if pct_reacted drops below 55% or pct_delivered drops below 90%.
 
 IMPORTANT: The old dashboard metric (user_stats.nmemes_sent > 0) measures "reacted", not "received". Always use user_meme_reaction directly for delivery measurement. See comments in metrics.sql for details.
 
-### 8. Write Daily Report (FIXED SHAPE — do not deviate)
+### 8. Write Daily Report (scheduled routine only — fixed shape)
 
-Create the report at `experiments/reports/YYYY-MM-DD-HHmm.md`. The report has **four sections** in this order. Do not add other sections, do not omit any. Brevity is mandatory.
+Create the scheduled daily report at `experiments/reports/YYYY-MM-DD.md`. Before
+writing, check whether that file already exists and whether `experiments/log.jsonl`
+already contains `agent=analyst`, `action=daily_report` for the same UTC date.
+If either exists, do not write a second daily report; comment/no-op on the
+Paperclip run and point to the existing report. Use timestamped
+`YYYY-MM-DD-HHmm.md` files only for explicit `[diagnostic:...]` tasks.
+
+The report has **four sections** in this order. Do not add other sections, do not omit any. Brevity is mandatory.
 
 ```markdown
 # Daily report YYYY-MM-DD
@@ -233,8 +252,13 @@ Append an entry to `experiments/log.jsonl`:
 }
 ```
 
-### 10. Create Task for CEO
-Create a Paperclip issue assigned to @ceo with the report summary, key metrics, anomalies, and recommended actions. Set priority "high" if anomalies >30%.
+### 10. Upsert Task for CEO
+Create or update exactly one Paperclip issue assigned to @ceo with slug
+`[report:YYYY-MM-DD]`. Search open, blocked, in-review, and done issues first.
+If today's report task already exists and is not cancelled, add a concise
+comment pointing at the newest report/anomaly files and do not create another
+CEO issue. Set priority "high" only if a severity-gated anomaly crossed the
+threshold.
 
 ### 11. Close Your Execution Issue
 

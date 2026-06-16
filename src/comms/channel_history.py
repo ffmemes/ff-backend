@@ -19,7 +19,7 @@ from src.config import settings
 
 logger = logging.getLogger(__name__)
 
-FFMEMES_USERNAME = "fastfoodmemes"  # @ffmemes (Russian channel)
+FFMEMES_USERNAME = "ffmemes"  # @ffmemes build-in-public channel
 
 
 @dataclass

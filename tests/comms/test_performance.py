@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 
 from src.comms.performance import (
     EditorialRow,
+    channel_stats_report_path,
     format_channel_stats_report,
 )
 
@@ -22,6 +23,7 @@ def _row(
     reactions_detail: dict[str, int] | None = None,
     forwards: int = 0,
     text: str = "sample",
+    stats_updated_at: datetime | None = None,
 ) -> EditorialRow:
     now = datetime(2026, 4, 24, 6, 0, 0)
     return EditorialRow(
@@ -37,6 +39,7 @@ def _row(
         reactions=reactions,
         reactions_detail=reactions_detail,
         telegram_message_id=1000 + rid,
+        stats_updated_at=stats_updated_at or now,
     )
 
 
@@ -51,6 +54,7 @@ def test_format_reports_median_and_counts():
     out = format_channel_stats_report(rows, channel="ru", days=30, as_of=datetime(2026, 4, 24, 10))
     assert "Posts: 5" in out
     assert "Median views: 120" in out
+    assert "Stats freshness: ok" in out
 
 
 def test_format_top_views_sorted_desc():
@@ -109,3 +113,26 @@ def test_format_strips_html_from_preview():
     out = format_channel_stats_report(rows, channel="ru", days=30, as_of=datetime(2026, 4, 24, 10))
     assert "<b>" not in out
     assert "жир и курсив" in out
+
+
+def test_channel_stats_report_path_is_channel_specific(tmp_path):
+    path = channel_stats_report_path(tmp_path, "ffmemes", datetime(2026, 4, 24, 10))
+    assert path.name == "channel-stats-ffmemes-2026-04-24.md"
+
+
+def test_format_marks_stale_stats_when_collector_update_is_old():
+    rows = [
+        _row(
+            1,
+            1,
+            100,
+            stats_updated_at=datetime(2026, 4, 23, 0, 0),
+        )
+    ]
+    out = format_channel_stats_report(
+        rows,
+        channel="ffmemes",
+        days=30,
+        as_of=datetime(2026, 4, 24, 14),
+    )
+    assert "Stats freshness: stale" in out
