@@ -135,9 +135,7 @@ def format_channel_stats_report(
     median_views = _median(views)
     newest_stats = max((r.stats_updated_at for r in rows if r.stats_updated_at), default=None)
     stats_age_hours = (
-        (as_of - newest_stats.replace(tzinfo=None)).total_seconds() / 3600
-        if newest_stats
-        else None
+        (as_of - newest_stats.replace(tzinfo=None)).total_seconds() / 3600 if newest_stats else None
     )
     freshness = "ok" if stats_age_hours is not None and stats_age_hours <= 12 else "stale"
     top_views = sorted(rows, key=lambda r: r.views, reverse=True)[:5]
@@ -162,8 +160,7 @@ def format_channel_stats_report(
         "",
         f"Window: last {days} days. Posts: {len(rows)}. Median views: {median_views}.",
         (
-            f"Stats freshness: {freshness} "
-            f"(last collector update {stats_age_hours:.1f}h ago)."
+            f"Stats freshness: {freshness} (last collector update {stats_age_hours:.1f}h ago)."
             if stats_age_hours is not None
             else "Stats freshness: stale (no collector update recorded)."
         ),
