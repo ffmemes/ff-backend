@@ -5,8 +5,8 @@ Two layers:
   1. `get_recent_editorial_performance(channel, days)` — DB query returning
      rows with category, entity_id, text preview, views, forwards, reactions.
   2. `write_channel_stats_report(channel, days, output_dir)` — materializes
-     `experiments/reports/channel-stats-YYYY-MM-DD.md`. The Comms Agent reads
-     this file as its first input of the day (Step 0 of its routine).
+     `experiments/reports/channel-stats-{channel}-YYYY-MM-DD.md`. The Comms
+     Agent reads this file as its first input of the day (Step 0 of its routine).
 
 The report is deliberately short (LLM-friendly): top/bottom by views,
 reaction-mix summary, category/entity frequency. Numbers are the source of
@@ -43,6 +43,7 @@ class EditorialRow:
     reactions: int
     reactions_detail: dict[str, int] | None
     telegram_message_id: int
+    stats_updated_at: datetime | None
 
 
 async def get_recent_editorial_performance(
@@ -65,6 +66,7 @@ async def get_recent_editorial_performance(
             editorial_posts.c.reactions,
             editorial_posts.c.reactions_detail,
             editorial_posts.c.telegram_message_id,
+            editorial_posts.c.stats_updated_at,
         )
         .where(editorial_posts.c.channel == channel)
         .where(editorial_posts.c.created_at >= cutoff)
@@ -85,6 +87,7 @@ async def get_recent_editorial_performance(
             reactions=r["reactions"] or 0,
             reactions_detail=r["reactions_detail"],
             telegram_message_id=r["telegram_message_id"],
+            stats_updated_at=r["stats_updated_at"],
         )
         for r in (rows or [])
     ]
@@ -130,6 +133,13 @@ def format_channel_stats_report(
 
     views = [r.views for r in rows]
     median_views = _median(views)
+    newest_stats = max((r.stats_updated_at for r in rows if r.stats_updated_at), default=None)
+    stats_age_hours = (
+        (as_of - newest_stats.replace(tzinfo=None)).total_seconds() / 3600
+        if newest_stats
+        else None
+    )
+    freshness = "ok" if stats_age_hours is not None and stats_age_hours <= 12 else "stale"
     top_views = sorted(rows, key=lambda r: r.views, reverse=True)[:5]
     # Only include posts that had at least 24h to accumulate views.
     cutoff_24h = as_of - timedelta(hours=24)
@@ -151,6 +161,12 @@ def format_channel_stats_report(
         f"# Channel stats — @{channel} — {as_of.date().isoformat()}",
         "",
         f"Window: last {days} days. Posts: {len(rows)}. Median views: {median_views}.",
+        (
+            f"Stats freshness: {freshness} "
+            f"(last collector update {stats_age_hours:.1f}h ago)."
+            if stats_age_hours is not None
+            else "Stats freshness: stale (no collector update recorded)."
+        ),
         "",
         "## Top 5 by views",
         "",
@@ -197,6 +213,12 @@ def format_channel_stats_report(
     return "\n".join(lines)
 
 
+def channel_stats_report_path(out_dir: Path, channel: str, as_of: datetime) -> Path:
+    """Return the channel-specific stats report path for a run date."""
+    safe_channel = channel.replace("/", "-")
+    return out_dir / f"channel-stats-{safe_channel}-{as_of.date().isoformat()}.md"
+
+
 @flow(
     retries=1,
     retry_delay_seconds=30,
@@ -216,8 +238,16 @@ async def write_channel_stats_report(
 
     out_dir = Path(output_dir) if output_dir else REPORTS_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / f"channel-stats-{as_of.date().isoformat()}.md"
+    path = channel_stats_report_path(out_dir, channel, as_of)
     path.write_text(report, encoding="utf-8")
+
+    # Backward-compatible alias for older Comms instructions during rollout.
+    # The daily deployment targets @ffmemes, so the legacy name should point to
+    # @ffmemes stats rather than the main meme channel.
+    if channel == "ffmemes":
+        legacy_path = out_dir / f"channel-stats-{as_of.date().isoformat()}.md"
+        legacy_path.write_text(report, encoding="utf-8")
+
     log.info(f"Wrote {path} with {len(rows)} posts")
     return str(path)
 
@@ -225,6 +255,7 @@ async def write_channel_stats_report(
 __all__ = [
     "EditorialRow",
     "REPORTS_DIR",
+    "channel_stats_report_path",
     "format_channel_stats_report",
     "get_recent_editorial_performance",
     "write_channel_stats_report",

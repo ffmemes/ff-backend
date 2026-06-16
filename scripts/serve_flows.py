@@ -181,12 +181,13 @@ if __name__ == "__main__":
             name="Weekly Burger Report",
             schedules=[CronSchedule(cron="0 14 * * 0", timezone=MSK)],
         ),
-        # Materialize channel-stats-YYYY-MM-DD.md 5 minutes before Comms Agent
-        # fires at 07:00 UTC (10:00 MSK) so agent reads a fresh digest.
+        # Materialize channel-stats-ffmemes-YYYY-MM-DD.md 5 minutes before
+        # Comms Agent fires at 07:00 UTC (10:00 MSK) so agent reads a fresh
+        # @ffmemes digest.
         write_channel_stats_report.to_deployment(
             name="Write Channel Stats Report",
             schedules=[CronSchedule(cron="55 6 * * *", timezone=LON)],
-            parameters={"channel": "ru", "days": 30},
+            parameters={"channel": "ffmemes", "days": 30},
         ),
         # ── Rewards (weekly) ──
         reward_ru_users_for_weekly_top_uploaded_memes.to_deployment(

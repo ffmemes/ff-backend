@@ -4,6 +4,11 @@ This module is intentionally small: Comms builds an explicit prompt, receives
 image bytes, visually reviews them, and passes the bytes directly to
 `publish_editorial_post(photo_bytes=...)`. No Telegram moderator-chat staging
 is needed to obtain a file_id.
+
+This helper is API-key backed and is not the approved path for Paperclip
+`codex_local` agents. Those agents should use first-class Codex subscription
+image-generation artifacts when the runtime exposes them, or create a visual
+handoff task for an interactive Codex operator.
 """
 
 from __future__ import annotations
