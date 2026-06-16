@@ -129,5 +129,10 @@ def test_format_marks_stale_stats_when_collector_update_is_old():
             stats_updated_at=datetime(2026, 4, 23, 0, 0),
         )
     ]
-    out = format_channel_stats_report(rows, channel="ffmemes", days=30, as_of=datetime(2026, 4, 24, 14))
+    out = format_channel_stats_report(
+        rows,
+        channel="ffmemes",
+        days=30,
+        as_of=datetime(2026, 4, 24, 14),
+    )
     assert "Stats freshness: stale" in out
