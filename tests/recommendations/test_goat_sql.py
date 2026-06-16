@@ -21,6 +21,11 @@ async def test_goat_recently_seen_filter_uses_sent_at(monkeypatch):
     await candidates.goat(user_id=10001, limit=5)
 
     query = captured["query"]
-    assert "umr.sent_at > NOW() - INTERVAL '30 days'" in query
-    assert "umr.reacted_at > NOW() - INTERVAL '30 days'" not in query
-    assert captured["params"] == {"user_id": 10001, "limit": 5}
+    assert "umr.sent_at > NOW() - (:goat_recently_sent_window_days * INTERVAL '1 day')" in query
+    assert "umr.sent_at > NOW() - INTERVAL '30 days'" not in query
+    assert "umr.reacted_at" not in query
+    assert captured["params"] == {
+        "user_id": 10001,
+        "limit": 5,
+        "goat_recently_sent_window_days": candidates.GOAT_RECENTLY_SENT_WINDOW_DAYS,
+    }
