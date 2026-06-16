@@ -84,9 +84,7 @@ def build_meme_share_assignment(
     inline_percent: int | None = None,
 ) -> tuple[str, dict[str, Any]]:
     rollout_percent = _bounded_percent(
-        settings.TELEGRAM_INLINE_SHARE_CANARY_PERCENT
-        if inline_percent is None
-        else inline_percent
+        settings.TELEGRAM_INLINE_SHARE_CANARY_PERCENT if inline_percent is None else inline_percent
     )
     key = f"{MEME_SHARE_BUTTON_EXPERIMENT_ID}:{user_id}"
     bucket = int.from_bytes(hashlib.sha256(key.encode("utf-8")).digest()[:8], "big") % 100
