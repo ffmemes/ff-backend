@@ -94,10 +94,13 @@ def test_build_meme_share_assignment_respects_canary_bounds():
 
 @pytest.mark.asyncio
 async def test_inline_share_variant_can_be_disabled_by_flag():
-    with patch("src.tgbot.sharing.settings.TELEGRAM_INLINE_SHARE_ENABLED", False), patch(
-        "src.tgbot.sharing.get_experiment_variant",
-        new_callable=AsyncMock,
-    ) as get_variant:
+    with (
+        patch("src.tgbot.sharing.settings.TELEGRAM_INLINE_SHARE_ENABLED", False),
+        patch(
+            "src.tgbot.sharing.get_experiment_variant",
+            new_callable=AsyncMock,
+        ) as get_variant,
+    ):
         variant = await get_or_assign_meme_share_button_variant(10001)
 
     assert variant == MEME_SHARE_BUTTON_URL
