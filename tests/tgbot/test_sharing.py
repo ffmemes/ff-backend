@@ -6,6 +6,7 @@ import pytest
 from src.tgbot.sharing import (
     MEME_SHARE_BUTTON_INLINE,
     MEME_SHARE_BUTTON_URL,
+    build_meme_share_assignment,
     build_meme_share_button,
     get_meme_inline_query,
     get_meme_share_link,
@@ -74,9 +75,26 @@ def test_build_inline_share_button_prefills_exact_meme_query():
     assert button.switch_inline_query_chosen_chat.allow_channel_chats is True
 
 
+def test_build_meme_share_assignment_respects_canary_bounds():
+    variant, metadata = build_meme_share_assignment(10001, inline_percent=0)
+
+    assert variant == MEME_SHARE_BUTTON_URL
+    assert metadata["inline_canary_percent"] == 0
+
+    variant, metadata = build_meme_share_assignment(10001, inline_percent=100)
+
+    assert variant == MEME_SHARE_BUTTON_INLINE
+    assert metadata["inline_canary_percent"] == 100
+
+    variant, metadata = build_meme_share_assignment(10001, inline_percent=150)
+
+    assert variant == MEME_SHARE_BUTTON_INLINE
+    assert metadata["inline_canary_percent"] == 100
+
+
 @pytest.mark.asyncio
-async def test_inline_share_variant_is_disabled_by_default():
-    with patch(
+async def test_inline_share_variant_can_be_disabled_by_flag():
+    with patch("src.tgbot.sharing.settings.TELEGRAM_INLINE_SHARE_ENABLED", False), patch(
         "src.tgbot.sharing.get_experiment_variant",
         new_callable=AsyncMock,
     ) as get_variant:
@@ -84,3 +102,39 @@ async def test_inline_share_variant_is_disabled_by_default():
 
     assert variant == MEME_SHARE_BUTTON_URL
     get_variant.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_inline_share_zero_canary_does_not_assign_experiment():
+    with (
+        patch("src.tgbot.sharing.settings.TELEGRAM_INLINE_SHARE_ENABLED", True),
+        patch("src.tgbot.sharing.settings.TELEGRAM_INLINE_SHARE_CANARY_PERCENT", 0),
+        patch("src.tgbot.sharing.get_experiment_variant", new_callable=AsyncMock) as get_variant,
+    ):
+        variant = await get_or_assign_meme_share_button_variant(10001)
+
+    assert variant == MEME_SHARE_BUTTON_URL
+    get_variant.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_inline_share_canary_assigns_inline_variant_when_bucketed_in():
+    with (
+        patch("src.tgbot.sharing.settings.TELEGRAM_INLINE_SHARE_ENABLED", True),
+        patch("src.tgbot.sharing.settings.TELEGRAM_INLINE_SHARE_CANARY_PERCENT", 100),
+        patch(
+            "src.tgbot.sharing.get_experiment_variant",
+            new_callable=AsyncMock,
+            return_value=None,
+        ) as get_variant,
+        patch(
+            "src.tgbot.sharing.assign_experiment",
+            new_callable=AsyncMock,
+            return_value=True,
+        ) as assign,
+    ):
+        variant = await get_or_assign_meme_share_button_variant(10001)
+
+    assert variant == MEME_SHARE_BUTTON_INLINE
+    get_variant.assert_awaited_once_with(10001, "meme_share_button")
+    assign.assert_awaited_once()

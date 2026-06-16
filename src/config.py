@@ -32,7 +32,8 @@ class Config(BaseSettings):
     TELEGRAM_BOT_TOKEN: str | None = None
     TELEGRAM_BOT_USERNAME: str | None = None
     TELEGRAM_BOT_WEBHOOK_SECRET: str | None = None
-    TELEGRAM_INLINE_SHARE_ENABLED: bool = False
+    TELEGRAM_INLINE_SHARE_ENABLED: bool = True
+    TELEGRAM_INLINE_SHARE_CANARY_PERCENT: int = 20
     MEME_STORAGE_TELEGRAM_CHAT_ID: str | None = None
     UPLOADED_MEMES_REVIEW_CHAT_ID: str | None = None
     ADMIN_LOGS_CHAT_ID: str | None = None
