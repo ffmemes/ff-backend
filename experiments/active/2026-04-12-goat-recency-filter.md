@@ -7,11 +7,11 @@
 
 ## Hypothesis
 
-The goat engine has the **best continuation rate (98%)** of all engines but suffered LR decline from 44% to ~16% over 6 days due to pool exhaustion — the same top-ranked GOATs are served repeatedly to users who already reacted to them. Adding a per-user recency filter (exclude memes the user reacted to in the last 30 days) will rotate the GOAT pool per-user, restoring fresh high-quality content delivery.
+The goat engine has the **best continuation rate (98%)** of all engines but suffered LR decline from 44% to ~16% over 6 days due to pool exhaustion — the same top-ranked GOATs are served repeatedly to users who already saw them. Adding a per-user recency filter (exclude memes sent to the user in the last 30 days) will rotate the GOAT pool per-user, restoring fresh high-quality content delivery.
 
 ## Changes Made
 
-- `src/recommendations/candidates.py` (goat function): Added per-user recency filter using `reacted_at` in SCORES CTE to exclude memes the user reacted to in the last 30 days. PR #162, commit 97f188a.
+- `src/recommendations/candidates.py` (goat function): Added per-user recency filter in SCORES CTE. PR #162, commit 97f188a shipped the original filter; 2026-06-16 correction changed the filter signal from `reacted_at` to `sent_at`, so recently sent but unreacted memes are excluded too.
 
 ## Metrics to Track
 

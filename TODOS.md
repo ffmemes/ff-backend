@@ -17,7 +17,7 @@
 **Context:** Done 2026-03-27. Rewrote `calculate_meme_stats()` to only update memes with reactions in the last 3 hours, then upsert only those rows. Prevents full-table scan timeout cascade at peak traffic. Commit `84a5119`. See [FFM-5](/FFM/issues/FFM-5).
 
 ### ~~Add per-user recency filter to goat engine~~ — DONE
-**Context:** Done 2026-04-13. Added per-user recency filter using `reacted_at` in SCORES CTE to exclude memes the user reacted to in the last 30 days. PR #162 + #169, deployed Apr 13. Goat LR recovered to 41.9% (7d) vs 39.4% baseline, continuation 97.5%. Experiment running through Apr 27.
+**Context:** Done 2026-04-13, corrected 2026-06-16. The GOAT filter uses `sent_at` in the SCORES CTE to exclude memes sent to the user in the last 30 days, including sent-but-unreacted memes. PR #162 + #169 shipped the original recency filter; the June correction changed the signal from `reacted_at` to `sent_at` while preserving the 30-day window to avoid lifetime pool exhaustion. Goat LR recovered to 41.9% (7d) vs 39.4% baseline, continuation 97.5%.
 
 ### Auto-discover new TG channels from forwarded messages
 **What:** When the TG scraper parses a forwarded post, extract the source channel URL. Store discovered channels in a new `meme_source_candidate` table with status='discovered'. Admin/moderator approval flow to promote to `meme_source`.
