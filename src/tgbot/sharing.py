@@ -75,12 +75,26 @@ def get_meme_inline_query(meme_id: int) -> str:
     return f"#{meme_id}"
 
 
-def build_meme_share_assignment(user_id: int) -> tuple[str, dict[str, Any]]:
+def _bounded_percent(value: int) -> int:
+    return max(0, min(100, value))
+
+
+def build_meme_share_assignment(
+    user_id: int,
+    inline_percent: int | None = None,
+) -> tuple[str, dict[str, Any]]:
+    rollout_percent = _bounded_percent(
+        settings.TELEGRAM_INLINE_SHARE_CANARY_PERCENT
+        if inline_percent is None
+        else inline_percent
+    )
     key = f"{MEME_SHARE_BUTTON_EXPERIMENT_ID}:{user_id}"
-    bucket = int.from_bytes(hashlib.sha256(key.encode("utf-8")).digest()[:8], "big") % 2
-    variant = MEME_SHARE_BUTTON_URL if bucket == 0 else MEME_SHARE_BUTTON_INLINE
+    bucket = int.from_bytes(hashlib.sha256(key.encode("utf-8")).digest()[:8], "big") % 100
+    variant = MEME_SHARE_BUTTON_INLINE if bucket < rollout_percent else MEME_SHARE_BUTTON_URL
     return variant, {
-        "assignment_strategy": "sha256(experiment_id:user_id)%2",
+        "assignment_strategy": "sha256(experiment_id:user_id)%100",
+        "inline_canary_percent": rollout_percent,
+        "bucket": bucket,
         "url_share": "t.me/share/url with m_{sharer_user_id}_{meme_id}",
         "inline_query": "switch_inline_query_chosen_chat with #meme_id",
     }
@@ -88,6 +102,9 @@ def build_meme_share_assignment(user_id: int) -> tuple[str, dict[str, Any]]:
 
 async def get_or_assign_meme_share_button_variant(user_id: int) -> str:
     if not settings.TELEGRAM_INLINE_SHARE_ENABLED:
+        return MEME_SHARE_BUTTON_URL
+
+    if _bounded_percent(settings.TELEGRAM_INLINE_SHARE_CANARY_PERCENT) <= 0:
         return MEME_SHARE_BUTTON_URL
 
     try:
