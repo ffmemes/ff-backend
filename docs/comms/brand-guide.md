@@ -140,8 +140,9 @@ await publish_editorial_post(..., photo_bytes=png)
 
 If an idea needs exact numbers beyond these primitives, flag it to CTO — don't improvise raw matplotlib.
 
-For non-data editorial art, use a first-class Codex/image-generation artifact
-only when the runtime exposes one without `OPENAI_API_KEY`. Codex-local
+For non-data editorial art, prefer Codex subscription image generation; do not
+look for a separate API token. Use a first-class Codex/image-generation
+artifact when the runtime exposes one without `OPENAI_API_KEY`. Codex-local
 Paperclip agents must not bind or use `OPENAI_API_KEY` for image generation.
 If no image-generation tool is available in the agent runtime, create a
 `[visual:YYYY-MM-DD-slug]` Paperclip task for an interactive Codex operator to
