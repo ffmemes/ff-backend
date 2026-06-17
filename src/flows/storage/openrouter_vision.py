@@ -23,13 +23,17 @@ OPENROUTER_FORBIDDEN_MODEL_COOLDOWN_SECONDS = 60 * 60 * 6
 # lifetime purchases for 1,000 req/day (vs 50/day without).
 # See specs/describe-memes.md for full OpenRouter constraints.
 #
-# Verified available on OpenRouter API as of 2026-05-17.
+# Verified available on OpenRouter API as of 2026-06-17.
 # Ordered by preference. Falls back to next model on 429/403/timeout/bad response.
 # Transient failures set Redis cooldowns so later memes/runs try other free models.
 VISION_MODELS = [
     "google/gemma-4-31b-it:free",  # 262k context, primary
+    "nex-agi/nex-n2-pro:free",  # 262k context, Qwen3.5 multimodal MoE
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",  # 256k context, multimodal
     "google/gemma-4-26b-a4b-it:free",  # 262k context, MoE variant
     # Gemma 3 free vision fallbacks are no longer listed by OpenRouter.
+    # nvidia/nemotron-3.5-content-safety:free is a guardrail classifier, not
+    # a general OCR/description model.
     # nvidia/nemotron-nano-12b-v2-vl:free removed — returns 504s and invalid
     # JSON/empty content (see specs/describe-memes.md).
 ]
