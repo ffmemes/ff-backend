@@ -9,6 +9,7 @@ from src.recommendations.meme_queue import (
     clear_meme_queue_for_user,
     generate_recommendations,
 )
+from src.recommendations.service import get_user_reactions
 from src.tgbot.constants import LANG_SETTINGS_END_CALLBACK_DATA
 from src.tgbot.handlers.onboarding import onboarding_flow
 from src.tgbot.service import (
@@ -138,5 +139,8 @@ async def handle_language_settings_end(
     user_id = update.effective_user.id
     await clear_meme_queue_for_user(user_id)
     await generate_recommendations(user_id, limit=15)
+
+    if await get_user_reactions(user_id):
+        return None
 
     return await onboarding_flow(update, context.bot)
