@@ -208,6 +208,34 @@ async def test_new_user_no_deep_link_enters_onboarding_without_db():
 
 
 @pytest.mark.asyncio
+async def test_language_settings_done_does_not_replay_onboarding_after_meme_sent():
+    from src.tgbot.handlers.language import handle_language_settings_end
+
+    update = SimpleNamespace(
+        effective_user=_make_tg_user(),
+        callback_query=SimpleNamespace(
+            answer=AsyncMock(),
+            message=SimpleNamespace(delete=AsyncMock()),
+        ),
+    )
+    context = _make_context(deep_link=None)
+
+    with (
+        patch("src.tgbot.handlers.language.clear_meme_queue_for_user", new_callable=AsyncMock),
+        patch("src.tgbot.handlers.language.generate_recommendations", new_callable=AsyncMock),
+        patch(
+            "src.tgbot.handlers.language.get_user_reactions",
+            new_callable=AsyncMock,
+            return_value=[{"meme_id": 10001}],
+        ),
+        patch("src.tgbot.handlers.language.onboarding_flow", new_callable=AsyncMock) as onboarding,
+    ):
+        await handle_language_settings_end(update, context)
+
+    onboarding.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_new_user_no_deep_link_runs_universal_side_effects(cleanup):
     mocks = await _run_handle_start(deep_link=None)
     await _assert_universal_side_effects(NEW_USER_ID, expected_deep_link=None)
@@ -246,7 +274,7 @@ async def test_new_user_giveaway_branch_inits_languages(cleanup):
     await _assert_universal_side_effects(NEW_USER_ID, expected_deep_link="giveaway_77")
     mocks["lang_settings"].assert_called_once()  # main `created` path runs
     mocks["giveaway"].assert_called_once()
-    mocks["onboarding"].assert_called_once()
+    mocks["onboarding"].assert_not_called()
 
 
 @pytest.mark.asyncio
