@@ -107,6 +107,7 @@ def _patch_handlers(shared_meme_sent: bool = False):
             new_callable=AsyncMock,
             return_value=shared_meme_sent,
         ),
+        patch(f"{HANDLER_MODULE}.onboarding_flow", new_callable=AsyncMock),
         patch(f"{HANDLER_MODULE}.next_message", new_callable=AsyncMock),
         patch(f"{HANDLER_MODULE}.log_start_event", new_callable=AsyncMock),
         patch("src.tgbot.handlers.stats.wrapped.handle_wrapped", new_callable=AsyncMock),
@@ -163,6 +164,7 @@ async def _run_handle_start(
                 "invited",
                 "shared_reward",
                 "shared_meme",
+                "onboarding",
                 "next_message",
                 "log_start",
                 "wrapped",
@@ -174,11 +176,44 @@ async def _run_handle_start(
 
 
 @pytest.mark.asyncio
+async def test_new_user_no_deep_link_enters_onboarding_without_db():
+    from src.tgbot.handlers.start import handle_start
+
+    update = _make_update(deep_link=None)
+    context = _make_context(deep_link=None)
+
+    with (
+        patch(f"{HANDLER_MODULE}.save_user_data", new_callable=AsyncMock) as save_user,
+        patch(f"{HANDLER_MODULE}.update_user_info_cache", new_callable=AsyncMock) as user_info,
+        patch(f"{HANDLER_MODULE}.log_user_deep_link", new_callable=AsyncMock),
+        patch(f"{HANDLER_MODULE}.log_start_event", new_callable=AsyncMock),
+        patch(f"{HANDLER_MODULE}.get_user_languages", new_callable=AsyncMock) as languages,
+        patch(
+            f"{HANDLER_MODULE}._send_shared_meme_from_deep_link",
+            new_callable=AsyncMock,
+            return_value=False,
+        ),
+        patch(f"{HANDLER_MODULE}.handle_invited_user", new_callable=AsyncMock),
+        patch(f"{HANDLER_MODULE}.handle_language_settings", new_callable=AsyncMock) as settings,
+        patch(f"{HANDLER_MODULE}.onboarding_flow", new_callable=AsyncMock) as onboarding,
+    ):
+        save_user.return_value = ({"id": NEW_USER_ID}, True)
+        user_info.return_value = {"type": "user", "interface_lang": "en"}
+        languages.return_value = {"en"}
+
+        await handle_start(update, context)
+
+    settings.assert_awaited_once_with(update, context)
+    onboarding.assert_awaited_once_with(update, context.bot)
+
+
+@pytest.mark.asyncio
 async def test_new_user_no_deep_link_runs_universal_side_effects(cleanup):
     mocks = await _run_handle_start(deep_link=None)
     await _assert_universal_side_effects(NEW_USER_ID, expected_deep_link=None)
     mocks["lang_settings"].assert_called_once()
     mocks["invited"].assert_called_once()
+    mocks["onboarding"].assert_called_once()
     mocks["next_message"].assert_not_called()
     mocks["kitchen"].assert_not_called()
     mocks["wrapped"].assert_not_called()
@@ -192,6 +227,7 @@ async def test_new_user_kitchen_branch_still_inits_languages(cleanup):
     await _assert_universal_side_effects(NEW_USER_ID, expected_deep_link="kitchen")
     mocks["kitchen"].assert_called_once()
     mocks["lang_settings"].assert_not_called()
+    mocks["onboarding"].assert_not_called()
     mocks["next_message"].assert_not_called()
 
 
@@ -201,6 +237,7 @@ async def test_new_user_wrapped_branch_inits_languages(cleanup):
     await _assert_universal_side_effects(NEW_USER_ID, expected_deep_link="wrapped")
     mocks["wrapped"].assert_called_once()
     mocks["lang_settings"].assert_not_called()
+    mocks["onboarding"].assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -209,6 +246,7 @@ async def test_new_user_giveaway_branch_inits_languages(cleanup):
     await _assert_universal_side_effects(NEW_USER_ID, expected_deep_link="giveaway_77")
     mocks["lang_settings"].assert_called_once()  # main `created` path runs
     mocks["giveaway"].assert_called_once()
+    mocks["onboarding"].assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -218,6 +256,7 @@ async def test_new_user_share_link_branch_inits_languages(cleanup):
     mocks["shared_meme"].assert_called_once()
     assert mocks["shared_meme"].call_args.kwargs["reaction_context"] == "onboard"
     mocks["lang_settings"].assert_not_called()
+    mocks["onboarding"].assert_not_called()
     mocks["invited"].assert_called_once()
 
 
@@ -233,6 +272,7 @@ async def test_blocked_acquisition_channel_silently_drops_new_user(cleanup):
     assert u_row is None, "blocked channel should not create user row"
     assert tg_row is None, "blocked channel should not create user_tg row"
     mocks["lang_settings"].assert_not_called()
+    mocks["onboarding"].assert_not_called()
     mocks["next_message"].assert_not_called()
     mocks["log_start"].assert_not_called()
 
@@ -262,6 +302,7 @@ async def test_existing_user_share_link_serves_shared_meme(cleanup):
 
     mocks["shared_meme"].assert_called_once()
     mocks["shared_reward"].assert_called_once()
+    mocks["onboarding"].assert_not_called()
     mocks["next_message"].assert_not_called()
     mocks["lang_settings"].assert_not_called()
 
