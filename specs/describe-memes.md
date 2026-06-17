@@ -45,6 +45,8 @@ Current production chain:
 ```python
 [
     "google/gemma-4-31b-it:free",
+    "nex-agi/nex-n2-pro:free",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
     "google/gemma-4-26b-a4b-it:free",
 ]
 ```
@@ -52,6 +54,9 @@ Current production chain:
 Gemma 3 free vision model IDs are intentionally excluded: they are no longer
 listed by OpenRouter and create avoidable failed attempts under the daily free
 quota.
+
+`nvidia/nemotron-3.5-content-safety:free` is intentionally excluded because it
+is a guardrail classifier, not a general OCR/description model.
 
 Do not add paid fallbacks. A paid fallback can spend the account below zero, after which OpenRouter returns 402 for all models, including free models.
 
