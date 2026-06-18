@@ -17,6 +17,7 @@ Usage:
     python scripts/e2e_smoke.py           # returning user flow
     python scripts/e2e_smoke.py --fresh   # reset state + onboarding flow
 """
+
 import argparse
 import asyncio
 import os
@@ -52,13 +53,18 @@ async def wait_for_response(client, entity, since_id, timeout=RESPONSE_TIMEOUT):
     return None
 
 
+def button_data(btn) -> bytes:
+    """Return callback data for callback buttons; URL buttons do not have data."""
+    return getattr(btn, "data", None) or b""
+
+
 def has_reaction_buttons(msg):
     """Check if message has inline keyboard with r: callback buttons."""
     if not msg.reply_markup:
         return False
     for row in msg.reply_markup.rows:
         for btn in row.buttons:
-            data = btn.data.decode() if btn.data else ""
+            data = button_data(btn).decode()
             if data.startswith("r:"):
                 return True
     return False
@@ -70,7 +76,7 @@ def find_like_button(msg):
         return None
     for row in msg.reply_markup.rows:
         for btn in row.buttons:
-            data = btn.data.decode() if btn.data else ""
+            data = button_data(btn).decode()
             if data.startswith("r:") and data.endswith(":1"):
                 return btn
     return None
@@ -113,7 +119,7 @@ async def test_like(client, bot, meme_msg):
         return "WARN", "No like button found on current meme, cannot test reaction flow"
 
     after_id = meme_msg.id
-    await meme_msg.click(data=like_btn.data)
+    await meme_msg.click(data=button_data(like_btn))
     next_msg = await wait_for_response(client, bot, after_id)
 
     if next_msg is None:
@@ -146,8 +152,9 @@ async def test_delete(client, bot):
     if msg.reply_markup:
         for row in msg.reply_markup.rows:
             for btn in row.buttons:
-                if btn.data and b"delete" in btn.data.lower():
-                    await msg.click(data=btn.data)
+                data = button_data(btn)
+                if data and b"delete" in data.lower():
+                    await msg.click(data=data)
                     confirm_msg = await wait_for_response(client, bot, msg.id)
                     confirm_text = (confirm_msg.text or "").lower() if confirm_msg else ""
                     if confirm_msg and ("ciao" in confirm_text or "start" in confirm_text):
