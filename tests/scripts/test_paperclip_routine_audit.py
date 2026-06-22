@@ -302,3 +302,21 @@ def test_freeform_approval_comment_is_not_publish_approval_signal():
     flags, _latest = audit.classify_issue(issue, comments)
 
     assert "approved_without_publish_marker" not in flags
+
+
+def test_gstack_rejected_script_import_is_degraded_green():
+    issue = {"title": "gstack Update Check", "description": ""}
+    comments = [
+        {
+            "body": (
+                "Skill preflight clean: failed_count=0.\n"
+                "POST /api/companies/<company-id>/skills/import failed: "
+                "sourceType=github trustLevel=scripts_executables "
+                "reason=scripts_executables_blocked."
+            )
+        }
+    ]
+
+    flags, _latest = audit.classify_issue(issue, comments)
+
+    assert "degraded_green" in flags
