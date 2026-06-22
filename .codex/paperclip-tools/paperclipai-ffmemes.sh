@@ -22,7 +22,7 @@ fi
 export PAPERCLIP_COMPANY_ID="${PAPERCLIP_COMPANY_ID:-96ee7b2e-6df2-43c8-bbe3-53e19297308a}"
 export PAPERCLIP_CONTEXT="${PAPERCLIP_CONTEXT:-$tool_root/context.json}"
 export NPM_CONFIG_CACHE="${NPM_CONFIG_CACHE:-$tool_root/.npm-cache}"
-export npm_config_cache="${npm_config_cache:-$NPM_CONFIG_CACHE}"
+export npm_config_cache="$NPM_CONFIG_CACHE"
 mkdir -p "$NPM_CONFIG_CACHE"
 
 if [[ -n "${PAPERCLIPAI_BIN:-}" ]]; then

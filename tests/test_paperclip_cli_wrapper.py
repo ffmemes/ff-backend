@@ -78,3 +78,30 @@ def test_wrapper_honors_explicit_npm_cache_override(tmp_path: Path) -> None:
     assert f"NPM_CONFIG_CACHE={override_cache}" in result.stdout
     assert f"npm_config_cache={override_cache}" in result.stdout
     assert override_cache.is_dir()
+
+
+def test_wrapper_overwrites_stale_lowercase_npm_cache(tmp_path: Path) -> None:
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    _fake_npx(fake_bin)
+    stale_cache = tmp_path / "stale-cache"
+
+    env = os.environ.copy()
+    env.pop("NPM_CONFIG_CACHE", None)
+    env.pop("PAPERCLIPAI_BIN", None)
+    env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
+    env["npm_config_cache"] = str(stale_cache)
+
+    result = subprocess.run(
+        ["bash", str(WRAPPER), "--version"],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert f"NPM_CONFIG_CACHE={DEFAULT_NPM_CACHE}" in result.stdout
+    assert f"npm_config_cache={DEFAULT_NPM_CACHE}" in result.stdout
+    assert f"npm_config_cache={stale_cache}" not in result.stdout
