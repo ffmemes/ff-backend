@@ -702,7 +702,7 @@ def _growing_retriever_class():
 
 @pytest.mark.asyncio
 async def test_gate_off_dormant_returner_still_uses_cold_start():
-    """Default (gate disabled): nsessions is ignored — cold_start still routes by nmemes_sent."""
+    """Emergency override off: nsessions is ignored and cold_start routes by nmemes_sent."""
     retriever = _growing_retriever_class()()
     with (
         _patch_user_info(nsessions=5, nmemes_sent=8),
@@ -712,6 +712,21 @@ async def test_gate_off_dormant_returner_still_uses_cold_start():
             TEST_USER_ID, 10, nmemes_sent=8, retriever=retriever
         )
     assert any(c["recommended_by"] == "cold_start_adapt" for c in candidates)
+
+
+@pytest.mark.asyncio
+async def test_gate_default_blocks_dormant_returner_from_cold_start():
+    """Default config blocks nsessions>=2 low-sent users from cold_start engines."""
+    retriever = _growing_retriever_class()()
+    with _patch_user_info(nsessions=3, nmemes_sent=8):
+        candidates = await generate_recommendations(
+            TEST_USER_ID, 10, nmemes_sent=8, retriever=retriever, random_seed=42
+        )
+
+    sources = {c["recommended_by"] for c in candidates}
+    assert "cold_start_explore" not in sources
+    assert "cold_start_adapt" not in sources
+    assert candidates[0]["recommended_by"] == "lr_smoothed"
 
 
 @pytest.mark.asyncio
