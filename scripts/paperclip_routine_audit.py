@@ -72,6 +72,10 @@ DEGRADED_PATTERNS = (
     "no local gstack install",
     "0 updated",
     "skills no longer in upstream",
+    "scripts_executables_blocked",
+    "scripts_executables",
+    "/skills/import",
+    "contains executable scripts and cannot be imported",
 )
 INTERACTION_LIST_KEYS = ("interactions", "items", "data")
 CONFIRMATION_KIND_MARKERS = ("confirmation", "request_confirmation")

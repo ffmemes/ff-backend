@@ -169,11 +169,10 @@ curl -s -X POST "$PAPERCLIP_URL/api/secrets/<secret-id>/rotate" \
   -H "Content-Type: application/json" \
   -d "$(jq -n --arg value "$SECRET_VALUE" '{"value":$value}')"
 
-# Import gstack skills
-curl -s -X POST "$PAPERCLIP_URL/api/companies/<company-id>/skills/import" \
-  -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"source": "https://github.com/garrytan/gstack"}'
+# Do not import upstream gstack directly in FFmemes operations. The current
+# Paperclip trust policy rejects executable-script skills with HTTP 422
+# (`scripts_executables_blocked`). See docs/paperclip-skill-catalog.md.
+# Use agents/deploy.sh --dry-run plus paperclip_skill_sync instead.
 
 # Wake an agent manually
 curl -s -X POST "$PAPERCLIP_URL/api/agents/<agent-id>/wakeup" \

@@ -66,6 +66,13 @@ update path, the run is degraded. Keep one open
 `[maintenance:gstack-update-blocked]` issue instead of closing each daily run as
 green.
 
+Direct upstream gstack imports are currently not a green update path for
+FFmemes. If a run attempts
+`POST /api/companies/<company-id>/skills/import` and receives
+`scripts_executables` / `scripts_executables_blocked`, classify it as degraded:
+the intended policy is curated catalog validation plus per-agent
+`paperclip_skill_sync`, documented in `docs/paperclip-skill-catalog.md`.
+
 ### Paperclip Update Check
 
 This is not only a SHA poll, and queueing a Coolify deployment is not terminal

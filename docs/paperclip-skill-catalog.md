@@ -39,6 +39,31 @@ Skill catalog preflight (dry-run):
 When `failed_count > 0`, the apply pass is blocked. `dry-run` still completes
 so the operator sees the full diff and the unknown skill names.
 
+## Import policy
+
+Do not use `POST /api/companies/<company-id>/skills/import` for the upstream
+`https://github.com/garrytan/gstack` source in FFmemes operations. Paperclip
+currently classifies at least one required gstack skill (`browse`) as an
+executable-script source and rejects the import with `HTTP 422`
+(`scripts_executables_blocked`). That is a supply-chain safety decision, not a
+transient import failure.
+
+The safe operating mode is:
+
+1. Treat the live Paperclip skill catalog as the curated source available to
+   agents.
+2. Use `agents/deploy.sh --dry-run` to verify desired skill paths against that
+   catalog.
+3. Use `paperclip_skill_sync` to attach the desired skill list to each agent.
+4. Open or update a single `[maintenance:gstack-update-blocked]` issue when the
+   catalog cannot be refreshed from upstream safely.
+
+A gstack update check must not close green solely because the per-agent
+preflight is clean if an attempted catalog refresh/import failed. Outcome
+comments that mention `/skills/import`, `scripts_executables`, or
+`scripts_executables_blocked` are degraded until a trusted-source mechanism,
+sanitized upstream package, or explicit Paperclip-side allowlist is available.
+
 ## Team-mode (gstack) decision: docs-only
 
 GStack supports a "team-mode" that lets multiple agents share the same skill

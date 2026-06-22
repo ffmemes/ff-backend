@@ -5,9 +5,12 @@ schema: "paperclip/v1"
 # agents, and do not set it globally in the Paperclip host env: Codex CLI
 # 0.122+ treats that as API-key billing instead of subscription billing.
 
-# gstack skills source — Paperclip pulls skills from this repo at the recorded ref.
-# Bump `ref` only after `agents/deploy.sh --dry-run` shows the new catalog with
-# zero unknown-desired-skills failures.
+# gstack skills source for desired-skill validation. FFmemes does not direct
+# import upstream gstack via /skills/import because Paperclip rejects
+# executable-script skills (`scripts_executables_blocked`). Use the curated live
+# catalog plus per-agent paperclip_skill_sync; see docs/paperclip-skill-catalog.md.
+# Bump `ref` only after `agents/deploy.sh --dry-run` shows the catalog with zero
+# unknown-desired-skills failures.
 skills:
   source: "https://github.com/garrytan/gstack"
   ref: "main"
