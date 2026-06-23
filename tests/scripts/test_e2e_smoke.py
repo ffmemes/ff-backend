@@ -1,51 +1,49 @@
-import importlib.util
-import sys
-from pathlib import Path
-from types import SimpleNamespace
-
-SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "scripts"
-if str(SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPTS_DIR))
-
-spec = importlib.util.spec_from_file_location("e2e_smoke", SCRIPTS_DIR / "e2e_smoke.py")
-assert spec and spec.loader
-e2e_smoke = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(e2e_smoke)
+from scripts.e2e_smoke import button_data, find_like_button, has_reaction_buttons
 
 
-class UrlButton:
+class _UrlButton:
     url = "https://t.me/share/url?url=https%3A%2F%2Ft.me%2Fffmemesbot"
 
 
-def _message_with_buttons(*buttons):
-    return SimpleNamespace(
-        reply_markup=SimpleNamespace(
-            rows=[SimpleNamespace(buttons=list(buttons))],
-        )
-    )
+class _CallbackButton:
+    def __init__(self, data: bytes) -> None:
+        self.data = data
 
 
-def test_has_reaction_buttons_ignores_url_buttons_without_data():
-    msg = _message_with_buttons(
-        UrlButton(),
-        SimpleNamespace(data=b"r:123:1"),
-    )
-
-    assert e2e_smoke.has_reaction_buttons(msg) is True
+class _Row:
+    def __init__(self, buttons: list[object]) -> None:
+        self.buttons = buttons
 
 
-def test_find_like_button_skips_url_buttons_before_reaction_row():
-    like_button = SimpleNamespace(data=b"r:123:1")
-    msg = _message_with_buttons(
-        UrlButton(),
-        SimpleNamespace(data=b"r:123:2"),
-        like_button,
-    )
-
-    assert e2e_smoke.find_like_button(msg) is like_button
+class _ReplyMarkup:
+    def __init__(self, rows: list[_Row]) -> None:
+        self.rows = rows
 
 
-def test_has_reaction_buttons_returns_false_for_url_only_keyboard():
-    msg = _message_with_buttons(UrlButton())
+class _Message:
+    def __init__(self, buttons: list[object]) -> None:
+        self.reply_markup = _ReplyMarkup([_Row(buttons)])
 
-    assert e2e_smoke.has_reaction_buttons(msg) is False
+
+def test_button_data_ignores_url_buttons_without_data() -> None:
+    assert button_data(_UrlButton()) == b""
+
+
+def test_reaction_button_detection_skips_url_buttons() -> None:
+    msg = _Message([_UrlButton(), _CallbackButton(b"r:123:1")])
+
+    assert has_reaction_buttons(msg) is True
+
+
+def test_find_like_button_skips_url_buttons_before_reaction_row() -> None:
+    like_button = _CallbackButton(b"r:123:1")
+    msg = _Message([_UrlButton(), _CallbackButton(b"r:123:2"), like_button])
+
+    assert find_like_button(msg) is like_button
+
+
+def test_reaction_button_detection_handles_url_only_markup() -> None:
+    msg = _Message([_UrlButton()])
+
+    assert has_reaction_buttons(msg) is False
+    assert find_like_button(msg) is None

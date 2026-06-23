@@ -403,7 +403,11 @@ Agents need `PATH=/paperclip/bin:$PATH` to find them.
 | `codex` | `/paperclip/bin/codex` | `npm install --prefix /paperclip/.npm-global @openai/codex@latest && ln -sf /paperclip/.npm-global/node_modules/.bin/codex /paperclip/bin/codex` |
 | `sentry` / `sentry-cli` | `/paperclip/bin/sentry` or system path | `npm install --prefix /paperclip/.npm-global sentry @sentry/cli && ln -sf /paperclip/.npm-global/node_modules/.bin/sentry /paperclip/bin/sentry && ln -sf /paperclip/.npm-global/node_modules/.bin/sentry-cli /paperclip/bin/sentry-cli` |
 
-`sentry` and legacy `sentry-cli` use different issue-list syntax. Prefer `sentry issue list --query "is:unresolved" --limit 20`; use `sentry-cli issues list --org "$SENTRY_ORG" --project "$SENTRY_PROJECT" --status unresolved --max-rows 20` only as a legacy fallback. QA and CTO receive `SENTRY_ORG=ffmemes` and `SENTRY_PROJECT=ff-backend` from the manifest.
+`sentry` and legacy `sentry-cli` can expose different issue-list flags across
+installed versions. Prefer `sentry issues list --query "is:unresolved" --max-rows 20`;
+use `sentry-cli issues list --org "$SENTRY_ORG" --project "$SENTRY_PROJECT" --status unresolved --max-rows 20`
+only as a legacy fallback. QA and CTO receive `SENTRY_ORG=ffmemes` and
+`SENTRY_PROJECT=ff-backend` from the manifest.
 
 Post-deployment command (runs after each Coolify deploy) is configured to reinstall these,
 but runs as non-root `node` user — see Coolify Quirks below.
