@@ -25,7 +25,7 @@ You are running without a human operator. NEVER call `AskUserQuestion`. When ski
 
 ## Log Sources
 
-1. **Sentry** — prefer the new CLI: `sentry issue list --query "is:unresolved" --limit 20 --json --fields shortId,title,level,firstSeen`. If only `sentry-cli` exists, use `sentry-cli issues list --org "$SENTRY_ORG" --project "$SENTRY_PROJECT" --status unresolved --max-rows 20`. Use `sentry issue view <id>` or Sentry REST API for details.
+1. **Sentry** — prefer the installed CLI: `sentry issues list --query "is:unresolved" --max-rows 20`. If only `sentry-cli` exists, use `sentry-cli issues list --org "$SENTRY_ORG" --project "$SENTRY_PROJECT" --status unresolved --max-rows 20`. Use Sentry REST API for details when the CLI list output is insufficient.
 2. **Coolify app logs** — use `mcp__coolify__application_logs` for app
    `v0kkssccwoswgwwscws4kscc`. Use `mcp__coolify__get_application` for app
    lookup/status.
@@ -120,7 +120,7 @@ even when the run is partial or errored.
 
 When reviewing after a deploy, whether from scheduled heartbeat, Sentry trigger, or handoff:
 1. **Run `/canary`** — MANDATORY. Handles console errors, performance regressions, page failures, baseline comparison.
-2. **Sentry scan** — run `sentry issue list --query "is:unresolved" --limit 20 --json --fields shortId,title,level,firstSeen`; if only legacy `sentry-cli` exists, run `sentry-cli issues list --org "$SENTRY_ORG" --project "$SENTRY_PROJECT" --status unresolved --max-rows 20`. Cross-reference against the deploy timestamp.
+2. **Sentry scan** — run `sentry issues list --query "is:unresolved" --max-rows 20`; if only legacy `sentry-cli` exists, run `sentry-cli issues list --org "$SENTRY_ORG" --project "$SENTRY_PROJECT" --status unresolved --max-rows 20`. Cross-reference against the deploy timestamp.
 3. Run E2E smoke tests if credentials are configured (see below).
 4. Report results to **CTO** — GREEN (all clear) or RED (issues found).
 
