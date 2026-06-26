@@ -6,11 +6,17 @@ never crashes the flow itself (critical gap from eng review).
 
 import logging
 
+from src.config import settings
+
 logger = logging.getLogger(__name__)
 
 
 def safe_emit(event: str, resource_id: str, payload: dict | None = None) -> None:
     """Emit a Prefect event, silently catching errors."""
+    if not settings.PREFECT_API_URL:
+        logger.debug("Skipping Prefect event %s: PREFECT_API_URL is not configured", event)
+        return
+
     try:
         from prefect.events import emit_event
 

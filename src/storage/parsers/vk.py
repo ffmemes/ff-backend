@@ -25,13 +25,14 @@ class VkGroupScraper(Scraper):
         self.source_link = source_link
         self.vk_source_link = None
         self.VK_TOKEN = settings.VK_TOKEN
-        self.base_url = "https://api.vk.com/method/wall.get?access_token={vk_token}&v={v}&domain={domain}&count=100&offset={offset}"  # noqa: E501
+        self.base_url = "https://api.vk.com/method/wall.get?access_token={vk_token}&v={v}&domain={domain}&count={count}&offset={offset}"  # noqa: E501
 
     async def get_items(self, num_of_posts: Optional[int] = None) -> list[VkGroupPostParsingResult]:
         logger.info(f"Going to parse VK: {self.source_link}")
         vk_source = _extract_username_from_url(self.source_link)
         self.vk_source_link = "https://vk.com/%s" % vk_source
-        r = await self._get_vk_wall(vk_source)
+        page_size = min(num_of_posts or 100, 100)
+        r = await self._get_vk_wall(vk_source, count=page_size)
         if r is None or "response" not in r:
             logger.error(f"Can't parse vk, got response: {r}")
             return []
@@ -41,29 +42,42 @@ class VkGroupScraper(Scraper):
         if num_of_posts:
             posts_count = num_of_posts
 
-        offset = 100
+        offset = len(posts)
         while posts_count > len(posts):
-            r = await self._get_vk_wall(vk_source, offset)
+            r = await self._get_vk_wall(vk_source, offset, count=min(posts_count - len(posts), 100))
             if r is None:
                 break
             posts.extend(r["response"]["items"])
-            offset += 100
+            offset += len(r["response"]["items"])
             await asyncio.sleep(5)  # to not to DDOS VK
+            if not r["response"]["items"]:
+                break
 
         results = []
-        for post in posts:
+        for post in posts[:posts_count]:
             post_details = await self.get_post_details(post)
             if post_details:
                 results.append(post_details)
 
         return results
 
-    async def _get_vk_wall(self, vk_source: str, offset: int = 0) -> Optional[dict]:
+    async def _get_vk_wall(
+        self,
+        vk_source: str,
+        offset: int = 0,
+        count: int = 100,
+    ) -> Optional[dict]:
         if self.VK_TOKEN is None:
             logger.error("Can't parse vk without VK_TOKEN")
             return None
         req = await self._request(
-            self.base_url.format(vk_token=self.VK_TOKEN, v="5.92", domain=vk_source, offset=offset)
+            self.base_url.format(
+                vk_token=self.VK_TOKEN,
+                v="5.92",
+                domain=vk_source,
+                count=count,
+                offset=offset,
+            )
         )
         if req.status_code != 200:
             raise ScraperException(f"Got status code {req.status_code}")

@@ -83,7 +83,48 @@ async def _execute_meme_reactions_and_engagement(
     Both metrics are computed from one pass over user_meme_reaction.
     """
 
-    query = """
+    if meme_ids:
+        recent_meme_ids_cte = "SELECT NULL::integer AS meme_id WHERE FALSE"
+    else:
+        recent_meme_ids_cte = """
+            SELECT meme_id
+            FROM user_meme_reaction
+            WHERE sent_at > NOW() - :lookback_hours * INTERVAL '1 hour'
+
+            UNION
+
+            SELECT meme_id
+            FROM user_meme_reaction
+            WHERE reacted_at > NOW() - :lookback_hours * INTERVAL '1 hour'
+        """
+
+    if include_user_history:
+        affected_users_cte = """
+        AFFECTED_USERS AS (
+            SELECT DISTINCT R.user_id
+            FROM user_meme_reaction R
+            INNER JOIN TARGET_MEME_IDS T
+                ON T.meme_id = R.meme_id
+        ),
+        """
+        base_reactions_from = """
+            FROM user_meme_reaction R
+            INNER JOIN AFFECTED_USERS AU
+                ON AU.user_id = R.user_id
+            INNER JOIN meme
+                ON R.meme_id = meme.id
+        """
+    else:
+        affected_users_cte = ""
+        base_reactions_from = """
+            FROM user_meme_reaction R
+            INNER JOIN TARGET_MEME_IDS T
+                ON T.meme_id = R.meme_id
+            INNER JOIN meme
+                ON R.meme_id = meme.id
+        """
+
+    query = f"""
         INSERT INTO meme_stats (
             meme_id, nlikes, ndislikes, nmemes_sent,
             age_days, sec_to_react, updated_at,
@@ -91,9 +132,7 @@ async def _execute_meme_reactions_and_engagement(
         )
 
         WITH RECENT_MEME_IDS AS (
-            SELECT DISTINCT meme_id
-            FROM user_meme_reaction
-            WHERE COALESCE(reacted_at, sent_at) > NOW() - :lookback_hours * INTERVAL '1 hour'
+            {recent_meme_ids_cte}
         ),
 
         FORCED_MEME_IDS AS (
@@ -108,12 +147,7 @@ async def _execute_meme_reactions_and_engagement(
             UNION
             SELECT meme_id FROM FORCED_MEME_IDS
         ),
-
-        AFFECTED_USERS AS (
-            SELECT DISTINCT user_id
-            FROM user_meme_reaction
-            WHERE meme_id IN (SELECT meme_id FROM TARGET_MEME_IDS)
-        ),
+        {affected_users_cte}
 
         BASE_REACTIONS AS (
             SELECT
@@ -125,15 +159,7 @@ async def _execute_meme_reactions_and_engagement(
                 EXTRACT(EPOCH FROM R.reacted_at - R.sent_at) AS sec_to_react,
                 MAX(CASE WHEN R.reaction_id IS NOT NULL THEN R.sent_at END)
                     OVER (PARTITION BY R.user_id) AS user_last_reaction_sent_at
-            FROM user_meme_reaction R
-            JOIN meme ON R.meme_id = meme.id
-            WHERE (
-                (:include_user_history AND R.user_id IN (SELECT user_id FROM AFFECTED_USERS))
-                OR (
-                    NOT :include_user_history
-                    AND R.meme_id IN (SELECT meme_id FROM TARGET_MEME_IDS)
-                )
-            )
+            {base_reactions_from}
         ),
 
         WITH_USER_AVGS AS (
@@ -212,8 +238,9 @@ async def _execute_meme_reactions_and_engagement(
                 ), 99999) AS sec_to_react
                 , NOW() AS updated_at
             FROM meme M
+            INNER JOIN TARGET_MEME_IDS T
+                ON T.meme_id = M.id
             LEFT JOIN user_meme_reaction E ON E.meme_id = M.id
-            WHERE M.id IN (SELECT meme_id FROM TARGET_MEME_IDS)
             GROUP BY 1
         )
 
