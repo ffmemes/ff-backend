@@ -69,10 +69,10 @@ MSK = "Europe/Moscow"
 
 if __name__ == "__main__":
     serve(
-        # ── Stats (every 15 min, staggered) ──
+        # ── Stats ──
         calculate_user_stats.to_deployment(
             name="Calculate user_stats",
-            schedules=[CronSchedule(cron="0,15,30,45 * * * *", timezone=LON)],
+            schedules=[CronSchedule(cron="0,30 * * * *", timezone=LON)],
         ),
         calculate_meme_stats.to_deployment(
             name="Calculate meme_stats",
@@ -84,13 +84,13 @@ if __name__ == "__main__":
         ),
         calculate_meme_source_stats.to_deployment(
             name="Calculate meme_source_stats",
-            schedules=[CronSchedule(cron="5,20,35,50 * * * *", timezone=LON)],
+            schedules=[CronSchedule(cron="10 * * * *", timezone=LON)],
         ),
         calculate_user_meme_source_stats.to_deployment(
             name="Calculate user_meme_source_stats",
             schedules=[
                 CronSchedule(
-                    cron="12,27,42,57 * * * *",
+                    cron="40 * * * *",
                     timezone=LON,
                 )
             ],

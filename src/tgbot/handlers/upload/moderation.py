@@ -25,7 +25,6 @@ from src.observability.sentry import (
 )
 from src.recommendations.service import create_user_meme_reaction
 from src.stats.meme import calculate_meme_reactions_and_engagement
-from src.stats.meme_source import calculate_meme_source_stats
 from src.storage.constants import MemeStatus, MemeType
 from src.storage.deduplication import (
     find_duplicate_by_ocr_text,
@@ -506,8 +505,7 @@ async def handle_uploaded_meme_review_button(
             reacted_at=datetime.utcnow(),
         )
 
-        asyncio.create_task(calculate_meme_source_stats())
-        asyncio.create_task(calculate_meme_reactions_and_engagement())
+        asyncio.create_task(calculate_meme_reactions_and_engagement(meme_ids=[meme["id"]]))
 
         await pay_if_not_paid_with_alert(
             context.bot,

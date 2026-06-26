@@ -10,7 +10,7 @@ bind_env = os.getenv("BIND", None)
 use_bind = bind_env if bind_env else f"{host}:{port}"
 
 workers_per_core_str = os.getenv("WORKERS_PER_CORE", "1")
-max_workers_str = os.getenv("MAX_WORKERS")
+max_workers_str = os.getenv("MAX_WORKERS", "4")
 web_concurrency_str = os.getenv("WEB_CONCURRENCY", None)
 
 cores = multiprocessing.cpu_count()
