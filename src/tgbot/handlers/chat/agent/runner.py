@@ -10,6 +10,7 @@ from sqlalchemy import text
 
 from src.config import settings
 from src.database import execute
+from src.observability.sentry import chat_agent_scope
 from src.tgbot.handlers.chat.agent.prompts import SYSTEM_PROMPT
 from src.tgbot.handlers.chat.agent.tools import get_tools
 from src.tgbot.handlers.chat.ai import _messages_to_text
@@ -96,12 +97,18 @@ async def run_chat_agent(
     start_time = time.time()
 
     try:
-        result = await Runner.run(
-            starting_agent=agent,
-            input=agent_input,
-            context=ctx,
-            max_turns=MAX_TURNS,
-        )
+        with chat_agent_scope(
+            chat_id=chat_id,
+            user_id=user_id,
+            reply_to_message_id=reply_to_message_id,
+            trigger_type=trigger_type,
+        ):
+            result = await Runner.run(
+                starting_agent=agent,
+                input=agent_input,
+                context=ctx,
+                max_turns=MAX_TURNS,
+            )
     except MaxTurnsExceeded as e:
         logger.warning(
             "Chat agent hit max turns in chat %s after %s turns: %s",

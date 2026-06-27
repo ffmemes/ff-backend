@@ -64,6 +64,33 @@ def before_send_log(log: dict[str, Any], _hint: dict[str, Any]) -> dict[str, Any
 
 
 @contextmanager
+def chat_agent_scope(
+    *,
+    chat_id: int,
+    user_id: int,
+    reply_to_message_id: int | None = None,
+    trigger_type: str | None = None,
+) -> Iterator[None]:
+    """Attach chat-agent context to Sentry events produced while running the agent."""
+    with sentry_sdk.new_scope() as scope:
+        scope.set_tag("ff.module", "chat_agent")
+        if trigger_type:
+            scope.set_tag("chat_agent.trigger_type", trigger_type)
+        scope.set_context(
+            "chat_agent",
+            _clean_context(
+                {
+                    "chat_id": chat_id,
+                    "user_id": user_id,
+                    "reply_to_message_id": reply_to_message_id,
+                    "trigger_type": trigger_type,
+                }
+            ),
+        )
+        yield
+
+
+@contextmanager
 def telegram_update_scope(update: Any) -> Iterator[None]:
     """Attach Telegram update context to Sentry events produced by one webhook."""
     with sentry_sdk.new_scope() as scope:
@@ -372,8 +399,48 @@ def _is_expected_chat_agent_max_turns_event(event: dict[str, Any]) -> bool:
             return True
         if _exception_has_chat_agent_frame(exception_value):
             return True
+        if _event_has_chat_agent_context(event):
+            return True
+        if _event_has_chat_agent_webhook_context(event, exception_value):
+            return True
 
     return False
+
+
+def _event_has_chat_agent_context(event: dict[str, Any]) -> bool:
+    tags = event.get("tags")
+    if isinstance(tags, dict):
+        if tags.get("ff.module") == "chat_agent":
+            return True
+        if tags.get("chat_agent.trigger_type"):
+            return True
+
+    contexts = event.get("contexts")
+    if isinstance(contexts, dict) and isinstance(contexts.get("chat_agent"), dict):
+        return True
+
+    return False
+
+
+def _event_has_chat_agent_webhook_context(
+    event: dict[str, Any],
+    exception_value: dict[str, Any],
+) -> bool:
+    mechanism = exception_value.get("mechanism")
+    if not isinstance(mechanism, dict) or mechanism.get("type") != "openai_agents":
+        return False
+
+    if event.get("transaction") != "/tgbot/webhook":
+        return False
+
+    tags = event.get("tags")
+    if not isinstance(tags, dict):
+        return False
+
+    return (
+        tags.get("telegram.update_type") == "message"
+        and tags.get("telegram.chat_type") == "supergroup"
+    )
 
 
 def _exception_has_chat_agent_frame(exception_value: dict[str, Any]) -> bool:
