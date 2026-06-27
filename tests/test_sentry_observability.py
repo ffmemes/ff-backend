@@ -143,6 +143,55 @@ def test_before_send_drops_handled_chat_agent_max_turns_event():
     assert before_send(event, {}) is None
 
 
+def test_before_send_drops_scoped_chat_agent_max_turns_event_without_logger():
+    event = {
+        "logger": None,
+        "tags": {
+            "ff.module": "chat_agent",
+        },
+        "contexts": {
+            "chat_agent": {
+                "chat_id": -1002391808824,
+                "user_id": 968203036,
+                "reply_to_message_id": 640447,
+                "trigger_type": "mention",
+            }
+        },
+        "exception": {
+            "values": [
+                {
+                    "type": "MaxTurnsExceeded",
+                    "module": "agents.exceptions",
+                }
+            ]
+        },
+    }
+
+    assert before_send(event, {}) is None
+
+
+def test_before_send_drops_chat_agent_webhook_max_turns_event_without_logger():
+    event = {
+        "logger": None,
+        "transaction": "/tgbot/webhook",
+        "tags": {
+            "telegram.chat_type": "supergroup",
+            "telegram.update_type": "message",
+        },
+        "exception": {
+            "values": [
+                {
+                    "type": "MaxTurnsExceeded",
+                    "module": "agents.exceptions",
+                    "mechanism": {"type": "openai_agents", "handled": False},
+                }
+            ]
+        },
+    }
+
+    assert before_send(event, {}) is None
+
+
 def test_before_send_keeps_unexpected_max_turns_events():
     event = {
         "exception": {
