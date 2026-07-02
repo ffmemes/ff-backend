@@ -117,6 +117,7 @@ def test_plan_for_user_gate_enabled_keeps_first_session_low_sent_users_in_cold_s
     plan = plan_candidate_selection_for_user(
         nmemes_sent=8,
         nsessions=nsessions,
+        cold_start_account_too_old=False,
         cold_start_nsessions_gate_enabled=True,
         limit=10,
     )
@@ -142,7 +143,7 @@ def test_plan_for_user_gate_enabled_routes_old_low_sent_users_to_growing_plan():
     plan = plan_candidate_selection_for_user(
         nmemes_sent=8,
         nsessions=1,
-        account_age_days=31,
+        cold_start_account_too_old=True,
         cold_start_nsessions_gate_enabled=True,
         limit=10,
     )

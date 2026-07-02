@@ -8,7 +8,12 @@ from src import redis
 from src.tgbot import service
 from src.tgbot.exceptions import UserNotFound
 
-USER_INFO_CACHE_REQUIRED_KEYS = frozenset({"account_age_days"})
+USER_INFO_CACHE_REQUIRED_KEYS = frozenset(
+    {
+        "account_age_days",
+        "cold_start_account_too_old",
+    }
+)
 
 
 async def get_cached_user_info(user_id: int) -> dict | None:

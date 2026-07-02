@@ -109,15 +109,12 @@ def plan_candidate_selection(nmemes_sent: int) -> CandidateSelectionPlan:
     )
 
 
-COLD_START_MAX_ACCOUNT_AGE_DAYS = 30
-
-
 def plan_candidate_selection_for_user(
     nmemes_sent: int,
     nsessions: int | None,
     cold_start_nsessions_gate_enabled: bool,
     limit: int | None = None,
-    account_age_days: int | None = None,
+    cold_start_account_too_old: bool = False,
 ) -> CandidateSelectionPlan:
     """Plan candidate selection with the production cold-start session gate.
 
@@ -125,9 +122,7 @@ def plan_candidate_selection_for_user(
     candidate selection depends on maturity, session count, and account age.
     """
     _ = limit
-    dormant_returner = (nsessions or 0) > 1 or (
-        account_age_days is not None and account_age_days > COLD_START_MAX_ACCOUNT_AGE_DAYS
-    )
+    dormant_returner = (nsessions or 0) > 1 or cold_start_account_too_old
     if cold_start_nsessions_gate_enabled and dormant_returner and nmemes_sent < 30:
         return plan_candidate_selection(30)
 
