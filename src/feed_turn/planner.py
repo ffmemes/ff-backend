@@ -114,14 +114,16 @@ def plan_candidate_selection_for_user(
     nsessions: int | None,
     cold_start_nsessions_gate_enabled: bool,
     limit: int | None = None,
+    cold_start_account_too_old: bool = False,
 ) -> CandidateSelectionPlan:
     """Plan candidate selection with the production cold-start session gate.
 
     ``limit`` is accepted for batch-pipeline call sites that already carry it;
-    candidate selection currently depends only on maturity and session count.
+    candidate selection depends on maturity, session count, and account age.
     """
     _ = limit
-    if cold_start_nsessions_gate_enabled and (nsessions or 0) > 1 and nmemes_sent < 30:
+    dormant_returner = (nsessions or 0) > 1 or cold_start_account_too_old
+    if cold_start_nsessions_gate_enabled and dormant_returner and nmemes_sent < 30:
         return plan_candidate_selection(30)
 
     return plan_candidate_selection(nmemes_sent)

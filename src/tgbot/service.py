@@ -440,6 +440,8 @@ async def get_user_info(
             type,
             COALESCE(nmemes_sent, 0) nmemes_sent,
             COALESCE(nsessions, 0) nsessions,
+            FLOOR(EXTRACT(EPOCH FROM (NOW() - U.created_at)) / 86400)::INT account_age_days,
+            U.created_at < NOW() - INTERVAL '30 days' cold_start_account_too_old,
             COALESCE(memes_watched_today, 0) memes_watched_today,
             UIL.interface_lang
         FROM "user" AS U
