@@ -730,6 +730,21 @@ async def test_gate_default_blocks_dormant_returner_from_cold_start():
 
 
 @pytest.mark.asyncio
+async def test_gate_default_blocks_old_low_sent_user_from_cold_start():
+    """Old accounts can be dormant returners even before nsessions increments."""
+    retriever = _growing_retriever_class()()
+    with _patch_user_info(nsessions=1, nmemes_sent=8, account_age_days=31):
+        candidates = await generate_recommendations(
+            TEST_USER_ID, 10, nmemes_sent=8, retriever=retriever, random_seed=42
+        )
+
+    sources = {c["recommended_by"] for c in candidates}
+    assert "cold_start_explore" not in sources
+    assert "cold_start_adapt" not in sources
+    assert candidates[0]["recommended_by"] == "lr_smoothed"
+
+
+@pytest.mark.asyncio
 async def test_gate_on_first_session_routes_to_cold_start_explore():
     """Gate on + nsessions<=1 + nmemes_sent<6 → cold_start_explore (Phase 1)."""
     retriever = _growing_retriever_class()()

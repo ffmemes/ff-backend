@@ -8,6 +8,8 @@ from src import redis
 from src.tgbot import service
 from src.tgbot.exceptions import UserNotFound
 
+USER_INFO_CACHE_REQUIRED_KEYS = frozenset({"account_age_days"})
+
 
 async def get_cached_user_info(user_id: int) -> dict | None:
     key = redis.get_user_info_key(user_id)
@@ -34,7 +36,7 @@ async def update_user_info_cache(user_id: int) -> defaultdict:
 
 async def get_user_info(user_id: int) -> defaultdict:
     user_info = await get_cached_user_info(user_id)
-    if user_info is None:
+    if user_info is None or not USER_INFO_CACHE_REQUIRED_KEYS.issubset(user_info):
         user_info = await update_user_info_cache(user_id)
 
     user_info["id"] = user_id

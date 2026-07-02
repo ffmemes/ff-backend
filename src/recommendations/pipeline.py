@@ -70,6 +70,7 @@ class RecommendationBatchRequest:
     limit: int
     nmemes_sent: int
     nsessions: int = 0
+    account_age_days: int | None = None
     user_type: str | None = None
     meme_ids_in_queue: Sequence[int] = field(default_factory=tuple)
     random_seed: int | None = None
@@ -131,6 +132,7 @@ class RecommendationBatchDiagnostics:
     limit: int
     nmemes_sent: int
     nsessions: int
+    account_age_days: int | None
     user_type: str | None
     queue_len_before: int
     exclude_count: int
@@ -176,6 +178,7 @@ class RecommendationBatchDiagnostics:
             "limit": self.limit,
             "nmemes_sent": self.nmemes_sent,
             "nsessions": self.nsessions,
+            "account_age_days": self.account_age_days,
             "cold_start_nsessions_gate_enabled": self.cold_start_nsessions_gate_enabled,
             "queue_len_before": self.queue_len_before,
             "exclude_count": self.exclude_count,
@@ -283,6 +286,7 @@ class RecommendationBatchPipeline:
             limit=request.limit,
             nmemes_sent=request.nmemes_sent,
             nsessions=request.nsessions,
+            account_age_days=request.account_age_days,
             user_type=request.user_type,
             queue_len_before=len(request.meme_ids_in_queue),
             exclude_count=len(request.meme_ids_in_queue),
@@ -392,6 +396,7 @@ class RecommendationBatchPipeline:
             nsessions=request.nsessions,
             cold_start_nsessions_gate_enabled=request.cold_start_nsessions_gate_enabled,
             limit=limit,
+            account_age_days=request.account_age_days,
         )
         diagnostics.maturity_stage = plan.maturity_stage
 
@@ -592,6 +597,7 @@ class RecommendationBatchPipeline:
                         limit=limit,
                         nmemes_sent=diagnostics.nmemes_sent,
                         nsessions=diagnostics.nsessions,
+                        account_age_days=diagnostics.account_age_days,
                         user_type=diagnostics.user_type,
                         meme_ids_in_queue=exclude_ids,
                     ),

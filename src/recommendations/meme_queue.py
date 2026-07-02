@@ -145,9 +145,10 @@ async def generate_recommendations(
         nmemes_sent = user_info["nmemes_sent"]
 
     # FFM-1161: nsessions gate. cold_start engines were designed for first-session
-    # users; the cached user_info may predate the gate (1h TTL) — treat missing as 0
-    # so we don't accidentally route dormant returners into cold_start.
+    # users. FFM-1819 also gates old low-sent accounts because nsessions is derived
+    # from send history and can remain <=1 until a dormant returner reacts again.
     nsessions = user_info.get("nsessions") or 0
+    account_age_days = user_info.get("account_age_days")
 
     queue_key = redis.get_meme_queue_key(user_id)
 
@@ -183,6 +184,7 @@ async def generate_recommendations(
             limit=limit,
             nmemes_sent=nmemes_sent,
             nsessions=nsessions,
+            account_age_days=account_age_days,
             user_type=None if user_type is None else user_type.value,
             meme_ids_in_queue=meme_ids_in_queue,
             random_seed=random_seed,
