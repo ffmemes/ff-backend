@@ -8,7 +8,11 @@ from src.recommendations.blender_experiments import (
     MATURE_BLENDER_TREATMENT_WEIGHTS,
 )
 from src.recommendations.candidates import CandidatesRetriever
-from src.recommendations.meme_queue import generate_recommendations, get_next_meme_for_user
+from src.recommendations.meme_queue import (
+    _cold_start_allowed_by_realtime_state,
+    generate_recommendations,
+    get_next_meme_for_user,
+)
 
 TEST_USER_ID = 99999
 
@@ -46,11 +50,57 @@ def mock_redis():
             new_callable=AsyncMock,
             side_effect=lambda user_id, weights: weights,
         ),
+        patch(
+            "src.recommendations.meme_queue._get_realtime_cold_start_routing_state",
+            new_callable=AsyncMock,
+            return_value=None,
+        ),
     ):
         yield
 
 
 # ── Cold start Phase 1 (nmemes_sent < 6): cold_start_explore ──
+
+
+@pytest.mark.parametrize(
+    ("state", "allowed"),
+    [
+        (
+            {
+                "prior_sent_count": 26,
+                "nsessions_after_next_send": 1,
+                "cold_start_account_too_old": False,
+            },
+            True,
+        ),
+        (
+            {
+                "prior_sent_count": 26,
+                "nsessions_after_next_send": 2,
+                "cold_start_account_too_old": False,
+            },
+            False,
+        ),
+        (
+            {
+                "prior_sent_count": 30,
+                "nsessions_after_next_send": 1,
+                "cold_start_account_too_old": False,
+            },
+            False,
+        ),
+        (
+            {
+                "prior_sent_count": 8,
+                "nsessions_after_next_send": 1,
+                "cold_start_account_too_old": True,
+            },
+            False,
+        ),
+    ],
+)
+def test_cold_start_realtime_state_predicate(state, allowed):
+    assert _cold_start_allowed_by_realtime_state(state) is allowed
 
 
 @pytest.mark.asyncio
@@ -73,7 +123,7 @@ async def test_get_next_meme_for_user_skips_stale_queue_payloads():
     async def pop_queue(_queue_key):
         return queued_payloads.pop(0) if queued_payloads else None
 
-    async def is_sendable(_user_id: int, meme_id: int) -> bool:
+    async def is_sendable(_user_id: int, meme_id: int, _recommended_by: str | None = None) -> bool:
         return meme_id == 102
 
     with (
@@ -119,7 +169,7 @@ async def test_get_next_meme_for_user_refills_after_draining_stale_payloads():
         )
         return True
 
-    async def is_sendable(_user_id: int, meme_id: int) -> bool:
+    async def is_sendable(_user_id: int, meme_id: int, _recommended_by: str | None = None) -> bool:
         return meme_id == 102
 
     with (
@@ -144,6 +194,58 @@ async def test_get_next_meme_for_user_refills_after_draining_stale_payloads():
     assert meme is not None
     assert meme.id == 102
     check_queue.assert_awaited_once_with(TEST_USER_ID)
+
+
+@pytest.mark.asyncio
+async def test_get_next_meme_for_user_discards_cold_start_payload_when_realtime_guard_blocks():
+    queued_payloads = [
+        {
+            "id": 101,
+            "type": "image",
+            "telegram_file_id": "stale-cold-start-file-id",
+            "caption": None,
+            "recommended_by": "cold_start_adapt",
+        },
+        {
+            "id": 102,
+            "type": "image",
+            "telegram_file_id": "growing-file-id",
+            "caption": None,
+            "recommended_by": "lr_smoothed",
+        },
+    ]
+    ineligible_state = {
+        "account_age_days": 28,
+        "cold_start_account_too_old": False,
+        "prior_sent_count": 26,
+        "nsessions_after_next_send": 2,
+    }
+
+    async def pop_queue(_queue_key):
+        return queued_payloads.pop(0) if queued_payloads else None
+
+    with (
+        patch(
+            "src.recommendations.meme_queue.redis.pop_meme_from_queue_by_key",
+            new_callable=AsyncMock,
+            side_effect=pop_queue,
+        ),
+        patch(
+            "src.recommendations.meme_queue.fetch_one",
+            new_callable=AsyncMock,
+            side_effect=[{"id": 101}, {"id": 102}],
+        ),
+        patch(
+            "src.recommendations.meme_queue._get_realtime_cold_start_routing_state",
+            new_callable=AsyncMock,
+            return_value=ineligible_state,
+        ) as realtime_state,
+    ):
+        meme = await get_next_meme_for_user(TEST_USER_ID)
+
+    assert meme is not None
+    assert meme.id == 102
+    realtime_state.assert_awaited_once_with(TEST_USER_ID)
 
 
 @pytest.mark.asyncio
@@ -747,6 +849,35 @@ async def test_gate_default_blocks_old_low_sent_user_from_cold_start():
     assert "cold_start_explore" not in sources
     assert "cold_start_adapt" not in sources
     assert candidates[0]["recommended_by"] == "lr_smoothed"
+
+
+@pytest.mark.asyncio
+async def test_gate_default_blocks_realtime_second_session_even_when_cache_is_stale():
+    """Realtime sent history catches dormant returners before user_info/user_stats catches up."""
+    retriever = _growing_retriever_class()()
+    stale_cached_state = {
+        "account_age_days": 28,
+        "cold_start_account_too_old": False,
+        "prior_sent_count": 26,
+        "nsessions_after_next_send": 2,
+    }
+    with (
+        _patch_user_info(nsessions=1, nmemes_sent=26, cold_start_account_too_old=False),
+        patch(
+            "src.recommendations.meme_queue._get_realtime_cold_start_routing_state",
+            new_callable=AsyncMock,
+            return_value=stale_cached_state,
+        ) as realtime_state,
+    ):
+        candidates = await generate_recommendations(
+            TEST_USER_ID, 10, nmemes_sent=26, retriever=retriever, random_seed=42
+        )
+
+    sources = {c["recommended_by"] for c in candidates}
+    assert "cold_start_explore" not in sources
+    assert "cold_start_adapt" not in sources
+    assert candidates[0]["recommended_by"] == "lr_smoothed"
+    realtime_state.assert_awaited_once_with(TEST_USER_ID)
 
 
 @pytest.mark.asyncio

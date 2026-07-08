@@ -25,6 +25,8 @@ from src.storage.schemas import MemeData
 from src.tgbot.constants import UserType
 from src.tgbot.user_info import get_user_info
 
+COLD_START_RECOMMENDED_BY = frozenset({"cold_start_explore", "cold_start_adapt"})
+
 
 async def get_next_meme_for_user(user_id: int) -> MemeData | None:
     queue_key = redis.get_meme_queue_key(user_id)
@@ -52,7 +54,7 @@ async def get_next_meme_for_user(user_id: int) -> MemeData | None:
             discarded_unsendable = True
             continue
 
-        if await _queued_meme_is_sendable(user_id, meme_id):
+        if await _queued_meme_is_sendable(user_id, meme_id, meme_data.get("recommended_by")):
             return MemeData(**meme_data)
 
         discarded_unsendable = True
@@ -63,7 +65,11 @@ async def get_next_meme_for_user(user_id: int) -> MemeData | None:
         )
 
 
-async def _queued_meme_is_sendable(user_id: int, meme_id: int) -> bool:
+async def _queued_meme_is_sendable(
+    user_id: int,
+    meme_id: int,
+    recommended_by: str | None = None,
+) -> bool:
     row = await fetch_one(
         text(
             """
@@ -79,7 +85,89 @@ async def _queued_meme_is_sendable(user_id: int, meme_id: int) -> bool:
         ),
         {"user_id": user_id, "meme_id": meme_id},
     )
-    return row is not None
+    if row is None:
+        return False
+
+    if not _is_cold_start_engine(recommended_by) or not settings.COLD_START_NSESSIONS_GATE_ENABLED:
+        return True
+
+    state = await _get_realtime_cold_start_routing_state(user_id)
+    if _cold_start_allowed_by_realtime_state(state):
+        return True
+
+    logging.info(
+        "discarding cold_start queued meme for ineligible user_id=%s meme_id=%s state=%s",
+        user_id,
+        meme_id,
+        state,
+    )
+    return False
+
+
+def _is_cold_start_engine(recommended_by: str | None) -> bool:
+    return recommended_by in COLD_START_RECOMMENDED_BY
+
+
+def _cold_start_allowed_by_realtime_state(state: dict[str, Any] | None) -> bool:
+    if state is None:
+        return False
+
+    return (
+        int(state.get("prior_sent_count") or 0) < 30
+        and int(state.get("nsessions_after_next_send") or 0) <= 1
+        and not bool(state.get("cold_start_account_too_old"))
+    )
+
+
+async def _get_realtime_cold_start_routing_state(user_id: int) -> dict[str, Any] | None:
+    """Return cold-start routing state from raw send history, including this send.
+
+    user_stats and cached user_info can lag. Counting NOW() as the candidate
+    send catches a dormant returner before the first cold_start meme leaks into
+    the new session.
+    """
+    row = await fetch_one(
+        text(
+            """
+            WITH EVENTS AS (
+                SELECT sent_at, FALSE AS is_candidate_send
+                FROM user_meme_reaction
+                WHERE user_id = :user_id
+
+                UNION ALL
+
+                SELECT NOW() AS sent_at, TRUE AS is_candidate_send
+            ),
+            ORDERED_EVENTS AS (
+                SELECT
+                    sent_at,
+                    is_candidate_send,
+                    LAG(sent_at) OVER (ORDER BY sent_at, is_candidate_send) AS previous_sent_at
+                FROM EVENTS
+            ),
+            METRICS AS (
+                SELECT
+                    COUNT(*) FILTER (WHERE NOT is_candidate_send) AS prior_sent_count,
+                    COUNT(*) FILTER (
+                        WHERE previous_sent_at IS NULL
+                            OR sent_at - previous_sent_at > INTERVAL '30 minutes'
+                    ) AS nsessions_after_next_send
+                FROM ORDERED_EVENTS
+            )
+            SELECT
+                FLOOR(EXTRACT(EPOCH FROM (NOW() - U.created_at)) / 86400)::INT
+                    AS account_age_days,
+                U.created_at < NOW() - INTERVAL '30 days' AS cold_start_account_too_old,
+                COALESCE(M.prior_sent_count, 0) AS prior_sent_count,
+                COALESCE(M.nsessions_after_next_send, 1) AS nsessions_after_next_send
+            FROM "user" U
+            CROSS JOIN METRICS M
+            WHERE U.id = :user_id
+        """
+        ),
+        {"user_id": user_id},
+    )
+    return None if row is None else dict(row)
 
 
 async def has_memes_in_queue(user_id: int) -> bool:
@@ -150,6 +238,15 @@ async def generate_recommendations(
     nsessions = user_info.get("nsessions") or 0
     account_age_days = user_info.get("account_age_days")
     cold_start_account_too_old = bool(user_info.get("cold_start_account_too_old"))
+    if settings.COLD_START_NSESSIONS_GATE_ENABLED and nmemes_sent < 30:
+        realtime_state = await _get_realtime_cold_start_routing_state(user_id)
+        if realtime_state is not None:
+            nmemes_sent = max(nmemes_sent, int(realtime_state.get("prior_sent_count") or 0))
+            nsessions = max(nsessions, int(realtime_state.get("nsessions_after_next_send") or 0))
+            account_age_days = realtime_state.get("account_age_days")
+            cold_start_account_too_old = cold_start_account_too_old or bool(
+                realtime_state.get("cold_start_account_too_old")
+            )
 
     queue_key = redis.get_meme_queue_key(user_id)
 
