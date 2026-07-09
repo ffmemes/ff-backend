@@ -38,6 +38,11 @@ The client enforces this twice:
 
 If Redis quota accounting fails, the client fails closed and does not call OpenRouter.
 
+Before each scheduled batch, the flow also checks `GET /api/v1/key`. If
+OpenRouter reports an invalid key or a configured key limit with
+`limit_remaining <= 0`, the batch stops before selecting memes. This does not
+spend model quota and makes account/key exhaustion visible in flow logs.
+
 ## Model Chain
 
 Current production chain:
@@ -45,7 +50,6 @@ Current production chain:
 ```python
 [
     "google/gemma-4-31b-it:free",
-    "nex-agi/nex-n2-pro:free",
     "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
     "google/gemma-4-26b-a4b-it:free",
 ]
@@ -57,6 +61,9 @@ quota.
 
 `nvidia/nemotron-3.5-content-safety:free` is intentionally excluded because it
 is a guardrail classifier, not a general OCR/description model.
+
+`nex-agi/nex-n2-pro:free` was removed after it disappeared from the OpenRouter
+free vision model list, creating avoidable failed attempts.
 
 Do not add paid fallbacks. A paid fallback can spend the account below zero, after which OpenRouter returns 402 for all models, including free models.
 
@@ -73,6 +80,9 @@ Do not add paid fallbacks. A paid fallback can spend the account below zero, aft
 - Healthy batch: up to 9 described, low failures. 429-only batches are acceptable.
 - Daily attempts: inspect Redis key `openrouter:free_requests:YYYY-MM-DD`.
 - Hourly model stats: inspect Redis hashes `openrouter:free_ocr_stats:YYYY-MM-DD:HH` (UTC, 14d TTL). Fields are `{model_id}:{outcome}`, e.g. `...:success`, `...:rate_limited`, `...:timeout`.
+- OpenRouter key health: check flow logs for `OpenRouter key health ok` or
+  `OpenRouter key limit exhausted`. A limit-exhausted key requires raising or
+  resetting the key credit limit, or rotating `OPENROUTER_API_KEY`.
 - Time-window tuning: compare hourly `success / attempt` by UTC hour, then shift the Prefect schedule or batch size if nights are consistently better.
 - Resume paused deployment:
 
