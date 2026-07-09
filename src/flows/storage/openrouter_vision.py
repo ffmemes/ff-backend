@@ -9,6 +9,7 @@ from src.config import settings
 from src.redis import redis_client
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_KEY_HEALTH_TIMEOUT_SECONDS = 10.0
 OPENROUTER_FREE_DAILY_REQUEST_LIMIT = 1000
 OPENROUTER_FREE_DAILY_REQUEST_BUDGET = 900
 OPENROUTER_FREE_REQUEST_COUNTER_TTL_SECONDS = 60 * 60 * 48
@@ -23,15 +24,15 @@ OPENROUTER_FORBIDDEN_MODEL_COOLDOWN_SECONDS = 60 * 60 * 6
 # lifetime purchases for 1,000 req/day (vs 50/day without).
 # See specs/describe-memes.md for full OpenRouter constraints.
 #
-# Verified available on OpenRouter API as of 2026-06-17.
+# Verified available on OpenRouter API as of 2026-07-09.
 # Ordered by preference. Falls back to next model on 429/403/timeout/bad response.
 # Transient failures set Redis cooldowns so later memes/runs try other free models.
 VISION_MODELS = [
     "google/gemma-4-31b-it:free",  # 262k context, primary
-    "nex-agi/nex-n2-pro:free",  # 262k context, Qwen3.5 multimodal MoE
     "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",  # 256k context, multimodal
     "google/gemma-4-26b-a4b-it:free",  # 262k context, MoE variant
     # Gemma 3 free vision fallbacks are no longer listed by OpenRouter.
+    # nex-agi/nex-n2-pro:free is no longer listed by OpenRouter.
     # nvidia/nemotron-3.5-content-safety:free is a guardrail classifier, not
     # a general OCR/description model.
     # nvidia/nemotron-nano-12b-v2-vl:free removed — returns 504s and invalid
@@ -190,6 +191,77 @@ async def _cool_down_transient_openrouter_model(model_id: str, reason: str) -> f
         reason,
     )
     return float(OPENROUTER_TRANSIENT_MODEL_COOLDOWN_SECONDS)
+
+
+def _is_exhausted_key_limit(limit: object, limit_remaining: object) -> bool:
+    """Return whether OpenRouter reports a configured key limit with no credit left."""
+    if limit is None or limit_remaining is None:
+        return False
+
+    try:
+        return float(limit_remaining) <= 0
+    except (TypeError, ValueError):
+        return False
+
+
+async def check_openrouter_key_health(log) -> bool:
+    """Check whether the configured OpenRouter key can make requests.
+
+    This endpoint does not spend model quota. If the check itself is unavailable,
+    fail open so a transient OpenRouter metadata outage does not stop OCR.
+    """
+    headers = {"Authorization": f"Bearer {settings.OPENROUTER_API_KEY}"}
+
+    try:
+        async with httpx.AsyncClient(timeout=OPENROUTER_KEY_HEALTH_TIMEOUT_SECONDS) as client:
+            response = await client.get(f"{OPENROUTER_BASE_URL}/key", headers=headers)
+    except httpx.RequestError as e:
+        log.warning(
+            "OpenRouter key health check unavailable (%s); continuing with model calls.",
+            type(e).__name__,
+        )
+        return True
+
+    if response.status_code in {401, 403}:
+        log.error(
+            "OpenRouter key health check failed with HTTP %s; "
+            "OPENROUTER_API_KEY is invalid or unauthorized.",
+            response.status_code,
+        )
+        return False
+
+    try:
+        response.raise_for_status()
+        payload = response.json()
+    except (httpx.HTTPStatusError, json.JSONDecodeError) as e:
+        log.warning("OpenRouter key health check returned unusable response: %s", e)
+        return True
+
+    data = payload.get("data", {}) if isinstance(payload, dict) else {}
+    limit = data.get("limit")
+    limit_remaining = data.get("limit_remaining")
+    limit_reset = data.get("limit_reset")
+    is_free_tier = data.get("is_free_tier")
+
+    if _is_exhausted_key_limit(limit, limit_remaining):
+        log.error(
+            "OpenRouter key limit exhausted (limit=%s, limit_remaining=%s, "
+            "limit_reset=%s). Raise/reset the key credit limit or rotate "
+            "OPENROUTER_API_KEY before Describe Memes can recover.",
+            limit,
+            limit_remaining,
+            limit_reset or "never",
+        )
+        return False
+
+    log.info(
+        "OpenRouter key health ok (limit=%s, limit_remaining=%s, limit_reset=%s, is_free_tier=%s).",
+        limit if limit is not None else "unlimited",
+        limit_remaining if limit_remaining is not None else "unlimited",
+        limit_reset or "never",
+        is_free_tier,
+    )
+    return True
 
 
 def _parse_vision_response(raw_content: str) -> dict:

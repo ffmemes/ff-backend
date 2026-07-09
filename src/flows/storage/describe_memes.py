@@ -45,6 +45,7 @@ from src.flows.storage.openrouter_vision import (
     RATE_LIMITED,
     VISION_MODELS,
     call_openrouter_vision,
+    check_openrouter_key_health,
 )
 from src.storage.deduplication import deduplicate_described_meme
 from src.storage.upload import download_meme_content_from_tg
@@ -133,6 +134,10 @@ async def describe_memes_flow(batch_size: int = 20) -> None:
 
     if not settings.OPENROUTER_API_KEY:
         log.warning("OPENROUTER_API_KEY not set. Skipping.")
+        return
+
+    if not await check_openrouter_key_health(log):
+        log.warning("OpenRouter key is not usable. Skipping Describe Memes batch.")
         return
 
     memes = await get_memes_to_describe(limit=batch_size)

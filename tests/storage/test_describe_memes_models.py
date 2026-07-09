@@ -12,7 +12,7 @@ def test_describe_memes_does_not_use_removed_gemma_3_free_models():
 
 def test_describe_memes_has_multiple_general_vision_fallbacks():
     assert "google/gemma-4-31b-it:free" in VISION_MODELS
-    assert "nex-agi/nex-n2-pro:free" in VISION_MODELS
     assert "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free" in VISION_MODELS
+    assert "nex-agi/nex-n2-pro:free" not in VISION_MODELS
     assert "nvidia/nemotron-3.5-content-safety:free" not in VISION_MODELS
     assert "nvidia/nemotron-nano-12b-v2-vl:free" not in VISION_MODELS
