@@ -11,9 +11,15 @@ does not change recommendation ranking, thresholds, weights, or assignments.
 import argparse
 import asyncio
 import os
+import sys
 from collections.abc import Sequence
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 
 def _to_asyncpg_url(url: str) -> str:
@@ -26,7 +32,7 @@ def _to_asyncpg_url(url: str) -> str:
 
 def _configure_database_url() -> None:
     analyst_url = os.environ.get("ANALYST_DATABASE_URL")
-    if analyst_url and not os.environ.get("DATABASE_URL"):
+    if analyst_url:
         os.environ["DATABASE_URL"] = _to_asyncpg_url(analyst_url)
     elif os.environ.get("DATABASE_URL"):
         os.environ["DATABASE_URL"] = _to_asyncpg_url(os.environ["DATABASE_URL"])

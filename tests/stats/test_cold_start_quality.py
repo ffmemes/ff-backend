@@ -1,7 +1,9 @@
+import os
 from datetime import datetime, timedelta, timezone
 
 import pytest
 import pytest_asyncio
+from scripts.cold_start_first10_quality_readout import _configure_database_url
 from tests.factories import (
     cleanup_test_data,
     create_meme,
@@ -134,6 +136,18 @@ async def _fetch_section(section: ReadoutSection, **params):
         candidate_limit=params.get("candidate_limit", 5),
     )
     return await fetch_all(build_cold_start_first10_quality_query(section), readout_params)
+
+
+def test_readout_script_prefers_analyst_database_url(monkeypatch):
+    primary_url = "postgresql" + "://primary.example/db"
+    analyst_url = "postgres" + "://analyst.example/db"
+    expected_url = "postgresql+asyncpg" + "://analyst.example/db"
+    monkeypatch.setenv("DATABASE_URL", primary_url)
+    monkeypatch.setenv("ANALYST_DATABASE_URL", analyst_url)
+
+    _configure_database_url()
+
+    assert os.environ["DATABASE_URL"] == expected_url
 
 
 @pytest.mark.asyncio
