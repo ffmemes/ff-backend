@@ -600,6 +600,8 @@ class RecommendationBatchPipeline:
         engine_map = getattr(self.retriever, "engine_map", None)
         if engine_map is None:
             return True
+        if type(self.retriever).get_candidates is not CandidatesRetriever.get_candidates:
+            return True
         return engine in engine_map
 
     async def _fetch_candidates_dict(

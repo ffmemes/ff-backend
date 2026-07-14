@@ -3,6 +3,7 @@ from typing import Any
 
 import pytest
 
+from src.recommendations.candidates import CandidatesRetriever
 from src.recommendations.pipeline import (
     RecommendationBatchPipeline,
     RecommendationBatchRequest,
@@ -277,17 +278,33 @@ async def test_cold_start_guardrails_preserve_existing_fallbacks():
 
 @pytest.mark.asyncio
 async def test_cold_start_guardrails_skip_unsupported_injected_fallback_engines():
-    class LimitedFallbackRetriever(FakeRetriever):
-        engine_map = {"cold_start_adapt": object(), "best_uploaded_memes": object()}
+    calls = []
 
-    retriever = LimitedFallbackRetriever(
-        {
-            "cold_start_adapt": [],
-            "best_uploaded_memes": [_meme(401, "best_uploaded_memes")],
+    async def cold_start_adapt(
+        user_id: int,
+        limit: int = 10,
+        exclude_meme_ids: list[int] | None = None,
+        **kwargs: Any,
+    ) -> list[dict[str, Any]]:
+        calls.append({"engine": "cold_start_adapt", "kwargs": kwargs})
+        return []
+
+    async def best_uploaded_memes(
+        user_id: int,
+        limit: int = 10,
+        exclude_meme_ids: list[int] | None = None,
+        **kwargs: Any,
+    ) -> list[dict[str, Any]]:
+        calls.append({"engine": "best_uploaded_memes", "kwargs": kwargs})
+        return [_meme(401, "best_uploaded_memes")]
+
+    class LimitedFallbackRetriever(CandidatesRetriever):
+        engine_map = {
+            "cold_start_adapt": cold_start_adapt,
+            "best_uploaded_memes": best_uploaded_memes,
         }
-    )
 
-    result = await _pipeline(retriever).run(
+    result = await _pipeline(LimitedFallbackRetriever()).run(
         _request(
             nmemes_sent=8,
             nsessions=1,
@@ -296,7 +313,7 @@ async def test_cold_start_guardrails_skip_unsupported_injected_fallback_engines(
     )
 
     assert _ids(result.selected) == [401]
-    assert [call["engine"] for call in retriever.calls] == [
+    assert [call["engine"] for call in calls] == [
         "cold_start_adapt",
         "best_uploaded_memes",
     ]
