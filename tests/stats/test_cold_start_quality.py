@@ -150,6 +150,13 @@ def test_readout_script_prefers_analyst_database_url(monkeypatch):
     assert os.environ["DATABASE_URL"] == expected_url
 
 
+def test_readout_includes_guarded_cold_start_treatment_engines():
+    query_sql = str(build_cold_start_first10_quality_query("summary"))
+
+    assert "cold_start_explore_guarded" in query_sql
+    assert "cold_start_adapt_guarded" in query_sql
+
+
 @pytest.mark.asyncio
 async def test_summary_uses_true_new_cold_start_cohort(cold_start_readout_data):
     rows = await _fetch_section("summary")

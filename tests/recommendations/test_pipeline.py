@@ -198,6 +198,125 @@ async def test_fallback_diagnostics_record_engine_that_supplied_candidates():
 
 
 @pytest.mark.asyncio
+async def test_cold_start_guardrails_apply_to_true_new_positions_2_to_10():
+    retriever = FakeRetriever(
+        {
+            "cold_start_explore": [_meme(101, "cold_start_explore_guarded")],
+            "text_light_lr_smoothed": [_meme(301, "text_light_lr_smoothed")],
+        }
+    )
+
+    result = await _pipeline(retriever).run(
+        _request(
+            nmemes_sent=1,
+            nsessions=1,
+            cold_start_candidate_guardrails_enabled=True,
+        )
+    )
+
+    assert _ids(result.selected) == [101]
+    assert retriever.calls[0]["engine"] == "cold_start_explore"
+    assert retriever.calls[0]["kwargs"] == {"candidate_guardrails_enabled": True}
+    assert result.diagnostics.cold_start_candidate_guardrails_enabled is True
+    assert result.diagnostics.cold_start_candidate_guardrails_applied is True
+
+
+@pytest.mark.asyncio
+async def test_cold_start_guardrails_keep_first_position_control_in_mixed_batch():
+    retriever = FakeRetriever(
+        {
+            "cold_start_explore": [
+                _meme(101, "cold_start_explore"),
+                _meme(102, "cold_start_explore_guarded"),
+            ]
+        }
+    )
+
+    result = await _pipeline(retriever).run(
+        _request(
+            nmemes_sent=0,
+            nsessions=1,
+            cold_start_candidate_guardrails_enabled=True,
+        )
+    )
+
+    assert _ids(result.selected) == [101, 102]
+    assert retriever.calls[0]["kwargs"] == {}
+    assert retriever.calls[1]["kwargs"] == {"candidate_guardrails_enabled": True}
+    assert result.diagnostics.cold_start_candidate_guardrails_applied is True
+
+
+@pytest.mark.asyncio
+async def test_cold_start_guardrails_preserve_existing_fallbacks():
+    retriever = FakeRetriever(
+        {
+            "cold_start_adapt": [],
+            "text_light_lr_smoothed": [_meme(301, "text_light_lr_smoothed")],
+            "best_uploaded_memes": [_meme(401, "best_uploaded_memes")],
+        }
+    )
+
+    result = await _pipeline(retriever).run(
+        _request(
+            nmemes_sent=8,
+            nsessions=1,
+            cold_start_candidate_guardrails_enabled=True,
+        )
+    )
+
+    assert _ids(result.selected) == [301]
+    assert [call["engine"] for call in retriever.calls] == [
+        "cold_start_adapt",
+        "text_light_lr_smoothed",
+    ]
+    assert retriever.calls[0]["kwargs"] == {"candidate_guardrails_enabled": True}
+    assert retriever.calls[1]["kwargs"] == {"min_sends": 10}
+    assert result.diagnostics.fallback_used == "text_light_lr_smoothed"
+
+
+@pytest.mark.asyncio
+async def test_cold_start_guardrails_do_not_apply_to_dormant_or_mature_users():
+    dormant_retriever = FakeRetriever(
+        {
+            "lr_smoothed": [_meme(101, "lr_smoothed")],
+            "recently_liked": [_meme(102, "recently_liked")],
+        }
+    )
+
+    dormant_result = await _pipeline(dormant_retriever).run(
+        _request(
+            nmemes_sent=8,
+            nsessions=3,
+            cold_start_nsessions_gate_enabled=True,
+            cold_start_candidate_guardrails_enabled=True,
+        )
+    )
+
+    assert _ids(dormant_result.selected) == [101, 102]
+    assert all(call["kwargs"] == {} for call in dormant_retriever.calls)
+    assert dormant_result.diagnostics.cold_start_candidate_guardrails_applied is False
+
+    mature_retriever = FakeRetriever(
+        {
+            "lr_smoothed": [_meme(201, "lr_smoothed")],
+            "recently_liked": [_meme(202, "recently_liked")],
+        }
+    )
+
+    mature_result = await _pipeline(mature_retriever).run(
+        _request(
+            nmemes_sent=50,
+            nsessions=5,
+            cold_start_candidate_guardrails_enabled=True,
+        )
+    )
+
+    assert _ids(mature_result.selected) == [201, 202]
+    assert all(call["kwargs"] == {} for call in mature_retriever.calls)
+    assert mature_result.diagnostics.cold_start_candidate_guardrails_applied is False
+
+
+@pytest.mark.asyncio
 async def test_blend_engine_failure_is_recorded_but_other_engines_continue():
     retriever = FakeRetriever(
         {

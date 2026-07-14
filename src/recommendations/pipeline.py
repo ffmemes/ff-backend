@@ -14,6 +14,8 @@ from sqlalchemy import text
 
 from src.config import settings
 from src.feed_turn.planner import (
+    COLD_START_1,
+    COLD_START_2,
     MATURE,
     CandidateSelectionPlan,
     low_sent_quota,
@@ -76,6 +78,7 @@ class RecommendationBatchRequest:
     meme_ids_in_queue: Sequence[int] = field(default_factory=tuple)
     random_seed: int | None = None
     cold_start_nsessions_gate_enabled: bool = False
+    cold_start_candidate_guardrails_enabled: bool = False
     text_light_blender_v1_enabled: bool = False
     source_diversity_enabled: bool = False
     shadow_scoring_enabled: bool = True
@@ -139,6 +142,8 @@ class RecommendationBatchDiagnostics:
     queue_len_before: int
     exclude_count: int
     cold_start_nsessions_gate_enabled: bool = False
+    cold_start_candidate_guardrails_enabled: bool = False
+    cold_start_candidate_guardrails_applied: bool = False
     diagnostics_sample_rate: float = 0.01
     maturity_stage: str | None = None
     duration_ms: int = 0
@@ -183,6 +188,12 @@ class RecommendationBatchDiagnostics:
             "account_age_days": self.account_age_days,
             "cold_start_account_too_old": self.cold_start_account_too_old,
             "cold_start_nsessions_gate_enabled": self.cold_start_nsessions_gate_enabled,
+            "cold_start_candidate_guardrails_enabled": (
+                self.cold_start_candidate_guardrails_enabled
+            ),
+            "cold_start_candidate_guardrails_applied": (
+                self.cold_start_candidate_guardrails_applied
+            ),
             "queue_len_before": self.queue_len_before,
             "exclude_count": self.exclude_count,
             "selected_count": self.selected_count,
@@ -295,6 +306,9 @@ class RecommendationBatchPipeline:
             queue_len_before=len(request.meme_ids_in_queue),
             exclude_count=len(request.meme_ids_in_queue),
             cold_start_nsessions_gate_enabled=request.cold_start_nsessions_gate_enabled,
+            cold_start_candidate_guardrails_enabled=(
+                request.cold_start_candidate_guardrails_enabled
+            ),
             diagnostics_sample_rate=request.diagnostics_sample_rate,
             source_diversity_enabled=request.source_diversity_enabled,
             shadow_scoring_enabled=request.shadow_scoring_enabled,
@@ -405,12 +419,13 @@ class RecommendationBatchPipeline:
         diagnostics.maturity_stage = plan.maturity_stage
 
         if plan.primary_engine:
-            candidates = await self._fetch_engine(
+            candidates = await self._fetch_primary_engine(
                 plan.primary_engine,
-                request.user_id,
+                request,
+                plan,
+                diagnostics,
                 limit,
                 exclude_ids,
-                diagnostics,
             )
             if candidates:
                 return candidates
@@ -440,6 +455,90 @@ class RecommendationBatchPipeline:
             return blended
 
         return await self._run_fallbacks(plan, request, limit, exclude_ids, diagnostics)
+
+    async def _fetch_primary_engine(
+        self,
+        engine: str,
+        request: RecommendationBatchRequest,
+        plan: CandidateSelectionPlan,
+        diagnostics: RecommendationBatchDiagnostics,
+        limit: int,
+        exclude_ids: list[int],
+    ) -> list[Candidate]:
+        selected: list[Candidate] = []
+        segment_exclude_ids = list(exclude_ids)
+        segments = self._primary_engine_fetch_segments(engine, request, plan, limit, diagnostics)
+
+        for segment_limit, kwargs in segments:
+            if segment_limit <= 0:
+                continue
+
+            candidates = await self._fetch_engine(
+                engine,
+                request.user_id,
+                segment_limit,
+                segment_exclude_ids,
+                diagnostics,
+                **kwargs,
+            )
+            excluded = set(segment_exclude_ids)
+            candidates = [
+                candidate for candidate in candidates if candidate.get("id") not in excluded
+            ]
+            if candidates:
+                selected.extend(candidates)
+                segment_exclude_ids.extend(_candidate_ids(candidates))
+                continue
+
+            if kwargs.get("candidate_guardrails_enabled"):
+                fallback_limit = max(0, limit - len(selected))
+                if fallback_limit > 0:
+                    selected.extend(
+                        await self._run_fallbacks(
+                            plan,
+                            request,
+                            fallback_limit,
+                            segment_exclude_ids,
+                            diagnostics,
+                        )
+                    )
+                return selected
+
+        return selected
+
+    def _primary_engine_fetch_segments(
+        self,
+        engine: str,
+        request: RecommendationBatchRequest,
+        plan: CandidateSelectionPlan,
+        limit: int,
+        diagnostics: RecommendationBatchDiagnostics,
+    ) -> list[tuple[int, dict[str, Any]]]:
+        default_segments = [(limit, {})]
+        if engine not in {"cold_start_explore", "cold_start_adapt"}:
+            return default_segments
+        if not request.cold_start_candidate_guardrails_enabled:
+            return default_segments
+        if plan.maturity_stage not in {COLD_START_1, COLD_START_2}:
+            return default_segments
+        if (request.nsessions or 0) > 1 or request.cold_start_account_too_old:
+            return default_segments
+
+        first_position = request.nmemes_sent + 1
+        last_position = request.nmemes_sent + limit
+        guarded_start = max(first_position, 2)
+        guarded_end = min(last_position, 10)
+        if guarded_start > guarded_end:
+            return default_segments
+
+        diagnostics.cold_start_candidate_guardrails_applied = True
+        segments: list[tuple[int, dict[str, Any]]] = []
+        if guarded_start > first_position:
+            segments.append((guarded_start - first_position, {}))
+        segments.append((guarded_end - guarded_start + 1, {"candidate_guardrails_enabled": True}))
+        if last_position > guarded_end:
+            segments.append((last_position - guarded_end, {}))
+        return segments
 
     async def _blend_weights(
         self,

@@ -40,7 +40,12 @@ true_new_users AS (
         sent_at AS first_send_at
     FROM first_sends
     WHERE sent_at >= NOW() - (:lookback_days * INTERVAL '1 day')
-      AND recommended_by IN ('cold_start_explore', 'cold_start_adapt')
+      AND recommended_by IN (
+        'cold_start_explore',
+        'cold_start_adapt',
+        'cold_start_explore_guarded',
+        'cold_start_adapt_guarded'
+      )
 ),
 
 candidate_sends AS (

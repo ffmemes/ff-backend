@@ -16,6 +16,16 @@ GOAT_MIN_LR = 0.20  # lr_smoothed — minimum proven like rate
 GOAT_MIN_AGE_DAYS = 3  # days since created_at — must have aged enough to accumulate reactions
 GOAT_RECENTLY_SENT_WINDOW_DAYS = 30
 TEXT_LIGHT_MAX_OCR_WORDS = 30
+COLD_START_GUARDRAIL_SOURCE_URLS = (
+    "https://vk.com/dfzwe4",
+    "https://vk.com/eternalclassic",
+    "https://t.me/ukrmemesmineproblemes",
+    "https://t.me/hindi_jokes_desi_memes",
+)
+COLD_START_EXPLORE_RECOMMENDED_BY = "cold_start_explore"
+COLD_START_ADAPT_RECOMMENDED_BY = "cold_start_adapt"
+COLD_START_EXPLORE_GUARDED_RECOMMENDED_BY = "cold_start_explore_guarded"
+COLD_START_ADAPT_GUARDED_RECOMMENDED_BY = "cold_start_adapt_guarded"
 
 _OCR_TEXT_SQL = "trim(coalesce(M.ocr_result->>'text', M.ocr_result->'raw_result'->>'ocr_text', ''))"
 TEXT_LIGHT_OCR_FILTER_SQL = f"""
@@ -25,6 +35,9 @@ TEXT_LIGHT_OCR_FILTER_SQL = f"""
                     ELSE cardinality(regexp_split_to_array({_OCR_TEXT_SQL}, '[[:space:]]+'))
                 END
             ) <= :text_light_max_ocr_words
+"""
+COLD_START_GUARDRAIL_SOURCE_FILTER_SQL = """
+            AND NOT (S.url = ANY(:cold_start_guardrail_source_urls))
 """
 
 
@@ -38,6 +51,38 @@ def _build_params(
     params: dict[str, Any] = {"user_id": user_id, "limit": limit, **extra}
     if exclude_meme_ids:
         params["exclude_meme_ids"] = exclude_meme_ids
+    return params
+
+
+def _cold_start_recommended_by(engine: str, candidate_guardrails_enabled: bool) -> str:
+    if engine == COLD_START_EXPLORE_RECOMMENDED_BY and candidate_guardrails_enabled:
+        return COLD_START_EXPLORE_GUARDED_RECOMMENDED_BY
+    if engine == COLD_START_ADAPT_RECOMMENDED_BY and candidate_guardrails_enabled:
+        return COLD_START_ADAPT_GUARDED_RECOMMENDED_BY
+    return engine
+
+
+def _cold_start_guardrail_source_filter(candidate_guardrails_enabled: bool) -> str:
+    return COLD_START_GUARDRAIL_SOURCE_FILTER_SQL if candidate_guardrails_enabled else ""
+
+
+def _cold_start_params(
+    user_id: int,
+    limit: int,
+    exclude_meme_ids: list[int],
+    *,
+    engine: str,
+    candidate_guardrails_enabled: bool,
+) -> dict[str, Any]:
+    params = _build_params(
+        user_id,
+        limit,
+        exclude_meme_ids,
+        recommended_by=_cold_start_recommended_by(engine, candidate_guardrails_enabled),
+        text_light_max_ocr_words=TEXT_LIGHT_MAX_OCR_WORDS,
+    )
+    if candidate_guardrails_enabled:
+        params["cold_start_guardrail_source_urls"] = list(COLD_START_GUARDRAIL_SOURCE_URLS)
     return params
 
 
@@ -413,6 +458,7 @@ async def cold_start_explore(
     user_id: int,
     limit: int = 5,
     exclude_meme_ids: list[int] = [],
+    candidate_guardrails_enabled: bool = False,
 ):
     """Phase 1 cold start: quality-first selection for new user first impression.
 
@@ -436,12 +482,14 @@ async def cold_start_explore(
         SELECT
             M.id
             , M.type, M.telegram_file_id, M.caption
-            , 'cold_start_explore' AS recommended_by
+            , :recommended_by AS recommended_by
             , COALESCE(MS.nlikes, 0) AS nlikes
 
         FROM meme M
         INNER JOIN meme_stats MS
             ON MS.meme_id = M.id
+        INNER JOIN meme_source S
+            ON S.id = M.meme_source_id
         INNER JOIN user_language L
             ON L.language_code = M.language_code
             AND L.user_id = :user_id
@@ -455,6 +503,7 @@ async def cold_start_explore(
             AND (MS.nlikes + MS.ndislikes) >= 20
             AND MS.lr_smoothed >= 0.10
             {TEXT_LIGHT_OCR_FILTER_SQL}
+            {_cold_start_guardrail_source_filter(candidate_guardrails_enabled)}
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
 
         ORDER BY (MS.nlikes::float / NULLIF(MS.nlikes + MS.ndislikes, 0)) DESC,
@@ -463,11 +512,12 @@ async def cold_start_explore(
     """
     return await fetch_all(
         text(query),
-        _build_params(
+        _cold_start_params(
             user_id,
             limit,
             exclude_meme_ids,
-            text_light_max_ocr_words=TEXT_LIGHT_MAX_OCR_WORDS,
+            engine=COLD_START_EXPLORE_RECOMMENDED_BY,
+            candidate_guardrails_enabled=candidate_guardrails_enabled,
         ),
     )
 
@@ -476,6 +526,7 @@ async def cold_start_adapt(
     user_id: int,
     limit: int = 15,
     exclude_meme_ids: list[int] = [],
+    candidate_guardrails_enabled: bool = False,
 ):
     """Phase 2 cold start: adapt to user's reactions in real-time.
 
@@ -506,12 +557,14 @@ async def cold_start_adapt(
         SELECT
             M.id
             , M.type, M.telegram_file_id, M.caption
-            , 'cold_start_adapt' AS recommended_by
+            , :recommended_by AS recommended_by
             , COALESCE(MS.nlikes, 0) AS nlikes
 
         FROM meme M
         INNER JOIN meme_stats MS
             ON MS.meme_id = M.id
+        INNER JOIN meme_source S
+            ON S.id = M.meme_source_id
 
         INNER JOIN user_language L
             ON L.language_code = M.language_code
@@ -530,6 +583,7 @@ async def cold_start_adapt(
             AND MS.nlikes > 1
             AND MS.nmemes_sent >= 10
             {TEXT_LIGHT_OCR_FILTER_SQL}
+            {_cold_start_guardrail_source_filter(candidate_guardrails_enabled)}
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
 
         ORDER BY -1
@@ -539,11 +593,12 @@ async def cold_start_adapt(
     """
     return await fetch_all(
         text(query),
-        _build_params(
+        _cold_start_params(
             user_id,
             limit,
             exclude_meme_ids,
-            text_light_max_ocr_words=TEXT_LIGHT_MAX_OCR_WORDS,
+            engine=COLD_START_ADAPT_RECOMMENDED_BY,
+            candidate_guardrails_enabled=candidate_guardrails_enabled,
         ),
     )
 

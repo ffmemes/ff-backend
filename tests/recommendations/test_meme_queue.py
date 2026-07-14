@@ -908,7 +908,6 @@ async def test_gate_on_first_session_routes_to_cold_start_explore():
         candidates = await generate_recommendations(
             TEST_USER_ID, 10, nmemes_sent=0, retriever=retriever
         )
-    assert len(candidates) == 1
     assert candidates[0]["recommended_by"] == "cold_start_explore"
 
 
