@@ -581,6 +581,8 @@ class RecommendationBatchPipeline:
         diagnostics: RecommendationBatchDiagnostics,
     ) -> list[Candidate]:
         for fallback in plan.fallback_engines:
+            if not self._retriever_supports_engine(fallback.engine):
+                continue
             candidates = await self._fetch_engine(
                 fallback.engine,
                 request.user_id,
@@ -593,6 +595,12 @@ class RecommendationBatchPipeline:
                 diagnostics.fallback_used = fallback.engine
                 return candidates
         return []
+
+    def _retriever_supports_engine(self, engine: str) -> bool:
+        engine_map = getattr(self.retriever, "engine_map", None)
+        if engine_map is None:
+            return True
+        return engine in engine_map
 
     async def _fetch_candidates_dict(
         self,

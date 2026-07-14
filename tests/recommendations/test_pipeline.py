@@ -276,6 +276,34 @@ async def test_cold_start_guardrails_preserve_existing_fallbacks():
 
 
 @pytest.mark.asyncio
+async def test_cold_start_guardrails_skip_unsupported_injected_fallback_engines():
+    class LimitedFallbackRetriever(FakeRetriever):
+        engine_map = {"cold_start_adapt": object(), "best_uploaded_memes": object()}
+
+    retriever = LimitedFallbackRetriever(
+        {
+            "cold_start_adapt": [],
+            "best_uploaded_memes": [_meme(401, "best_uploaded_memes")],
+        }
+    )
+
+    result = await _pipeline(retriever).run(
+        _request(
+            nmemes_sent=8,
+            nsessions=1,
+            cold_start_candidate_guardrails_enabled=True,
+        )
+    )
+
+    assert _ids(result.selected) == [401]
+    assert [call["engine"] for call in retriever.calls] == [
+        "cold_start_adapt",
+        "best_uploaded_memes",
+    ]
+    assert result.diagnostics.fallback_used == "best_uploaded_memes"
+
+
+@pytest.mark.asyncio
 async def test_cold_start_guardrails_use_queued_items_for_true_new_positions():
     retriever = FakeRetriever(
         {
