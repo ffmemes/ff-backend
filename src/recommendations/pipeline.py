@@ -467,7 +467,14 @@ class RecommendationBatchPipeline:
     ) -> list[Candidate]:
         selected: list[Candidate] = []
         segment_exclude_ids = list(exclude_ids)
-        segments = self._primary_engine_fetch_segments(engine, request, plan, limit, diagnostics)
+        segments = self._primary_engine_fetch_segments(
+            engine,
+            request,
+            plan,
+            limit,
+            diagnostics,
+            queued_or_selected_ahead=len(exclude_ids),
+        )
 
         for segment_limit, kwargs in segments:
             if segment_limit <= 0:
@@ -488,7 +495,11 @@ class RecommendationBatchPipeline:
             if candidates:
                 selected.extend(candidates)
                 segment_exclude_ids.extend(_candidate_ids(candidates))
-                continue
+                if (
+                    not kwargs.get("candidate_guardrails_enabled")
+                    or len(candidates) >= segment_limit
+                ):
+                    continue
 
             if kwargs.get("candidate_guardrails_enabled"):
                 fallback_limit = max(0, limit - len(selected))
@@ -513,6 +524,8 @@ class RecommendationBatchPipeline:
         plan: CandidateSelectionPlan,
         limit: int,
         diagnostics: RecommendationBatchDiagnostics,
+        *,
+        queued_or_selected_ahead: int,
     ) -> list[tuple[int, dict[str, Any]]]:
         default_segments = [(limit, {})]
         if engine not in {"cold_start_explore", "cold_start_adapt"}:
@@ -524,8 +537,8 @@ class RecommendationBatchPipeline:
         if (request.nsessions or 0) > 1 or request.cold_start_account_too_old:
             return default_segments
 
-        first_position = request.nmemes_sent + 1
-        last_position = request.nmemes_sent + limit
+        first_position = request.nmemes_sent + queued_or_selected_ahead + 1
+        last_position = request.nmemes_sent + queued_or_selected_ahead + limit
         guarded_start = max(first_position, 2)
         guarded_end = min(last_position, 10)
         if guarded_start > guarded_end:

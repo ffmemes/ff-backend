@@ -208,6 +208,7 @@ async def test_cold_start_guardrails_apply_to_true_new_positions_2_to_10():
 
     result = await _pipeline(retriever).run(
         _request(
+            limit=1,
             nmemes_sent=1,
             nsessions=1,
             cold_start_candidate_guardrails_enabled=True,
@@ -271,6 +272,71 @@ async def test_cold_start_guardrails_preserve_existing_fallbacks():
     ]
     assert retriever.calls[0]["kwargs"] == {"candidate_guardrails_enabled": True}
     assert retriever.calls[1]["kwargs"] == {"min_sends": 10}
+    assert result.diagnostics.fallback_used == "text_light_lr_smoothed"
+
+
+@pytest.mark.asyncio
+async def test_cold_start_guardrails_use_queued_items_for_true_new_positions():
+    retriever = FakeRetriever(
+        {
+            "cold_start_adapt": [
+                _meme(101, "cold_start_adapt"),
+                _meme(102, "cold_start_adapt"),
+            ]
+        }
+    )
+
+    result = await _pipeline(retriever).run(
+        _request(
+            nmemes_sent=7,
+            nsessions=1,
+            meme_ids_in_queue=list(range(901, 909)),
+            cold_start_candidate_guardrails_enabled=True,
+        )
+    )
+
+    assert _ids(result.selected) == [101, 102]
+    assert [call["engine"] for call in retriever.calls] == ["cold_start_adapt"]
+    assert retriever.calls[0]["kwargs"] == {}
+    assert result.diagnostics.cold_start_candidate_guardrails_applied is False
+
+
+@pytest.mark.asyncio
+async def test_partial_cold_start_guarded_segment_falls_back_before_unguarded_tail():
+    retriever = FakeRetriever(
+        {
+            "cold_start_explore": [
+                _meme(101, "cold_start_explore"),
+                _meme(102, "cold_start_explore_guarded"),
+                _meme(103, "cold_start_explore_guarded"),
+                _meme(104, "cold_start_explore_guarded"),
+                _meme(105, "cold_start_explore_guarded"),
+            ],
+            "text_light_lr_smoothed": [
+                _meme(301, "text_light_lr_smoothed"),
+                _meme(302, "text_light_lr_smoothed"),
+            ],
+        }
+    )
+
+    result = await _pipeline(retriever).run(
+        _request(
+            limit=12,
+            nmemes_sent=0,
+            nsessions=1,
+            cold_start_candidate_guardrails_enabled=True,
+        )
+    )
+
+    assert _ids(result.selected) == [101, 102, 103, 104, 105, 301, 302]
+    assert [call["engine"] for call in retriever.calls] == [
+        "cold_start_explore",
+        "cold_start_explore",
+        "text_light_lr_smoothed",
+    ]
+    assert retriever.calls[0]["kwargs"] == {}
+    assert retriever.calls[1]["kwargs"] == {"candidate_guardrails_enabled": True}
+    assert retriever.calls[2]["kwargs"] == {"min_sends": 10}
     assert result.diagnostics.fallback_used == "text_light_lr_smoothed"
 
 
