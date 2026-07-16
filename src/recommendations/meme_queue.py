@@ -33,6 +33,12 @@ COLD_START_RECOMMENDED_BY = frozenset(
         "cold_start_adapt_guarded",
     }
 )
+COLD_START_GUARDED_RECOMMENDED_BY = frozenset(
+    {
+        "cold_start_explore_guarded",
+        "cold_start_adapt_guarded",
+    }
+)
 
 
 async def get_next_meme_for_user(user_id: int) -> MemeData | None:
@@ -77,6 +83,17 @@ async def _queued_meme_is_sendable(
     meme_id: int,
     recommended_by: str | None = None,
 ) -> bool:
+    if (
+        _is_cold_start_guarded_engine(recommended_by)
+        and not settings.COLD_START_CANDIDATE_GUARDRAILS_ENABLED
+    ):
+        logging.info(
+            "discarding guarded cold_start queued meme after rollback for user_id=%s meme_id=%s",
+            user_id,
+            meme_id,
+        )
+        return False
+
     row = await fetch_one(
         text(
             """
@@ -113,6 +130,10 @@ async def _queued_meme_is_sendable(
 
 def _is_cold_start_engine(recommended_by: str | None) -> bool:
     return recommended_by in COLD_START_RECOMMENDED_BY
+
+
+def _is_cold_start_guarded_engine(recommended_by: str | None) -> bool:
+    return recommended_by in COLD_START_GUARDED_RECOMMENDED_BY
 
 
 def _cold_start_allowed_by_realtime_state(state: dict[str, Any] | None) -> bool:

@@ -249,6 +249,54 @@ async def test_get_next_meme_for_user_discards_cold_start_payload_when_realtime_
 
 
 @pytest.mark.asyncio
+async def test_get_next_meme_for_user_discards_guarded_payload_after_flag_rollback():
+    queued_payloads = [
+        {
+            "id": 101,
+            "type": "image",
+            "telegram_file_id": "guarded-cold-start-file-id",
+            "caption": None,
+            "recommended_by": "cold_start_explore_guarded",
+        },
+        {
+            "id": 102,
+            "type": "image",
+            "telegram_file_id": "control-file-id",
+            "caption": None,
+            "recommended_by": "lr_smoothed",
+        },
+    ]
+
+    async def pop_queue(_queue_key):
+        return queued_payloads.pop(0) if queued_payloads else None
+
+    with (
+        patch("src.recommendations.meme_queue.settings") as settings,
+        patch(
+            "src.recommendations.meme_queue.redis.pop_meme_from_queue_by_key",
+            new_callable=AsyncMock,
+            side_effect=pop_queue,
+        ),
+        patch(
+            "src.recommendations.meme_queue.fetch_one",
+            new_callable=AsyncMock,
+            return_value={"id": 102},
+        ) as fetch_one,
+        patch(
+            "src.recommendations.meme_queue._get_realtime_cold_start_routing_state",
+            new_callable=AsyncMock,
+        ) as realtime_state,
+    ):
+        settings.COLD_START_CANDIDATE_GUARDRAILS_ENABLED = False
+        meme = await get_next_meme_for_user(TEST_USER_ID)
+
+    assert meme is not None
+    assert meme.id == 102
+    fetch_one.assert_awaited_once()
+    realtime_state.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_cold_start_phase1_uses_explore():
     """Phase 1 (<6 memes): uses cold_start_explore engine"""
 
