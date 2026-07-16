@@ -55,6 +55,9 @@ class Config(BaseSettings):
     # users (nsessions <= 1). Dormant returners with nmemes_sent < 30 but
     # multiple sessions fall through to the growing-user blender instead.
     COLD_START_NSESSIONS_GATE_ENABLED: bool = True
+    # FFM-1882: narrow true-new cold-start positions 2-10 experiment.
+    # Roll back by setting this to false in production env.
+    COLD_START_CANDIDATE_GUARDRAILS_ENABLED: bool = True
 
     # Recommendation batch diagnostics are realtime operational data, not
     # durable product facts. Keep compact logs/spans always on and sample full
