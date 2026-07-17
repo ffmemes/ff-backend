@@ -56,10 +56,15 @@ def test_review_keyboard_separates_approve_and_rejection_reasons():
     assert len(keyboard) == 2
     assert [button.text for button in keyboard[0]] == ["✅ Всё ок"]
     assert [button.callback_data for button in keyboard[0]] == ["upload:42:review:approve"]
-    assert [button.text for button in keyboard[1]] == ["❌ Не смешно", "🌐 Не тот язык"]
+    assert [button.text for button in keyboard[1]] == [
+        "❌ Не смешно",
+        "🌐 Не тот язык",
+        "🔁 Баян",
+    ]
     assert [button.callback_data for button in keyboard[1]] == [
         "upload:42:review:reject_not_funny",
         "upload:42:review:reject_wrong_language",
+        "upload:42:review:reject_duplicate",
     ]
 
 
@@ -70,6 +75,8 @@ def test_rejection_reason_messages_are_localized_in_english_and_russian():
         "upload.rejected_wrong_language", "en"
     )
     assert "выбран не тот язык" in moderation.localizer.t("upload.rejected_wrong_language", "ru")
+    assert "already in our collection" in moderation.localizer.t("upload.rejected_duplicate", "en")
+    assert "уже есть в нашей коллекции" in moderation.localizer.t("upload.rejected_duplicate", "ru")
 
 
 @pytest.mark.asyncio
@@ -126,6 +133,44 @@ async def test_upload_review_chat_member_can_reject_without_moderator_user_type(
     notify.assert_awaited_once()
     assert "выбран не тот язык" in notify.await_args.args[2]
     get_user_info.assert_awaited_once_with(7)
+
+
+@pytest.mark.asyncio
+async def test_upload_review_duplicate_reason_notifies_uploader(monkeypatch):
+    monkeypatch.setattr(moderation.settings, "UPLOADED_MEMES_REVIEW_CHAT_ID", "-100")
+    update, message, query = _update(
+        user_id=8,
+        data="upload:42:review:reject_duplicate",
+    )
+    context = SimpleNamespace(bot=AsyncMock())
+
+    with (
+        patch.object(
+            moderation,
+            "get_meme_raw_upload_by_id",
+            new=AsyncMock(return_value={"id": 42, "user_id": 7, "message_id": 100}),
+        ),
+        patch.object(
+            moderation,
+            "update_meme_by_upload_id",
+            new=AsyncMock(return_value={"id": 99}),
+        ) as update_meme,
+        patch.object(moderation, "pay_if_not_paid_with_alert", new=AsyncMock()),
+        patch.object(moderation, "_notify_uploader", new=AsyncMock()) as notify,
+        patch.object(
+            moderation,
+            "get_user_info",
+            new=AsyncMock(return_value={"interface_lang": "ru"}),
+        ),
+    ):
+        await moderation.handle_uploaded_meme_review_button(update, context)
+
+    query.answer.assert_awaited_once_with()
+    update_meme.assert_awaited_once_with(42, status=moderation.MemeStatus.REJECTED)
+    message.edit_caption.assert_awaited_once()
+    assert "Баян" in message.edit_caption.await_args.kwargs["caption"]
+    notify.assert_awaited_once()
+    assert "уже есть в нашей коллекции" in notify.await_args.args[2]
 
 
 @pytest.mark.asyncio
