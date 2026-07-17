@@ -47,13 +47,16 @@ UPLOADED_MEME_REVIEW_CALLBACK_DATA_REGEXP = r"upload:(\d+):review:([a-z_]+)"
 UPLOADED_MEME_REVIEW_APPROVE_ACTION = "approve"
 UPLOADED_MEME_REVIEW_REJECT_NOT_FUNNY_ACTION = "reject_not_funny"
 UPLOADED_MEME_REVIEW_REJECT_WRONG_LANGUAGE_ACTION = "reject_wrong_language"
+UPLOADED_MEME_REVIEW_REJECT_DUPLICATE_ACTION = "reject_duplicate"
 UPLOADED_MEME_REVIEW_REJECTION_LOCALIZATION_KEYS = {
     UPLOADED_MEME_REVIEW_REJECT_NOT_FUNNY_ACTION: "upload.rejected_not_funny",
     UPLOADED_MEME_REVIEW_REJECT_WRONG_LANGUAGE_ACTION: "upload.rejected_wrong_language",
+    UPLOADED_MEME_REVIEW_REJECT_DUPLICATE_ACTION: "upload.rejected_duplicate",
 }
 UPLOADED_MEME_REVIEW_REJECTION_CAPTION_REASONS = {
     UPLOADED_MEME_REVIEW_REJECT_NOT_FUNNY_ACTION: "Не смешно",
     UPLOADED_MEME_REVIEW_REJECT_WRONG_LANGUAGE_ACTION: "Не тот язык",
+    UPLOADED_MEME_REVIEW_REJECT_DUPLICATE_ACTION: "Баян",
 }
 
 LEADERBOARD_URL = (
@@ -350,6 +353,13 @@ def review_keyboard(upload_id: int) -> InlineKeyboardMarkup:
                     callback_data=UPLOADED_MEME_REIVIEW_CALLBACK_DATA_PATTERN.format(
                         upload_id=upload_id,
                         action=UPLOADED_MEME_REVIEW_REJECT_WRONG_LANGUAGE_ACTION,
+                    ),
+                ),
+                InlineKeyboardButton(
+                    text="🔁 Баян",
+                    callback_data=UPLOADED_MEME_REIVIEW_CALLBACK_DATA_PATTERN.format(
+                        upload_id=upload_id,
+                        action=UPLOADED_MEME_REVIEW_REJECT_DUPLICATE_ACTION,
                     ),
                 ),
             ],
