@@ -16,6 +16,16 @@ skills:
   ref: "main"
   update_method: "paperclip_skill_sync"  # POST /api/agents/<id>/skills/sync (per-agent)
 
+projects:
+  operations:
+    executionWorkspacePolicy:
+      enabled: true
+      defaultMode: "shared_workspace"
+      allowIssueOverride: true
+      defaultProjectWorkspaceName: "repo"
+      workspaceStrategy:
+        type: "project_primary"
+
 agents:
   analyst:
     role: "researcher"
