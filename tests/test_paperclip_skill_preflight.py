@@ -343,6 +343,65 @@ def test_skill_preflight_only_fails_when_catalog_validation_skipped(
     assert "skill catalog validation skipped" in captured.err
 
 
+def test_project_policy_resolves_workspace_name(sync_module) -> None:
+    project = {
+        "urlKey": "operations",
+        "workspaces": [
+            {"id": "workspace-id", "name": "repo"},
+        ],
+    }
+    spec = {
+        "executionWorkspacePolicy": {
+            "enabled": True,
+            "defaultMode": "shared_workspace",
+            "allowIssueOverride": True,
+            "defaultProjectWorkspaceName": "repo",
+            "workspaceStrategy": {"type": "project_primary"},
+        }
+    }
+
+    assert sync_module.target_project_policy(project, spec) == {
+        "enabled": True,
+        "defaultMode": "shared_workspace",
+        "allowIssueOverride": True,
+        "defaultProjectWorkspaceId": "workspace-id",
+        "workspaceStrategy": {"type": "project_primary"},
+    }
+
+
+def test_project_policy_dry_run_reports_drift(
+    sync_module, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    def fake_api(method, path, body=None):
+        assert method == "GET"
+        assert path.endswith("/projects")
+        return [
+            {
+                "id": "project-id",
+                "name": "Operations",
+                "urlKey": "operations",
+                "executionWorkspacePolicy": None,
+                "workspaces": [{"id": "workspace-id", "name": "repo"}],
+            }
+        ]
+
+    manifest = {
+        "projects": {
+            "operations": {
+                "executionWorkspacePolicy": {
+                    "enabled": True,
+                    "defaultMode": "shared_workspace",
+                    "defaultProjectWorkspaceName": "repo",
+                }
+            }
+        }
+    }
+    monkeypatch.setattr(sync_module, "api", fake_api)
+
+    assert sync_module.sync_project_execution_policies(manifest) == (1, 0, 0)
+    assert "WOULD PATCH project operations" in capsys.readouterr().out
+
+
 def test_deploy_skill_preflight_propagates_config_sync_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -375,6 +375,95 @@ def routine_patch_payload(routine: dict, description: str) -> dict:
     return payload
 
 
+def normalize_project_policy(policy: dict | None) -> dict | None:
+    if policy is None:
+        return None
+    return {key: value for key, value in sorted(policy.items())}
+
+
+def resolve_project_workspace_id(project: dict, workspace_name: str) -> str:
+    matches = [
+        workspace
+        for workspace in project.get("workspaces") or []
+        if workspace.get("name") == workspace_name
+        or workspace.get("id") == workspace_name
+        or workspace.get("sharedWorkspaceKey") == workspace_name
+    ]
+    if len(matches) != 1:
+        raise ConfigError(
+            f"project {project.get('urlKey') or project.get('name')}: expected 1 "
+            f"workspace named {workspace_name!r}, found {len(matches)}"
+        )
+    workspace_id = matches[0].get("id")
+    if not workspace_id:
+        raise ConfigError(
+            f"project {project.get('urlKey') or project.get('name')}: "
+            f"workspace {workspace_name!r} has no id"
+        )
+    return workspace_id
+
+
+def target_project_policy(project: dict, spec: dict) -> dict:
+    policy = dict(spec.get("executionWorkspacePolicy") or {})
+    workspace_name = policy.pop("defaultProjectWorkspaceName", None)
+    if workspace_name:
+        policy["defaultProjectWorkspaceId"] = resolve_project_workspace_id(project, workspace_name)
+    return policy
+
+
+def sync_project_execution_policies(manifest: dict) -> tuple[int, int, int]:
+    project_specs = manifest.get("projects") or {}
+    if not project_specs:
+        return 0, 0, 0
+
+    projects = api("GET", f"/api/companies/{COMPANY}/projects")
+    if not isinstance(projects, list):
+        raise ConfigError("unexpected projects response")
+
+    by_key: dict[str, dict] = {}
+    for project in projects:
+        for key in (project.get("urlKey"), project.get("name"), project.get("id")):
+            if key:
+                by_key[str(key)] = project
+
+    patched = 0
+    skipped = 0
+    failed = 0
+    for key, spec in project_specs.items():
+        project = by_key.get(str(key))
+        if not project:
+            print(f"  ERROR project {key}: not found", file=sys.stderr)
+            failed += 1
+            continue
+        try:
+            target = target_project_policy(project, spec or {})
+        except ConfigError as exc:
+            print(f"  ERROR project {key}: {exc}", file=sys.stderr)
+            failed += 1
+            continue
+
+        current = project.get("executionWorkspacePolicy")
+        if normalize_project_policy(current) == normalize_project_policy(target):
+            print(f"  skip project {key} execution workspace policy (no drift)")
+            skipped += 1
+            continue
+
+        if DRY:
+            print(f"  WOULD PATCH project {key}: executionWorkspacePolicy: {current} -> {target}")
+            patched += 1
+            continue
+
+        try:
+            api("PATCH", f"/api/projects/{project['id']}", {"executionWorkspacePolicy": target})
+        except Exception as exc:
+            print(f"  ERROR PATCH project {key}: {exc}", file=sys.stderr)
+            failed += 1
+            continue
+        print(f"  PATCHED project {key}: executionWorkspacePolicy")
+        patched += 1
+    return patched, skipped, failed
+
+
 def sync_routine_descriptions(by_slug: dict[str, dict]) -> tuple[int, int, int]:
     specs = load_routine_description_specs()
     if not specs:
@@ -485,6 +574,15 @@ def main() -> int:
 
     if SKILL_PREFLIGHT_ONLY:
         return 0
+
+    print("\nSyncing project execution workspace policies...")
+    try:
+        project_patched, project_skipped, project_failed = sync_project_execution_policies(manifest)
+    except (ConfigError, urllib.error.HTTPError, urllib.error.URLError) as exc:
+        print(f"  ERROR project sync aborted: {exc}", file=sys.stderr)
+        project_patched = 0
+        project_skipped = 0
+        project_failed = 1
 
     try:
         secret_ids = load_secret_ids()
@@ -645,15 +743,24 @@ def main() -> int:
     if DRY:
         print(f"\nConfig sync (dry-run): would patch {would_patch}, skip {skipped} (no drift).")
         print(
+            f"Project sync (dry-run): would patch {project_patched}, "
+            f"skip {project_skipped}, failed={project_failed}."
+        )
+        print(
             f"Routine sync (dry-run): would patch {routine_patched}, "
             f"skip {routine_skipped}, failed={routine_failed}."
         )
     else:
         print(f"\nConfig sync: patched={patched}, skipped={skipped}, failed={failed}.")
         print(
+            f"Project sync: patched={project_patched}, "
+            f"skipped={project_skipped}, failed={project_failed}."
+        )
+        print(
             f"Routine sync: patched={routine_patched}, "
             f"skipped={routine_skipped}, failed={routine_failed}."
         )
+    failed += project_failed
     failed += routine_failed
     return 1 if failed > 0 else 0
 
