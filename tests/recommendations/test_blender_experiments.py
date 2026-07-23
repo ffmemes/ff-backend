@@ -6,6 +6,7 @@ from src.recommendations.blender_experiments import (
     MATURE_BLENDER_CONTROL_WEIGHTS,
     MATURE_BLENDER_TREATMENT_WEIGHTS,
     RECENTLY_LIKED_BLENDER_V2_CONTROL,
+    RECENTLY_LIKED_BLENDER_V2_ENROLLMENT_FROZEN_AT,
     RECENTLY_LIKED_BLENDER_V2_EXCLUDED,
     RECENTLY_LIKED_BLENDER_V2_EXPERIMENT_ID,
     RECENTLY_LIKED_BLENDER_V2_SAMPLE_GATE_PER_VARIANT,
@@ -177,12 +178,47 @@ async def test_existing_recently_liked_blender_v2_assignment_wins():
 
 
 @pytest.mark.asyncio
+async def test_frozen_recently_liked_blender_v2_does_not_assign_new_user():
+    with (
+        patch(
+            "src.recommendations.blender_experiments.get_experiment_assignment",
+            new_callable=AsyncMock,
+            return_value=None,
+        ) as get_assignment,
+        patch(
+            "src.recommendations.blender_experiments.get_recent_7d_lr_assignment_metrics",
+            new_callable=AsyncMock,
+        ) as get_metrics,
+        patch(
+            "src.recommendations.blender_experiments.assign_experiment",
+            new_callable=AsyncMock,
+        ) as assign,
+        patch(
+            "src.recommendations.blender_experiments.get_experiment_variant",
+            new_callable=AsyncMock,
+        ) as get_variant,
+    ):
+        variant = await get_or_assign_recently_liked_blender_v2_variant(202)
+
+    assert variant == RECENTLY_LIKED_BLENDER_V2_CONTROL
+    assert RECENTLY_LIKED_BLENDER_V2_ENROLLMENT_FROZEN_AT == "2026-07-23T18:05:54Z"
+    get_assignment.assert_awaited_once_with(202, RECENTLY_LIKED_BLENDER_V2_EXPERIMENT_ID)
+    get_metrics.assert_not_awaited()
+    assign.assert_not_awaited()
+    get_variant.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_recently_liked_blender_v2_race_rereads_winning_assignment():
     with (
         patch(
             "src.recommendations.blender_experiments.get_experiment_assignment",
             new_callable=AsyncMock,
             return_value=None,
+        ),
+        patch(
+            "src.recommendations.blender_experiments.RECENTLY_LIKED_BLENDER_V2_ENROLLMENT_FROZEN",
+            False,
         ),
         patch(
             "src.recommendations.blender_experiments.get_recent_7d_lr_assignment_metrics",
@@ -217,6 +253,10 @@ async def test_recently_liked_blender_v2_defers_assignment_without_real_boundari
             "src.recommendations.blender_experiments.get_experiment_assignment",
             new_callable=AsyncMock,
             return_value=None,
+        ),
+        patch(
+            "src.recommendations.blender_experiments.RECENTLY_LIKED_BLENDER_V2_ENROLLMENT_FROZEN",
+            False,
         ),
         patch(
             "src.recommendations.blender_experiments.get_recent_7d_lr_assignment_metrics",
