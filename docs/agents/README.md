@@ -14,6 +14,7 @@ override current Codex or Paperclip decisions.
 | Paperclip runtime migration or auth | [Paperclip-native migration](../paperclip-native-migration.md) and [ADR-0002](../adr/0002-codex-oauth-agent-auth.md) | Codex agents are OAuth/subscription-only; no `OPENAI_API_KEY` binding. |
 | Agent skill catalog or generated exports | [Paperclip skill catalog](../paperclip-skill-catalog.md) and [ADR-0004](../adr/0004-generated-agent-readme.md) | Generated README snapshots are reference only. |
 | Routine health and outcomes | [Routine observability](routine-observability.md) and [Outcome ledger](outcome-ledger.md) | Prefer business outcome checks over generic liveness checks. |
+| Paperclip experiment history | [Paperclip experiment retrospective](paperclip-experiment-retrospective-2026.md) | Git is the durable source of truth; the retrospective is not a substitute for a private restore-tested Paperclip backup. |
 | PR review automation | [PR review cycle](pr-review-cycle.md) | Keep GitHub payloads narrow and Paperclip issue links explicit. |
 | Moderator source scouting | [Moderator community loop spec](../../specs/moderator-community-loop.md), [CONTEXT.md](../../CONTEXT.md), and [ADR-0003](../adr/0003-prepared-source-etl-guard.md) | Use the Russian domain vocabulary; prepared sources stay parked until enabled. |
 | Describe Memes / vision OCR | [AGENTS.md](../../AGENTS.md) and [Describe Memes spec](../../specs/describe-memes.md) | Free OpenRouter vision models only. |

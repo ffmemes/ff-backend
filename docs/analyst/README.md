@@ -11,6 +11,7 @@ The Analyst agent monitors product health, tracks experiments, and produces dail
 ## Key Files
 - `docs/analyst/metrics.sql` — SQL queries organized by section (health, north star, engines, retention, etc.)
 - `docs/analyst/crossposting.sql` — reusable read-only queries for Telegram channel views/forwards, 24h labels, and pre-posting share signals.
+- `docs/analyst/readouts/` — durable decision-grade experiment readouts. Daily generated reports stay outside Git.
 - `scripts/cold_start_first10_quality_readout.py` — repeatable true-new cold-start first-10 readout. It uses each user's first-ever `user_meme_reaction.sent_at`, requires that first send to be `cold_start_explore` or `cold_start_adapt`, and then reports first-meme/first-10 quality, depth gates, per-position, engine, source/type/language, and top/bottom meme slices.
 - `specs/crossposting-share-optimization-2026-05-18.md` — current compact crossposting readout and next experiment gate.
 - `experiments/active/` — Currently running experiments to monitor
