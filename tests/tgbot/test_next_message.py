@@ -7,6 +7,7 @@ from telegram.error import NetworkError
 from src.storage.constants import MemeType
 from src.storage.schemas import MemeData
 from src.tgbot.senders import next_message
+from src.tgbot.senders.delivery import PreparedMemeDelivery
 
 
 def _meme() -> MemeData:
@@ -15,6 +16,15 @@ def _meme() -> MemeData:
         type=MemeType.IMAGE,
         telegram_file_id="photo-file-id",
         caption="<b>caption</b>",
+    )
+
+
+def _prepared_delivery() -> PreparedMemeDelivery:
+    return PreparedMemeDelivery(
+        caption="<b>caption</b>",
+        reply_markup=object(),  # type: ignore[arg-type]
+        share_button_variant="url_share",
+        languages=frozenset({"en"}),
     )
 
 
@@ -32,15 +42,12 @@ async def test_next_message_does_not_try_another_meme_after_ambiguous_send_error
         "get_user_info",
         AsyncMock(return_value={"interface_lang": "en", "nmemes_sent": 1}),
     )
-    monkeypatch.setattr(next_message, "collect_user_languages", AsyncMock(return_value={"en"}))
     monkeypatch.setattr(next_message, "get_popup_to_send", AsyncMock(return_value=None))
     monkeypatch.setattr(next_message, "get_next_meme_for_user", get_next)
-    monkeypatch.setattr(next_message, "get_visible_meme_like_count", AsyncMock(return_value=0))
-    monkeypatch.setattr(next_message, "meme_reaction_keyboard", lambda *_args, **_kwargs: object())
     monkeypatch.setattr(
         next_message,
-        "get_meme_caption_for_user_id",
-        AsyncMock(return_value="<b>caption</b>"),
+        "prepare_meme_delivery",
+        AsyncMock(return_value=_prepared_delivery()),
     )
     monkeypatch.setattr(next_message, "send_new_message_with_meme", send_new)
     monkeypatch.setattr(next_message, "create_user_meme_reaction", create_reaction)
