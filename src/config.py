@@ -65,6 +65,10 @@ class Config(BaseSettings):
     RECOMMENDATION_DIAGNOSTICS_SAMPLE_RATE: float = 0.01
     RECOMMENDATION_SOURCE_DIVERSITY_ENABLED: bool = False
     RECOMMENDATION_SHADOW_SCORING_ENABLED: bool = True
+    # Hard-filter memes from sources where the user has more dislikes than likes
+    # after enough evidence (see block_disliked_sources_sql_filter).
+    RECOMMENDATION_BLOCK_DISLIKED_SOURCES: bool = True
+    RECOMMENDATION_BLOCK_DISLIKED_MIN_REACTIONS: int = 5
 
     PREFECT_API_URL: str | None = None
     PREFECT_AUTH_STRING: str | None = None

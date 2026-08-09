@@ -5,7 +5,10 @@ from typing import Any
 from sqlalchemy import text
 
 from src.database import fetch_all, fetch_one
-from src.recommendations.utils import exclude_meme_ids_sql_filter
+from src.recommendations.utils import (
+    block_disliked_sources_sql_filter,
+    exclude_meme_ids_sql_filter,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +125,7 @@ async def best_uploaded_memes(
             AND R.meme_id IS NULL
             AND S.type = 'user upload'
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+            {block_disliked_sources_sql_filter()}
 
         ORDER BY -1
             * COALESCE((UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.), 0.5)
@@ -163,6 +167,7 @@ async def like_spread_and_recent_memes(
             AND MS.nlikes > MS.ndislikes
             AND MS.raw_impr_rank = 0
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+            {block_disliked_sources_sql_filter()}
         ORDER BY -1
             * (MS.nlikes - MS.ndislikes) / (MS.nmemes_sent + 1.)
         LIMIT :limit
@@ -221,6 +226,7 @@ async def _get_lr_smoothed_candidates(
             {min_sends_filter}
             {text_light_filter}
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+            {block_disliked_sources_sql_filter()}
 
         ORDER BY -1
             * COALESCE((UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.), 0.5)
@@ -307,6 +313,7 @@ async def get_es_ranked(
             AND R.meme_id IS NULL
             AND MS.engagement_score > 0
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+            {block_disliked_sources_sql_filter()}
 
         ORDER BY -1
             * COALESCE((UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.), 0.5)
@@ -390,6 +397,7 @@ async def goat(
 
         WHERE 1=1
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+            {block_disliked_sources_sql_filter()}
         ORDER BY SCORES.score DESC NULLS LAST
         LIMIT :limit
     """
@@ -449,6 +457,7 @@ async def get_recently_liked(
             AND M.status = 'ok'
             AND R.meme_id IS NULL
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+            {block_disliked_sources_sql_filter()}
         LIMIT :limit
     """
     return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
@@ -505,6 +514,7 @@ async def cold_start_explore(
             {TEXT_LIGHT_OCR_FILTER_SQL}
             {_cold_start_guardrail_source_filter(candidate_guardrails_enabled)}
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+            {block_disliked_sources_sql_filter()}
 
         ORDER BY (MS.nlikes::float / NULLIF(MS.nlikes + MS.ndislikes, 0)) DESC,
                  (MS.nlikes + MS.ndislikes) DESC
@@ -585,6 +595,7 @@ async def cold_start_adapt(
             {TEXT_LIGHT_OCR_FILTER_SQL}
             {_cold_start_guardrail_source_filter(candidate_guardrails_enabled)}
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+            {block_disliked_sources_sql_filter()}
 
         ORDER BY -1
             * GREATEST(COALESCE(RR.raw_weight, 0) + 0.5, 0.1)
@@ -647,6 +658,7 @@ async def viral_shares(
             AND COALESCE(MS.nmemes_sent, 0) >= 20
             AND COALESCE(MS.lr_smoothed, 0) >= 0.05
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+            {block_disliked_sources_sql_filter()}
 
         ORDER BY
             (

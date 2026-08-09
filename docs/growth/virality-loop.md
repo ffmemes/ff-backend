@@ -55,6 +55,18 @@ A shippable ranking/growth experiment should have:
 4. **Readout SQL** committed under `docs/analyst/` or `experiments/active/…`
 5. **Control weights** imported from `src/feed_turn/planner.py` (`MATURE_BLEND_WEIGHTS` / `GROWING_BLEND_WEIGHTS`), never copy-pasted.
 
+## Shipped: block disliked sources (2026-08-09)
+
+Hard policy: do not recommend memes from sources where the user already has
+`ndislikes > nlikes` after ≥5 reactions (`user_meme_source_stats`).
+Kill switch: `RECOMMENDATION_BLOCK_DISLIKED_SOURCES`.
+
+Offline counterfactual (7d user sends): would remove **~57%** of impressions with
+**LR ~11%** on blocked vs **~82%** on kept; dislike rate on blocked **~89%**.
+
+Playground: `python scripts/reco_eval.py counterfactual-block-disliked --days 7`  
+Platform plan: [reco-experiment-platform.md](reco-experiment-platform.md)
+
 ## Shipped: recently_liked blender v2 closeout (2026-08-09)
 
 Treatment mature blend is now the **default** (`MATURE_BLEND_WEIGHTS`): more
