@@ -351,27 +351,61 @@ async def get_unloaded_tg_memes(
     )
 
 
-async def get_unloaded_vk_memes(limit: int) -> list[dict[str, Any]]:
-    """Returns memes from VK, that have not been yet uploaded to Telegram."""
+async def get_unloaded_vk_memes(
+    limit: int,
+    meme_source_ids: list[int] | None = None,
+    *,
+    fresh_only: bool = True,
+) -> list[dict[str, Any]]:
+    """Returns VK memes not yet uploaded to Telegram storage.
 
+    Parity with TG unload path:
+    - only ``parsing_enabled`` sources
+    - retry ``broken_content_link`` (ETL already resets → created periodically)
+    - optional fresh window on raw post timestamps
+    """
     select_query = f"""
         SELECT
             meme.id,
             meme.type,
-            meme_raw_vk.media->>0 content_url
+            CASE
+                WHEN JSONB_TYPEOF(meme_raw_vk.media) = 'array'
+                THEN meme_raw_vk.media->>0
+                ELSE meme_raw_vk.media::text
+            END AS content_url
         FROM meme
         INNER JOIN meme_source
             ON meme_source.id = meme.meme_source_id
             AND meme_source.type = '{MemeSourceType.VK.value}'
+            AND meme_source.status = '{MemeSourceStatus.PARSING_ENABLED.value}'
         INNER JOIN meme_raw_vk
             ON meme_raw_vk.id = meme.raw_meme_id
             AND meme_raw_vk.meme_source_id = meme.meme_source_id
         WHERE 1=1
-            AND meme.telegram_file_id IS NULL
+            AND (
+                meme.telegram_file_id IS NULL
+                OR meme.status = 'broken_content_link'
+            )
+            AND (
+                NOT :filter_meme_source_ids
+                OR meme.meme_source_id = ANY(:meme_source_ids)
+            )
+            AND (
+                NOT :fresh_only
+                OR COALESCE(meme_raw_vk.updated_at, meme_raw_vk.created_at)
+                    >= NOW() - INTERVAL '24 hours'
+            )
         ORDER BY meme.published_at DESC
-        LIMIT {limit}
+        LIMIT {int(limit)}
     """
-    return await fetch_all(text(select_query))
+    return await fetch_all(
+        text(select_query),
+        {
+            "filter_meme_source_ids": meme_source_ids is not None,
+            "meme_source_ids": meme_source_ids or [],
+            "fresh_only": fresh_only,
+        },
+    )
 
 
 async def update_meme_status_of_ready_memes(

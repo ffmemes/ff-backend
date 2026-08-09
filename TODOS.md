@@ -33,10 +33,10 @@ Do **not** close from interim n (~20 users); day-7 needs ≥80/arm or wait day-1
 
 ## P2 — Supply side (ETL)
 
-### Align VK ETL guards with TG
-**What:** `parsing_enabled` gate, broken-link retry, auto-snooze after empty parses — currently TG-only in places.
-**Why:** Feature drift floods or starves VK content relative to TG.
+### ~~Align VK ETL guards with TG~~ — SHIPPED
+**What:** VK ETL `parsing_enabled` + top-view gate; unload broken-link retry; parse auto-snooze (same as TG).
 **Files:** `src/storage/etl.py`, `src/storage/service.py`, `src/flows/parsers/vk.py`
+**Tests:** `tests/storage/test_vk_etl_parity.py`
 
 ### Auto-discover sources from forwards
 **What:** Forwarded channel URLs → `meme_source_candidate` (partially shipped). Keep discovery + moderator vote loop healthy.
