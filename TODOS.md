@@ -10,7 +10,9 @@
 
 ### ~~Virality score for ranking~~ — SHIPPED as viral_shares_blender_v1
 **What:** Engine `viral_shares` + mature blend A/B (`viral_shares_blender_v1`). See `experiments/active/2026-08-09-viral-shares-blender-v1.md`.
-**Next:** day-7 readout via `docs/analyst/viral-shares-blender-v1.sql`; decide keep/scale/kill.
+**Next checks (hard dates):** smoke **2026-08-12**, primary **2026-08-16**, final **2026-08-23**.  
+**Rules + all open hypotheses:** [`experiments/HYPOTHESES.md`](experiments/HYPOTHESES.md).  
+Do **not** close from interim n (~20 users); day-7 needs ≥80/arm or wait day-14.
 
 ### Per-engine session continuation rate (dashboard)
 **What:** SQL/readout for % of times a user continues scrolling after a meme from each `recommended_by` engine.

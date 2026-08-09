@@ -1,48 +1,22 @@
 # Experiment: Viral shares blender v1
 
+Canonical note: [`experiments/active/2026-08-09-viral-shares-blender-v1.md`](../../experiments/active/2026-08-09-viral-shares-blender-v1.md)  
+Decision calendar: [`experiments/HYPOTHESES.md`](../../experiments/HYPOTHESES.md) **H1**
+
 Created: 2026-08-09  
-Status: active  
-Owner: engineer / analyst  
-Deployed: pending merge  
-Measure after: +7 days and sample_gate_per_variant ≥ 1000
+Status: **active** (HOLD until day-7/14)  
+Deployed: 2026-08-09  
+**Measure after: 2026-08-16** · Final: 2026-08-23 · Smoke: 2026-08-12
 
 ## Hypothesis
 
-Injecting a dedicated `viral_shares` engine (memes ranked by share-click conversion)
-into the mature blend at weight 0.2 (stolen from `lr_smoothed`) increases unique
-share clickers and new-user invites per 1k memes sent without reducing session depth.
+Mature blend weight 0.2 on `viral_shares` (from `lr_smoothed`) lifts unique
+non-self share clickers and invites per 1k sends without harming session depth.
 
-## Changes Made
+## Interim
 
-- Engine: `src/recommendations/candidates.py::viral_shares`
-- Experiment: `viral_shares_blender_v1` in `src/recommendations/blender_experiments.py`
-- Wiring: mature path uses `get_mature_blend_weights_with_experiments` (recently_liked v2 base + viral overlay)
-- Delivery prep seam: `src/tgbot/senders/delivery.py` (shared by `next_message` + `send_meme_to_user`)
-- Crosspost fix: share-click CTEs accept both `m_` and `s_` deep links
-
-## Assignment
-
-- Eligible: mature users via existing mature blend path (`nmemes_sent ≥ 100`)
-- Strategy: `sha256(experiment_id:user_id) % 2`
-- Control: base mature weights (after recently_liked v2 assignment)
-- Treatment: base + `viral_shares: 0.2`, `lr_smoothed` reduced by 0.2
-- Sample gate: 1000 users/variant before day-7 read
-
-## Primary metrics
-
-1. Unique non-self share clickers (`user_deep_link_log` m_/s_) per 1k memes sent
-2. New-user invites (`user.inviter_id` attributed in window) per 1k memes sent
-
-## Guardrails
-
-- Median / p50 session length (memes with reaction gap < 30 min)
-- Like rate (7d)
-- Block rate
-
-## Engine slice
-
-Where `recommended_by = 'viral_shares'`: continuation rate vs `lr_smoothed`.
+See `docs/analyst/readouts/2026-08-09-viral-shares-interim.md` — underpowered, HOLD.
 
 ## Readout SQL
 
-See `docs/analyst/viral-shares-blender-v1.sql`.
+`docs/analyst/viral-shares-blender-v1.sql`
