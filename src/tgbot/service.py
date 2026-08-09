@@ -45,6 +45,7 @@ from src.tgbot.repo.popups import (
     user_popup_already_sent,
 )
 from src.tgbot.repo.users import (
+    _blocked_bot_at_timestamp,
     add_user_tg_chat_membership,
     create_or_update_user,
     get_tg_user_by_id,
@@ -57,6 +58,7 @@ from src.tgbot.repo.users import (
 )
 
 __all__ = [
+    "_blocked_bot_at_timestamp",
     "add_user_language",
     "add_user_languages",
     "add_user_tg_chat_membership",
