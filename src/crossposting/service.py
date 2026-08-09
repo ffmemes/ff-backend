@@ -1,8 +1,10 @@
+import math
 from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert
 
+from src.config import settings
 from src.crossposting.constants import Channel
 from src.database import (
     crossposting,
@@ -10,6 +12,12 @@ from src.database import (
     execute,
     fetch_all,
 )
+
+# score_version in crossposting + decision_log
+SCORE_VERSION_V2 = 2
+SCORE_VERSION_SHARE_MAX = 3
+# RU: v2 factors × ln(nlikes+1) — meme-level like volume (docs/analyst/readouts/2026-08-09-…)
+SCORE_VERSION_MEME_LIKE_VOLUME = 4
 
 
 async def log_meme_sent(
@@ -46,7 +54,12 @@ _CHANNEL_PARAMS: dict[str, dict[str, Any]] = {
 }
 
 
-def _compute_score_breakdown(row: dict[str, Any], channel: str) -> dict[str, Any]:
+def _compute_score_breakdown(
+    row: dict[str, Any],
+    channel: str,
+    *,
+    like_volume_enabled: bool = False,
+) -> dict[str, Any]:
     """Reproduce the SQL ORDER BY in Python so each candidate gets a logged score
     breakdown. Must stay in sync with the ORDER BY in the SQL queries below."""
     params = _CHANNEL_PARAMS[channel]
@@ -76,6 +89,8 @@ def _compute_score_breakdown(row: dict[str, Any], channel: str) -> dict[str, Any
         src_quality_mult = 1.0
 
     invited_boost = 1.0 + min(invited_count, 10) * 0.1
+    # Meme-level volume (not LR): prefers "well tested in bot" over high-LR sparse.
+    like_volume_factor = math.log(float(nlikes) + 1.0) if like_volume_enabled else 1.0
 
     final_score = (
         lr_factor
@@ -85,9 +100,10 @@ def _compute_score_breakdown(row: dict[str, Any], channel: str) -> dict[str, Any
         * sent_factor
         * src_quality_mult
         * invited_boost
+        * like_volume_factor
     )
 
-    return {
+    out = {
         "lr_factor": round(lr_factor, 4),
         "impr_factor": round(impr_factor, 4),
         "age_factor": round(age_factor, 4),
@@ -95,14 +111,19 @@ def _compute_score_breakdown(row: dict[str, Any], channel: str) -> dict[str, Any
         "sent_factor": round(sent_factor, 4),
         "src_quality_mult": round(src_quality_mult, 4),
         "invited_boost": round(invited_boost, 4),
+        "like_volume_factor": round(like_volume_factor, 4),
+        "like_volume_enabled": like_volume_enabled,
         "final_score": round(final_score, 6),
     }
+    return out
 
 
 def _build_decision_log(
     channel: str,
     score_version: int,
     candidates: list[dict[str, Any]],
+    *,
+    like_volume_enabled: bool = False,
 ) -> dict[str, Any] | None:
     """Build the kwargs dict for log_ranker_decision from a top-N candidate list.
     Returns None if candidates is empty."""
@@ -111,7 +132,7 @@ def _build_decision_log(
     picked = candidates[0]
     log_candidates = []
     for i, row in enumerate(candidates):
-        breakdown = _compute_score_breakdown(row, channel)
+        breakdown = _compute_score_breakdown(row, channel, like_volume_enabled=like_volume_enabled)
         log_candidate = {
             "rank": i + 1,
             "meme_id": row["id"],
@@ -242,7 +263,12 @@ _STANDARD_RANKER_QUERY = """
                         )),
                         1.0
                       )
-                    * (1.0 + LEAST(MS.invited_count, 10) * 0.1),
+                    * (1.0 + LEAST(MS.invited_count, 10) * 0.1)
+                    -- meme-level volume (score_version=4): ln(nlikes+1); weight 0 → 1.0
+                    * CASE
+                        WHEN :like_volume_enabled THEN LN(COALESCE(MS.nlikes, 0) + 1.0)
+                        ELSE 1.0
+                      END,
                     M.id
             ) AS candidate_rank
         FROM meme M
@@ -271,7 +297,11 @@ _STANDARD_RANKER_QUERY = """
                 )),
                 1.0
               )
-            * (1.0 + LEAST(MS.invited_count, 10) * 0.1),
+            * (1.0 + LEAST(MS.invited_count, 10) * 0.1)
+            * CASE
+                WHEN :like_volume_enabled THEN LN(COALESCE(MS.nlikes, 0) + 1.0)
+                ELSE 1.0
+              END,
             M.id
         LIMIT :limit
     )
@@ -505,16 +535,30 @@ async def _get_next_meme_for_channel(
     *,
     log_top_n: int,
     score_version: int,
+    like_volume_enabled: bool = False,
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     params = {
         **_CHANNEL_PARAMS[channel],
         "channel": channel,
         "limit": log_top_n,
+        "like_volume_enabled": like_volume_enabled,
     }
     rows = await fetch_all(text(_STANDARD_RANKER_QUERY), params)
     if not rows:
         return None, None
-    return _picked_meme_dict(rows[0]), _build_decision_log(channel, score_version, rows)
+    return (
+        _picked_meme_dict(rows[0]),
+        _build_decision_log(
+            channel,
+            score_version,
+            rows,
+            like_volume_enabled=like_volume_enabled,
+        ),
+    )
+
+
+def _ru_like_volume_ranker_enabled() -> bool:
+    return bool(settings.CROSSPOST_RU_MEME_LIKE_VOLUME_ENABLED)
 
 
 async def get_next_meme_for_tgchannelru(
@@ -529,22 +573,32 @@ async def get_next_meme_for_tgchannelru(
       filters.
     - ``decision_log`` — kwargs dict for ``log_ranker_decision``, with the top-N
       candidates and per-candidate score breakdown. ``None`` when no candidates.
+
+    When ``CROSSPOST_RU_MEME_LIKE_VOLUME_ENABLED`` (default ON), uses
+    ``score_version=4``: v2 factors × ``ln(nlikes+1)`` so high bot-exposure
+    memes win within source prior (offline H6). Kill switch → v2.
     """
+    like_vol = _ru_like_volume_ranker_enabled()
     return await _get_next_meme_for_channel(
         "tgchannelru",
         log_top_n=log_top_n,
-        score_version=2,
+        score_version=(SCORE_VERSION_MEME_LIKE_VOLUME if like_vol else SCORE_VERSION_V2),
+        like_volume_enabled=like_vol,
     )
 
 
 async def get_next_meme_for_tgchannelen(
     log_top_n: int = 5,
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
-    """Same as :func:`get_next_meme_for_tgchannelru` but for @fast_food_memes (EN)."""
+    """Same as :func:`get_next_meme_for_tgchannelru` but for @fast_food_memes (EN).
+
+    EN stays on score_version=2 (no like-volume factor) until offline gate passes.
+    """
     return await _get_next_meme_for_channel(
         "tgchannelen",
         log_top_n=log_top_n,
-        score_version=2,
+        score_version=SCORE_VERSION_V2,
+        like_volume_enabled=False,
     )
 
 
@@ -571,7 +625,9 @@ async def get_next_share_max_meme_for_tgchannelru(
     rows = await fetch_all(text(_SHARE_MAX_QUERY), params)
     if not rows:
         return None, None
-    return _picked_meme_dict(rows[0]), _build_decision_log("tgchannelru", 3, rows)
+    return _picked_meme_dict(rows[0]), _build_decision_log(
+        "tgchannelru", SCORE_VERSION_SHARE_MAX, rows
+    )
 
 
 async def get_next_share_max_meme_for_tgchannelen(
@@ -595,4 +651,6 @@ async def get_next_share_max_meme_for_tgchannelen(
     rows = await fetch_all(text(_SHARE_MAX_QUERY), params)
     if not rows:
         return None, None
-    return _picked_meme_dict(rows[0]), _build_decision_log("tgchannelen", 3, rows)
+    return _picked_meme_dict(rows[0]), _build_decision_log(
+        "tgchannelen", SCORE_VERSION_SHARE_MAX, rows
+    )
