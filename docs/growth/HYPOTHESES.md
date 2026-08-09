@@ -262,6 +262,40 @@ week CS3 band.
 
 ---
 
+## H6 — Crosspost RU: meme-level bot volume (not LR) × source prior
+
+| Field | Value |
+|-------|--------|
+| **ID** | `crosspost_meme_level_v1` |
+| **Status** | **offline PASS (partial)** — not in cron yet |
+| **Readout** | `docs/analyst/readouts/2026-08-09-crosspost-meme-level-offline.md` |
+| **n** | 611 RU image posts / 120d |
+
+### Hypothesis
+
+Among channel candidates, **timestamp-safe pre-post like volume** (and engaged likes)
+improves 24h channel forwards **beyond source prior**. Bot **like rate** does not.
+
+### Offline result (2026-08-09)
+
+- pre_lr vs channel: ~0 (reject LR feature)
+- pre_likes / engaged_likes residual Spearman ~**0.16–0.20**
+- top-20% **src × log1p(pre_likes)** lift **1.14×** forwards (time-split test too)
+- pre_share coverage **2.6%** only
+- HIT threshold: f1k ≥ **~31** (p75) OR forwards ≥ **12**
+
+### Next
+
+1. Shadow-log meme score in `crossposting_decision_log` (no post change)
+2. RU canary / score_version bump only after shadow confirms ranking flip quality
+3. Optional ML only if beats `src × log1p(likes)` by ≥5% lift
+
+### Next check
+
+- After shadow deploy: weekly hit_rate + mean forwards vs v2 baseline  
+
+---
+
 ## Explicitly not open experiments
 
 | Item | State |
@@ -270,6 +304,7 @@ week CS3 band.
 | Hard-block majority-dislike | **Rejected** as default; opt-in flag only |
 | Full Feed Turn rewrite | Not doing |
 | New blender A/B | Do not start until H1 day-7 done |
+| Crosspost rank by bot LR | **Rejected** offline (H6) |
 
 ---
 
