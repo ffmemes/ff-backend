@@ -13,6 +13,29 @@ MATURE = "mature"
 
 MODERATOR_USER_TYPES = frozenset({"moderator", "admin"})
 
+# Single source of truth for default blend weights. Experiments must import
+# these maps rather than re-declaring the control blend.
+GROWING_BLEND_WEIGHTS: Mapping[str, float] = MappingProxyType(
+    {
+        "best_uploaded_memes": 0.1,
+        "lr_smoothed": 0.3,
+        "recently_liked": 0.2,
+        "goat": 0.1,
+        "es_ranked": 0.1,
+        "like_spread_and_recent_memes": 0.2,
+    }
+)
+MATURE_BLEND_WEIGHTS: Mapping[str, float] = MappingProxyType(
+    {
+        "best_uploaded_memes": 0.3,
+        "like_spread_and_recent_memes": 0.3,
+        "lr_smoothed": 0.4,
+        "recently_liked": 0.2,
+        "goat": 0.1,
+        "es_ranked": 0.1,
+    }
+)
+
 
 _EMPTY_MAPPING: Mapping[Any, Any] = MappingProxyType({})
 
@@ -83,28 +106,14 @@ def plan_candidate_selection(nmemes_sent: int) -> CandidateSelectionPlan:
         return CandidateSelectionPlan(
             maturity_stage=GROWING,
             primary_engine=None,
-            blend_weights={
-                "best_uploaded_memes": 0.1,
-                "lr_smoothed": 0.3,
-                "recently_liked": 0.2,
-                "goat": 0.1,
-                "es_ranked": 0.1,
-                "like_spread_and_recent_memes": 0.2,
-            },
+            blend_weights=GROWING_BLEND_WEIGHTS,
             fixed_pos={0: "lr_smoothed"},
         )
 
     return CandidateSelectionPlan(
         maturity_stage=MATURE,
         primary_engine=None,
-        blend_weights={
-            "best_uploaded_memes": 0.3,
-            "like_spread_and_recent_memes": 0.3,
-            "lr_smoothed": 0.4,
-            "recently_liked": 0.2,
-            "goat": 0.1,
-            "es_ranked": 0.1,
-        },
+        blend_weights=MATURE_BLEND_WEIGHTS,
         fixed_pos={0: "lr_smoothed"},
     )
 

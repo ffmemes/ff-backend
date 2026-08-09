@@ -11,13 +11,13 @@ override current Codex or Paperclip decisions.
 | General repo work | [AGENTS.md](../../AGENTS.md) | Current Codex operating notes and hard constraints. |
 | Paperclip inspection or agent ops | [ADR-0001](../adr/0001-local-paperclip-cli.md) and `.codex/skills/paperclip/SKILL.md` | Local Codex sessions use the project-local wrapper; Paperclip-managed runs use native Paperclip CLI/env. Do not enable global Paperclip MCP. |
 | Local agent readiness check | [`scripts/agent_doctor.py`](../../scripts/agent_doctor.py) | Read-only checks for local commands, Describe Memes free-model contract, Paperclip access adapter, and agent-doc workflow invariants. |
-| Paperclip runtime migration or auth | [Paperclip-native migration](../paperclip-native-migration.md) and [ADR-0002](../adr/0002-codex-oauth-agent-auth.md) | Codex agents are OAuth/subscription-only; no `OPENAI_API_KEY` binding. |
+| Paperclip runtime migration or auth | [Paperclip ops runbook](../paperclip-ops-runbook.md), archived [native migration](../archive/2026-q2/paperclip-native-migration.md), and [ADR-0002](../adr/0002-codex-oauth-agent-auth.md) | Codex agents are OAuth/subscription-only; no `OPENAI_API_KEY` binding. |
 | Agent skill catalog or generated exports | [Paperclip skill catalog](../paperclip-skill-catalog.md) and [ADR-0004](../adr/0004-generated-agent-readme.md) | Generated README snapshots are reference only. |
 | Routine health and outcomes | [Routine observability](routine-observability.md) and [Outcome ledger](outcome-ledger.md) | Prefer business outcome checks over generic liveness checks. |
-| Paperclip experiment history | [Paperclip experiment retrospective](paperclip-experiment-retrospective-2026.md) | Git is the durable source of truth; the retrospective is not a substitute for a private restore-tested Paperclip backup. |
 | PR review automation | [PR review cycle](pr-review-cycle.md) | Keep GitHub payloads narrow and Paperclip issue links explicit. |
 | Moderator source scouting | [Moderator community loop spec](../../specs/moderator-community-loop.md), [CONTEXT.md](../../CONTEXT.md), and [ADR-0003](../adr/0003-prepared-source-etl-guard.md) | Use the Russian domain vocabulary; prepared sources stay parked until enabled. |
 | Describe Memes / vision OCR | [AGENTS.md](../../AGENTS.md) and [Describe Memes spec](../../specs/describe-memes.md) | Free OpenRouter vision models only. |
+| In-bot meme share button | [Share readout (archive)](../archive/2026-q2/meme-share-button-readout-2026-06-04.md), [CONTEXT.md](../../CONTEXT.md), [growth/virality-loop](../growth/virality-loop.md), and [Analyst README](../analyst/README.md) | Count non-self `m_`/`s_` deep-link starts; raw share-click counts include self-clicks. |
 | Crossposting / channel shares | [Crossposting share readout](../../specs/crossposting-share-optimization-2026-05-18.md), [Analyst crossposting SQL](../analyst/crossposting.sql), and [CONTEXT.md](../../CONTEXT.md) | Separate in-bot share clicks, channel deep links, and Telegram channel forwards/views. |
 
 ## Authority Boundaries

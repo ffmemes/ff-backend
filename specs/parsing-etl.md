@@ -3,19 +3,23 @@
 ## Meme Lifecycle
 
 ```
-Source Channels (TG/VK/IG)
-  -> Parser (hourly cron) -> meme_raw_telegram/vk/ig tables
+Source Channels (TG/VK)
+  -> Parser (hourly cron) -> meme_raw_telegram / meme_raw_vk
   -> ETL: filter single-media, detect type -> meme table (status='created')
   -> Download from source URL
   -> Watermark (image only, @ffmemesbot, 35% opacity, adaptive corner)
   -> Upload to TG storage chat -> telegram_file_id
-  -> Ad filter (caption keyword check, 48 stop words)
-  -> Dedup (OCR text trigram similarity, if OCR enabled)
+  -> Ad filter (caption keyword check)
+  -> Dedup (OCR text trigram similarity when OCR present)
   -> status='ok' (enters recommendation pool)
   -> Describe Memes (async, every 15min, OpenRouter free vision) -> ocr_result JSONB
 ```
 
-Note: Legacy Modal OCR has been removed. [Describe Memes](describe-memes.md) (OpenRouter free vision) is the active system for image analysis.
+Note: Legacy Modal OCR has been removed. [Describe Memes](describe-memes.md) is the
+active system for image analysis.
+
+**Instagram:** parser and `ig_meme_pipeline` are **removed**. Historical
+`meme_raw_ig` rows may remain; do not document IG as an active source.
 
 ## Parsing Schedule
 
@@ -23,32 +27,30 @@ Note: Legacy Modal OCR has been removed. [Describe Memes](describe-memes.md) (Op
 |--------|------|-----------|-------------|
 | Telegram | `40 * * * *` | Hourly at :40 | `src/storage/parsers/tg.py` |
 | VK | `20 * * * *` | Hourly at :20 | `src/storage/parsers/vk.py` |
-| Instagram | `30 0 * * *` | Daily at 00:30 | `src/storage/parsers/ig.py` |
 
 Cron definitions: `scripts/serve_flows.py`
 
 ## Parsers
 
-**Telegram**: BeautifulSoup HTML scraping on `t.me/s/{username}`. Extracts: post_id, URL, date, content, media (with dimensions), views, forwarded_url (repost detection), mentions, hashtags. 10 posts per page with pagination.
+**Telegram**: BeautifulSoup HTML scraping on `t.me/s/{username}`. Extracts: post_id, URL, date, content, media (with dimensions), views, forwarded_url (repost detection), mentions, hashtags.
 
-**VK**: VK API (v5.92). Filters ads (`marked_as_ads`), multi-media posts. Extracts best quality image from attachments.
-
-**Instagram**: HikerAPI (3rd-party). Stores user_info in meme_source.data JSONB. Currently not in active use (pending evaluation).
+**VK**: VK API. Filters ads (`marked_as_ads`), multi-media posts. Extracts best quality image from attachments.
 
 ## Source Management
 
-- `meme_source` table: 750 sources, status = in_moderation | parsing_enabled | parsing_disabled | snoozed
-- `get_meme_sources_to_parse()` selects up to 10 sources per run, ordered by `parsed_at` ASC (NULLS FIRST)
-- Sources can be added by users (`added_by` FK) or admins
+- `meme_source` table: status includes `in_moderation` | `parsing_enabled` | `snoozed` (plus legacy strings)
+- Prepared sources (`in_moderation`) must not ETL into the user feed until promoted — TG ETL guards on `parsing_enabled` (ADR-0003). VK parity is incomplete debt.
+- Sources can be added by users (`added_by` FK), moderators, or discovery → candidate promotion
 
 ## ETL Filters
 
 1. **Single-media only**: `JSONB_ARRAY_LENGTH(media) = 1` — removes carousels
-2. **Type detection**: video (has duration), animation (.mp4 no duration), image (default)
-3. **Repost dedup (TG only)**: `DISTINCT ON (COALESCE(forwarded_url, random()::text))` — within-source only
-4. **24h window**: Only processes posts from last 24 hours
-5. **Ad filter**: 48 Russian/English stop words + length > 200 chars
-6. **Link cleanup**: Removes @mentions, http links, t.me/ links from captions
+2. **Type detection**: video / animation / image (TG); VK currently often forces image
+3. **Repost dedup (TG only)**: `DISTINCT ON (COALESCE(forwarded_url, …))`
+4. **24h window**: only recent raw posts
+5. **Ad filter**: stop words + length > 200 chars (`src/storage/ads.py`)
+6. **Link cleanup**: removes @mentions / http / t.me from captions
+7. **TG engagement filters**: top-view / median view quality gates (VK lacks these — drift)
 
 ## Status Progression
 
@@ -56,24 +58,24 @@ Cron definitions: `scripts/serve_flows.py`
 created (initial ETL)
   ├── broken_content_link (download/upload fails)
   ├── ad (caption analysis matches ad keywords)
-  ├── duplicate (OCR text matches existing, when OCR enabled)
-  ├── disabled (manually disabled)
-  ├── rejected (moderator rejection)
-  └── ok (all checks pass -> enters recommendations)
+  ├── duplicate (OCR text matches existing)
+  ├── disabled / snoozed / rejected
+  └── ok (enters recommendations)
 ```
 
 Only `status='ok'` memes are served to users.
 
 ## Repost Detection Gap
 
-Current: Only detects Telegram forwards within same source via `forwarded_url` field.
+Current: only Telegram forwards within same source via `forwarded_url`.
 
 NOT detected:
+
 - Cross-source duplicates (same meme in TG and VK)
 - Cropped/watermarked/edited versions
-- Same meme reposted in different TG channels without forward attribution
+- Same meme in different TG channels without forward attribution
 
-See [dedup.md](dedup.md) for improvement plan.
+See [dedup.md](dedup.md).
 
 ## Key Files
 
@@ -81,11 +83,10 @@ See [dedup.md](dedup.md) for improvement plan.
 |------|---------|
 | `src/storage/parsers/tg.py` | Telegram HTML scraper |
 | `src/storage/parsers/vk.py` | VK API parser |
-| `src/storage/parsers/ig.py` | Instagram HikerAPI parser |
-| `src/storage/etl.py` | Raw -> processed meme transformation |
+| `src/storage/etl.py` | Raw → processed meme transformation |
 | `src/storage/service.py` | Shared DB queries and meme status updates |
-| `src/storage/deduplication.py` | File ID/OCR duplicate detection and resolution |
+| `src/storage/deduplication/` | File ID / OCR duplicate detection |
 | `src/storage/watermark.py` | Image watermarking (Pillow) |
 | `src/storage/ads.py` | Ad keyword detection |
-| `src/flows/storage/memes.py` | Pipeline orchestration (tg/vk/ig_meme_pipeline) |
+| `src/flows/storage/memes.py` | `tg_meme_pipeline` / `vk_meme_pipeline` / `final_meme_pipeline` |
 | `scripts/serve_flows.py` | Cron schedule definitions |

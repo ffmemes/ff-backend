@@ -8,6 +8,7 @@ import pytest
 from src.tgbot import service
 from src.tgbot.constants import UserType
 from src.tgbot.handlers import block
+from src.tgbot.repo import users as users_repo
 
 
 def test_blocked_bot_at_timestamp_converts_aware_datetime_to_naive_utc() -> None:
@@ -28,12 +29,13 @@ async def test_mark_user_blocked_sends_naive_timestamp_to_db(monkeypatch) -> Non
             "blocked_bot_at": datetime(2026, 4, 27, 20, 0, 27),
         }
     )
+    # mark_user_blocked lives in repo.users; patch that module's globals.
     monkeypatch.setattr(
-        service,
+        users_repo,
         "get_user_by_id",
         AsyncMock(return_value={"id": 10001, "type": UserType.USER.value}),
     )
-    monkeypatch.setattr(service, "update_user", update_user)
+    monkeypatch.setattr(users_repo, "update_user", update_user)
 
     monkeypatch.setitem(
         sys.modules,
@@ -64,11 +66,11 @@ async def test_mark_user_blocked_preserves_admin_type(monkeypatch) -> None:
         }
     )
     monkeypatch.setattr(
-        service,
+        users_repo,
         "get_user_by_id",
         AsyncMock(return_value={"id": 49820636, "type": UserType.ADMIN.value}),
     )
-    monkeypatch.setattr(service, "update_user", update_user)
+    monkeypatch.setattr(users_repo, "update_user", update_user)
 
     monkeypatch.setitem(
         sys.modules,

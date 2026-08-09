@@ -7,6 +7,7 @@ from src.tgbot.handlers.inline import (
     build_inline_meme_result,
     parse_exact_meme_inline_query,
 )
+from src.tgbot.repo import inline_search as inline_search_repo
 
 
 def test_inline_search_returns_twenty_results():
@@ -44,7 +45,7 @@ async def test_inline_search_uses_old_new_ocr_and_openrouter_description(monkeyp
         captured["params"] = params
         return [{"id": 1}]
 
-    monkeypatch.setattr(service, "fetch_all", fake_fetch_all)
+    monkeypatch.setattr(inline_search_repo, "fetch_all", fake_fetch_all)
 
     rows = await service.search_memes_for_inline_query("деньги", limit=10)
 
@@ -77,7 +78,7 @@ async def test_inline_search_clamps_limit(monkeypatch):
         captured["params"] = params
         return []
 
-    monkeypatch.setattr(service, "fetch_all", fake_fetch_all)
+    monkeypatch.setattr(inline_search_repo, "fetch_all", fake_fetch_all)
 
     await service.search_memes_for_inline_query("money", limit=1000)
 
@@ -92,7 +93,7 @@ async def test_inline_search_escapes_like_wildcards(monkeypatch):
         captured["params"] = params
         return []
 
-    monkeypatch.setattr(service, "fetch_all", fake_fetch_all)
+    monkeypatch.setattr(inline_search_repo, "fetch_all", fake_fetch_all)
 
     await service.search_memes_for_inline_query(r"%%_\\", limit=10)
 

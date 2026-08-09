@@ -8,6 +8,7 @@ import orjson
 from sqlalchemy import text
 
 from src.database import fetch_one
+from src.feed_turn.planner import MATURE_BLEND_WEIGHTS
 from src.redis import redis_client
 from src.tgbot.service import (
     assign_experiment,
@@ -41,14 +42,8 @@ TEXT_LIGHT_BLENDER_V1_TREATMENT = "treatment_text_light_lr_smoothed"
 TEXT_LIGHT_BLENDER_V1_MAX_OCR_WORDS = 30
 TEXT_LIGHT_BLENDER_V1_SAMPLE_GATE_PER_VARIANT = 1000
 
-MATURE_BLENDER_CONTROL_WEIGHTS = {
-    "best_uploaded_memes": 0.3,
-    "like_spread_and_recent_memes": 0.3,
-    "lr_smoothed": 0.4,
-    "recently_liked": 0.2,
-    "goat": 0.1,
-    "es_ranked": 0.1,
-}
+# Control = default mature plan weights (SSOT in feed_turn.planner).
+MATURE_BLENDER_CONTROL_WEIGHTS = dict(MATURE_BLEND_WEIGHTS)
 MATURE_BLENDER_TREATMENT_WEIGHTS = {
     "best_uploaded_memes": 0.3,
     "like_spread_and_recent_memes": 0.25,

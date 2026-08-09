@@ -16,11 +16,11 @@
 
 Paperclip manages the autonomous AI agent team for @ffmemesbot.
 Dashboard: `https://org.ffmemes.com` (URL is public, auth required).
-**Version**: current verified deployment is 2026.512.0 (deployed from
-`ohld/paperclip:ffmemes/v2026.512.0` on 2026-05-12; Coolify deployment
-`q12xc4c1q6m4smzk1zfkog02`, commit
-`c445e5925628d11bf59d52604b8aa63a6e9aa800`). See
-`docs/paperclip-native-migration.md`.
+**Version**: current verified deployment is 2026.525.0 (deployed from
+`ohld/paperclip:ffmemes/v2026.525.0` on 2026-05-27; Coolify deployment
+`<coolify-deployment-id>`, commit
+`60efa38f868e838e9af2e2168daf0c70afefb9e6`). See
+`docs/archive/2026-q2/paperclip-native-migration.md`.
 
 All secrets (API keys, DB credentials, tokens) live in **environment variables** — never in this repo.
 Required env vars for local management: `PAPERCLIP_URL`, `PAPERCLIP_API_KEY` (set in `~/.zshrc` or `.env`).
@@ -53,8 +53,8 @@ Agent prompts reference MCP tools instead of curl. See agent `AGENTS.md` files f
 
 ```
 org.ffmemes.com (Paperclip dashboard)
-  ├── Coolify app: k4w804sco4s8kc88kwcw0ow4
-  ├── Git source: ohld/paperclip fork (pinned ffmemes/v2026.512.0 branch)
+  ├── Coolify app: <coolify-paperclip-app-id>
+  ├── Git source: ohld/paperclip fork (pinned ffmemes/v2026.525.0 branch)
   │   └── Keep production on pinned stable refs, not upstream/fork master
   ├── External PostgreSQL (shared Coolify DB service)
   │   └── Database: paperclip
@@ -94,7 +94,7 @@ export PAPERCLIP_API_KEY="<your-board-api-key>"  # Get from dashboard Settings
 
 <!-- agent-runtime: human-only — SSH/docker exec — agents must NOT run these -->
 
-Run on the server: `ssh root@t.ffmemes.com`, then `docker exec -it $CONT npx paperclipai <command>`.
+Run on the server: `ssh "$PAPERCLIP_HOST"`, then `docker exec -it $CONT npx paperclipai <command>`.
 Or locally with `--api-base` and `--api-key` flags.
 
 ```bash
@@ -169,10 +169,11 @@ curl -s -X POST "$PAPERCLIP_URL/api/secrets/<secret-id>/rotate" \
   -H "Content-Type: application/json" \
   -d "$(jq -n --arg value "$SECRET_VALUE" '{"value":$value}')"
 
-# Do not import upstream gstack directly in FFmemes operations. The current
-# Paperclip trust policy rejects executable-script skills with HTTP 422
-# (`scripts_executables_blocked`). See docs/paperclip-skill-catalog.md.
-# Use agents/deploy.sh --dry-run plus paperclip_skill_sync instead.
+# Import gstack skills
+curl -s -X POST "$PAPERCLIP_URL/api/companies/<company-id>/skills/import" \
+  -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"source": "https://github.com/garrytan/gstack"}'
 
 # Wake an agent manually
 curl -s -X POST "$PAPERCLIP_URL/api/agents/<agent-id>/wakeup" \
@@ -186,8 +187,8 @@ curl -s -X POST "$PAPERCLIP_URL/api/agents/<agent-id>/wakeup" \
 <!-- agent-runtime: human-only — SSH/docker exec — agents must NOT run these -->
 
 ```bash
-ssh root@t.ffmemes.com
-CONT=$(docker ps --format '{{.Names}}' | grep k4w804 | head -1)
+ssh "$PAPERCLIP_HOST"
+CONT=$(docker ps --format '{{.Names}}' | grep <coolify-app-prefix> | head -1)
 
 # Re-auth tools (interactive — needed after volume loss only)
 docker exec -it $CONT codex login --device-auth
@@ -197,8 +198,8 @@ docker exec -it $CONT gh auth login
 # Preferred: use the deploy script (syncs all agent instructions + config)
 ./agents/deploy.sh
 # Manual (single agent):
-# scp agents/<name>/AGENTS.md root@t.ffmemes.com:/tmp/agent.md
-# ssh root@t.ffmemes.com "docker cp /tmp/agent.md $CONT:/paperclip/instances/default/companies/<company-id>/agents/<agent-id>/instructions/AGENTS.md"
+# scp agents/<name>/AGENTS.md "$PAPERCLIP_HOST":/tmp/agent.md
+# ssh "$PAPERCLIP_HOST" "docker cp /tmp/agent.md $CONT:/paperclip/instances/default/companies/<company-id>/agents/<agent-id>/instructions/AGENTS.md"
 ```
 
 ## Agent Team
@@ -251,7 +252,7 @@ stopped work, and next bets. The weekly source of truth is the
 | Routine | Agent | Schedule (UTC) | Trigger Type | What it does |
 |---------|-------|----------------|-------------|--------------|
 | Daily Analyst Report | Analyst | `19 6 * * *` | schedule + API | Query metrics, detect anomalies, write report |
-| QA Log Scan | QA | `7 */3 * * *` | schedule + Sentry webhook + API | Sentry, Coolify logs, DB health, E2E smoke |
+| QA Log Scan | QA | `7 */6 * * *` | schedule + Sentry webhook + API | Sentry, Coolify logs, DB health, E2E smoke |
 | Process Health Check | QA | `37 12 * * *` | schedule | Watchdog: verify all routines are running and succeeding |
 | Weekly CEO Review | CEO | `11 9 * * 1` | schedule | Retro, experiments, priorities |
 | Weekly Analyst Summary | Analyst | `23 9 * * 1` | schedule | Weekly summary for CEO review |
@@ -318,7 +319,7 @@ Paperclip triggers now support multiple signing modes:
 |--------|------|------|-------|
 | Sentry | Sentry Internal Integration → Paperclip trigger | none (publicId is the secret) | Integration name is stored in Sentry, not this public repo |
 | GitHub | GH Actions (`notify-staff-engineer`) → Paperclip routine API trigger | Board API key | Sends narrow `{pr_number, pr_url}` variables |
-| Prefect | (none) | — | Failures surface via QA Log Scan 3h cron |
+| Prefect | (none) | — | Failures surface via QA Log Scan 6h cron |
 | Coolify | (none) | — | Was never actively used in practice |
 
 **Sentry → Paperclip QA trigger** is fully direct since PR #212. Set up:
@@ -359,7 +360,7 @@ curl -X PATCH "https://org.ffmemes.com/api/routine-triggers/$TRIGGER_ID" \
 
 # Restore proxy: revert PR #212 in this repo. Until that's redeployed,
 # Sentry deliveries will 401 because Paperclip is back in bearer mode without
-# auth headers. Acceptable for short windows; QA cron runs every 3h regardless.
+# auth headers. Acceptable for short windows; QA cron runs every 6h regardless.
 ```
 
 **Tradeoff accepted**: no Sentry HMAC verification, no Coolify UUID filter, no instant Prefect alert. Worst case is noisy QA scans (the routine has no user-input parsing — its agent always re-scans logs from scratch). The 24-char publicId provides URL-based obscurity; if it leaks, rotate via `POST /routine-triggers/:id/rotate-secret`.
@@ -370,7 +371,7 @@ These are encrypted in Paperclip DB and injected as env vars during agent runs:
 
 `agents/_sync_config.py` materializes env from `agents/.paperclip.yaml`: `kind: secret` becomes a Paperclip `secret_ref`, `kind: plain` is written directly, and missing required secrets fail the config sync before any PATCH. Optional missing secrets are omitted. Docs should name env var names and Paperclip secret names only, never secret IDs or values.
 
-For v2026.512.0 provider vaults, the default remains Paperclip company secrets.
+For v2026.525.0 provider vaults, the default remains Paperclip company secrets.
 Do not import AWS Secrets Manager for this setup. Coolify envs are acceptable
 for Paperclip service-level config, but not for Codex auth or per-agent
 `OPENAI_API_KEY` injection.
@@ -403,11 +404,7 @@ Agents need `PATH=/paperclip/bin:$PATH` to find them.
 | `codex` | `/paperclip/bin/codex` | `npm install --prefix /paperclip/.npm-global @openai/codex@latest && ln -sf /paperclip/.npm-global/node_modules/.bin/codex /paperclip/bin/codex` |
 | `sentry` / `sentry-cli` | `/paperclip/bin/sentry` or system path | `npm install --prefix /paperclip/.npm-global sentry @sentry/cli && ln -sf /paperclip/.npm-global/node_modules/.bin/sentry /paperclip/bin/sentry && ln -sf /paperclip/.npm-global/node_modules/.bin/sentry-cli /paperclip/bin/sentry-cli` |
 
-`sentry` and legacy `sentry-cli` can expose different issue-list flags across
-installed versions. Prefer `sentry issues list --query "is:unresolved" --max-rows 20`;
-use `sentry-cli issues list --org "$SENTRY_ORG" --project "$SENTRY_PROJECT" --status unresolved --max-rows 20`
-only as a legacy fallback. QA and CTO receive `SENTRY_ORG=ffmemes` and
-`SENTRY_PROJECT=ff-backend` from the manifest.
+`sentry` and legacy `sentry-cli` use different issue-list syntax. Prefer `sentry issue list --query "is:unresolved" --limit 20`; use `sentry-cli issues list --org "$SENTRY_ORG" --project "$SENTRY_PROJECT" --status unresolved --max-rows 20` only as a legacy fallback. QA and CTO receive `SENTRY_ORG=ffmemes` and `SENTRY_PROJECT=ff-backend` from the manifest.
 
 Post-deployment command (runs after each Coolify deploy) is configured to reinstall these,
 but runs as non-root `node` user — see Coolify Quirks below.
@@ -451,7 +448,7 @@ but runs as non-root `node` user — see Coolify Quirks below.
 ### Config.json recovery
 If `config.json` is lost but DB is intact, recreate manually — **DO NOT run onboard**:
 ```bash
-CONT=$(docker ps --format '{{.Names}}' | grep k4w804 | head -1)
+CONT=$(docker ps --format '{{.Names}}' | grep <coolify-app-prefix> | head -1)
 # Get DATABASE_URL from Coolify env vars first, then:
 docker exec $CONT sh -c 'cat > /paperclip/instances/default/config.json << '\''EOF'\''
 {
@@ -473,7 +470,7 @@ docker restart $CONT
 ## Incidents
 
 <!-- agent-runtime: read-only — historical incident notes; do NOT execute the recovery commands.
-     Live recovery procedures are in `docs/paperclip-native-migration.md`. -->
+     Live recovery procedures are in `docs/archive/2026-q2/paperclip-native-migration.md`. -->
 
 ### 2026-03-27: Full data wipe + rebuild
 
@@ -504,8 +501,8 @@ docker restart $CONT
 After every redeploy, run this to install system tools:
 
 ```bash
-ssh root@t.ffmemes.com
-CONT=$(docker ps --format '{{.Names}}' | grep k4w804 | head -1)
+ssh "$PAPERCLIP_HOST"
+CONT=$(docker ps --format '{{.Names}}' | grep <coolify-app-prefix> | head -1)
 
 # Install gh, persistent Codex, and Sentry CLI aliases (runs as root)
 docker exec -u root $CONT sh -c "apt-get update -qq && apt-get install -y -qq gh && npm install --prefix /paperclip/.npm-global @openai/codex@latest @sentry/cli sentry && ln -sf /paperclip/.npm-global/node_modules/.bin/codex /paperclip/bin/codex && ln -sf /paperclip/.npm-global/node_modules/.bin/sentry /paperclip/bin/sentry && ln -sf /paperclip/.npm-global/node_modules/.bin/sentry-cli /paperclip/bin/sentry-cli"
@@ -520,7 +517,7 @@ System-wide installs via `apt-get` and `npm install -g` do NOT survive redeploys
 ### Verify after redeploy
 
 ```bash
-CONT=$(docker ps --format '{{.Names}}' | grep k4w804 | head -1)
+CONT=$(docker ps --format '{{.Names}}' | grep <coolify-app-prefix> | head -1)
 
 # Auth survived?
 docker exec $CONT sh -c "test -f /paperclip/.codex/auth.json && echo codex:OK"
@@ -543,22 +540,22 @@ Paperclip is deployed from the fork `ohld/paperclip` (not upstream `paperclipai/
 Use pinned stable refs. Do not sync the fork to upstream `master`; upstream
 master may be ahead of the latest stable release.
 
-Current production deployment (verified 2026-05-12): Coolify app
-`k4w804sco4s8kc88kwcw0ow4` tracks
-`ohld/paperclip:ffmemes/v2026.512.0` at
-`c445e5925628d11bf59d52604b8aa63a6e9aa800`. Coolify deployment
-`q12xc4c1q6m4smzk1zfkog02` completed successfully. State file
+Current production deployment (verified 2026-05-27): Coolify app
+`<coolify-paperclip-app-id>` tracks
+`ohld/paperclip:ffmemes/v2026.525.0` at
+`60efa38f868e838e9af2e2168daf0c70afefb9e6`. Coolify deployment
+`<coolify-deployment-id>` completed successfully. State file
 `/paperclip/.last-deployed-paperclip-sha` must match that verified deployed
 commit.
 
 Last pre-deploy backups on `t.ffmemes.com:/root/paperclip-backups/`:
-`paperclip-20260512T145333Z.sql.gz` and
-`paperclip-volume-20260512T145333Z.tgz`.
+`paperclip-20260527T151256Z.sql.gz` and
+`paperclip-volume-slim-20260527T152629Z.tgz`.
 
 ```bash
 # 1. Pick the approved stable release.
-TARGET_VERSION=2026.512.0
-TARGET_SHA=c445e5925628d11bf59d52604b8aa63a6e9aa800
+TARGET_VERSION=2026.525.0
+TARGET_SHA=60efa38f868e838e9af2e2168daf0c70afefb9e6
 FORK_BRANCH=ffmemes/v${TARGET_VERSION}
 
 # 2. Create/update a pinned fork branch at the stable upstream tag.
@@ -568,11 +565,11 @@ gh api -X POST repos/ohld/paperclip/git/refs \
   -f ref="refs/heads/${FORK_BRANCH}" -f sha="$TARGET_SHA"
 
 # 3. Check migration prerequisites.
-ssh root@t.ffmemes.com "docker exec \$(docker ps --format '{{.Names}}' | grep tkg4c0 | head -1) psql -U paperclip -d paperclip -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm;'"
+ssh "$PAPERCLIP_HOST" "docker exec \$(docker ps --format '{{.Names}}' | grep <paperclip-db-container-prefix> | head -1) psql -U paperclip -d paperclip -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm;'"
 
-# 4. Take a fresh db + volume backup before deploy and verify both archives.
+# 4. Take a fresh db + slim volume backup before deploy and verify both archives.
 
-# 5. Point Coolify app k4w804sco4s8kc88kwcw0ow4 at the pinned fork branch,
+# 5. Point Coolify app <coolify-paperclip-app-id> at the pinned fork branch,
 #    then force deploy. Hard gate: the finished deployment commit must equal
 #    TARGET_SHA. Queueing a deploy is not success.
 
@@ -580,10 +577,58 @@ ssh root@t.ffmemes.com "docker exec \$(docker ps --format '{{.Names}}' | grep tk
 #    Confirm Codex auth is OAuth/subscription-backed and OPENAI_API_KEY is absent.
 ```
 
+### Backup hygiene
+
+Do not use a naive full `paperclip-data` archive as the default upgrade backup:
+the volume contains npm/npx caches, runtime logs, old backup blobs, browser
+caches, and per-workspace transient files. The durable product/control-plane
+state is primarily the Postgres dump plus the volume's auth/config/agent state.
+
+For normal Paperclip upgrades, take:
+
+- DB dump: full `paperclip` database, gzip verified.
+- Slim volume archive: include auth/config/agent state, but exclude cache,
+  logs, previous backup blobs, and generated package caches.
+
+Current known large transient paths to exclude:
+
+```text
+./.npm
+./.cache
+./.local
+./.agent-browser
+./.bun
+./.npm-global
+./backups
+./.paperclip/instances/default/data/backups
+./instances/default/logs
+./instances/default/data/run-logs
+./instances/default/projects/*/*/repo/.codex/npm-cache-paperclip
+./instances/default/projects/*/*/repo/.codex/npm-cache
+./instances/default/projects/*/*/repo/.codex/.npm-cache
+./instances/default/projects/*/*/repo/.cache/npm
+```
+
+Keep at least one recent full volume backup until the slim backup/restore path
+has been tested end-to-end. After a successful upgrade, prune older full volume
+archives deliberately; do not archive old archives inside the live
+`paperclip-data` volume.
+
+Current retention after the 2026-05-27 v2026.525.0 upgrade:
+
+- Fresh restore pair: `paperclip-20260527T151256Z.sql.gz` plus
+  `paperclip-volume-slim-20260527T152629Z.tgz`.
+- Temporary full-volume insurance backup:
+  `paperclip-volume-20260514T122247Z.tgz`.
+- Older full volume archives from 2026-05-06 and 2026-05-12 were pruned on
+  2026-05-27. Small historical DB dumps were kept.
+
 ### Notable version changes
 
 | Version | Key changes |
 |---------|-------------|
+| v2026.525.0 | Modal sandbox provider plugin, workspace diff plugin, routine env/secrets with agent < project < routine precedence, local Cloud Upstream sync, scoped assignment/permissions plus retry-now affordances, plugin runtime scoping, import/runtime reliability fixes |
+| v2026.517.0 | Issue document locks, stronger plugin form/runtime surfaces, control-plane reliability fixes |
 | v2026.512.0 | Codex auth.json generation support (not used for API-key billing here), planning-mode issues, full company search, routine revision history, issue monitors / retry-now, provider vaults |
 | v2026.428.0 | Stable target for v416 upgrade: productivity review, stranded assignment recovery, routine variables UI, attachment size limits, issue tree pause/resume fixes |
 | v2026.427.0 | Multi-user control plane, structured issue interactions, liveness/watchdog recovery, blocker-aware scheduling, issue subtree pause/cancel/restore, beta Environments |

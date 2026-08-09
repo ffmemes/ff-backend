@@ -19,6 +19,6 @@ historical or migration context.
 
 ## References
 
-- [Paperclip-native migration](../paperclip-native-migration.md)
+- [Paperclip-native migration (archive)](../archive/2026-q2/paperclip-native-migration.md)
 - [Paperclip operations runbook](../paperclip-ops-runbook.md)
 - [Agent entrypoint map](../agents/README.md)

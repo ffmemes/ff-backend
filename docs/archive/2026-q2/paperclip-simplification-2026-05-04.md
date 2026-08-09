@@ -18,7 +18,7 @@ code. It avoids rereading the full upstream repo and the long ops runbook.
   - [`agents/_sync_config.py`](../../agents/_sync_config.py)
   - [`.github/workflows/staff-engineer-trigger.yml`](../../.github/workflows/staff-engineer-trigger.yml)
 - Related local notes:
-  - [`paperclip-native-migration.md`](../paperclip-native-migration.md)
+  - [`paperclip-native-migration.md`](paperclip-native-migration.md)
   - [`update-routine-findings-2026-05-01.md`](update-routine-findings-2026-05-01.md)
   - [`routine-observability.md`](routine-observability.md)
 

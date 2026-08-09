@@ -1,126 +1,68 @@
 # TODOS
 
-> Last updated: 2026-05-12. Items marked ~~strikethrough~~ with "DONE" are completed.
+> Living backlog only. Completed items live in git history and dated experiment
+> write-ups under `experiments/completed/` / `specs/archive/`.
+> Last cleaned: 2026-06 (Wave A hygiene).
 
-## P1 — High Priority
+**Product compass:** [docs/growth/virality-loop.md](docs/growth/virality-loop.md)
 
-### ~~Create read-only PostgreSQL user for AI agents~~ — DONE
-**Context:** Done 2026-03-20. Read-only user created with 30s statement_timeout. ANALYST_DATABASE_URL in .env.
+## P1 — Growth & feed measurement
 
-### ~~Remove fast_dopamine_20240804 from blender~~ — DONE
-**Context:** Done. Engine removed from all source files.
+### Virality score for ranking
+**What:** First-class meme-level virality signal from share clicks (`user_deep_link_log`) + invites (`invited_count` / `user.inviter_id`), used either as an engine or as a re-ranker on the mature blend.
+**Why:** Organic user growth is the growth north star; LR alone underweights shareable memes.
+**Depends on:** clean attribution defs in `CONTEXT.md` (done).
 
-### ~~Unstarve like_spread_and_recent engine~~ — DONE
-**Context:** Done 2026-03-20. Removed `age_days < 30` filter in `src/recommendations/candidates.py`. Candidates 72→thousands. See [specs/experiment-2026-03-20-adaptive-cold-start.md](specs/experiment-2026-03-20-adaptive-cold-start.md).
+### Per-engine session continuation rate (dashboard)
+**What:** SQL/readout for % of times a user continues scrolling after a meme from each `recommended_by` engine.
+**Why:** Better engine evaluation than LR; aligns with session-length north star.
+**Context:** Measurement patterns exist in archived cold-start / es-ranked experiment notes under `specs/archive/`.
 
-### ~~Incremental meme_stats computation~~ — DONE
-**Context:** Done 2026-03-27. Rewrote `calculate_meme_stats()` to only update memes with reactions in the last 3 hours, then upsert only those rows. Prevents full-table scan timeout cascade at peak traffic. Commit `84a5119`. See [FFM-5](/FFM/issues/FFM-5).
+### Share CTA experiment harness
+**What:** All share-button / caption CTA variants go through one delivery-prep module + `experiment_assignment`.
+**Why:** Avoid copy-paste across `senders/meme.py` and `senders/next_message.py`.
 
-### ~~Add per-user recency filter to goat engine~~ — DONE
-**Context:** Done 2026-04-13, corrected 2026-06-16. The GOAT filter uses `sent_at` in the SCORES CTE to exclude memes sent to the user in the last 30 days, including sent-but-unreacted memes. PR #162 + #169 shipped the original recency filter; the June correction changed the signal from `reacted_at` to `sent_at` while preserving the 30-day window to avoid lifetime pool exhaustion. Goat LR recovered to 41.9% (7d) vs 39.4% baseline, continuation 97.5%.
+## P2 — Supply side (ETL)
 
-### Auto-discover new TG channels from forwarded messages
-**What:** When the TG scraper parses a forwarded post, extract the source channel URL. Store discovered channels in a new `meme_source_candidate` table with status='discovered'. Admin/moderator approval flow to promote to `meme_source`.
-**Why:** Meme channels frequently forward from other meme channels. Self-growing pipeline of source candidates.
-**Files:** `src/storage/parsers/telegram.py` (extract forwarded_url), `src/database.py` (new table), `alembic/` (migration)
-**Depends on:** Nothing technically — design decision on approval UX.
+### Align VK ETL guards with TG
+**What:** `parsing_enabled` gate, broken-link retry, auto-snooze after empty parses — currently TG-only in places.
+**Why:** Feature drift floods or starves VK content relative to TG.
+**Files:** `src/storage/etl.py`, `src/storage/service.py`, `src/flows/parsers/vk.py`
 
-### Auto-snooze broken/dead sources
-**What:** If a TG source returns 0 posts for 3 consecutive parse attempts, or its `meme_source_stats` like_rate drops below 10%, auto-set status to 'snoozed' and alert admins via Telegram.
-**Why:** Dead/broken sources waste parsing slots. With 108 enabled sources, each dead source delays the cycle for all others.
-**Files:** `src/flows/storage/parsers.py` (check after parse), `src/database.py` (meme_source.data JSONB)
-**Depends on:** Nothing — small, self-contained change.
+### Auto-discover sources from forwards
+**What:** Forwarded channel URLs → `meme_source_candidate` (partially shipped). Keep discovery + moderator vote loop healthy.
+**Files:** TG parser + `specs/moderator-community-loop.md`
 
-## P2 — Medium Priority
+### Auto-snooze broken sources
+**What:** Consecutive empty parses / catastrophic like_rate → `snoozed` + alert.
+**Status:** TG has partial auto-snooze; extend carefully.
 
-### Upgrade pre-commit secrets scanner to detect-secrets
-**What:** Replace shell script `.git/hooks/pre-commit` with Yelp's `detect-secrets` framework.
-**Why:** Better coverage for public repo, especially when AI agents push code. Current hook has false positives on doc text.
-**Depends on:** Phase 2 (Engineer agent pushing code).
+## P2 — Platform hygiene
 
-### Audit python-telegram-bot 22.7 best practices and handler layout
-**What:** Review official PTB 22.7 docs/changelog for handler groups, callback query patterns, lifecycle hooks, rate limiting, webhook/polling setup, and any new recommended syntax. Turn the result into a concrete module layout for `src/tgbot/handlers/`.
-**Why:** Source voting and moderator-community features need clearer Telegram handler boundaries without confusing FastAPI routers with Telegram handler registrars.
-**Files:** `src/tgbot/app.py`, `src/tgbot/handlers/`, `src/tgbot/handlers/moderator/registry.py`
-**Depends on:** Moderator community source-voting prototype design.
+### Parameterize remaining f-string SQL on hot paths
+**What:** Prefer bound params for user-id style queries in `tgbot/repo` and admin upload stats.
+**Why:** Consistency + safety; not classical SQLi when ids are ints, but pattern is easy to misuse.
 
-### Per-engine session continuation rate
-**What:** SQL query that computes, for each engine: % of times user continued scrolling after seeing that engine's meme.
-**Why:** Better engine evaluation metric than LR. Directly aligned with session length north star.
-**Context:** Measurement SQL already exists in [specs/experiment-2026-03-16-es-ranked.md](specs/experiment-2026-03-16-es-ranked.md) and [specs/experiment-2026-03-20-adaptive-cold-start.md](specs/experiment-2026-03-20-adaptive-cold-start.md).
-**Depends on:** Session gap standardization (done: 30 min).
+### Language list SSOT
+**What:** One registry for meme languages (feed / upload / source admin currently diverge).
+**Files:** `handlers/language.py`, `handlers/upload/constants.py`, `senders/keyboards.py`
 
-### Incremental engagement_score computation
-**What:** Add `WHERE user_id IN (...)` to limit the full-table scan.
-**Why:** If the hourly full scan becomes slow as data grows beyond 22M rows.
-**Files:** `src/stats/meme.py` (engagement_score calculation)
-**Depends on:** V1 engagement_score being deployed.
+### Drop or wire orphan tables
+**What:** `user_wrapped` (Redis-only wrapped today); inventory `meme_raw_ig` then freeze or drop.
+**Why:** Schema that nothing writes confuses agents and migrations.
 
-### Incremental user_stats scan
-**What:** Add `WHERE reacted_at > NOW() - INTERVAL '2 days'` to the EVENTS CTE in `calculate_user_stats()`.
-**Why:** Full table scan on 22M+ rows. Bounded scan would be faster.
-**File:** `src/stats/user.py`
-**Depends on:** Nothing — but test session boundary detection still works.
+## P3 — Nice-to-have
 
-### Add share bonus to engagement_score V2
-**What:** Include `invited_count` as a bonus signal in engagement_score.
-**Why:** Shares are the highest-intent positive signal.
-**File:** `src/stats/meme.py`
-**Depends on:** V1 shadow mode validation.
+### Pre-commit secrets scanner upgrade
+**What:** Stronger scanner than current shell hook (`detect-secrets` or keep `redaction_audit.py` as sole gate).
+**Why:** Public repo.
 
-### Skip rate alerting
-**What:** Flag memes with >50% skip rate for manual review.
-**Why:** These memes are actively boring users.
-**File:** `src/stats/meme.py`, `src/flows/stats/meme.py`
-**Depends on:** V1 engagement_score validation.
+### PTB handler layout pass
+**What:** Clearer **регистратор Telegram-хендлеров** boundaries as moderator features grow.
+**Files:** `src/tgbot/app.py`, `handlers/moderator/registry.py`
 
-### Cold start quality score
-**What:** Compute engagement_score specifically for the first 10 memes each new user sees.
-**Why:** 25% of users leave within first 5 memes. See [specs/data-hypotheses.md](specs/data-hypotheses.md) H4.
-**Context:** Now measurable via `recommended_by IN ('cold_start_explore', 'cold_start_adapt')` labels.
-**Depends on:** Adaptive cold start deployed (DONE).
+## Explicitly not doing right now
 
-### ~~Audit all handlers for unhandled Forbidden~~ — DONE
-**Context:** Done 2026-03-20. Fixed 4 handlers: `language.py`, `send_tokens.py`, `feedback.py`, `treasury/payments.py`. All now catch `Forbidden` for cross-user message sends. Error handler already protects moderators/admins from demotion.
-
-## Channel Growth
-
-### DRY crossposting scoring functions
-**What:** Merge get_next_meme_for_tgchannelru() and get_next_meme_for_tgchannelen() into get_next_meme_for_channel(channel, language_code, weights).
-**Why:** 90% identical SQL. When formula changes, need to update in two places. The weights dict becomes the experiment variable for future A/B testing.
-**File:** `src/crossposting/service.py`
-**Depends on:** Channel growth baseline data (2 weeks after deploy of stats collector)
-
-### Autoresearch loop for channel growth
-**What:** AI agent generates scoring formula variants, tags posts with score_version, measures forwards_per_1k_views, keeps winners. Karpathy-inspired automated experimentation.
-**Why:** At 6 posts/day, convergence takes weeks manually. Automated loop can test more variants faster.
-**Depends on:** 4+ weeks of Telethon stats data + DRY scoring functions
-
-### Fix non-idempotent crossposting flow
-**What:** Current flow sends to Telegram BEFORE writing to DB. Failure after send = live post with no DB record (ghost post). Fix: write DB row first with status='pending', send, then update status='sent' + message_id.
-**Why:** Stats collector can't match ghost posts. Data loss on retries.
-**File:** `src/flows/crossposting/meme.py`
-**Depends on:** Nothing
-
-### Channel audience study via giveaway
-**What:** Post a deep link button in channel offering +10 burger coins. Track who clicks. Cross-reference with bot users. Use Telethon to analyze their profiles (linked channels, gift exchanges).
-**Why:** Understand who reads the channel, what they look like, whether they're already bot users.
-**Depends on:** Telethon admin access to channel
-
-### Track channel join/leave events
-**What:** Use Telethon admin log to record join/leave events for both channels. Cross-reference with bot user data.
-**Why:** Understand churn. Are people who leave the channel still using the bot? Are new joiners converting?
-**Depends on:** Telethon admin access to channel
-
-### Backfill historical channel posts to DB
-**What:** Bulk-insert the 15K posts from channel_posts_snapshot.json into crossposting_snapshots table after migration.
-**Why:** Full historical data for analysis. Currently only new posts (after T2 deploy) will have telegram_message_id.
-**File:** channel_posts_snapshot.json -> crossposting_snapshots
-**Depends on:** Migration deployed
-
-## P3 — Nice to Have
-
-### Daily north star log message
-**What:** Log line printed hourly: "Session length: median=22, avg=45, WAU=530, share_rate=16.8%".
-**Why:** Quick pulse of the product without running queries manually.
-**Files:** `src/flows/stats/` (add to existing stats flow)
+- Rebuilding full Feed Turn (`turn.py` / `refill.py`) until delivery ownership needs it — **planner is already live**.
+- Merging `comms` / `crossposting` / `broadcasts` packages (different seams).
+- Re-adding Instagram parsing without a product decision.

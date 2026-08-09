@@ -105,7 +105,7 @@ async def test_promote_does_not_clobber_concurrent_dismiss(conn: AsyncConnection
         return snapshot
 
     with patch(
-        "src.tgbot.service.get_source_candidate_by_id",
+        "src.tgbot.repo.meme_sources.get_source_candidate_by_id",
         side_effect=get_then_dismiss,
     ):
         promoted = await promote_source_candidate(candidate_id, added_by_user_id=PROMOTING_USER_ID)

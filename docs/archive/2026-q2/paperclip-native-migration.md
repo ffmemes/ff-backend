@@ -1,13 +1,47 @@
 # Paperclip-native migration
 
-Prod is on **Paperclip v2026.512.0** as of 2026-05-12. Verified deployment:
-Coolify deployment `q12xc4c1q6m4smzk1zfkog02`, fork branch
-`ohld/paperclip:ffmemes/v2026.512.0`, commit
-`c445e5925628d11bf59d52604b8aa63a6e9aa800`, health check green. Codex
+Prod is on **Paperclip v2026.525.0** as of 2026-05-27. Verified deployment:
+Coolify deployment `<coolify-deployment-id>`, fork branch
+`ohld/paperclip:ffmemes/v2026.525.0`, commit
+`60efa38f868e838e9af2e2168daf0c70afefb9e6`, health check green. Codex
 OAuth auth is present at `/paperclip/.codex/auth.json`, and `OPENAI_API_KEY`
 is absent from the Paperclip host env and all managed Codex agent env bindings.
 
 Goal: stop maintaining custom scaffolding for things Paperclip ships natively, so upstream fixes apply to us for free.
+
+## 2026-05-27 adopted: v2026.525.0
+
+Upstream `v2026.525.0` was deployed after a fresh Postgres backup, slim
+volume backup, pinned fork branch update, migration prerequisite check
+(`pg_trgm`), Coolify hard-gate verification, and post-deploy auth checks.
+Production remains on a stable tag; latest canary observed during the upgrade
+was `2026.526.0-canary.1` and was not adopted.
+
+Adopted / recommended for FFmemes:
+
+- **Routine env and secrets.** Prefer native routine-level env/secret bindings
+  when a scheduled job needs narrower credentials. Keep the precedence model in
+  mind: agent defaults, project overrides, then routine-specific bindings.
+- **Workspace diff plugin.** Use Paperclip's native workspace diff/review
+  surfaces for PR/task handoffs before adding custom "show me the diff" prompt
+  text to agent instructions.
+- **Scoped assignment and retry-now.** Use native assignment controls,
+  blocker dependencies, issue monitors, and retry-now affordances when
+  unblocking work. Avoid comment-only wakeups when the dashboard has a first
+  class state transition.
+- **Plugin runtime scoping.** Keep Telegram and future operational plugins
+  scoped to the agents/routines that need them instead of exposing broad tools
+  to every agent.
+- **Cloud Upstream sync and runtime reliability fixes.** Treat these as
+  platform benefits; no FFmemes-specific prompt changes are required.
+
+Do not adopt yet:
+
+- **Modal sandbox provider as a default.** The release adds the provider, but
+  FFmemes agents are already configured around `codex_local`; switch only for a
+  specific workload with a rollback plan.
+- **Grok provider / AWS vault paths.** They are not part of the current
+  subscription-auth and Paperclip-company-secret operating model.
 
 ## 2026-05-12 adopted: v2026.512.0
 
@@ -49,9 +83,21 @@ Do not adopt yet:
 - **OPENAI_API_KEY-backed Codex auth.** This is useful upstream for users who
   want API billing. It is explicitly not our desired path.
 
+## Previous 2026-05-12 stable deployment
+
+Previous verified production was **v2026.512.0**. Production now runs
+**v2026.525.0** from a pinned stable ref. Canary builds may exist, but
+production should stay on a pinned stable release unless a specific blocker
+requires a canary and the rollback path is explicit.
+
+The previous deployed target was upstream tag `v2026.512.0` at commit
+`c445e5925628d11bf59d52604b8aa63a6e9aa800`. Coolify deployed
+`ohld/paperclip:ffmemes/v2026.512.0` for deployment
+`q12xc4c1q6m4smzk1zfkog02`.
+
 ## Previous 2026-05-06 stable deployment
 
-Previous verified production was **v2026.428.0** ([release notes](https://github.com/paperclipai/paperclip/releases/tag/v2026.428.0); mirror: [newreleases](https://newreleases.io/project/github/paperclipai/paperclip/release/v2026.428.0)). Production now runs **v2026.512.0** from a pinned stable ref. Canary builds may exist, but production should stay on a pinned stable release unless a specific blocker requires a canary and the rollback path is explicit.
+Earlier verified production was **v2026.428.0** ([release notes](https://github.com/paperclipai/paperclip/releases/tag/v2026.428.0); mirror: [newreleases](https://newreleases.io/project/github/paperclipai/paperclip/release/v2026.428.0)).
 
 The previous deployed target was upstream tag `v2026.428.0` at commit
 `3494e84a2920f3e2bc5f627f916da29e224086dc`. Coolify deploys
@@ -72,18 +118,34 @@ Safe company import still rejects `replace` for existing companies, so the repo'
 
 ## Pre-flight backups
 
+Fresh v2026.525.0 upgrade backups taken 2026-05-27 on
+`t.ffmemes.com:/root/paperclip-backups/`:
+
+- `paperclip-20260527T151256Z.sql.gz` — DB dump, gzip verified.
+- `paperclip-volume-slim-20260527T152629Z.tgz` — slim Paperclip named-volume
+  archive, tar verified; excludes runtime logs, caches, previous backup blobs,
+  and generated package caches.
+
+Retained full-volume insurance backup after pruning older full archives on
+2026-05-27:
+
+- `paperclip-volume-20260514T122247Z.tgz` — full named-volume archive, kept
+  temporarily until the slim backup/restore path is tested end-to-end.
+- `paperclip-20260514T122247Z.sql.gz` — matching DB dump, gzip verified.
+
 Fresh v2026.512.0 upgrade backups taken 2026-05-12 on
 `t.ffmemes.com:/root/paperclip-backups/`:
 
 - `paperclip-20260512T145333Z.sql.gz` — DB dump, gzip verified.
-- `paperclip-volume-20260512T145333Z.tgz` — Paperclip named-volume archive,
-  tar verified.
+- `paperclip-volume-20260512T145333Z.tgz` — pruned 2026-05-27 after the
+  v2026.525.0 deploy because a newer full archive and fresh slim backup exist.
 
 Earlier v2026.428.0 upgrade backups taken 2026-05-06 on
 `t.ffmemes.com:/root/paperclip-backups/`:
 
 - `paperclip-20260506T160310Z.sql.gz` — DB dump, gzip verified.
-- `paperclip-volume-clean-20260506T160914Z.tgz` — Paperclip named-volume archive, tar verified.
+- `paperclip-volume-clean-20260506T160914Z.tgz` — pruned 2026-05-27 after the
+  v2026.525.0 deploy because a newer full archive and fresh slim backup exist.
 
 Earlier migration backups taken 2026-04-24 09:27 UTC:
 
@@ -96,7 +158,7 @@ Restore (only if needed):
 gunzip -c preexport-20260424-092754.sql.gz | docker exec -i <paperclip-container> psql "$DATABASE_URL"
 ```
 
-## What Paperclip-native looks like (v2026.512+)
+## What Paperclip-native looks like (v2026.525+)
 
 CLI commands we now rely on:
 - `paperclipai db:backup` — native DB dump.
@@ -107,6 +169,10 @@ CLI commands we now rely on:
 - Native company search — replace broad custom issue scans for slug dedupe.
 - Native routine revision history and restore — replace manual description
   history outside git for routine text.
+- Native routine env/secrets — replace prompt-side instructions that ask an
+  agent to discover or borrow credentials from a broader scope.
+- Native workspace diff plugin — use Paperclip's task/workspace view before
+  adding custom diff summarizers to agent prompts.
 
 API endpoints we now use directly (no SSH, no `docker cp`):
 - `GET  /api/companies/<id>/agents` — slug → agent ID resolution.
@@ -181,7 +247,7 @@ Concurrency group `paperclip-deploy-agents` prevents overlapping runs; `cancel-i
 manifest. Codex auth is subscription/OAuth-only; `OPENAI_API_KEY` is deliberately
 absent from Codex env bindings.
 
-**3b. Retire the webhook proxy.** ✅ Done 2026-04-29. QA trigger signing mode flipped to `none`; Sentry Internal Integration now POSTs directly to the Paperclip QA trigger URL stored in Sentry/Paperclip configuration. Do not commit routine trigger IDs or full public trigger paths; treat publicIds as sensitive operational material. Deleted: `src/integrations/paperclip.py`, `notify_qa_sync` callsite in `src/flows/hooks.py`, env vars `WEBHOOK_PROXY_SECRET` / `SENTRY_CLIENT_SECRET` / `PAPERCLIP_QA_TRIGGER_URL` / `PAPERCLIP_QA_TRIGGER_SECRET`. Coolify webhook path was unused (no hits in 24h prior to removal). Prefect failures now surface via the QA Log Scan 3h cron instead of an instant push — accepted tradeoff for less code. Trigger publicId leakage = at most noisy QA scans (no user input or commands accepted).
+**3b. Retire the webhook proxy.** ✅ Done 2026-04-29. QA trigger signing mode flipped to `none`; Sentry Internal Integration now POSTs directly to the Paperclip QA trigger URL stored in Sentry/Paperclip configuration. Do not commit routine trigger IDs or full public trigger paths; treat publicIds as sensitive operational material. Deleted: `src/integrations/paperclip.py`, `notify_qa_sync` callsite in `src/flows/hooks.py`, env vars `WEBHOOK_PROXY_SECRET` / `SENTRY_CLIENT_SECRET` / `PAPERCLIP_QA_TRIGGER_URL` / `PAPERCLIP_QA_TRIGGER_SECRET`. Coolify webhook path was unused (no hits in 24h prior to removal). Prefect failures now surface via the QA Log Scan 6h cron instead of an instant push — accepted tradeoff for less code. Trigger publicId leakage = at most noisy QA scans (no user input or commands accepted).
 
 **3c. CLI-native agent skills and v512 built-ins.** In each AGENTS.md, replace raw `curl https://org.ffmemes.com/api/...` with native Paperclip skill/MCP/CLI operations: issue search, company search, planning-mode issue creation, monitor/retry-now, approvals, `paperclipai dashboard get`, and `paperclipai heartbeat run --agent-id`. Reduces per-wake context and avoids custom liveness logic.
 

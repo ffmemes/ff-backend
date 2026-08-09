@@ -25,37 +25,6 @@ from src.tgbot.sharing import build_meme_share_button
 
 HEART_EMOJI = ["❤️", "♥️", "💙", "💜", "💛", "🧡", "💚", "🩵"]
 
-RUSSIAN_REFERRAL_BUTTON_TEXTS = [
-    "Мемы для тебя",
-    "Твои мемы",
-    "Еще мемы",
-    "Бот с мемами",
-    "За мемами",
-    "Свежие мемы",
-    "Мемы тут",
-    "Мемная лента",
-    "Мемы рядом",
-    "Лови мемы",
-]
-
-ENGLISH_REFERRAL_BUTTON_TEXTS = [
-    "Memes for you",
-    "Your memes",
-    "More memes",
-    "Meme bot",
-    "Grab memes",
-    "Fresh memes",
-    "Meme feed",
-    "Daily memes",
-    "Tap memes",
-    "Memes inside",
-]
-
-
-def select_referral_button_text(has_russian_language: bool) -> str:
-    texts = RUSSIAN_REFERRAL_BUTTON_TEXTS if has_russian_language else ENGLISH_REFERRAL_BUTTON_TEXTS
-    return random.choice(texts)
-
 
 def meme_reaction_keyboard(
     meme_id: int,

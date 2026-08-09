@@ -24,4 +24,4 @@ for Paperclip agent configuration is:
 
 - [Paperclip skill catalog](../paperclip-skill-catalog.md)
 - [Agent entrypoint map](../agents/README.md)
-- [Paperclip-native migration](../paperclip-native-migration.md)
+- [Paperclip-native migration (archive)](../archive/2026-q2/paperclip-native-migration.md)

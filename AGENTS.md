@@ -1,9 +1,10 @@
 # ff-backend Agent Notes
 
 ## Automated parsing & Prefect storage flows
-- The Prefect flows in [`src/flows/storage/memes.py`](src/flows/storage/memes.py) orchestrate ingestion from all automated sources:
-  - `tg_meme_pipeline`, `vk_meme_pipeline`, and `ig_meme_pipeline` ETL raw posts, download media, watermark images, push them into the storage bot chat, and hand off to `final_meme_pipeline`.
+- The Prefect flows in [`src/flows/storage/memes.py`](src/flows/storage/memes.py) orchestrate ingestion from automated sources:
+  - `tg_meme_pipeline` and `vk_meme_pipeline` ETL raw posts, download media, watermark images, push them into the storage bot chat, and hand off to `final_meme_pipeline`.
   - `final_meme_pipeline` performs duplicate checks, normalizes captions, and promotes records by calling `update_meme_status_of_ready_memes`.
+  - **Instagram pipeline is removed.** `meme_raw_ig` may still exist for historical rows; do not reintroduce `ig_meme_pipeline` without a product decision.
 - Legacy Modal OCR has been removed. The active image analysis system is **Describe Memes** (see below).
 
 ## Manual upload & moderation workflow
@@ -18,17 +19,19 @@
 - When implementing prepared sources, the Telegram ETL must only transform raw posts for `meme_source.status = 'parsing_enabled'`; this guard prevents pre-parsed candidates from leaking into recommendations before a successful vote.
 
 ## Recommendation queue generation
-- Recommendation queues are stored in Redis; see [`src/recommendations/meme_queue.py`](src/recommendations/meme_queue.py) for helper utilities.
-  - `check_queue` and `generate_recommendations` refill a user's queue when it drops to two items, blending candidate sources via the `CandidatesRetriever` and `blend` helper.
-  - Cold-start users (<30 memes sent) fall back to `best_uploaded_memes`, `fast_dopamine`, and curated source lists; more engaged users use weighted blends that may include long-tail boosters.
+- Recommendation queues are stored in Redis; see [`src/recommendations/meme_queue.py`](src/recommendations/meme_queue.py).
+  - `check_queue` refills when queue length drops to **≤ 8**; `generate_recommendations` runs `RecommendationBatchPipeline` (maturity plan from [`src/feed_turn/planner.py`](src/feed_turn/planner.py) + engines + blend).
+  - Cold start is **3-phase** (`cold_start_explore` → `cold_start_adapt` → blend). Mature default weights live in `feed_turn.planner` (`MATURE_BLEND_WEIGHTS`); blender experiments must import that map for control.
   - Accepted recommendations are pushed to Redis with `add_memes_to_queue_by_key`; consumption pops entries one-by-one.
-- User reactions are persisted through `create_user_meme_reaction` / `update_user_meme_reaction` (see [`src/recommendations/service.py`](src/recommendations/service.py)). These records drive `calculate_meme_reactions_stats` and related counters, which in turn update meme statuses and recommendation eligibility.
+- User reactions are persisted through `create_user_meme_reaction` / `update_user_meme_reaction` (see [`src/recommendations/service.py`](src/recommendations/service.py)). These records drive stats aggregation and recommendation eligibility.
+- Share attribution: deep links `s_{user_id}_{meme_id}` in `user_deep_link_log` — see `CONTEXT.md` **Share Attribution**. Growth thesis and measurement plan: [`docs/growth/virality-loop.md`](docs/growth/virality-loop.md).
 
 ## Operational notes
 - Manual upload review happens entirely inside the designated Telegram upload review chat. Keep communications and escalations there for traceability.
 - Weekly maintenance (Prefect flow health checks, data hygiene jobs, etc.) runs through Prefect deployment definitions. Use Prefect CLI to trigger flows during scheduled operations.
 - Paperclip inspection should use the project-local CLI skill at `.codex/skills/paperclip/SKILL.md` and wrapper `.codex/paperclip-tools/paperclipai-ffmemes.sh`. Do not enable Paperclip MCP globally; it adds a large always-on tool surface.
 - Agent architecture decisions and task entrypoints live in [`docs/adr/`](docs/adr/) and [`docs/agents/README.md`](docs/agents/README.md).
+- Telegram-facing DB helpers are split under [`src/tgbot/repo/`](src/tgbot/repo/); [`src/tgbot/service.py`](src/tgbot/service.py) re-exports them for compatibility.
 
 ## Describe Memes (OpenRouter Vision)
 
@@ -61,3 +64,7 @@ Before resuming, verify the root cause is fixed (check recent flow run logs).
 ## Key settings & environment toggles
 - Redis, Postgres, and Telegram configuration live in [`src/config.py`](src/config.py).
 - `OPENROUTER_API_KEY` — required for describe_memes. Balance must stay >= $0.
+
+## Public repo hygiene
+- This repository is public. Follow [`docs/public-repo-rule.md`](docs/public-repo-rule.md).
+- Never commit production hostnames/IPs, Coolify app UUIDs, SSH recipes that grant access, or secret values. Use env var **names** only.

@@ -33,7 +33,8 @@ await send_broadcast(
 Commit, push, merge to production, wait for Coolify deploy to finish. Then run:
 
 ```bash
-ssh root@65.108.127.32 "docker exec -e PYTHONPATH=/src <container> \
+# On the production host (private ops notes; do not commit host/IP here):
+ssh "$PROD_SSH" "docker exec -e PYTHONPATH=/src <container> \
     python scripts/broadcast_<name>.py <broadcast_id> --dry-run"
 ```
 
@@ -42,7 +43,7 @@ Verify counts in dry run output. Then run without `--dry-run`.
 ### 3. Monitor
 
 ```bash
-ssh root@65.108.127.32 "docker exec <container> tail -5 /tmp/broadcast.log"
+ssh "$PROD_SSH" "docker exec <container> tail -5 /tmp/broadcast.log"
 ```
 
 ## Rules (Lessons Learned)

@@ -12,7 +12,6 @@ from src.tgbot.constants import (
     TELEGRAM_CHANNEL_RU_CHAT_ID,
     TELEGRAM_CHANNEL_RU_LINK,
 )
-from src.tgbot.schemas import UserTg
 from src.tgbot.service import add_user_tg_chat_membership
 
 logger = logging.getLogger(__name__)
@@ -37,10 +36,6 @@ def remove_buttons_with_callback(reply_markup: dict) -> dict:
 
     reply_markup["inline_keyboard"] = new_keyboard
     return reply_markup
-
-
-def tg_user_repr(tg_user: UserTg) -> str:
-    return f"@{tg_user.username}" if tg_user.username else f"#{tg_user.id}"
 
 
 async def safe_answer_callback_query(callback_query, *args, **kwargs) -> None:
