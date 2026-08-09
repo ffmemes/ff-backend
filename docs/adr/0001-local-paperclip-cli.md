@@ -20,4 +20,4 @@ needed for a specific investigation, keep it local and task-scoped.
 
 - [AGENTS.md](../../AGENTS.md)
 - [Agent entrypoint map](../agents/README.md)
-- [Paperclip simplification notes](../agents/paperclip-simplification-2026-05-04.md)
+- [Paperclip simplification notes (archive)](../archive/2026-q2/paperclip-simplification-2026-05-04.md)

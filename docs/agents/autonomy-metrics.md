@@ -87,8 +87,8 @@ decisions.
   contracts.
 - [`outcome-ledger.md`](outcome-ledger.md) defines the weekly CEO outcome review
   contract.
-- [`paperclip-simplification-2026-05-04.md`](paperclip-simplification-2026-05-04.md)
-  defines the runtime simplification direction.
+- [`paperclip-simplification-2026-05-04.md`](../archive/2026-q2/paperclip-simplification-2026-05-04.md)
+  (archive) records the runtime simplification direction.
 - [`../../scripts/paperclip_routine_audit.py`](../../scripts/paperclip_routine_audit.py)
   gives compact routine health input.
 - [`../../scripts/paperclip_outcome_audit.py`](../../scripts/paperclip_outcome_audit.py)

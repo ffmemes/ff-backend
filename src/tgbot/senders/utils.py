@@ -1,5 +1,4 @@
 from random import choice
-from typing import Iterable
 
 from telegram import Message, Update
 from telegram.constants import ParseMode
@@ -89,10 +88,6 @@ async def collect_user_languages(
         if language:
             languages.add(language)
     return languages
-
-
-def has_russian_language(languages: Iterable[str]) -> bool:
-    return any(language and language.startswith("ru") for language in languages)
 
 
 async def send_or_edit(

@@ -95,13 +95,6 @@ async def filter_unseen_memes(
     return res
 
 
-async def get_user_reactions(
-    user_id: int,
-) -> list[dict[str, Any]]:
-    select_statement = select(user_meme_reaction).where(user_meme_reaction.c.user_id == user_id)
-    return await fetch_all(select_statement)
-
-
 async def get_user_reactions_for_meme_ids(
     user_id: int,
     meme_ids: list[int],

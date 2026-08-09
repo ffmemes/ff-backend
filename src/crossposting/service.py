@@ -597,6 +597,3 @@ async def get_next_share_max_meme_for_tgchannelen(
         return None, None
     return _picked_meme_dict(rows[0]), _build_decision_log("tgchannelen", 3, rows)
 
-
-async def get_next_meme_for_vkgroupru():
-    pass

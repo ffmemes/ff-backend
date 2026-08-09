@@ -10,9 +10,9 @@ experiments/
 │   └── YYYY-MM-DD-experiment-name.md
 ├── completed/        # Finished experiments (never deleted)
 │   └── YYYY-MM-DD-experiment-name.md
-├── reports/          # Analyst daily reports
+├── reports/          # Local analyst dumps (gitignored — do not commit)
 │   └── YYYY-MM-DD-daily.md
-└── log.jsonl         # Machine-readable audit trail
+└── log.jsonl         # Local audit trail (gitignored — do not commit)
 ```
 
 ## Experiment Lifecycle

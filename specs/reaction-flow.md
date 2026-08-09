@@ -26,7 +26,7 @@ The most important code path in the system. A bug here breaks the core UX.
    ├─> create_user_meme_reaction()     — DB: INSERT with sent_at (pre-reactive)
    ├─> send meme (edit_last_message or send_new_message)
    ├─> send_popup() if applicable
-   └─> check_queue()                   — trigger refill if <= 2 remaining
+   └─> check_queue()                   — trigger refill if queue length <= 8
 ```
 
 ## Race Conditions

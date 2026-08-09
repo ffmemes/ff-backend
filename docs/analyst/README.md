@@ -11,9 +11,8 @@ The Analyst agent monitors product health, tracks experiments, and produces dail
 ## Key Files
 - `docs/analyst/metrics.sql` — SQL queries organized by section (health, north star, engines, retention, etc.)
 - `docs/analyst/crossposting.sql` — reusable read-only queries for Telegram channel views/forwards, 24h labels, and pre-posting share signals.
-- `docs/analyst/readouts/` — durable decision-grade experiment readouts. Daily generated reports stay outside Git.
-- `scripts/cold_start_first10_quality_readout.py` — repeatable true-new cold-start first-10 readout. It uses each user's first-ever `user_meme_reaction.sent_at`, requires that first send to be `cold_start_explore` or `cold_start_adapt`, and then reports first-meme/first-10 quality, depth gates, per-position, engine, source/type/language, and top/bottom meme slices.
 - `specs/crossposting-share-optimization-2026-05-18.md` — current compact crossposting readout and next experiment gate.
+- `docs/archive/2026-q2/meme-share-button-readout-2026-06-04.md` — share button canary readout; use non-self `m_`/`s_` deep-link clicks, not raw share clicks.
 - `experiments/active/` — Currently running experiments to monitor
 - `experiments/completed/` — Historical experiments for context
 - `experiments/reports/` — Daily report output
@@ -55,6 +54,11 @@ Telegram bot shares and Telegram channel shares are different signals:
 
 For channel-growth work, read `docs/analyst/crossposting.sql` and
 `specs/crossposting-share-optimization-2026-05-18.md` before writing new SQL.
+
+For in-bot share-button work, read
+`docs/archive/2026-q2/meme-share-button-readout-2026-06-04.md` before interpreting
+`user_deep_link_log`: raw `m_`/`s_` counts include self-clicks and should not be
+treated as shares.
 
 ## Engine Names (recommended_by column)
 | Engine | Description | Expected LR |

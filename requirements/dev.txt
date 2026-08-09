@@ -1,10 +1,7 @@
 -r base.txt
 ruff==0.15.*
-coverage==7.13.*
-mypy==1.20.*
 pytest==9.0.*
 pytest-asyncio==1.3.*
-async-asgi-testclient==1.4.11
 pytest-env==1.6.*
 
 ipython==9.13.*

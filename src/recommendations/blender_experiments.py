@@ -8,6 +8,7 @@ import orjson
 from sqlalchemy import text
 
 from src.database import fetch_one
+from src.feed_turn.planner import MATURE_BLEND_WEIGHTS
 from src.redis import redis_client
 from src.tgbot.service import (
     assign_experiment,
@@ -21,8 +22,6 @@ RECENTLY_LIKED_BLENDER_V2_EXPERIMENT_ID = "recently_liked_blender_v2"
 RECENTLY_LIKED_BLENDER_V2_CONTROL = "control"
 RECENTLY_LIKED_BLENDER_V2_TREATMENT = "treatment"
 RECENTLY_LIKED_BLENDER_V2_EXCLUDED = "excluded_high_volume_skipper"
-RECENTLY_LIKED_BLENDER_V2_ENROLLMENT_FROZEN = True
-RECENTLY_LIKED_BLENDER_V2_ENROLLMENT_FROZEN_AT = "2026-07-23T18:05:54Z"
 RECENTLY_LIKED_BLENDER_V2_SAMPLE_GATE_PER_VARIANT = 1000
 RECENTLY_LIKED_BLENDER_V2_MATURE_MIN_MEMES_SENT = 100
 RECENTLY_LIKED_BLENDER_V2_SKIPPER_MIN_REACTIONS_7D = 50
@@ -41,14 +40,8 @@ TEXT_LIGHT_BLENDER_V1_TREATMENT = "treatment_text_light_lr_smoothed"
 TEXT_LIGHT_BLENDER_V1_MAX_OCR_WORDS = 30
 TEXT_LIGHT_BLENDER_V1_SAMPLE_GATE_PER_VARIANT = 1000
 
-MATURE_BLENDER_CONTROL_WEIGHTS = {
-    "best_uploaded_memes": 0.3,
-    "like_spread_and_recent_memes": 0.3,
-    "lr_smoothed": 0.4,
-    "recently_liked": 0.2,
-    "goat": 0.1,
-    "es_ranked": 0.1,
-}
+# Control = default mature plan weights (SSOT in feed_turn.planner).
+MATURE_BLENDER_CONTROL_WEIGHTS = dict(MATURE_BLEND_WEIGHTS)
 MATURE_BLENDER_TREATMENT_WEIGHTS = {
     "best_uploaded_memes": 0.3,
     "like_spread_and_recent_memes": 0.25,
@@ -336,9 +329,6 @@ async def get_or_assign_recently_liked_blender_v2_variant(user_id: int) -> str:
     )
     if assignment is not None:
         return assignment["variant"]
-
-    if RECENTLY_LIKED_BLENDER_V2_ENROLLMENT_FROZEN:
-        return RECENTLY_LIKED_BLENDER_V2_CONTROL
 
     metrics = await get_recent_7d_lr_assignment_metrics(user_id)
     if metrics is None:
