@@ -161,8 +161,9 @@ Primary metrics library:
 
 | Phase | Deliverable | Effort |
 |-------|-------------|--------|
-| **0 (this PR)** | `block_disliked_sources` policy in all engines + config kill switch | S |
+| **0** | Soft **demote** disliked sources (×0.15); hard-block opt-in only | S |
 | **1** | `scripts/reco_eval.py counterfactual-block-disliked` | S |
+| **1b** | Label retention pushes `broadcast_reengagement` for dwell analysis | S |
 | **2** | Candidate-log sampling (top-K engines per refill) for true shadow rank | M |
 | **3** | Experiment registry refactor (one apply path) | M |
 | **4** | Soft scorer (affinity + virality + exploration budget) | L |

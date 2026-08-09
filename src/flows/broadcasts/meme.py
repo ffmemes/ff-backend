@@ -48,6 +48,8 @@ class _FirstMemeNudgeTaskList(list[asyncio.Task[None]]):
 async def _send_to_user(
     user_id: int,
     first_meme_nudge_tasks: list[asyncio.Task[None]],
+    *,
+    broadcast_label: str = "broadcast_reengagement",
 ) -> None:
     await check_queue(user_id)
     meme = await get_next_meme_for_user(user_id)
@@ -57,6 +59,9 @@ async def _send_to_user(
             user_id,
             meme,
             first_meme_nudge_tasks=first_meme_nudge_tasks,
+            # Distinguish retention pushes from in-session feed for analytics
+            # (dwell / sec_to_react distributions differ by delivery path).
+            recommended_by=broadcast_label,
         )
 
 
