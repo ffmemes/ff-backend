@@ -74,6 +74,9 @@ class Config(BaseSettings):
     RECOMMENDATION_BLOCK_DISLIKED_SOURCES: bool = False
     RECOMMENDATION_BLOCK_DISLIKED_MIN_REACTIONS: int = 15
     RECOMMENDATION_BLOCK_DISLIKED_RATIO: float = 3.0  # ndislikes >= 3 * nlikes
+    # Retention broadcasts: pick high-confidence meme (affinity + LR) instead of
+    # blind Redis queue pop. Kill switch rolls back to queue path.
+    BROADCAST_HIGH_QUALITY_PICK_ENABLED: bool = True
 
     PREFECT_API_URL: str | None = None
     PREFECT_AUTH_STRING: str | None = None

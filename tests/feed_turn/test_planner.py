@@ -48,10 +48,11 @@ def test_cold_start_fallback_order_and_min_sends(nmemes_sent):
 def test_transition_blend_and_empty_blend_fallback_order():
     plan = plan_candidate_selection(16)
 
+    # CS3 prefers proven social proof over like_spread for early personalization.
     assert dict(plan.blend_weights) == {
-        "cold_start_adapt": 0.5,
+        "cold_start_adapt": 0.4,
+        "best_uploaded_memes": 0.3,
         "text_light_lr_smoothed": 0.3,
-        "like_spread_and_recent_memes": 0.2,
     }
     assert dict(plan.fixed_pos) == {0: "cold_start_adapt"}
     assert _fallbacks(16) == (

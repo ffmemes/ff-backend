@@ -12,7 +12,8 @@ The Analyst agent monitors product health, tracks experiments, and produces dail
 - `docs/analyst/metrics.sql` — SQL queries organized by section (health, north star, engines, retention, etc.)
 - `docs/analyst/viral-shares-blender-v1.sql` — readout for `viral_shares_blender_v1` (share clickers + invites vs control + session guardrail).
 - `docs/analyst/dwell-feed-vs-broadcast.sql` — `sec_to_react` percentiles: like vs skip × feed vs broadcast; dwell buckets; demote inventory risk.
-- `docs/analyst/source-affinity-demote-guardrails.sql` — post-deploy volume / LR / broadcast label checks for soft-demote (#340).
+- `docs/analyst/source-affinity-demote-guardrails.sql` — post-deploy volume / LR checks for soft-demote (#340).
+- `docs/analyst/broadcast-reengagement.sql` — retention push HQ vs queue fallback vs feed.
 - Living decision calendar: [`experiments/HYPOTHESES.md`](../../experiments/HYPOTHESES.md).
 - `docs/growth/2026-08-09-viral-shares-blender-v1.md` — experiment design note (also under `experiments/active/` when tracked).
 - `docs/analyst/crossposting.sql` — reusable read-only queries for Telegram channel views/forwards, 24h labels, and pre-posting share signals.

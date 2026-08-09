@@ -31,6 +31,10 @@ async def test_cold_start_explore_guardrails_exclude_weak_sources_and_mark_treat
     assert "S.url = ANY(:cold_start_guardrail_source_urls)" in query_sql
     assert params["recommended_by"] == COLD_START_EXPLORE_GUARDED_RECOMMENDED_BY
     assert params["cold_start_guardrail_source_urls"] == list(COLD_START_GUARDRAIL_SOURCE_URLS)
+    assert params["cold_start_explore_min_raw_like_rate"] == 0.50
+    assert params["cold_start_explore_min_reactions"] == 25
+    assert "cold_start_explore_min_raw_like_rate" in query_sql
+    assert "lr_smoothed DESC" in query_sql
 
 
 @pytest.mark.asyncio

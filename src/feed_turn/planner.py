@@ -89,13 +89,16 @@ def plan_candidate_selection(nmemes_sent: int) -> CandidateSelectionPlan:
         )
 
     if nmemes_sent < 30:
+        # CS3 (memes 16-29): still personalizing. Prefer proven social proof
+        # (best_uploaded + text-light) over like_spread virality — early users
+        # lack signal for spread engines, and uploads historically hold LR better.
         return CandidateSelectionPlan(
             maturity_stage=COLD_START_3,
             primary_engine=None,
             blend_weights={
-                "cold_start_adapt": 0.5,
+                "cold_start_adapt": 0.4,
+                "best_uploaded_memes": 0.3,
                 "text_light_lr_smoothed": 0.3,
-                "like_spread_and_recent_memes": 0.2,
             },
             fixed_pos={0: "cold_start_adapt"},
             fallback_engines=(

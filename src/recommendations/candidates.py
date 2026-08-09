@@ -20,6 +20,12 @@ GOAT_MIN_LR = 0.20  # lr_smoothed — minimum proven like rate
 GOAT_MIN_AGE_DAYS = 3  # days since created_at — must have aged enough to accumulate reactions
 GOAT_RECENTLY_SENT_WINDOW_DAYS = 30
 TEXT_LIGHT_MAX_OCR_WORDS = 30
+# Cold-start first-impression floors (raw LR, not bias-corrected lr_smoothed).
+# 7d prod: cold_start_explore_guarded LR ~18% — raise the bar so phase-1 only
+# serves memes the crowd already likes at a majority rate.
+COLD_START_EXPLORE_MIN_EXPLICIT_REACTIONS = 25
+COLD_START_EXPLORE_MIN_LR_SMOOTHED = 0.10
+COLD_START_EXPLORE_MIN_RAW_LIKE_RATE = 0.50
 COLD_START_GUARDRAIL_SOURCE_URLS = (
     "https://vk.com/dfzwe4",
     "https://vk.com/eternalclassic",
@@ -525,27 +531,35 @@ async def cold_start_explore(
         WHERE 1=1
             AND M.status = 'ok'
             AND R.meme_id IS NULL
-            AND (MS.nlikes + MS.ndislikes) >= 20
-            AND MS.lr_smoothed >= 0.10
+            AND (MS.nlikes + MS.ndislikes) >= :cold_start_explore_min_reactions
+            AND MS.lr_smoothed >= :cold_start_explore_min_lr_smoothed
+            AND (MS.nlikes::float / NULLIF(MS.nlikes + MS.ndislikes, 0))
+                >= :cold_start_explore_min_raw_like_rate
             {TEXT_LIGHT_OCR_FILTER_SQL}
             {_cold_start_guardrail_source_filter(candidate_guardrails_enabled)}
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
             {block_disliked_sources_sql_filter()}
 
-        ORDER BY (MS.nlikes::float / NULLIF(MS.nlikes + MS.ndislikes, 0)) DESC,
+        ORDER BY MS.lr_smoothed DESC NULLS LAST,
+                 (MS.nlikes::float / NULLIF(MS.nlikes + MS.ndislikes, 0)) DESC,
                  (MS.nlikes + MS.ndislikes) DESC
         LIMIT :limit
     """
-    return await fetch_all(
-        text(query),
-        _cold_start_params(
-            user_id,
-            limit,
-            exclude_meme_ids,
-            engine=COLD_START_EXPLORE_RECOMMENDED_BY,
-            candidate_guardrails_enabled=candidate_guardrails_enabled,
-        ),
+    params = _cold_start_params(
+        user_id,
+        limit,
+        exclude_meme_ids,
+        engine=COLD_START_EXPLORE_RECOMMENDED_BY,
+        candidate_guardrails_enabled=candidate_guardrails_enabled,
     )
+    params.update(
+        {
+            "cold_start_explore_min_reactions": COLD_START_EXPLORE_MIN_EXPLICIT_REACTIONS,
+            "cold_start_explore_min_lr_smoothed": COLD_START_EXPLORE_MIN_LR_SMOOTHED,
+            "cold_start_explore_min_raw_like_rate": COLD_START_EXPLORE_MIN_RAW_LIKE_RATE,
+        }
+    )
+    return await fetch_all(text(query), params)
 
 
 async def cold_start_adapt(

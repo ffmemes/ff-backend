@@ -3,7 +3,7 @@
 **Purpose:** When an agent (or human) resumes after days/weeks, this file answers:
 what is live, what we expected, when to re-measure, and what “good / kill” means.
 
-**Last updated:** 2026-08-09 (UTC)  
+**Last updated:** 2026-08-09 (UTC) — added H5 cold-start + H3b HQ broadcast pick  
 **Prod DB clock at last interim:** `2026-08-09 15:44 UTC`
 
 How to use on resume:
@@ -21,9 +21,9 @@ How to use on resume:
 
 | Date (UTC) | What to run | Hypotheses |
 |------------|-------------|------------|
-| **2026-08-12** (day ~3) | Smoke only — not a ship decision | H1 viral_shares, H2 demote |
-| **2026-08-16** (day ~7) | **Primary readout** | H1, H2, H3 broadcast label |
-| **2026-08-23** (day ~14) | Final keep/kill if day-7 underpowered | H1 primarily |
+| **2026-08-12** (day ~3) | Smoke only — not a ship decision | H1, H2, H3/H3b, H5 |
+| **2026-08-16** (day ~7) | **Primary readout** | H1, H2, H3/H3b, H5 |
+| **2026-08-23** (day ~14) | Final keep/kill if day-7 underpowered | H1 primarily; H3b/H5 if thin |
 | Ad-hoc | After any ranking/deploy incident | all active |
 
 Agent prompt on resume (copy-paste):
@@ -140,29 +140,66 @@ volume collapse.
 | Field | Value |
 |-------|--------|
 | **ID** | `broadcast_reengagement_label` |
-| **Status** | **shipped** (label on new retention pushes) |
+| **Status** | **shipped** — labels live (39 rows within hours of #340) |
 | **Shipped** | 2026-08-09 with #340 |
-| **Code** | `flows/broadcasts/meme.py` → `recommended_by=broadcast_reengagement` |
-| **SQL** | `docs/analyst/dwell-feed-vs-broadcast.sql` sections 1–3, 6 |
+| **Code** | `flows/broadcasts/meme.py` → `recommended_by=broadcast_*` |
+| **SQL** | `docs/analyst/broadcast-reengagement.sql`, dwell SQL |
 
 ### Hypothesis
 
 Labeling retention pushes separately from feed engines lets us measure true
-in-session `sec_to_react` and optimize broadcast timing for **fast** reaction
-(not content affinity from stale opens).
+in-session `sec_to_react` and optimize broadcast timing for **fast** reaction.
 
-### Success criteria (day-7+)
+### Success criteria
 
-1. Rows with `recommended_by = 'broadcast_reengagement'` appear after ≥1
-   scheduled reengagement run;
-2. Broadcast p50 `sec_to_react` **higher** than feed (delayed opens expected);
-3. Share of broadcast reactions with `sec_to_react > 1h` documented (exclude
-   from affinity later).
+1. ✅ Labeled rows exist (`broadcast_reengagement` / `_hq`)
+2. Broadcast p50 `sec_to_react` **higher** than feed (delayed opens expected)
+3. Share of broadcast reactions with `sec_to_react > 1h` documented
 
 ### Next check
 
-- **2026-08-12** — any labeled rows yet?  
-- **2026-08-16** — full feed vs broadcast dwell table  
+- **2026-08-12 / 16** — full feed vs broadcast dwell table
+
+---
+
+## H3b — High-quality meme pick for retention broadcasts
+
+| Field | Value |
+|-------|--------|
+| **ID** | `broadcast_reengagement_hq_pick` |
+| **Status** | **shipping** (this PR) |
+| **Code** | `src/recommendations/broadcast_pick.py`, kill switch `BROADCAST_HIGH_QUALITY_PICK_ENABLED` |
+| **Labels** | `broadcast_reengagement_hq` (SQL pick) vs `broadcast_reengagement` (queue fallback) |
+| **SQL** | `docs/analyst/broadcast-reengagement.sql` |
+
+### Hypothesis
+
+Choosing the reengagement meme by **user×source affinity × raw like rate**
+(avoiding majority-dislike sources) beats blind feed-queue pop on:
+
+1. **react_within_1h %** (primary — “came back because of this push”)
+2. like rate among reacted
+3. p50 `sec_to_react` among in-window reactions (secondary)
+
+### Pre-HQ baseline (2026-08-09, ~39 `broadcast_reengagement` sends)
+
+- like rate ~54% (small n)
+- only ~4 reacts under 2 minutes — delayed open is the norm
+
+### Decision rules (day-7 from HQ deploy)
+
+**Keep HQ ON** if:
+
+- `broadcast_reengagement_hq` react_within_1h ≥ queue-fallback **or** ≥ pre-HQ baseline + directionally better LR;
+- no send failure spike (empty HQ → fallback should keep volume).
+
+**Disable** (`BROADCAST_HIGH_QUALITY_PICK_ENABLED=false`) if HQ pool empty for
+most users (fallback rate &gt;80%) or LR collapses &gt;5 pp vs fallback.
+
+### Next check
+
+- **2026-08-12** smoke: any `_hq` rows? fallback share?  
+- **2026-08-16** primary HQ vs fallback vs feed  
 
 ---
 
@@ -188,6 +225,43 @@ ignore `>1h` reactions in affinity.
 
 ---
 
+## H5 — Cold-start first-session quality floors
+
+| Field | Value |
+|-------|--------|
+| **ID** | `cold_start_first_impression_v2` |
+| **Status** | **shipping** (this PR) |
+| **Code** | `cold_start_explore` raw-LR floor; CS3 blend → `best_uploaded` + text-light |
+| **SQL** | engine slice in `docs/analyst/metrics.sql` / cold_start quality scripts |
+
+### Hypothesis
+
+**A1.** Raising `cold_start_explore` floors (raw like rate ≥0.50, ≥25 reactions,
+order by `lr_smoothed`) lifts first-10 LR and reached-10 vs pre-change
+(guarded explore was ~**18%** LR on 7d — too weak for first impression).
+
+**A2.** CS3 (memes 16–29) replacing `like_spread` with `best_uploaded_memes`
+improves LR/continuation in that band without starving personalization
+(`cold_start_adapt` stays fixed_pos 0).
+
+### Decision rules (day-7)
+
+**Keep** if first-10 LR for `cold_start_explore*` ≥ pre-change + directionally
+higher reached-5/10; no empty-queue spike for new users.
+
+**Rollback explore floors** if explore pool empty → fallback share spikes and
+session depth drops.
+
+**Rollback CS3** if `best_uploaded` share causes lower continuation vs prior
+week CS3 band.
+
+### Next check
+
+- **2026-08-12** smoke: explore volume + LR  
+- **2026-08-16** first-10 / CS3 band metrics  
+
+---
+
 ## Explicitly not open experiments
 
 | Item | State |
@@ -207,6 +281,7 @@ ignore `>1h` reactions in affinity.
 psql "$ANALYST_DATABASE_URL" -f docs/analyst/viral-shares-blender-v1.sql
 psql "$ANALYST_DATABASE_URL" -f docs/analyst/source-affinity-demote-guardrails.sql
 psql "$ANALYST_DATABASE_URL" -f docs/analyst/dwell-feed-vs-broadcast.sql
+psql "$ANALYST_DATABASE_URL" -f docs/analyst/broadcast-reengagement.sql
 # 3) Update this file Status/Decision + write
 #    docs/analyst/readouts/YYYY-MM-DD-weekly-hypotheses.md
 ```
