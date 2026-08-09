@@ -376,45 +376,156 @@ async def etl_memes_from_raw_telegram_posts(
     await update_or_create_memes(transformed_memes, memes_not_in_memes_table)
 
 
-async def etl_memes_from_raw_vk_posts() -> None:
+async def etl_memes_from_raw_vk_posts(
+    meme_source_ids: list[int] | None = None,
+    *,
+    fresh_only: bool = True,
+) -> None:
+    """Promote raw VK posts into ``meme`` — only for ``parsing_enabled`` sources.
+
+    Parity with TG ETL (ADR-0003 / prepared-source guard):
+    - ``in_moderation`` / snoozed / etc. must not enter the user feed pool.
+    - Single-media only; optional 24h freshness window.
+    - Light engagement gate: top-viewed among latest posts (VK has ``views``).
+    """
+    # Safe media length: media may be non-array JSON in corrupted rows.
+    media_len_sql = """
+        JSONB_ARRAY_LENGTH(
+            CASE
+                WHEN JSONB_TYPEOF(MRV.media) = 'array' THEN MRV.media
+                ELSE '[]'::jsonb
+            END
+        ) = 1
+    """
     transformed_memes = await fetch_all(
         text(
-            """
+            f"""
+                WITH source_medians AS (
+                    SELECT
+                        meme_source_id,
+                        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY views) AS median_views
+                    FROM meme_raw_vk
+                    WHERE COALESCE(updated_at, created_at) >= NOW() - INTERVAL '24 hours'
+                      AND views > 0
+                    GROUP BY meme_source_id
+                ),
+                latest_source_posts AS (
+                    SELECT
+                        MRV.id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY MRV.meme_source_id
+                            ORDER BY MRV.date DESC, MRV.post_id DESC, MRV.id DESC
+                        ) AS recent_rank
+                    FROM meme_raw_vk MRV
+                    INNER JOIN meme_source MS
+                        ON MS.id = MRV.meme_source_id
+                    WHERE MS.status = 'parsing_enabled'
+                        AND MS.type = 'vk'
+                        AND (
+                            NOT :filter_meme_source_ids
+                            OR MRV.meme_source_id = ANY(:meme_source_ids)
+                        )
+                        AND (
+                            NOT :fresh_only
+                            OR COALESCE(MRV.updated_at, MRV.created_at)
+                                >= NOW() - INTERVAL '24 hours'
+                        )
+                ),
+                top_viewed_recent_posts AS (
+                    SELECT id
+                    FROM (
+                        SELECT
+                            MRV.id,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY MRV.meme_source_id
+                                ORDER BY MRV.views DESC, MRV.date DESC,
+                                         MRV.post_id DESC, MRV.id DESC
+                            ) AS views_rank
+                        FROM meme_raw_vk MRV
+                        INNER JOIN latest_source_posts LSP
+                            ON LSP.id = MRV.id
+                        WHERE LSP.recent_rank <= :recent_posts_window
+                    ) ranked_recent
+                    WHERE views_rank <= :top_viewed_posts_limit
+                )
                 SELECT
-                MRV.meme_source_id,
-                MRV.id AS raw_meme_id,
-                MRV.content AS caption,
-                'created' AS status,
-                'image' AS type,
-                MS.language_code AS language_code,
-                MRV.date AS published_at
-            FROM meme_raw_vk AS MRV
-            LEFT JOIN meme_source AS MS
-                ON MS.id = MRV.meme_source_id
-            WHERE 1=1
-                -- only one attachment
-                AND JSONB_ARRAY_LENGTH(MRV.media) = 1
-                AND COALESCE(MRV.updated_at, MRV.created_at) >= NOW() - INTERVAL '24 hours'
-            """  # noqa: E501
-        )
+                    MRV.meme_source_id,
+                    MRV.id AS raw_meme_id,
+                    MRV.content AS caption,
+                    'created' AS status,
+                    'image' AS type,
+                    MS.language_code AS language_code,
+                    MRV.date AS published_at
+                FROM meme_raw_vk AS MRV
+                INNER JOIN meme_source AS MS
+                    ON MS.id = MRV.meme_source_id
+                LEFT JOIN source_medians SM
+                    ON SM.meme_source_id = MRV.meme_source_id
+                INNER JOIN top_viewed_recent_posts TVRP
+                    ON TVRP.id = MRV.id
+                WHERE 1=1
+                    AND MS.status = 'parsing_enabled'
+                    AND MS.type = 'vk'
+                    AND (
+                        NOT :filter_meme_source_ids
+                        OR MRV.meme_source_id = ANY(:meme_source_ids)
+                    )
+                    AND {media_len_sql}
+                    AND (
+                        NOT :fresh_only
+                        OR COALESCE(MRV.updated_at, MRV.created_at)
+                            >= NOW() - INTERVAL '24 hours'
+                    )
+                    AND (
+                        MRV.views = 0
+                        OR SM.median_views IS NULL
+                        OR MRV.views >= SM.median_views * 0.3
+                    )
+            """
+        ),
+        {
+            "filter_meme_source_ids": meme_source_ids is not None,
+            "meme_source_ids": meme_source_ids or [],
+            "fresh_only": fresh_only,
+            "recent_posts_window": TG_RECENT_POSTS_WINDOW,
+            "top_viewed_posts_limit": TG_TOP_VIEWED_POSTS_LIMIT,
+        },
     )
 
     memes_not_in_memes_table = await fetch_all(
         text(
-            """
+            f"""
                 SELECT
                     MRV.meme_source_id,
                     MRV.id AS raw_meme_id
                 FROM meme_raw_vk MRV
+                INNER JOIN meme_source MS
+                    ON MS.id = MRV.meme_source_id
                 LEFT JOIN meme
                     ON meme.meme_source_id = MRV.meme_source_id
                     AND meme.raw_meme_id = MRV.id
                 WHERE 1=1
+                    AND MS.status = 'parsing_enabled'
+                    AND MS.type = 'vk'
+                    AND (
+                        NOT :filter_meme_source_ids
+                        OR MRV.meme_source_id = ANY(:meme_source_ids)
+                    )
+                    AND (
+                        NOT :fresh_only
+                        OR COALESCE(MRV.updated_at, MRV.created_at)
+                            >= NOW() - INTERVAL '24 hours'
+                    )
                     AND meme.meme_source_id IS NULL
                     AND meme.raw_meme_id IS NULL
-                    AND JSONB_ARRAY_LENGTH(MRV.media) = 1
+                    AND {media_len_sql}
             """
-        )
+        ),
+        {
+            "filter_meme_source_ids": meme_source_ids is not None,
+            "meme_source_ids": meme_source_ids or [],
+            "fresh_only": fresh_only,
+        },
     )
 
     await update_or_create_memes(transformed_memes, memes_not_in_memes_table)

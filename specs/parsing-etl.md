@@ -39,18 +39,20 @@ Cron definitions: `scripts/serve_flows.py`
 ## Source Management
 
 - `meme_source` table: status includes `in_moderation` | `parsing_enabled` | `snoozed` (plus legacy strings)
-- Prepared sources (`in_moderation`) must not ETL into the user feed until promoted — TG ETL guards on `parsing_enabled` (ADR-0003). VK parity is incomplete debt.
+- Prepared sources (`in_moderation`) must not ETL into the user feed until promoted — **both TG and VK** ETL/unload paths guard on `parsing_enabled` (ADR-0003).
 - Sources can be added by users (`added_by` FK), moderators, or discovery → candidate promotion
+- **Auto-snooze after parse** (`maybe_auto_snooze_source`): TG + **VK** — 3× empty parse, low LR, high ad-rate. Stale no-raw-posts flow is shared (`auto_snooze_stale_sources`).
 
 ## ETL Filters
 
-1. **Single-media only**: `JSONB_ARRAY_LENGTH(media) = 1` — removes carousels
-2. **Type detection**: video / animation / image (TG); VK currently often forces image
+1. **Single-media only**: safe `JSONB_ARRAY_LENGTH` when media is an array — removes carousels
+2. **Type detection**: video / animation / image (TG); VK currently forces image
 3. **Repost dedup (TG only)**: `DISTINCT ON (COALESCE(forwarded_url, …))`
-4. **24h window**: only recent raw posts
+4. **24h window**: only recent raw posts (`fresh_only`, default true)
 5. **Ad filter**: stop words + length > 200 chars (`src/storage/ads.py`)
 6. **Link cleanup**: removes @mentions / http / t.me from captions
-7. **TG engagement filters**: top-view / median view quality gates (VK lacks these — drift)
+7. **Engagement filters (TG + VK)**: among latest 10 posts per source, promote top 5 by views; drop posts with views &lt; 30% of source median (when views &gt; 0)
+8. **Unload path**: `get_unloaded_tg_memes` / `get_unloaded_vk_memes` only `parsing_enabled`; retry `broken_content_link`
 
 ## Status Progression
 

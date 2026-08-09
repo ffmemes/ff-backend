@@ -1,4 +1,5 @@
 import asyncio
+import time
 from datetime import datetime
 
 from prefect import flow, get_run_logger
@@ -9,8 +10,10 @@ from src.storage.etl import insert_parsed_posts_from_vk
 from src.storage.parsers.vk import VkGroupScraper
 from src.storage.service import (
     get_vk_sources_to_parse,
+    maybe_auto_snooze_source,
     update_meme_source,
 )
+from src.tgbot.logs import log
 
 
 @flow(name="Parse VK Source", timeout_seconds=300)
@@ -19,6 +22,7 @@ async def parse_vk_source(
     meme_source_url: str,
     nposts: int = 10,
 ) -> None:
+    """Parse one VK source. Mirrors TG: empty-parse counter + auto-snooze."""
     logger = get_run_logger()
 
     vk = VkGroupScraper(meme_source_url)
@@ -29,6 +33,21 @@ async def parse_vk_source(
         await insert_parsed_posts_from_vk(meme_source_id, posts)
 
     await update_meme_source(meme_source_id=meme_source_id, parsed_at=datetime.utcnow())
+
+    # Same policy as TG: 3× empty parse / low LR / high ad-rate → snoozed.
+    snooze_reason = await maybe_auto_snooze_source(meme_source_id, len(posts))
+    if snooze_reason:
+        logger.warning(
+            "Auto-snoozed source %s (%s): %s",
+            meme_source_id,
+            meme_source_url,
+            snooze_reason,
+        )
+        await log(
+            f"🔕 Auto-snoozed VK source <b>{meme_source_url}</b> (id={meme_source_id})\n"
+            f"Reason: <code>{snooze_reason}</code>"
+        )
+
     await asyncio.sleep(5)
 
 
@@ -45,6 +64,7 @@ async def parse_vk_sources(
     nposts=10,
 ) -> None:
     logger = get_run_logger()
+    t0 = time.monotonic()
     vk_sources = await get_vk_sources_to_parse(limit=sources_batch_size)
     logger.info(f"Received {len(vk_sources)} vk sources to scrape.")
 
@@ -57,6 +77,12 @@ async def parse_vk_sources(
         except Exception as e:
             fail_count += 1
             logger.error(f"Source {vk_source['id']} ({vk_source['url']}) failed: {e}")
+
+    elapsed = time.monotonic() - t0
+    logger.info(
+        f"Parsing done: {ok_count} ok, {fail_count} failed "
+        f"out of {len(vk_sources)} sources in {elapsed:.0f}s"
+    )
 
     safe_emit(
         "ff.parser.vk.completed",
