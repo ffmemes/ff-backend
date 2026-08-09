@@ -454,7 +454,7 @@ async def test_cold_start_phase2_fallback():
 
 @pytest.mark.asyncio
 async def test_cold_start_phase3_blends():
-    """Phase 3 (16-30 memes): blends cold_start_adapt + growing engines"""
+    """Phase 3 (16-30 memes): blends adapt + best_uploaded + text_light."""
 
     async def cold_start_adapt(self, user_id, limit=10, exclude_meme_ids=[], **kw):
         return [{"id": 201}, {"id": 202}, {"id": 203}]
@@ -462,18 +462,14 @@ async def test_cold_start_phase3_blends():
     async def lr_smoothed(self, user_id, limit=10, exclude_meme_ids=[], **kw):
         return [{"id": 301}, {"id": 302}]
 
-    async def like_spread(self, user_id, limit=10, exclude_meme_ids=[], **kw):
-        return [{"id": 501}, {"id": 502}]
-
     async def best_uploaded(self, user_id, limit=10, exclude_meme_ids=[], **kw):
-        return [{"id": 401}]
+        return [{"id": 401}, {"id": 402}, {"id": 403}]
 
     class TestRetriever(CandidatesRetriever):
         engine_map = {
             "cold_start_adapt": cold_start_adapt,
             "text_light_lr_smoothed": lr_smoothed,
             "lr_smoothed": lr_smoothed,
-            "like_spread_and_recent_memes": like_spread,
             "best_uploaded_memes": best_uploaded,
             "cold_start_explore": cold_start_adapt,  # unused but needed in map
         }
@@ -484,6 +480,8 @@ async def test_cold_start_phase3_blends():
     assert len(candidates) == 7
     # cold_start_adapt is pinned at position 0
     assert candidates[0]["id"] in [201, 202, 203]
+    sources = {c["id"] for c in candidates}
+    assert sources & {401, 402, 403}, "CS3 should pull best_uploaded memes"
 
 
 # ── Growing (30-100) and Mature (100+) — existing behavior ──
