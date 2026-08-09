@@ -14,6 +14,14 @@
 **Rules + all open hypotheses:** [`experiments/HYPOTHESES.md`](experiments/HYPOTHESES.md).  
 Do **not** close from interim n (~20 users); day-7 needs ≥80/arm or wait day-14.
 
+### Cold-start first-session quality floors — SHIPPING
+**What:** explore raw-LR ≥0.50 / n≥25; CS3 blend uses best_uploaded + text_light (no like_spread).
+**Check:** H5 in `experiments/HYPOTHESES.md` — smoke 2026-08-12, primary 2026-08-16.
+
+### Broadcast HQ meme pick — SHIPPING
+**What:** retention pushes pick affinity×LR meme (`broadcast_reengagement_hq`) vs queue fallback.
+**SQL:** `docs/analyst/broadcast-reengagement.sql`. Kill switch `BROADCAST_HIGH_QUALITY_PICK_ENABLED`.
+
 ### Per-engine session continuation rate (dashboard)
 **What:** SQL/readout for % of times a user continues scrolling after a meme from each `recommended_by` engine.
 **Why:** Better engine evaluation than LR; aligns with session-length north star.

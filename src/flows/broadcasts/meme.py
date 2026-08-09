@@ -7,7 +7,7 @@ from src.broadcasts.service import (
     get_users_active_more_than_days_ago,
 )
 from src.flows.hooks import notify_telegram_on_failure
-from src.recommendations.meme_queue import check_queue, get_next_meme_for_user
+from src.recommendations.broadcast_pick import pick_reengagement_meme
 from src.tgbot.bot import bot
 from src.tgbot.senders.meme import send_meme_to_user
 
@@ -49,19 +49,19 @@ async def _send_to_user(
     user_id: int,
     first_meme_nudge_tasks: list[asyncio.Task[None]],
     *,
-    broadcast_label: str = "broadcast_reengagement",
+    broadcast_label: str | None = None,
 ) -> None:
-    await check_queue(user_id)
-    meme = await get_next_meme_for_user(user_id)
+    # HQ pick (affinity + proven LR) when enabled; else feed-queue fallback.
+    # recommended_by is broadcast_reengagement_hq vs broadcast_reengagement
+    # so we can measure push effectiveness separately from in-session feed.
+    meme, picked_label = await pick_reengagement_meme(user_id)
     if meme:
         await send_meme_to_user(
             bot,
             user_id,
             meme,
             first_meme_nudge_tasks=first_meme_nudge_tasks,
-            # Distinguish retention pushes from in-session feed for analytics
-            # (dwell / sec_to_react distributions differ by delivery path).
-            recommended_by=broadcast_label,
+            recommended_by=broadcast_label or picked_label,
         )
 
 
