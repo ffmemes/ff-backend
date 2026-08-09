@@ -266,33 +266,46 @@ week CS3 band.
 
 | Field | Value |
 |-------|--------|
-| **ID** | `crosspost_meme_level_v1` |
-| **Status** | **offline PASS (partial)** — not in cron yet |
-| **Readout** | `docs/analyst/readouts/2026-08-09-crosspost-meme-level-offline.md` |
-| **n** | 611 RU image posts / 120d |
+| **ID** | `crosspost_meme_level_v1` / **score_version=4** |
+| **Status** | **SHIPPING** (RU scheduled ranker default ON) |
+| **Kill switch** | `CROSSPOST_RU_MEME_LIKE_VOLUME_ENABLED=false` → v2 |
+| **Readout offline** | `docs/analyst/readouts/2026-08-09-crosspost-meme-level-offline.md` |
+| **Readout online** | `docs/analyst/crossposting-v4-like-volume.sql` |
+| **n offline** | 611 RU image posts / 120d |
 
 ### Hypothesis
 
-Among channel candidates, **timestamp-safe pre-post like volume** (and engaged likes)
-improves 24h channel forwards **beyond source prior**. Bot **like rate** does not.
+Among channel candidates, **like volume** (`ln(nlikes+1)` via `meme_stats`) improves
+24h channel forwards beyond source prior. Bot **like rate** does not.
 
 ### Offline result (2026-08-09)
 
 - pre_lr vs channel: ~0 (reject LR feature)
-- pre_likes / engaged_likes residual Spearman ~**0.16–0.20**
+- pre_likes residual Spearman ~**0.16–0.20**
 - top-20% **src × log1p(pre_likes)** lift **1.14×** forwards (time-split test too)
-- pre_share coverage **2.6%** only
-- HIT threshold: f1k ≥ **~31** (p75) OR forwards ≥ **12**
+- HIT: f1k ≥ **~31** OR forwards ≥ **12**
 
-### Next
+### Production formula (score_version=4)
 
-1. Shadow-log meme score in `crossposting_decision_log` (no post change)
-2. RU canary / score_version bump only after shadow confirms ranking flip quality
-3. Optional ML only if beats `src × log1p(likes)` by ≥5% lift
+```text
+v2_score * LN(COALESCE(nlikes,0) + 1)
+```
+
+Logged in decision candidates: `like_volume_factor`, `like_volume_enabled`.
+
+### Online success (7–14d after deploy)
+
+Compare v4 mature posts vs last 30d v2 baseline:
+
+- hit_rate_pct not down; preferably **+3pp**
+- avg forwards_24h ≥ v2 baseline
+- avg views_24h not &lt; v2 − 15%
+- Kill if hit_rate collapses or empty slots spike
 
 ### Next check
 
-- After shadow deploy: weekly hit_rate + mean forwards vs v2 baseline  
+- **2026-08-12** smoke: score_version=4 rows appear  
+- **2026-08-17** (~7d): `crossposting-v4-like-volume.sql` keep/kill
 
 ---
 
