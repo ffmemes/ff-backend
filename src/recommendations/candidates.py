@@ -603,6 +603,63 @@ async def cold_start_adapt(
     )
 
 
+async def viral_shares(
+    user_id: int,
+    limit: int = 10,
+    exclude_meme_ids: list[int] = [],
+):
+    """Memes with proven share-click conversion (unique non-self deep-link clickers).
+
+    Ranks by invited_count / ln(nmemes_sent + e) so high-volume memes do not
+    dominate purely by raw share-click counts. Quality floor keeps junk out of
+    the growth-oriented blend slot.
+    """
+    query = f"""
+        SELECT
+            M.id
+            , M.type, M.telegram_file_id, M.caption
+            , 'viral_shares' AS recommended_by
+            , COALESCE(MS.nlikes, 0) AS nlikes
+            , COALESCE(MS.invited_count, 0) AS invited_count
+            , COALESCE(MS.nmemes_sent, 0) AS nmemes_sent
+            , COALESCE(MS.lr_smoothed, 0) AS lr_smoothed
+            , (
+                COALESCE(MS.invited_count, 0)::float
+                / LN(COALESCE(MS.nmemes_sent, 0) + 2.718281828)
+              ) AS virality_score
+
+        FROM meme M
+        INNER JOIN meme_stats MS
+            ON MS.meme_id = M.id
+
+        INNER JOIN user_language L
+            ON L.language_code = M.language_code
+            AND L.user_id = :user_id
+
+        LEFT JOIN user_meme_reaction R
+            ON R.meme_id = M.id
+            AND R.user_id = :user_id
+
+        WHERE 1=1
+            AND M.status = 'ok'
+            AND R.meme_id IS NULL
+            AND COALESCE(MS.invited_count, 0) > 0
+            AND COALESCE(MS.nmemes_sent, 0) >= 20
+            AND COALESCE(MS.lr_smoothed, 0) >= 0.05
+            {exclude_meme_ids_sql_filter(exclude_meme_ids)}
+
+        ORDER BY
+            (
+                COALESCE(MS.invited_count, 0)::float
+                / LN(COALESCE(MS.nmemes_sent, 0) + 2.718281828)
+            ) DESC
+            , MS.lr_smoothed DESC NULLS LAST
+            , MS.nlikes DESC NULLS LAST
+        LIMIT :limit
+    """
+    return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
+
+
 class CandidatesRetriever:
     """CandidatesRetriever class is used for unit testing"""
 
@@ -616,6 +673,7 @@ class CandidatesRetriever:
         "es_ranked": get_es_ranked,
         "cold_start_explore": cold_start_explore,
         "cold_start_adapt": cold_start_adapt,
+        "viral_shares": viral_shares,
     }
 
     async def get_candidates(

@@ -288,7 +288,7 @@ _STANDARD_RANKER_QUERY = """
         FROM user_deep_link_log udll
         CROSS JOIN LATERAL (
             SELECT substring(
-                udll.deep_link FROM ('^s_([1-9][0-9]{0,18})_' || ranked.id || '$')
+                udll.deep_link FROM ('^[ms]_([1-9][0-9]{0,18})_' || ranked.id || '$')
             ) AS sharer_id
         ) share_link
         WHERE udll.created_at < selected_at.decided_at
@@ -413,7 +413,7 @@ _SHARE_MAX_QUERY = """
         CROSS JOIN selected_at
         CROSS JOIN LATERAL regexp_matches(
             udll.deep_link,
-            '^s_([1-9][0-9]{0,18})_([1-9][0-9]{0,18})$'
+            '^[ms]_([1-9][0-9]{0,18})_([1-9][0-9]{0,18})$'
         ) AS share_match(parts)
         WHERE udll.created_at < selected_at.decided_at
           AND CASE

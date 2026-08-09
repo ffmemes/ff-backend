@@ -15,9 +15,14 @@ from src.recommendations.blender_experiments import (
     TEXT_LIGHT_BLENDER_V1_EXPERIMENT_ID,
     TEXT_LIGHT_BLENDER_V1_MAX_OCR_WORDS,
     TEXT_LIGHT_BLENDER_V1_TREATMENT,
+    VIRAL_SHARES_BLENDER_V1_CONTROL,
+    VIRAL_SHARES_BLENDER_V1_TREATMENT,
+    VIRAL_SHARES_BLENDER_V1_WEIGHT,
     _lr_quartile_from_boundaries,
+    apply_viral_shares_treatment_weights,
     build_recently_liked_blender_v2_assignment,
     build_text_light_blender_v1_assignment,
+    build_viral_shares_blender_v1_assignment,
     get_or_assign_recently_liked_blender_v2_variant,
     get_or_assign_text_light_blender_v1_variant,
     get_recent_7d_lr_assignment_metrics,
@@ -95,6 +100,34 @@ def test_text_light_assignment_replaces_lr_engine_only_for_treatment():
         assert metadata["assigned_weights"]["text_light_lr_smoothed"] == 0.3
     else:
         assert metadata["assigned_weights"] == base_weights
+
+
+def test_viral_shares_treatment_steals_weight_from_lr_smoothed():
+    base_weights = dict(MATURE_BLENDER_CONTROL_WEIGHTS)
+    treated = apply_viral_shares_treatment_weights(base_weights)
+
+    assert treated["viral_shares"] == VIRAL_SHARES_BLENDER_V1_WEIGHT
+    assert treated["lr_smoothed"] == pytest.approx(
+        base_weights["lr_smoothed"] - VIRAL_SHARES_BLENDER_V1_WEIGHT
+    )
+    assert sum(treated.values()) == pytest.approx(sum(base_weights.values()))
+
+
+def test_viral_shares_assignment_is_stable():
+    base_weights = dict(MATURE_BLENDER_CONTROL_WEIGHTS)
+    first, first_meta = build_viral_shares_blender_v1_assignment(909, base_weights)
+    second, second_meta = build_viral_shares_blender_v1_assignment(909, base_weights)
+
+    assert first == second
+    assert first_meta == second_meta
+    assert first in {
+        VIRAL_SHARES_BLENDER_V1_CONTROL,
+        VIRAL_SHARES_BLENDER_V1_TREATMENT,
+    }
+    if first == VIRAL_SHARES_BLENDER_V1_TREATMENT:
+        assert first_meta["assigned_weights"]["viral_shares"] == VIRAL_SHARES_BLENDER_V1_WEIGHT
+    else:
+        assert "viral_shares" not in first_meta["assigned_weights"]
 
 
 def test_lr_quartile_uses_cached_boundaries():

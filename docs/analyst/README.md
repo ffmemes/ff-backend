@@ -10,6 +10,8 @@ The Analyst agent monitors product health, tracks experiments, and produces dail
 
 ## Key Files
 - `docs/analyst/metrics.sql` — SQL queries organized by section (health, north star, engines, retention, etc.)
+- `docs/analyst/viral-shares-blender-v1.sql` — readout for `viral_shares_blender_v1` (share clickers + invites vs control).
+- `docs/growth/2026-08-09-viral-shares-blender-v1.md` — experiment design note (also under `experiments/active/` when tracked).
 - `docs/analyst/crossposting.sql` — reusable read-only queries for Telegram channel views/forwards, 24h labels, and pre-posting share signals.
 - `specs/crossposting-share-optimization-2026-05-18.md` — current compact crossposting readout and next experiment gate.
 - `docs/archive/2026-q2/meme-share-button-readout-2026-06-04.md` — share button canary readout; use non-self `m_`/`s_` deep-link clicks, not raw share clicks.

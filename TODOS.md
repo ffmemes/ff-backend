@@ -8,19 +8,18 @@
 
 ## P1 — Growth & feed measurement
 
-### Virality score for ranking
-**What:** First-class meme-level virality signal from share clicks (`user_deep_link_log`) + invites (`invited_count` / `user.inviter_id`), used either as an engine or as a re-ranker on the mature blend.
-**Why:** Organic user growth is the growth north star; LR alone underweights shareable memes.
-**Depends on:** clean attribution defs in `CONTEXT.md` (done).
+### ~~Virality score for ranking~~ — SHIPPED as viral_shares_blender_v1
+**What:** Engine `viral_shares` + mature blend A/B (`viral_shares_blender_v1`). See `experiments/active/2026-08-09-viral-shares-blender-v1.md`.
+**Next:** day-7 readout via `docs/analyst/viral-shares-blender-v1.sql`; decide keep/scale/kill.
 
 ### Per-engine session continuation rate (dashboard)
 **What:** SQL/readout for % of times a user continues scrolling after a meme from each `recommended_by` engine.
 **Why:** Better engine evaluation than LR; aligns with session-length north star.
 **Context:** Measurement patterns exist in archived cold-start / es-ranked experiment notes under `specs/archive/`.
 
-### Share CTA experiment harness
-**What:** All share-button / caption CTA variants go through one delivery-prep module + `experiment_assignment`.
-**Why:** Avoid copy-paste across `senders/meme.py` and `senders/next_message.py`.
+### ~~Share CTA experiment harness~~ — seam landed
+**What:** `src/tgbot/senders/delivery.py` unifies prep for `next_message` + `send_meme_to_user`.
+**Next:** CTA copy/placement experiments only need to touch delivery + `sharing.py`.
 
 ## P2 — Supply side (ETL)
 

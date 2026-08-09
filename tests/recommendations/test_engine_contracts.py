@@ -108,6 +108,7 @@ ENGINES_LEFT_JOIN_UMSS = [
     "text_light_lr_smoothed",
     "like_spread_and_recent_memes",
     "es_ranked",
+    "viral_shares",
 ]
 
 # Engines that require user_meme_source_stats via INNER JOIN

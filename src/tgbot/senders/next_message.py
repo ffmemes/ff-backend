@@ -15,25 +15,16 @@ from src.storage.service import update_meme
 from src.tgbot.constants import Reaction
 from src.tgbot.logs import log
 from src.tgbot.senders.alerts import send_queue_preparing_alert
-from src.tgbot.senders.keyboards import (
-    meme_reaction_keyboard,
-)
+from src.tgbot.senders.delivery import prepare_meme_delivery
 from src.tgbot.senders.meme import (
     edit_last_message_with_meme,
     send_new_message_with_meme,
 )
-from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
-from src.tgbot.senders.meme_like_count_experiment import get_visible_meme_like_count
 from src.tgbot.senders.popups import (
     get_or_assign_first_meme_nudge_variant,
     get_popup_to_send,
     maybe_send_first_meme_nudge,
     send_popup,
-)
-from src.tgbot.senders.utils import collect_user_languages
-from src.tgbot.sharing import (
-    get_meme_share_button_text,
-    get_or_assign_meme_share_button_variant,
 )
 from src.tgbot.user_info import get_user_info
 
@@ -73,7 +64,6 @@ async def next_message(
     prev_reaction_id: int | None = None,
 ) -> Message:
     user_info = await get_user_info(user_id)
-    languages = await collect_user_languages(user_id, user_info["interface_lang"])
     is_first_meme = (user_info["nmemes_sent"] or 0) == 0
     # TODO: if watched > 30 memes / day show paywall / tasks / donate
 
@@ -100,32 +90,20 @@ async def next_message(
             no_memes_left = True
             break
 
-        referral_button_text = get_meme_share_button_text(user_info["interface_lang"])
-        share_button_variant = await get_or_assign_meme_share_button_variant(user_id)
-        logger.debug(
-            "Next meme %s for user %s uses share button '%s' variant=%s (languages=%s)",
-            meme.id,
-            user_id,
-            referral_button_text,
-            share_button_variant,
-            sorted(languages),
+        prepared = await prepare_meme_delivery(
+            user_id=user_id,
+            meme=meme,
+            user_info=user_info,
         )
-        reply_markup = meme_reaction_keyboard(
-            meme.id,
-            user_id,
-            referral_button_text,
-            visible_like_count=await get_visible_meme_like_count(user_id, meme.nlikes),
-            share_button_variant=share_button_variant,
-            interface_lang=user_info["interface_lang"],
-            meme_type=meme.type.value,
-        )
-        meme.caption = await get_meme_caption_for_user_id(meme, user_id, user_info)
+        meme.caption = prepared.caption
 
         try:
             if should_replace_previous and previous_message is not None:
-                msg = await _replace_previous_message(bot, previous_message, meme, reply_markup)
+                msg = await _replace_previous_message(
+                    bot, previous_message, meme, prepared.reply_markup
+                )
             else:
-                msg = await send_new_message_with_meme(bot, user_id, meme, reply_markup)
+                msg = await send_new_message_with_meme(bot, user_id, meme, prepared.reply_markup)
         except BadRequest as error:
             await _disable_broken_meme(meme, error)
             attempt += 1

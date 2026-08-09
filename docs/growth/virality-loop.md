@@ -55,15 +55,23 @@ A shippable ranking/growth experiment should have:
 4. **Readout SQL** committed under `docs/analyst/` or `experiments/active/…`
 5. **Control weights** imported from `src/feed_turn/planner.py` (`MATURE_BLEND_WEIGHTS` / `GROWING_BLEND_WEIGHTS`), never copy-pasted.
 
-## Architecture we want next (not done in Wave A)
+## Shipped: viral_shares blender v1 (2026-08-09)
 
-To make product tests cheaper:
+| Piece | Location |
+|-------|----------|
+| Engine | `candidates.viral_shares` — rank by `invited_count / ln(nmemes_sent+e)` |
+| Experiment | `viral_shares_blender_v1` — 0.2 weight from `lr_smoothed` for treatment |
+| Mature wiring | `get_mature_blend_weights_with_experiments` |
+| Delivery prep | `src/tgbot/senders/delivery.py` |
+| Readout | `docs/analyst/viral-shares-blender-v1.sql` |
+| Experiment note | `experiments/active/2026-08-09-viral-shares-blender-v1.md` |
 
-1. **Deepen meme delivery prep** — one module for caption + share button + keyboard so CTA experiments touch one seam.
-2. **Engine template / viral score module** — explicit “virality score” from share clicks + invites + (optional) channel forwards, as a first-class engine or re-ranker, not buried in inline search SQL only.
-3. **Experiment harness** — flags in `config.py` + assignment helpers only; hard-disabled experiments either deleted or gated by settings (no silent `enabled=False` with full code paths).
-4. **VK ETL parity** — same `parsing_enabled` / quality gates as TG so the supply side is comparable.
-5. **Analyst dashboard queries** for weekly: top memes by share-click conversion, engines by continuation, invite funnel by language.
+## Architecture still wanted
+
+1. **VK ETL parity** — same `parsing_enabled` / quality gates as TG.
+2. **Stronger experiment harness** — flags in `config.py`; hard-disabled experiments quarantined.
+3. **Weekly analyst dashboard** — engines by continuation, invite funnel by language.
+4. Optional: meme-level **new-user invite** rate (not only unique clickers via `invited_count`).
 
 ## Related living docs
 

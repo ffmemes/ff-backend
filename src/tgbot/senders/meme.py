@@ -17,21 +17,12 @@ from src.recommendations.service import create_user_meme_reaction
 from src.storage.constants import MemeType
 from src.storage.schemas import MemeData
 from src.tgbot.bot import bot
-from src.tgbot.senders.keyboards import (
-    meme_reaction_keyboard,
-)
-from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
-from src.tgbot.senders.meme_like_count_experiment import get_visible_meme_like_count
+from src.tgbot.senders.delivery import prepare_meme_delivery
 from src.tgbot.senders.popups import (
     get_first_meme_nudge_variant_to_send,
     maybe_send_first_meme_nudge,
 )
-from src.tgbot.senders.utils import collect_user_languages
 from src.tgbot.service import mark_user_blocked
-from src.tgbot.sharing import (
-    get_meme_share_button_text,
-    get_or_assign_meme_share_button_variant,
-)
 from src.tgbot.telegram_retry import telegram_call_with_retry
 from src.tgbot.user_info import get_user_info
 
@@ -46,31 +37,16 @@ async def send_meme_to_user(
     first_meme_nudge_tasks: list[asyncio.Task[None]] | None = None,
 ):
     user_info = await get_user_info(user_id)
-    languages = await collect_user_languages(user_id, user_info["interface_lang"])
     is_first_meme = (user_info["nmemes_sent"] or 0) == 0
-    referral_button_text = get_meme_share_button_text(user_info["interface_lang"])
-    share_button_variant = await get_or_assign_meme_share_button_variant(user_id)
-    logger.debug(
-        "Sending meme %s to user %s with share button '%s' variant=%s (languages=%s)",
-        meme.id,
-        user_id,
-        referral_button_text,
-        share_button_variant,
-        sorted(languages),
-    )
-    reply_markup = meme_reaction_keyboard(
-        meme.id,
-        user_id,
-        referral_button_text,
-        visible_like_count=await get_visible_meme_like_count(user_id, meme.nlikes),
-        share_button_variant=share_button_variant,
-        interface_lang=user_info["interface_lang"],
+    prepared = await prepare_meme_delivery(
+        user_id=user_id,
+        meme=meme,
+        user_info=user_info,
         reaction_context=reaction_context,
-        meme_type=meme.type.value,
     )
-    meme.caption = await get_meme_caption_for_user_id(meme, user_id, user_info)
+    meme.caption = prepared.caption
 
-    sent_message = await send_new_message_with_meme(bot, user_id, meme, reply_markup)
+    sent_message = await send_new_message_with_meme(bot, user_id, meme, prepared.reply_markup)
     if sent_message is None:
         return
 
