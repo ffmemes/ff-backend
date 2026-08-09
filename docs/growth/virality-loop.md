@@ -55,6 +55,13 @@ A shippable ranking/growth experiment should have:
 4. **Readout SQL** committed under `docs/analyst/` or `experiments/active/…`
 5. **Control weights** imported from `src/feed_turn/planner.py` (`MATURE_BLEND_WEIGHTS` / `GROWING_BLEND_WEIGHTS`), never copy-pasted.
 
+## Shipped: recently_liked blender v2 closeout (2026-08-09)
+
+Treatment mature blend is now the **default** (`MATURE_BLEND_WEIGHTS`): more
+`recently_liked` (0.3), slightly less `lr_smoothed` / `like_spread`. Evidence:
+session median +5.6%, user median LR +8pp, global LR flat/slightly up.
+Full readout: [docs/analyst/recently-liked-blender-v2-closeout.md](../analyst/recently-liked-blender-v2-closeout.md).
+
 ## Shipped: viral_shares blender v1 (2026-08-09)
 
 | Piece | Location |

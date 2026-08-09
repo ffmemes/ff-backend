@@ -25,12 +25,15 @@ GROWING_BLEND_WEIGHTS: Mapping[str, float] = MappingProxyType(
         "like_spread_and_recent_memes": 0.2,
     }
 )
+# Shipped 2026-08-09 from recently_liked_blender_v2 treatment (see
+# docs/analyst/recently-liked-blender-v2-closeout.md). Relative weights;
+# blender normalizes.
 MATURE_BLEND_WEIGHTS: Mapping[str, float] = MappingProxyType(
     {
         "best_uploaded_memes": 0.3,
-        "like_spread_and_recent_memes": 0.3,
-        "lr_smoothed": 0.4,
-        "recently_liked": 0.2,
+        "like_spread_and_recent_memes": 0.25,
+        "lr_smoothed": 0.35,
+        "recently_liked": 0.3,
         "goat": 0.1,
         "es_ranked": 0.1,
     }

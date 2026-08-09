@@ -43,12 +43,16 @@ TEXT_LIGHT_BLENDER_V1_MAX_OCR_WORDS = 30
 TEXT_LIGHT_BLENDER_V1_SAMPLE_GATE_PER_VARIANT = 1000
 
 # Control = default mature plan weights (SSOT in feed_turn.planner).
+# After recently_liked_blender_v2 closeout (2026-08-09), the shipped default IS
+# the former treatment map. Historical treatment alias kept for old tests/docs.
 MATURE_BLENDER_CONTROL_WEIGHTS = dict(MATURE_BLEND_WEIGHTS)
-MATURE_BLENDER_TREATMENT_WEIGHTS = {
+MATURE_BLENDER_TREATMENT_WEIGHTS = dict(MATURE_BLEND_WEIGHTS)
+# Pre-closeout control (for archaeology / partial-read comparisons only).
+MATURE_BLENDER_LEGACY_CONTROL_WEIGHTS = {
     "best_uploaded_memes": 0.3,
-    "like_spread_and_recent_memes": 0.25,
-    "lr_smoothed": 0.35,
-    "recently_liked": 0.3,
+    "like_spread_and_recent_memes": 0.3,
+    "lr_smoothed": 0.4,
+    "recently_liked": 0.2,
     "goat": 0.1,
     "es_ranked": 0.1,
 }
@@ -359,17 +363,14 @@ async def get_or_assign_recently_liked_blender_v2_variant(user_id: int) -> str:
 
 
 async def get_recently_liked_blender_v2_weights(user_id: int) -> dict[str, float]:
-    try:
-        variant = await get_or_assign_recently_liked_blender_v2_variant(user_id)
-    except Exception:
-        logger.warning(
-            "recently_liked blender v2 assignment failed for user %d",
-            user_id,
-            exc_info=True,
-        )
-        return dict(MATURE_BLENDER_CONTROL_WEIGHTS)
+    """Mature blend weights after recently_liked_blender_v2 closeout.
 
-    return _weights_for_variant(variant)
+    Treatment won on session depth and user-level LR with no LR regression
+    (see docs/analyst/recently-liked-blender-v2-closeout.md). All mature users
+    now receive the shipped default; no new assignment / dual-path.
+    """
+    del user_id  # API kept for pipeline mature_weights_func signature
+    return dict(MATURE_BLEND_WEIGHTS)
 
 
 def build_text_light_blender_v1_assignment(

@@ -79,11 +79,12 @@ def test_growing_blend_plan():
 def test_mature_blend_plan():
     plan = plan_candidate_selection(100)
 
+    # Shipped recently_liked_blender_v2 treatment as default (2026-08-09).
     assert dict(plan.blend_weights) == {
         "best_uploaded_memes": 0.3,
-        "like_spread_and_recent_memes": 0.3,
-        "lr_smoothed": 0.4,
-        "recently_liked": 0.2,
+        "like_spread_and_recent_memes": 0.25,
+        "lr_smoothed": 0.35,
+        "recently_liked": 0.3,
         "goat": 0.1,
         "es_ranked": 0.1,
     }

@@ -313,29 +313,13 @@ async def test_recently_liked_blender_v2_defers_assignment_without_real_boundari
 
 
 @pytest.mark.asyncio
-async def test_recently_liked_blender_v2_weights_fall_back_to_control_on_assignment_error():
-    with patch(
-        "src.recommendations.blender_experiments.get_or_assign_recently_liked_blender_v2_variant",
-        new_callable=AsyncMock,
-        side_effect=RuntimeError("assignment unavailable"),
-    ):
-        weights = await get_recently_liked_blender_v2_weights(100)
+async def test_recently_liked_blender_v2_weights_ship_default_after_closeout():
+    # Experiment closed: no assignment path; always return shipped mature default.
+    weights = await get_recently_liked_blender_v2_weights(100)
 
     assert weights == MATURE_BLENDER_CONTROL_WEIGHTS
-
-
-@pytest.mark.asyncio
-async def test_recently_liked_blender_v2_treatment_increases_recently_liked_weight():
-    with patch(
-        "src.recommendations.blender_experiments.get_or_assign_recently_liked_blender_v2_variant",
-        new_callable=AsyncMock,
-        return_value=RECENTLY_LIKED_BLENDER_V2_TREATMENT,
-    ):
-        weights = await get_recently_liked_blender_v2_weights(100)
-
-    assert weights == MATURE_BLENDER_TREATMENT_WEIGHTS
-    assert weights["recently_liked"] > MATURE_BLENDER_CONTROL_WEIGHTS["recently_liked"]
-    assert weights["lr_smoothed"] < MATURE_BLENDER_CONTROL_WEIGHTS["lr_smoothed"]
+    assert weights["recently_liked"] == 0.3
+    assert weights["lr_smoothed"] == 0.35
 
 
 @pytest.mark.asyncio
