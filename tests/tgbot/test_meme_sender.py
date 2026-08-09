@@ -7,7 +7,17 @@ from telegram.error import BadRequest, NetworkError
 from src.storage.constants import MemeType
 from src.storage.schemas import MemeData
 from src.tgbot.senders import meme as meme_sender
+from src.tgbot.senders.delivery import PreparedMemeDelivery
 from src.tgbot.senders.meme import edit_last_message_with_meme, send_new_message_with_meme
+
+
+def _prepared_delivery() -> PreparedMemeDelivery:
+    return PreparedMemeDelivery(
+        caption="<b>caption</b>",
+        reply_markup=object(),  # type: ignore[arg-type]
+        share_button_variant="url_share",
+        languages=frozenset({"en"}),
+    )
 
 
 def _meme() -> MemeData:
@@ -110,23 +120,10 @@ async def test_send_meme_to_user_assigns_first_meme_nudge_after_delivery(monkeyp
         "get_user_info",
         AsyncMock(return_value={"interface_lang": "en", "nmemes_sent": 0}),
     )
-    monkeypatch.setattr(meme_sender, "collect_user_languages", AsyncMock(return_value={"en"}))
-    monkeypatch.setattr(meme_sender, "get_meme_share_button_text", lambda _lang: "Share")
     monkeypatch.setattr(
         meme_sender,
-        "get_or_assign_meme_share_button_variant",
-        AsyncMock(return_value="url_share"),
-    )
-    monkeypatch.setattr(meme_sender, "get_visible_meme_like_count", AsyncMock(return_value=0))
-    monkeypatch.setattr(
-        meme_sender,
-        "meme_reaction_keyboard",
-        lambda *_args, **_kwargs: object(),
-    )
-    monkeypatch.setattr(
-        meme_sender,
-        "get_meme_caption_for_user_id",
-        AsyncMock(return_value="<b>caption</b>"),
+        "prepare_meme_delivery",
+        AsyncMock(return_value=_prepared_delivery()),
     )
     monkeypatch.setattr(meme_sender, "send_new_message_with_meme", send_meme)
     monkeypatch.setattr(
@@ -156,23 +153,10 @@ async def test_send_meme_to_user_does_not_assign_first_meme_nudge_on_failed_deli
         "get_user_info",
         AsyncMock(return_value={"interface_lang": "en", "nmemes_sent": 0}),
     )
-    monkeypatch.setattr(meme_sender, "collect_user_languages", AsyncMock(return_value={"en"}))
-    monkeypatch.setattr(meme_sender, "get_meme_share_button_text", lambda _lang: "Share")
     monkeypatch.setattr(
         meme_sender,
-        "get_or_assign_meme_share_button_variant",
-        AsyncMock(return_value="url_share"),
-    )
-    monkeypatch.setattr(meme_sender, "get_visible_meme_like_count", AsyncMock(return_value=0))
-    monkeypatch.setattr(
-        meme_sender,
-        "meme_reaction_keyboard",
-        lambda *_args, **_kwargs: object(),
-    )
-    monkeypatch.setattr(
-        meme_sender,
-        "get_meme_caption_for_user_id",
-        AsyncMock(return_value="<b>caption</b>"),
+        "prepare_meme_delivery",
+        AsyncMock(return_value=_prepared_delivery()),
     )
     monkeypatch.setattr(meme_sender, "send_new_message_with_meme", send_meme)
     monkeypatch.setattr(
@@ -204,23 +188,10 @@ async def test_send_meme_to_user_does_not_assign_first_meme_nudge_on_rejected_de
         "get_user_info",
         AsyncMock(return_value={"interface_lang": "en", "nmemes_sent": 0}),
     )
-    monkeypatch.setattr(meme_sender, "collect_user_languages", AsyncMock(return_value={"en"}))
-    monkeypatch.setattr(meme_sender, "get_meme_share_button_text", lambda _lang: "Share")
     monkeypatch.setattr(
         meme_sender,
-        "get_or_assign_meme_share_button_variant",
-        AsyncMock(return_value="url_share"),
-    )
-    monkeypatch.setattr(meme_sender, "get_visible_meme_like_count", AsyncMock(return_value=0))
-    monkeypatch.setattr(
-        meme_sender,
-        "meme_reaction_keyboard",
-        lambda *_args, **_kwargs: object(),
-    )
-    monkeypatch.setattr(
-        meme_sender,
-        "get_meme_caption_for_user_id",
-        AsyncMock(return_value="<b>caption</b>"),
+        "prepare_meme_delivery",
+        AsyncMock(return_value=_prepared_delivery()),
     )
     monkeypatch.setattr(meme_sender, "send_new_message_with_meme", AsyncMock(return_value=None))
     monkeypatch.setattr(
@@ -261,23 +232,10 @@ async def test_send_meme_to_user_records_delivery_after_nudge_assignment_error(
         "get_user_info",
         AsyncMock(return_value={"interface_lang": "en", "nmemes_sent": 0}),
     )
-    monkeypatch.setattr(meme_sender, "collect_user_languages", AsyncMock(return_value={"en"}))
-    monkeypatch.setattr(meme_sender, "get_meme_share_button_text", lambda _lang: "Share")
     monkeypatch.setattr(
         meme_sender,
-        "get_or_assign_meme_share_button_variant",
-        AsyncMock(return_value="url_share"),
-    )
-    monkeypatch.setattr(meme_sender, "get_visible_meme_like_count", AsyncMock(return_value=0))
-    monkeypatch.setattr(
-        meme_sender,
-        "meme_reaction_keyboard",
-        lambda *_args, **_kwargs: object(),
-    )
-    monkeypatch.setattr(
-        meme_sender,
-        "get_meme_caption_for_user_id",
-        AsyncMock(return_value="<b>caption</b>"),
+        "prepare_meme_delivery",
+        AsyncMock(return_value=_prepared_delivery()),
     )
     monkeypatch.setattr(meme_sender, "send_new_message_with_meme", send_meme)
     monkeypatch.setattr(
@@ -316,23 +274,10 @@ async def test_send_meme_to_user_continues_recording_after_cancellation(monkeypa
         "get_user_info",
         AsyncMock(return_value={"interface_lang": "en", "nmemes_sent": 0}),
     )
-    monkeypatch.setattr(meme_sender, "collect_user_languages", AsyncMock(return_value={"en"}))
-    monkeypatch.setattr(meme_sender, "get_meme_share_button_text", lambda _lang: "Share")
     monkeypatch.setattr(
         meme_sender,
-        "get_or_assign_meme_share_button_variant",
-        AsyncMock(return_value="url_share"),
-    )
-    monkeypatch.setattr(meme_sender, "get_visible_meme_like_count", AsyncMock(return_value=0))
-    monkeypatch.setattr(
-        meme_sender,
-        "meme_reaction_keyboard",
-        lambda *_args, **_kwargs: object(),
-    )
-    monkeypatch.setattr(
-        meme_sender,
-        "get_meme_caption_for_user_id",
-        AsyncMock(return_value="<b>caption</b>"),
+        "prepare_meme_delivery",
+        AsyncMock(return_value=_prepared_delivery()),
     )
     monkeypatch.setattr(meme_sender, "send_new_message_with_meme", send_meme)
     monkeypatch.setattr(
@@ -391,23 +336,10 @@ async def test_send_meme_to_user_continues_post_delivery_after_nudge_assignment_
         "get_user_info",
         AsyncMock(return_value={"interface_lang": "en", "nmemes_sent": 0}),
     )
-    monkeypatch.setattr(meme_sender, "collect_user_languages", AsyncMock(return_value={"en"}))
-    monkeypatch.setattr(meme_sender, "get_meme_share_button_text", lambda _lang: "Share")
     monkeypatch.setattr(
         meme_sender,
-        "get_or_assign_meme_share_button_variant",
-        AsyncMock(return_value="url_share"),
-    )
-    monkeypatch.setattr(meme_sender, "get_visible_meme_like_count", AsyncMock(return_value=0))
-    monkeypatch.setattr(
-        meme_sender,
-        "meme_reaction_keyboard",
-        lambda *_args, **_kwargs: object(),
-    )
-    monkeypatch.setattr(
-        meme_sender,
-        "get_meme_caption_for_user_id",
-        AsyncMock(return_value="<b>caption</b>"),
+        "prepare_meme_delivery",
+        AsyncMock(return_value=_prepared_delivery()),
     )
     monkeypatch.setattr(meme_sender, "send_new_message_with_meme", send_meme)
     monkeypatch.setattr(
@@ -463,23 +395,10 @@ async def test_send_meme_to_user_can_defer_first_meme_nudge_after_reaction(monke
         "get_user_info",
         AsyncMock(return_value={"interface_lang": "en", "nmemes_sent": 0}),
     )
-    monkeypatch.setattr(meme_sender, "collect_user_languages", AsyncMock(return_value={"en"}))
-    monkeypatch.setattr(meme_sender, "get_meme_share_button_text", lambda _lang: "Share")
     monkeypatch.setattr(
         meme_sender,
-        "get_or_assign_meme_share_button_variant",
-        AsyncMock(return_value="url_share"),
-    )
-    monkeypatch.setattr(meme_sender, "get_visible_meme_like_count", AsyncMock(return_value=0))
-    monkeypatch.setattr(
-        meme_sender,
-        "meme_reaction_keyboard",
-        lambda *_args, **_kwargs: object(),
-    )
-    monkeypatch.setattr(
-        meme_sender,
-        "get_meme_caption_for_user_id",
-        AsyncMock(return_value="<b>caption</b>"),
+        "prepare_meme_delivery",
+        AsyncMock(return_value=_prepared_delivery()),
     )
     monkeypatch.setattr(meme_sender, "send_new_message_with_meme", AsyncMock())
     monkeypatch.setattr(
@@ -537,23 +456,10 @@ async def test_send_meme_to_user_retries_assigned_undelivered_nudge(monkeypatch)
         "get_user_info",
         AsyncMock(return_value={"interface_lang": "en", "nmemes_sent": 2}),
     )
-    monkeypatch.setattr(meme_sender, "collect_user_languages", AsyncMock(return_value={"en"}))
-    monkeypatch.setattr(meme_sender, "get_meme_share_button_text", lambda _lang: "Share")
     monkeypatch.setattr(
         meme_sender,
-        "get_or_assign_meme_share_button_variant",
-        AsyncMock(return_value="url_share"),
-    )
-    monkeypatch.setattr(meme_sender, "get_visible_meme_like_count", AsyncMock(return_value=0))
-    monkeypatch.setattr(
-        meme_sender,
-        "meme_reaction_keyboard",
-        lambda *_args, **_kwargs: object(),
-    )
-    monkeypatch.setattr(
-        meme_sender,
-        "get_meme_caption_for_user_id",
-        AsyncMock(return_value="<b>caption</b>"),
+        "prepare_meme_delivery",
+        AsyncMock(return_value=_prepared_delivery()),
     )
     monkeypatch.setattr(meme_sender, "send_new_message_with_meme", AsyncMock())
     monkeypatch.setattr(
@@ -576,23 +482,10 @@ async def test_send_meme_to_user_does_not_assign_new_nudge_for_returning_user(mo
         "get_user_info",
         AsyncMock(return_value={"interface_lang": "en", "nmemes_sent": 2}),
     )
-    monkeypatch.setattr(meme_sender, "collect_user_languages", AsyncMock(return_value={"en"}))
-    monkeypatch.setattr(meme_sender, "get_meme_share_button_text", lambda _lang: "Share")
     monkeypatch.setattr(
         meme_sender,
-        "get_or_assign_meme_share_button_variant",
-        AsyncMock(return_value="url_share"),
-    )
-    monkeypatch.setattr(meme_sender, "get_visible_meme_like_count", AsyncMock(return_value=0))
-    monkeypatch.setattr(
-        meme_sender,
-        "meme_reaction_keyboard",
-        lambda *_args, **_kwargs: object(),
-    )
-    monkeypatch.setattr(
-        meme_sender,
-        "get_meme_caption_for_user_id",
-        AsyncMock(return_value="<b>caption</b>"),
+        "prepare_meme_delivery",
+        AsyncMock(return_value=_prepared_delivery()),
     )
     monkeypatch.setattr(meme_sender, "send_new_message_with_meme", AsyncMock())
     first_meme_nudge_variant = AsyncMock()

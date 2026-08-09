@@ -569,7 +569,7 @@ async def test_generate_above_100():
     with (
         patch("src.recommendations.meme_queue.blend", side_effect=capture_blend),
         patch(
-            "src.recommendations.meme_queue.get_recently_liked_blender_v2_weights",
+            "src.recommendations.meme_queue.get_mature_blend_weights_with_experiments",
             new_callable=AsyncMock,
             return_value=MATURE_BLENDER_CONTROL_WEIGHTS,
         ) as get_weights,
@@ -609,7 +609,7 @@ async def test_generate_above_100_treatment_uses_recently_liked_weights():
 
     with (
         patch(
-            "src.recommendations.meme_queue.get_recently_liked_blender_v2_weights",
+            "src.recommendations.meme_queue.get_mature_blend_weights_with_experiments",
             new_callable=AsyncMock,
             return_value=MATURE_BLENDER_TREATMENT_WEIGHTS,
         ) as get_weights,
@@ -655,7 +655,7 @@ async def test_text_light_blender_v1_is_disabled_in_queue_generation():
 
     with (
         patch(
-            "src.recommendations.meme_queue.get_recently_liked_blender_v2_weights",
+            "src.recommendations.meme_queue.get_mature_blend_weights_with_experiments",
             new_callable=AsyncMock,
             return_value=MATURE_BLENDER_CONTROL_WEIGHTS,
         ),
@@ -695,7 +695,7 @@ async def test_recently_liked_blender_v2_assignment_is_mature_only():
         }
 
     with patch(
-        "src.recommendations.meme_queue.get_recently_liked_blender_v2_weights",
+        "src.recommendations.meme_queue.get_mature_blend_weights_with_experiments",
         new_callable=AsyncMock,
         return_value=MATURE_BLENDER_TREATMENT_WEIGHTS,
     ) as get_weights:
@@ -729,7 +729,7 @@ async def test_recently_liked_blender_v2_skips_moderator_assignment():
 
     with (
         patch(
-            "src.recommendations.meme_queue.get_recently_liked_blender_v2_weights",
+            "src.recommendations.meme_queue.get_mature_blend_weights_with_experiments",
             new_callable=AsyncMock,
             return_value=MATURE_BLENDER_TREATMENT_WEIGHTS,
         ) as get_weights,
@@ -770,7 +770,7 @@ async def test_generate_empty_above_100():
         }
 
     with patch(
-        "src.recommendations.meme_queue.get_recently_liked_blender_v2_weights",
+        "src.recommendations.meme_queue.get_mature_blend_weights_with_experiments",
         new_callable=AsyncMock,
         return_value=MATURE_BLENDER_CONTROL_WEIGHTS,
     ):
@@ -1006,7 +1006,7 @@ async def test_gate_on_mature_user_unchanged():
         _patch_user_info(nsessions=5, nmemes_sent=120),
         patch("src.config.settings.COLD_START_NSESSIONS_GATE_ENABLED", True),
         patch(
-            "src.recommendations.meme_queue.get_recently_liked_blender_v2_weights",
+            "src.recommendations.meme_queue.get_mature_blend_weights_with_experiments",
             new_callable=AsyncMock,
             return_value=MATURE_BLENDER_TREATMENT_WEIGHTS,
         ) as get_weights,

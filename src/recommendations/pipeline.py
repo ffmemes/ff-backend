@@ -25,7 +25,7 @@ from src.observability.sentry import sentry_log_extra
 from src.recommendations.blender import blend as default_blend
 from src.recommendations.blender_experiments import (
     MATURE_BLENDER_CONTROL_WEIGHTS,
-    get_recently_liked_blender_v2_weights,
+    get_mature_blend_weights_with_experiments,
     get_text_light_blender_v1_weights,
 )
 from src.recommendations.candidates import CandidatesRetriever
@@ -280,7 +280,7 @@ class RecommendationBatchPipeline:
         fetch_all_func: FetchAllFunc | None = None,
         low_sent_fetcher: LowSentFetcher | None = None,
         shadow_scorer: ShadowScorer | None = None,
-        mature_weights_func: MatureWeightsFunc = get_recently_liked_blender_v2_weights,
+        mature_weights_func: MatureWeightsFunc = get_mature_blend_weights_with_experiments,
         text_light_weights_func: TextLightWeightsFunc = get_text_light_blender_v1_weights,
         mature_control_weights: Mapping[str, float] = MATURE_BLENDER_CONTROL_WEIGHTS,
     ) -> None:

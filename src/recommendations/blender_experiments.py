@@ -440,3 +440,130 @@ async def get_text_light_blender_v1_weights(
     if variant == TEXT_LIGHT_BLENDER_V1_TREATMENT:
         return _text_light_weights(base_weights)
     return dict(base_weights)
+
+
+# --- Viral shares blender v1: inject share-conversion engine into mature blend ---
+
+VIRAL_SHARES_BLENDER_V1_EXPERIMENT_ID = "viral_shares_blender_v1"
+VIRAL_SHARES_BLENDER_V1_CONTROL = "control"
+VIRAL_SHARES_BLENDER_V1_TREATMENT = "treatment_viral_shares"
+VIRAL_SHARES_BLENDER_V1_SAMPLE_GATE_PER_VARIANT = 1000
+VIRAL_SHARES_BLENDER_V1_WEIGHT = 0.2
+VIRAL_SHARES_BLENDER_V1_SOURCE_ENGINE = "lr_smoothed"
+
+
+def _viral_shares_variant_for_user(user_id: int) -> str:
+    key = f"{VIRAL_SHARES_BLENDER_V1_EXPERIMENT_ID}:{user_id}"
+    bucket = int.from_bytes(hashlib.sha256(key.encode("utf-8")).digest()[:8], "big") % 2
+    if bucket == 0:
+        return VIRAL_SHARES_BLENDER_V1_CONTROL
+    return VIRAL_SHARES_BLENDER_V1_TREATMENT
+
+
+def apply_viral_shares_treatment_weights(base_weights: dict[str, float]) -> dict[str, float]:
+    """Steal weight from lr_smoothed (or next available) into viral_shares."""
+    weights = dict(base_weights)
+    amount = VIRAL_SHARES_BLENDER_V1_WEIGHT
+    source = VIRAL_SHARES_BLENDER_V1_SOURCE_ENGINE
+    available = float(weights.get(source, 0.0))
+    if available >= amount:
+        weights[source] = available - amount
+    else:
+        # Fall back: take from the largest non-viral engine so total mass stays ~constant.
+        weights[source] = 0.0
+        remaining = amount - available
+        donors = sorted(
+            ((k, float(v)) for k, v in weights.items() if k != "viral_shares" and v > 0),
+            key=lambda item: item[1],
+            reverse=True,
+        )
+        for key, value in donors:
+            if remaining <= 0:
+                break
+            take = min(value, remaining)
+            weights[key] = value - take
+            remaining -= take
+    weights["viral_shares"] = float(weights.get("viral_shares", 0.0)) + amount
+    # Drop zero-weight engines so the retriever does not fetch them for nothing.
+    return {k: v for k, v in weights.items() if v > 0}
+
+
+def build_viral_shares_blender_v1_assignment(
+    user_id: int,
+    base_weights: dict[str, float],
+) -> tuple[str, dict[str, Any]]:
+    variant = _viral_shares_variant_for_user(user_id)
+    treatment_weights = apply_viral_shares_treatment_weights(base_weights)
+    assignment_metadata = {
+        "assignment_strategy": "sha256(experiment_id:user_id)%2",
+        "engine": "viral_shares",
+        "weight": VIRAL_SHARES_BLENDER_V1_WEIGHT,
+        "source_engine": VIRAL_SHARES_BLENDER_V1_SOURCE_ENGINE,
+        "sample_gate_per_variant": VIRAL_SHARES_BLENDER_V1_SAMPLE_GATE_PER_VARIANT,
+        "primary_read": (
+            "unique share clickers + new-user invites per 1k memes sent; "
+            "guardrails: session depth, LR, block rate"
+        ),
+        "base_weights": dict(base_weights),
+        "assigned_weights": (
+            treatment_weights
+            if variant == VIRAL_SHARES_BLENDER_V1_TREATMENT
+            else dict(base_weights)
+        ),
+    }
+    return variant, assignment_metadata
+
+
+async def get_or_assign_viral_shares_blender_v1_variant(
+    user_id: int,
+    base_weights: dict[str, float],
+) -> str:
+    assignment = await get_experiment_assignment(
+        user_id,
+        VIRAL_SHARES_BLENDER_V1_EXPERIMENT_ID,
+    )
+    if assignment is not None:
+        return assignment["variant"]
+
+    proposed_variant, assignment_metadata = build_viral_shares_blender_v1_assignment(
+        user_id,
+        base_weights,
+    )
+    inserted = await assign_experiment(
+        user_id,
+        VIRAL_SHARES_BLENDER_V1_EXPERIMENT_ID,
+        proposed_variant,
+        assignment_metadata,
+    )
+    if inserted:
+        return proposed_variant
+
+    return (
+        await get_experiment_variant(user_id, VIRAL_SHARES_BLENDER_V1_EXPERIMENT_ID)
+        or VIRAL_SHARES_BLENDER_V1_CONTROL
+    )
+
+
+async def get_viral_shares_blender_v1_weights(
+    user_id: int,
+    base_weights: dict[str, float],
+) -> dict[str, float]:
+    try:
+        variant = await get_or_assign_viral_shares_blender_v1_variant(user_id, base_weights)
+    except Exception:
+        logger.warning(
+            "viral_shares blender v1 assignment failed for user %d",
+            user_id,
+            exc_info=True,
+        )
+        return dict(base_weights)
+
+    if variant == VIRAL_SHARES_BLENDER_V1_TREATMENT:
+        return apply_viral_shares_treatment_weights(base_weights)
+    return dict(base_weights)
+
+
+async def get_mature_blend_weights_with_experiments(user_id: int) -> dict[str, float]:
+    """Mature blend weights: recently_liked v2 base, then viral_shares overlay."""
+    base = await get_recently_liked_blender_v2_weights(user_id)
+    return await get_viral_shares_blender_v1_weights(user_id, base)
