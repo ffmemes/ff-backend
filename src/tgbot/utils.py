@@ -37,6 +37,7 @@ def remove_buttons_with_callback(reply_markup: dict) -> dict:
     reply_markup["inline_keyboard"] = new_keyboard
     return reply_markup
 
+
 async def safe_answer_callback_query(callback_query, *args, **kwargs) -> None:
     try:
         await callback_query.answer(*args, **kwargs)

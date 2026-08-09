@@ -22,6 +22,8 @@ RECENTLY_LIKED_BLENDER_V2_EXPERIMENT_ID = "recently_liked_blender_v2"
 RECENTLY_LIKED_BLENDER_V2_CONTROL = "control"
 RECENTLY_LIKED_BLENDER_V2_TREATMENT = "treatment"
 RECENTLY_LIKED_BLENDER_V2_EXCLUDED = "excluded_high_volume_skipper"
+RECENTLY_LIKED_BLENDER_V2_ENROLLMENT_FROZEN = True
+RECENTLY_LIKED_BLENDER_V2_ENROLLMENT_FROZEN_AT = "2026-07-23T18:05:54Z"
 RECENTLY_LIKED_BLENDER_V2_SAMPLE_GATE_PER_VARIANT = 1000
 RECENTLY_LIKED_BLENDER_V2_MATURE_MIN_MEMES_SENT = 100
 RECENTLY_LIKED_BLENDER_V2_SKIPPER_MIN_REACTIONS_7D = 50
@@ -329,6 +331,9 @@ async def get_or_assign_recently_liked_blender_v2_variant(user_id: int) -> str:
     )
     if assignment is not None:
         return assignment["variant"]
+
+    if RECENTLY_LIKED_BLENDER_V2_ENROLLMENT_FROZEN:
+        return RECENTLY_LIKED_BLENDER_V2_CONTROL
 
     metrics = await get_recent_7d_lr_assignment_metrics(user_id)
     if metrics is None:

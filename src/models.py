@@ -26,4 +26,3 @@ class CustomModel(BaseModel):
         }
 
         return {**data, **datetime_fields}
-
