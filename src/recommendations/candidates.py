@@ -7,6 +7,7 @@ from sqlalchemy import text
 from src.database import fetch_all, fetch_one
 from src.recommendations.utils import (
     block_disliked_sources_sql_filter,
+    disliked_source_demote_sql,
     exclude_meme_ids_sql_filter,
 )
 
@@ -129,6 +130,7 @@ async def best_uploaded_memes(
 
         ORDER BY -1
             * COALESCE((UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.), 0.5)
+            * {disliked_source_demote_sql()}
             * (MS.nlikes + 1.) / (MS.nlikes + MS.ndislikes + 1.)
         NULLS LAST
         LIMIT :limit
@@ -160,6 +162,10 @@ async def like_spread_and_recent_memes(
                 ON R.meme_id = M.id
                 AND R.user_id = :user_id
 
+        LEFT JOIN user_meme_source_stats UMSS
+            ON UMSS.meme_source_id = M.meme_source_id
+            AND UMSS.user_id = :user_id
+
         WHERE 1=1
             AND M.status = 'ok'
             AND R.meme_id IS NULL
@@ -170,6 +176,7 @@ async def like_spread_and_recent_memes(
             {block_disliked_sources_sql_filter()}
         ORDER BY -1
             * (MS.nlikes - MS.ndislikes) / (MS.nmemes_sent + 1.)
+            * {disliked_source_demote_sql()}
         LIMIT :limit
     """
     return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
@@ -230,6 +237,7 @@ async def _get_lr_smoothed_candidates(
 
         ORDER BY -1
             * COALESCE((UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.), 0.5)
+            * {disliked_source_demote_sql()}
             * MS.lr_smoothed
         LIMIT :limit
     """
@@ -317,6 +325,7 @@ async def get_es_ranked(
 
         ORDER BY -1
             * COALESCE((UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.), 0.5)
+            * {disliked_source_demote_sql()}
             * MS.engagement_score
         LIMIT :limit
     """
@@ -361,6 +370,7 @@ async def goat(
                     * CASE WHEN MS.raw_impr_rank < 1 THEN 1 ELSE 0.8 END
                     * (MSS.nlikes + MSS.ndislikes)::float / (MSS.nmemes_sent_events + 1.)
                     * (UMSS.nlikes + 1.)::float / (UMSS.nlikes + UMSS.ndislikes + 1.)
+                    * {disliked_source_demote_sql()}
                 ) AS score
             FROM meme M
             INNER JOIN meme_stats MS
@@ -453,11 +463,17 @@ async def get_recently_liked(
             ON R.meme_id = M.id
             AND R.user_id = :user_id
 
+        LEFT JOIN user_meme_source_stats UMSS
+            ON UMSS.meme_source_id = M.meme_source_id
+            AND UMSS.user_id = :user_id
+
         WHERE 1=1
             AND M.status = 'ok'
             AND R.meme_id IS NULL
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
             {block_disliked_sources_sql_filter()}
+        -- Prefer non-disliked sources first (demote mult 1.0 before 0.15)
+        ORDER BY {disliked_source_demote_sql()} DESC, M.id DESC
         LIMIT :limit
     """
     return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
@@ -651,6 +667,10 @@ async def viral_shares(
             ON R.meme_id = M.id
             AND R.user_id = :user_id
 
+        LEFT JOIN user_meme_source_stats UMSS
+            ON UMSS.meme_source_id = M.meme_source_id
+            AND UMSS.user_id = :user_id
+
         WHERE 1=1
             AND M.status = 'ok'
             AND R.meme_id IS NULL
@@ -664,7 +684,7 @@ async def viral_shares(
             (
                 COALESCE(MS.invited_count, 0)::float
                 / LN(COALESCE(MS.nmemes_sent, 0) + 2.718281828)
-            ) DESC
+            ) * {disliked_source_demote_sql()} DESC
             , MS.lr_smoothed DESC NULLS LAST
             , MS.nlikes DESC NULLS LAST
         LIMIT :limit

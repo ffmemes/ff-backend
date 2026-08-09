@@ -35,9 +35,17 @@ async def send_meme_to_user(
     meme: MemeData,
     reaction_context: str | None = None,
     first_meme_nudge_tasks: list[asyncio.Task[None]] | None = None,
+    recommended_by: str | None = None,
 ):
+    """Send a meme to a user.
+
+    ``recommended_by`` overrides the queue label when recording delivery
+    (e.g. ``broadcast_reengagement`` for retention pushes).
+    """
     user_info = await get_user_info(user_id)
     is_first_meme = (user_info["nmemes_sent"] or 0) == 0
+    if recommended_by:
+        meme.recommended_by = recommended_by
     prepared = await prepare_meme_delivery(
         user_id=user_id,
         meme=meme,
