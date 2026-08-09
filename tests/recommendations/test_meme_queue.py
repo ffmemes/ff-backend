@@ -620,8 +620,10 @@ async def test_generate_above_100_treatment_uses_recently_liked_weights():
         )
 
     assert candidates == [{"id": 4, "recommended_by": "recently_liked"}]
+    # After v2 closeout, treatment weights == shipped control default.
     assert captured_weights == MATURE_BLENDER_TREATMENT_WEIGHTS
-    assert captured_weights["recently_liked"] > MATURE_BLENDER_CONTROL_WEIGHTS["recently_liked"]
+    assert captured_weights == MATURE_BLENDER_CONTROL_WEIGHTS
+    assert captured_weights["recently_liked"] == 0.3
     get_weights.assert_awaited_once_with(TEST_USER_ID)
 
 

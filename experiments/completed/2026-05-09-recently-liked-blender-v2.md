@@ -58,7 +58,21 @@ The v1 failure is therefore treated as an experiment-design failure, not proof t
 
 ## Metrics After
 
-Pending deployment and measurement.
+See [docs/analyst/recently-liked-blender-v2-closeout.md](../../docs/analyst/recently-liked-blender-v2-closeout.md).
+
+| Metric | Control | Treatment |
+|--------|---------|-----------|
+| Global LR (30d post-assign) | 63.33% | 63.67% |
+| Median session 14d | 18 | 19 (+5.6%) |
+| Median user LR | 62.65% | 71.08% |
+| recently_liked traffic share | 16.9% | 22.9% |
+
+## Conclusion
+
+**Ship treatment as mature default.** Stratified assignment fixed v1 failure mode.
+Enrollment frozen; sample gate 1000 unreachable at current WAU — closed on partial
+but consistent evidence. Do not re-open without a realistic sample gate.
+
 
 ## Conclusion
 
