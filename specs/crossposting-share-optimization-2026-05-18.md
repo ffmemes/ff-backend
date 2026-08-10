@@ -142,6 +142,21 @@ Minimum next experiment: RU-only offline evaluator for a timestamp-safe
 prior-share feature, with superuser features measured but coefficient fixed at
 zero. EN stays report-only until it shows a positive offline signal.
 
+## Stats collector (2026-08-10)
+
+`collect_channel_stats` (Telethon) is healthy in prod: ~6h cadence, p50 time to
+first snapshot ~4.7h. Gaps for early canary reads:
+
+| Path | Schedule | Purpose |
+|------|----------|---------|
+| Full sweep | `0 */6` LON | 30d messages + subs + lifecycle |
+| Young posts | `30 * * * *` LON | posts &lt;48h only (dense early curve) |
+| Post-hook | after each TG crosspost | first sample within seconds |
+
+Shared write path: `_persist_crosspost_metrics` → `crossposting_snapshots` +
+live `crossposting.views/forwards`. Single-msg API:
+`refresh_crosspost_message_stats(channel, message_id, meme_id)`.
+
 ## Architecture follow-up
 
 The current ranker SQL and analysis queries are too expensive to rediscover and

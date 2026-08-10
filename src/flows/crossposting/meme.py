@@ -18,6 +18,7 @@ from src.crossposting.service import (
     log_ranker_decision,
 )
 from src.crossposting.vk import post_photo_to_group
+from src.flows.crossposting.stats_collector import refresh_crosspost_message_stats
 from src.flows.hooks import notify_telegram_on_failure
 from src.storage.constants import MemeStatus, MemeType
 from src.storage.schemas import MemeData
@@ -188,6 +189,29 @@ def _get_en_caption_for_crossposting_meme(meme: MemeData, channel: Channel) -> s
     return text
 
 
+async def _safe_refresh_crosspost_stats(
+    channel: Channel,
+    meme_id: int,
+    telegram_message_id: int | None,
+    logger,
+) -> None:
+    """Best-effort first snapshot right after post (does not fail the post flow)."""
+    if telegram_message_id is None:
+        return
+    if channel.value not in ("tgchannelru", "tgchannelen"):
+        return
+    try:
+        await refresh_crosspost_message_stats(channel.value, int(telegram_message_id), meme_id)
+    except Exception as e:
+        logger.warning(
+            "Post-hook stats refresh failed channel=%s meme=%s msg=%s: %s",
+            channel.value,
+            meme_id,
+            telegram_message_id,
+            e,
+        )
+
+
 @flow(
     retries=2,
     retry_delay_seconds=30,
@@ -226,6 +250,7 @@ async def post_meme_to_tgchannelen():
         score_version=SCORE_VERSION_V2,
     )
     await update_meme(next_meme.id, status=MemeStatus.PUBLISHED)
+    await _safe_refresh_crosspost_stats(Channel.TG_CHANNEL_EN, next_meme.id, msg.message_id, logger)
 
     uploader_user_id = await get_meme_uploader_user_id(next_meme.id)
     if uploader_user_id:
@@ -286,6 +311,7 @@ async def post_meme_to_tgchannelru():
         score_version=ru_score_version,
     )
     await update_meme(next_meme.id, status=MemeStatus.PUBLISHED)
+    await _safe_refresh_crosspost_stats(Channel.TG_CHANNEL_RU, next_meme.id, msg.message_id, logger)
 
     if next_meme.type == MemeType.IMAGE:
         try:
@@ -358,6 +384,7 @@ async def post_share_max_meme_to_tgchannelen():
         score_version=3,
     )
     await update_meme(next_meme.id, status=MemeStatus.PUBLISHED)
+    await _safe_refresh_crosspost_stats(Channel.TG_CHANNEL_EN, next_meme.id, msg.message_id, logger)
 
     uploader_user_id = await get_meme_uploader_user_id(next_meme.id)
     if uploader_user_id:
@@ -416,6 +443,7 @@ async def post_share_max_meme_to_tgchannelru():
         score_version=3,
     )
     await update_meme(next_meme.id, status=MemeStatus.PUBLISHED)
+    await _safe_refresh_crosspost_stats(Channel.TG_CHANNEL_RU, next_meme.id, msg.message_id, logger)
 
     uploader_user_id = await get_meme_uploader_user_id(next_meme.id)
     if uploader_user_id:
