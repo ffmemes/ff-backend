@@ -31,7 +31,10 @@ from src.flows.crossposting.meme import (
     post_share_max_meme_to_tgchannelen,
     post_share_max_meme_to_tgchannelru,
 )
-from src.flows.crossposting.stats_collector import collect_channel_stats
+from src.flows.crossposting.stats_collector import (
+    collect_channel_stats,
+    collect_young_channel_stats,
+)
 from src.flows.crossposting.weekly_report import post_weekly_burger_report
 from src.flows.moderator.source_voting import daily_moderator_source_voting
 
@@ -168,10 +171,17 @@ if __name__ == "__main__":
         post_share_max_meme_to_tgchannelen.to_deployment(
             name="Post Share Max Meme to TG Channel EN",
         ),
-        # ── Channel Stats (every 6h) ──
+        # ── Channel Stats ──
+        # Full sweep: mature 24h labels + subscribers + lifecycle.
         collect_channel_stats.to_deployment(
             name="Collect Channel Stats",
             schedules=[CronSchedule(cron="0 */6 * * *", timezone=LON)],
+        ),
+        # Dense early samples for posts <48h (canary / score_version reads).
+        # Offset :30 so we don't stack with the full :00 sweep.
+        collect_young_channel_stats.to_deployment(
+            name="Collect Young Channel Stats",
+            schedules=[CronSchedule(cron="30 * * * *", timezone=LON)],
         ),
         # ── Editorial (on-demand + weekly report + daily stats digest) ──
         post_editorial_to_channel.to_deployment(
