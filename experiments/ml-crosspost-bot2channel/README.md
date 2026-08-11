@@ -30,11 +30,18 @@ psql "$ANALYST_DATABASE_URL" -f sql/02_coverage.sql
 psql "$ANALYST_DATABASE_URL" -f sql/03_quintile_lifts.sql
 psql "$ANALYST_DATABASE_URL" -f sql/04_source_prior_sanity.sql
 
-# 2) Export raw layers
-python export_raw.py --days 180
+# 2) Export raw layers from DB
+#    --days 0 = all history (recommended). Lifetime labels ≫ 24h-snap labels.
+python export_raw.py --days 0
+
+# 2b) Optional: full channel history via Telethon (deeplink sc_{meme_id}_…)
+#     Needs TELEGRAM_API_ID / HASH / SESSION_STRING (same as stats_collector / zshrc)
+python export_channel_telethon.py --limit 0
 
 # 3) Build meme-level dataset
-python build_dataset.py
+#    lifetime = live views/forwards (~thousands of rows)
+#    24h      = strict 18–36h snapshots (~600 rows when collector was dense)
+python build_dataset.py --label-mode lifetime
 
 # 4) Local EDA extras
 python eda_local.py

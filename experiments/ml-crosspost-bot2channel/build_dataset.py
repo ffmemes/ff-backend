@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
-"""Polars: raw layers → meme-level dataset.parquet (leakage-safe priors)."""
+"""Polars: raw layers → meme-level dataset.parquet (leakage-safe priors).
+
+Label modes:
+  --label-mode 24h       strict 18–36h snapshots (smaller n, cleaner target)
+  --label-mode lifetime  live views/forwards on crossposting (much larger n)
+"""
 
 from __future__ import annotations
 
+import argparse
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,9 +21,44 @@ OUT = ROOT / "data" / "dataset.parquet"
 META = ROOT / "data" / "dataset_meta.json"
 
 
+def _load_labels(mode: str) -> pl.DataFrame:
+    if mode == "24h":
+        labels = pl.read_parquet(RAW / "labels_24h.parquet")
+        # already has views_24h, forwards_24h, f1k_24h
+        return labels
+    if mode == "lifetime":
+        path = RAW / "labels_lifetime.parquet"
+        if not path.exists():
+            raise SystemExit(
+                "labels_lifetime.parquet missing — re-run export_raw.py "
+                "(updated script writes this file)"
+            )
+        labels = pl.read_parquet(path)
+        # normalize column names so train_eval keeps working
+        return labels.rename(
+            {
+                "views_life": "views_24h",
+                "forwards_life": "forwards_24h",
+                "reactions_life": "reactions_24h",
+                "comments_life": "comments_24h",
+                "f1k_life": "f1k_24h",
+            }
+        )
+    raise SystemExit(f"unknown label mode: {mode}")
+
+
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "--label-mode",
+        choices=("24h", "lifetime"),
+        default="lifetime",
+        help="24h=strict snaps; lifetime=all posts with live channel stats (default)",
+    )
+    args = ap.parse_args()
+
     posts = pl.read_parquet(RAW / "posts.parquet")
-    labels = pl.read_parquet(RAW / "labels_24h.parquet")
+    labels = _load_labels(args.label_mode)
     reacts = pl.read_parquet(RAW / "reactions_pre.parquet")
     ut = pl.read_parquet(RAW / "users_tg.parquet")
     users = pl.read_parquet(RAW / "users.parquet")
@@ -186,6 +227,7 @@ def main() -> None:
 
     meta = {
         "built_at_utc": datetime.now(timezone.utc).isoformat(),
+        "label_mode": args.label_mode,
         "n": df.height,
         "posted_at_min": str(df["posted_at"].min()),
         "posted_at_max": str(df["posted_at"].max()),
@@ -204,9 +246,13 @@ def main() -> None:
         ],
         "baselines": ["v4_proxy", "src_prior_f1k"],
         "labels": ["f1k_24h", "forwards_24h", "views_24h", "reactions_24h"],
+        "label_note": (
+            "column names always f1k_24h/… for train_eval; "
+            "when label_mode=lifetime they are live channel stats, not 18–36h snaps"
+        ),
     }
     META.write_text(json.dumps(meta, indent=2))
-    print(f"wrote {OUT} n={df.height}")
+    print(f"wrote {OUT} n={df.height} label_mode={args.label_mode}")
     print(f"pre_likes mean={df['pre_likes'].mean():.1f} f1k mean={df['f1k_24h'].mean():.2f}")
 
 
