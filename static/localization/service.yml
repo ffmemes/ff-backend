@@ -56,11 +56,11 @@ help.text:
 
 last.none:
   en: |-
-    No previous meme yet — press /start and watch a few first.
+    No reaction to undo yet — like or skip a meme first, then /last.
   ru: |-
-    Пока нечего возвращать — жми /start и посмотри пару мемов.
+    Пока нечего исправлять — сначала лайкни или скипни мем, потом /last.
   uk: |-
-    Поки немає попереднього мема — натисни /start і подивись кілька мемів.
+    Поки немає що виправляти — спочатку лайкни або скіпни мем, потім /last.
 
 last.unavailable:
   en: |-

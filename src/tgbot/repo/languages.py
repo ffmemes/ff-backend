@@ -61,3 +61,18 @@ async def del_user_language(
     )
 
     await execute(delete_language_query)
+
+
+async def clear_user_languages(user_id: int) -> None:
+    await execute(user_language.delete().where(user_language.c.user_id == user_id))
+
+
+async def set_user_languages_exclusive(
+    user_id: int,
+    language_codes: Sequence[str],
+) -> None:
+    """Replace the user's content languages with exactly this set."""
+    codes = [code for code in language_codes if code]
+    await clear_user_languages(user_id)
+    if codes:
+        await add_user_languages(user_id, codes)

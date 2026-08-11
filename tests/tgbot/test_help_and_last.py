@@ -73,14 +73,14 @@ async def test_last_replies_when_no_history(monkeypatch):
     )
     monkeypatch.setattr(
         help_handlers,
-        "get_last_sent_meme_for_user",
+        "get_last_reacted_meme_for_user",
         AsyncMock(return_value=None),
     )
 
     await help_handlers.handle_last(update, _make_context())
 
     text = update.message.reply_text.call_args.args[0]
-    assert "/start" in text
+    assert "/last" in text or "исправлять" in text or "undo" in text.lower() or "скип" in text
 
 
 @pytest.mark.asyncio
@@ -94,7 +94,7 @@ async def test_last_resends_meme(monkeypatch):
     )
     monkeypatch.setattr(
         help_handlers,
-        "get_last_sent_meme_for_user",
+        "get_last_reacted_meme_for_user",
         AsyncMock(
             return_value={
                 "id": 99,

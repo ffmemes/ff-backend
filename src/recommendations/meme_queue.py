@@ -234,7 +234,13 @@ async def check_queue(user_id: int) -> bool:
         queue_length = await redis.get_meme_queue_length_by_key(queue_key)
 
         if queue_length <= 8:
-            await generate_recommendations(user_id, limit=15)
+            # Cold start: small batches so maturity stage re-plans as nmemes_sent
+            # grows (explore → adapt). A single limit=15 fill at nmemes_sent=0
+            # used to leave users stuck on explore_guarded for the whole queue.
+            user_info = await get_user_info(user_id)
+            nmemes_sent = int(user_info.get("nmemes_sent") or 0)
+            limit = 5 if nmemes_sent < 30 else 15
+            await generate_recommendations(user_id, limit=limit)
     except Exception:
         # DB connection errors (pool exhaustion, connection killed mid-query)
         # are expected under traffic spikes. Queue will refill on next attempt.

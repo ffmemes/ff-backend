@@ -138,6 +138,30 @@ onboarding.invited_by_admin:
     💎 नमस्ते! अब आपके पास भी पहुंच है। ➡️ /start पर क्लिक करें
 
 
+onboarding.pick_language:
+  ru: |-
+    Выбери язык мемов 👇
+  en: |-
+    Pick your meme language 👇
+  uk: |-
+    Обери мову мемів 👇
+  es: |-
+    Elige el idioma de los memes 👇
+  pt-br: |-
+    Escolha o idioma dos memes 👇
+  fr: |-
+    Choisis la langue des memes 👇
+  it: |-
+    Scegli la lingua dei meme 👇
+  de: |-
+    Wähle die Meme-Sprache 👇
+  fa: |-
+    زبان میم‌ها را انتخاب کن 👇
+  hi: |-
+    मीम्स की भाषा चुनें 👇
+  tr: |-
+    Meme dilini seç 👇
+
 onboarding.language_settings:
   ru: |-
     Выбери ВСЕ языки, на которых ты хочешь получать мемы

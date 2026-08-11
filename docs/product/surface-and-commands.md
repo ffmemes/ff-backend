@@ -236,4 +236,5 @@ Aliases: `/last` = `/previous` = `/prev` if cheap.
 
 - **2026-08-11:** Initial notes from founder conversation + first prod proxy readout (no direct command telemetry).
 - **2026-08-11:** Private DMs → `message_tg` (no separate command table); `/last` + `/help` menu (`last` first); re-reaction allowed.
+- **2026-08-11:** `/last` = last *reacted* meme (not last sent/visible). Onboarding: single-language picker; auto-skip for ru/uk/CIS/cyrillic name; welcome only after language. Cold-start queue refill limit=5 while nmemes_sent<30 so adapt stage re-plans.
 
