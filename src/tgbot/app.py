@@ -17,6 +17,7 @@ from telegram.ext import (
 
 from src.config import settings
 from src.observability.sentry import telegram_update_scope
+from src.tgbot.commands_catalog import sync_bot_commands
 from src.tgbot.constants import (
     LANG_SETTINGS_END_CALLBACK_DATA,
     LANG_SETTINGS_LANG_CHANGE_CALLBACK_PATTERN,
@@ -66,6 +67,7 @@ from src.tgbot.handlers.chat.send_tokens import (
     reward_active_chat_users,
     send_tokens_to_reply,
 )
+from src.tgbot.handlers.help import handle_help, handle_last
 from src.tgbot.handlers.moderator.registry import add_moderator_handlers
 from src.tgbot.handlers.payments.purchase import (
     PURCHASE_TOKEN_CALLBACK_DATA_REGEXP,
@@ -74,6 +76,7 @@ from src.tgbot.handlers.payments.purchase import (
     refund_command,
     successful_payment_callback,
 )
+from src.tgbot.handlers.private_message_log import log_private_inbound_message
 from src.tgbot.handlers.stats.stats import handle_stats
 from src.tgbot.handlers.stats.wrapped import handle_wrapped, handle_wrapped_button
 from src.tgbot.handlers.treasury.commands import (
@@ -95,10 +98,38 @@ def _get_update_user_id(update: Update) -> int | None:
 
 
 def add_handlers(application: Application) -> None:
+    # Analytics: persist all private DMs (incl. slash commands) into message_tg.
+    # PTB runs each handler group independently; group -1 does not block group 0.
+    application.add_handler(
+        MessageHandler(
+            filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+            log_private_inbound_message,
+        ),
+        group=-1,
+    )
+
     application.add_handler(
         CommandHandler(
             "start",
             start.handle_start,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+        )
+    )
+
+    ###################
+    # re-show previous meme + help catalog
+    # /last is first in set_my_commands (see commands_catalog).
+    application.add_handler(
+        CommandHandler(
+            ["last", "previous", "prev"],
+            handle_last,
+            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+        )
+    )
+    application.add_handler(
+        CommandHandler(
+            "help",
+            handle_help,
             filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
         )
     )
@@ -497,9 +528,14 @@ async def setup_webhook(application: Application) -> None:
     await application.start()
 
 
+async def _post_init(application: Application) -> None:
+    await sync_bot_commands(application.bot)
+
+
 def setup_application(is_webhook: bool = False) -> Application:
     application_builder = Application.builder().token(settings.TELEGRAM_BOT_TOKEN)
     application_builder.rate_limiter(AIORateLimiter(max_retries=10))
+    application_builder.post_init(_post_init)
 
     if is_webhook:
         application_builder.updater(None)
