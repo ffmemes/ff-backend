@@ -178,6 +178,7 @@ def _build_decision_log(
         log_candidates.append(log_candidate)
 
     # Shadow ranks among this top-N only (production order unchanged).
+    # Keep shadow_* only inside candidates[] — log_ranker_decision kwargs are fixed columns.
     log_candidates = attach_shadow_ranks(log_candidates)
 
     return {
@@ -191,10 +192,6 @@ def _build_decision_log(
         ),
         "pool_size": picked.get("candidate_pool_size"),
         "candidates": log_candidates,
-        "shadow_version": log_candidates[0].get("shadow_version") if log_candidates else None,
-        "shadow_vs_prod_disagree": (
-            log_candidates[0].get("shadow_vs_prod_disagree") if log_candidates else None
-        ),
     }
 
 

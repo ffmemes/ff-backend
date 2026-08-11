@@ -76,11 +76,12 @@ def test_build_decision_log_includes_shadow():
     ]
     log = _build_decision_log("tgchannelru", 4, cands, like_volume_enabled=True)
     assert log is not None
-    assert log["shadow_version"] == SHADOW_VERSION
+    # Top-level keys must stay compatible with log_ranker_decision() columns only
+    assert "shadow_version" not in log
     top = log["candidates"][0]
+    assert top["shadow_version"] == SHADOW_VERSION
     assert "shadow_score" in top
     assert "shadow_rank" in top
     assert top["rank"] == 1  # production order preserved
-    # shadow ranks assigned
     ranks = {c["meme_id"]: c["shadow_rank"] for c in log["candidates"]}
     assert set(ranks.values()) == {1, 2}
