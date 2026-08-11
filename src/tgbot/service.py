@@ -19,8 +19,10 @@ from src.tgbot.repo.inline_search import (
 from src.tgbot.repo.languages import (
     add_user_language,
     add_user_languages,
+    clear_user_languages,
     del_user_language,
     get_user_languages,
+    set_user_languages_exclusive,
 )
 from src.tgbot.repo.meme_sources import (
     dismiss_source_candidate,
@@ -33,6 +35,7 @@ from src.tgbot.repo.meme_sources import (
     update_meme_source,
 )
 from src.tgbot.repo.memes import (
+    get_last_reacted_meme_for_user,
     get_last_sent_meme_for_user,
     get_meme_by_id,
     get_meme_stats,
@@ -64,6 +67,7 @@ __all__ = [
     "add_user_languages",
     "add_user_tg_chat_membership",
     "assign_experiment",
+    "clear_user_languages",
     "create_inline_chosen_result_log",
     "create_inline_search_log",
     "create_or_update_user",
@@ -73,6 +77,7 @@ __all__ = [
     "dismiss_source_candidate",
     "get_experiment_assignment",
     "get_experiment_variant",
+    "get_last_reacted_meme_for_user",
     "get_last_sent_meme_for_user",
     "get_meme_by_id",
     "get_meme_source_by_id",
@@ -93,6 +98,7 @@ __all__ = [
     "promote_source_candidate",
     "save_tg_user",
     "search_memes_for_inline_query",
+    "set_user_languages_exclusive",
     "update_meme_source",
     "update_user",
     "update_user_popup_log",

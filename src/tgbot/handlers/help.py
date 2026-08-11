@@ -10,7 +10,7 @@ from telegram.ext import ContextTypes
 
 from src import localizer
 from src.storage.schemas import MemeData
-from src.tgbot.repo.memes import get_last_sent_meme_for_user
+from src.tgbot.repo.memes import get_last_reacted_meme_for_user
 from src.tgbot.senders.meme import send_meme_to_user
 from src.tgbot.user_info import get_user_info
 
@@ -50,7 +50,7 @@ async def handle_last(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         user_info = None
 
     lang = _interface_lang(user_info)
-    row = await get_last_sent_meme_for_user(user_id)
+    row = await get_last_reacted_meme_for_user(user_id)
     if row is None:
         await update.message.reply_text(localizer.t("last.none", lang))
         return

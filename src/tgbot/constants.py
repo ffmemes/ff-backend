@@ -97,9 +97,13 @@ INLINE_SEARCH_REQUEST_DEEPLINK = "inline_search_request"
 # deep link for adding bot to a group chat
 ADD_TO_GROUP_DEEPLINK = "https://t.me/ffmemesbot?startgroup=true"
 
-# /lang
+# /lang (multi-select settings for existing users)
 LANG_SETTINGS_LANG_CHANGE_CALLBACK_PATTERN = r"^l:\w+:(add|del)"
 LANG_SETTINGS_END_CALLBACK_DATA = "l:end"
+
+# Onboarding single-language picker (one primary language)
+ONBOARDING_LANG_CALLBACK_DATA_PATTERN = "ol:{lang}"
+ONBOARDING_LANG_CALLBACK_REGEXP = r"^ol:[\w-]{2,8}$"
 
 MESSAGE_REACTIONS = [
     "👍",

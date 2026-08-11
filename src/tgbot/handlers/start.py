@@ -7,8 +7,9 @@ from src.recommendations.meme_queue import clear_meme_queue_for_user
 from src.storage.schemas import MemeData
 from src.tgbot.handlers.deep_link import handle_invited_user, handle_shared_meme_reward
 from src.tgbot.handlers.language import (
-    handle_language_settings,
     init_user_languages_from_tg_user,
+    resolve_onboarding_auto_language,
+    send_onboarding_language_picker,
 )
 from src.tgbot.handlers.onboarding import onboarding_flow
 from src.tgbot.handlers.treasury.commands import (
@@ -25,6 +26,7 @@ from src.tgbot.service import (
     get_user_languages,
     log_user_deep_link,
     save_tg_user,
+    set_user_languages_exclusive,
 )
 from src.tgbot.sharing import (
     MEME_REACTION_CONTEXT_ONBOARD,
@@ -159,15 +161,18 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         created,
     )
 
-    # Lazy language init. Covers: new users on every deep_link path
-    # (kitchen used to skip this), and historical orphans whose init
-    # was never run — they were stuck on "memes ended" because
-    # recommendations filter by user_language. Idempotent:
-    # add_user_languages uses ON CONFLICT DO NOTHING.
-    if not await get_user_languages(user_id):
+    # Language seeding. New users get a single primary language (auto or picker).
+    # Existing orphans without user_language still use multi-seed init.
+    has_languages = bool(await get_user_languages(user_id))
+    if not has_languages and not created:
         await init_user_languages_from_tg_user(update.effective_user)
+        has_languages = bool(await get_user_languages(user_id))
 
     if deep_link == "kitchen":
+        if not has_languages:
+            auto = resolve_onboarding_auto_language(update.effective_user) or "en"
+            await set_user_languages_exclusive(user_id, [auto])
+            await update_user_info_cache(user_id)
         return await handle_show_kitchen(update, context)
 
     if deep_link == "wrapped":
@@ -193,13 +198,24 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         if shared_meme_sent:
             return
 
-        await handle_language_settings(update, context)
-
-        # handle giveaway after onboarding so user_language rows exist
+        # handle giveaway after languages exist
         if deep_link and deep_link.startswith("giveaway_"):
+            if not await get_user_languages(user_id):
+                auto = resolve_onboarding_auto_language(update.effective_user) or "en"
+                await set_user_languages_exclusive(user_id, [auto])
+                await update_user_info_cache(user_id)
             from src.tgbot.handlers.treasury.giveaway import handle_giveaway
 
             return await handle_giveaway(update, context, deep_link)
+
+        # Primary language first; welcome + first meme only after language is set.
+        if not await get_user_languages(user_id):
+            auto = resolve_onboarding_auto_language(update.effective_user)
+            if auto:
+                await set_user_languages_exclusive(user_id, [auto])
+                await update_user_info_cache(user_id)
+            else:
+                return await send_onboarding_language_picker(update, context)
 
         return await onboarding_flow(update, context.bot)
     else:  # existing user:

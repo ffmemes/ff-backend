@@ -23,6 +23,7 @@ from src.tgbot.constants import (
     LANG_SETTINGS_LANG_CHANGE_CALLBACK_PATTERN,
     MEME_BUTTON_CALLBACK_DATA_REGEXP,
     MEME_QUEUE_IS_EMPTY_ALERT_CALLBACK_DATA,
+    ONBOARDING_LANG_CALLBACK_REGEXP,
     POPUP_BUTTON_CALLBACK_DATA_REGEXP,
     TELEGRAM_CHANNEL_RU_CHAT_ID,
     TELEGRAM_FEEDBACK_CHAT_ID,
@@ -155,6 +156,14 @@ def add_handlers(application: Application) -> None:
         CallbackQueryHandler(
             language.handle_language_settings_end,
             pattern=LANG_SETTINGS_END_CALLBACK_DATA,
+        )
+    )
+
+    # New-user single-language onboarding picker
+    application.add_handler(
+        CallbackQueryHandler(
+            language.handle_onboarding_language_selected,
+            pattern=ONBOARDING_LANG_CALLBACK_REGEXP,
         )
     )
 
