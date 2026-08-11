@@ -3,7 +3,7 @@
 **Purpose:** When an agent (or human) resumes after days/weeks, this file answers:
 what is live, what we expected, when to re-measure, and what “good / kill” means.
 
-**Last updated:** 2026-08-10 (UTC) — freeze H6 online gates + H7 taste-cohort shadow  
+**Last updated:** 2026-08-11 (UTC) — H8 bot→channel offline ML lab  
 **Prod DB clock at last interim:** `2026-08-10 ~17 UTC` (v4 early WATCH; H7 not yet deployed)
 
 How to use on resume:
@@ -26,6 +26,7 @@ How to use on resume:
 | **2026-08-17** | **Crosspost v4 mature keep/kill** | **H6** |
 | **2026-08-23** | Feed exp finals if needed | H1 primarily |
 | **2026-08-24** | Taste shadow readout | **H7** |
+| Ad-hoc | Bot→channel ML re-run / walk-forward | **H8** |
 | Ad-hoc | After any ranking/deploy incident | all active |
 
 Agent prompt on resume (copy-paste):
@@ -361,6 +362,37 @@ replacement for like volume.
 `python scripts/crosspost_taste_cohort.py`
 
 ---
+
+
+---
+
+## H8 — Bot→channel ML lab (OFFLINE)
+
+| Field | Value |
+|-------|--------|
+| **ID** | `bot2channel_ml_lab_v1` |
+| **Status** | **offline only** — no prod ranker change |
+| **Code** | `experiments/ml-crosspost-bot2channel/` |
+| **Note** | `experiments/active/2026-08-11-bot2channel-ml-lab.md` |
+| **Report** | `experiments/ml-crosspost-bot2channel/reports/2026-08-11-models.md` |
+
+### Hypothesis
+
+Simple linear/logistic models on pre-post bot features + source prior beat
+`ln(pre_likes+1)` on time-holdout top-20% f1k lift without tree overfit.
+
+### First result (2026-08-11)
+
+- n=624 labeled; test n=188 time split
+- logreg top20 f1k lift **1.187** vs v4 **1.114** (bar v4+0.05: PASS once)
+- HGB depth3 **overfits** (train spearman 0.67 vs test 0.14) — discard for ship
+- **No production change** until walk-forward / shadow design
+
+### Next check
+
+- Ad-hoc: re-run after more mature v4 data or walk-forward split
+- Do not schedule as feed experiment
+
 
 ## Explicitly not open experiments
 

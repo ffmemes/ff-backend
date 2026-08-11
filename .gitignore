@@ -172,3 +172,6 @@ agents/backup/*.json
 
 # Ralphex local audit snapshots (redacted summaries committed elsewhere)
 .ralphex/
+
+# Local bot→channel ML lab dumps
+experiments/ml-crosspost-bot2channel/data/
