@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Hypothesis battery · bot→channel</title>
+<style>
+:root { --bg:#0c1017; --card:#151c28; --text:#e8eef7; --muted:#8b9bb4; --line:#2a3548;
+--good:#3dd68c; --bad:#f07178; --accent:#6cb6ff; --warn:#e6c07b; }
+body { margin:0; font-family:Segoe UI,system-ui,sans-serif; background:var(--bg); color:var(--text); line-height:1.5; }
+.wrap { max-width:1100px; margin:0 auto; padding:28px 16px 64px; }
+h1 { margin:0 0 8px; font-size:1.6rem; }
+h2 { margin:24px 0 10px; font-size:1.15rem; color:var(--accent); }
+.sub { color:var(--muted); }
+.card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px 20px; margin-top:14px; }
+table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+th,td { padding:7px 8px; border-bottom:1px solid var(--line); text-align:left; }
+th { color:var(--muted); font-size:0.68rem; text-transform:uppercase; }
+td.n, th.n { text-align:right; font-variant-numeric:tabular-nums; }
+td.tiny { font-size:0.75rem; color:var(--muted); }
+td.fam { color:var(--muted); font-size:0.78rem; }
+tr.pass td { background:rgba(61,214,140,.08); }
+tr.base td { color:var(--muted); }
+.pill { padding:2px 8px; border-radius:6px; font-size:0.72rem; font-weight:700; }
+.pill.yes { background:rgba(61,214,140,.2); color:var(--good); }
+.pill.no { background:rgba(240,113,120,.15); color:var(--bad); }
+.pill.base { background:#1e2838; color:var(--muted); }
+.badge { display:inline-block; padding:4px 10px; border-radius:999px; font-size:0.78rem; margin:4px 4px 0 0;
+ border:1px solid var(--line); }
+.badge.ok { color:var(--good); border-color:rgba(61,214,140,.4); }
+.badge.no { color:var(--bad); border-color:rgba(240,113,120,.4); }
+ul { margin:8px 0; padding-left:1.2rem; }
+code { background:#1e2838; padding:1px 5px; border-radius:4px; }
+</style></head><body><div class="wrap">
+<h1>Батарея гипотез: стрельнёт ли мем в канале?</h1>
+<p class="sub">Walk-forward · top-20% lift f1k · bar: ≥ v4+0.05 на ≥2/3 фолдах · 2026-08-11</p>
+<span class="badge">0 PASS</span>
+<span class="badge">24h lifetime</span>
+<span class="badge">18 scorers</span>
+
+<div class="card">
+<h2>Зачем это, а не «миллиард агентов»</h2>
+<ul>
+<li>Один датасет, <b>одни фолды</b>, много <b>фальсифицируемых</b> scorers — сравнимо.</li>
+<li>Когорты = кто шумит: haters, rare users, cold users vs power/engaged/premium.</li>
+<li>Сначала offline PASS → потом shadow в decision_log → canary soft boost → тюнинг.</li>
+<li>Lifetime: f1k top-quartile (rate). Lifetime и 24h — <b>разные задачи</b>.</li>
+</ul>
+</div>
+
+<div class="card">
+<h2>Кто прошёл bar</h2>
+<p><b>Ни одна гипотеза не прошла bar на walk-forward.</b> Но ranking table всё равно показывает, что ближе к цели.</p>
+</div>
+
+<div class="card">
+<h2>Label: 24h snaps (early virality) · n≈625</h2>
+<table><thead><tr><th>Hypothesis</th><th>Family</th><th class='n'>Wins vs v4</th><th class='n'>Mean lift</th><th class='n'>v4 lift</th><th class='n'>ρ</th><th class='n'>HIT@top20</th><th>Per-fold lift</th><th></th></tr></thead><tbody><tr class=''><td>maturity × source</td><td class='fam'>hybrid</td><td class='n'>1/3</td><td class='n'>1.109</td><td class='n'>1.079</td><td class='n'>0.138</td><td class='n'>0.426</td><td class='tiny'>1.12, 1.06, 1.14</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>v4 × source</td><td class='fam'>hybrid</td><td class='n'>1/3</td><td class='n'>1.098</td><td class='n'>1.079</td><td class='n'>0.149</td><td class='n'>0.426</td><td class='tiny'>1.09, 1.06, 1.14</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>power × source</td><td class='fam'>hybrid</td><td class='n'>1/3</td><td class='n'>1.098</td><td class='n'>1.079</td><td class='n'>0.148</td><td class='n'>0.426</td><td class='tiny'>1.09, 1.06, 1.14</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>source prior f1k</td><td class='fam'>source</td><td class='n'>1/3</td><td class='n'>1.017</td><td class='n'>1.079</td><td class='n'>0.042</td><td class='n'>0.333</td><td class='tiny'>1.01, 1.11, 0.93</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>engaged × source</td><td class='fam'>hybrid</td><td class='n'>0/3</td><td class='n'>1.112</td><td class='n'>1.079</td><td class='n'>0.168</td><td class='n'>0.426</td><td class='tiny'>1.08, 1.07, 1.19</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>no-haters × source</td><td class='fam'>hybrid</td><td class='n'>0/3</td><td class='n'>1.093</td><td class='n'>1.079</td><td class='n'>0.150</td><td class='n'>0.407</td><td class='tiny'>1.08, 1.06, 1.14</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>mods/admins only</td><td class='fam'>cohort</td><td class='n'>0/3</td><td class='n'>1.084</td><td class='n'>1.079</td><td class='n'>0.087</td><td class='n'>0.426</td><td class='tiny'>1.03, 1.01, 1.21</td><td><span class='pill no'>no</span></td></tr><tr class='base'><td>v4 all likes</td><td class='fam'>volume</td><td class='n'>0/3</td><td class='n'>1.079</td><td class='n'>1.079</td><td class='n'>0.065</td><td class='n'>0.426</td><td class='tiny'>1.03, 1.02, 1.19</td><td><span class='pill base'>BASE</span></td></tr><tr class=''><td>power users (top20% likes)</td><td class='fam'>cohort</td><td class='n'>0/3</td><td class='n'>1.079</td><td class='n'>1.079</td><td class='n'>0.068</td><td class='n'>0.426</td><td class='tiny'>1.03, 1.02, 1.19</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>mid+ users (top50%)</td><td class='fam'>cohort</td><td class='n'>0/3</td><td class='n'>1.079</td><td class='n'>1.079</td><td class='n'>0.066</td><td class='n'>0.426</td><td class='tiny'>1.03, 1.02, 1.19</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>exclude serial haters</td><td class='fam'>cohort</td><td class='n'>0/3</td><td class='n'>1.079</td><td class='n'>1.079</td><td class='n'>0.066</td><td class='n'>0.426</td><td class='tiny'>1.03, 1.02, 1.19</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>exclude rare users</td><td class='fam'>cohort</td><td class='n'>0/3</td><td class='n'>1.079</td><td class='n'>1.079</td><td class='n'>0.065</td><td class='n'>0.426</td><td class='tiny'>1.03, 1.02, 1.19</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>super-lovers only</td><td class='fam'>cohort</td><td class='n'>0/3</td><td class='n'>1.079</td><td class='n'>1.079</td><td class='n'>0.057</td><td class='n'>0.426</td><td class='tiny'>1.03, 1.02, 1.19</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>engaged likes only</td><td class='fam'>cohort</td><td class='n'>0/3</td><td class='n'>1.073</td><td class='n'>1.079</td><td class='n'>0.108</td><td class='n'>0.426</td><td class='tiny'>1.03, 1.01, 1.18</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>power × engaged</td><td class='fam'>cohort</td><td class='n'>0/3</td><td class='n'>1.073</td><td class='n'>1.079</td><td class='n'>0.105</td><td class='n'>0.426</td><td class='tiny'>1.03, 1.01, 1.18</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>maturity band volume</td><td class='fam'>maturity</td><td class='n'>0/3</td><td class='n'>1.051</td><td class='n'>1.079</td><td class='n'>0.038</td><td class='n'>0.407</td><td class='tiny'>0.95, 1.01, 1.19</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>volume / source scale</td><td class='fam'>hybrid</td><td class='n'>0/3</td><td class='n'>1.048</td><td class='n'>1.079</td><td class='n'>0.024</td><td class='n'>0.426</td><td class='tiny'>0.98, 0.99, 1.17</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>premium likers</td><td class='fam'>cohort</td><td class='n'>0/3</td><td class='n'>1.045</td><td class='n'>1.079</td><td class='n'>0.088</td><td class='n'>0.389</td><td class='tiny'>1.03, 0.97, 1.13</td><td><span class='pill no'>no</span></td></tr></tbody></table>
+</div>
+
+<div class="card">
+<h2>Label: lifetime Telethon (long horizon) · n≈3712</h2>
+<table><thead><tr><th>Hypothesis</th><th>Family</th><th class='n'>Wins vs v4</th><th class='n'>Mean lift</th><th class='n'>v4 lift</th><th class='n'>ρ</th><th class='n'>HIT@top20</th><th>Per-fold lift</th><th></th></tr></thead><tbody><tr class=''><td>maturity × source</td><td class='fam'>hybrid</td><td class='n'>1/3</td><td class='n'>1.081</td><td class='n'>1.057</td><td class='n'>0.108</td><td class='n'>0.300</td><td class='tiny'>1.03, 1.06, 1.16</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>v4 × source</td><td class='fam'>hybrid</td><td class='n'>1/3</td><td class='n'>1.081</td><td class='n'>1.057</td><td class='n'>0.110</td><td class='n'>0.303</td><td class='tiny'>1.02, 1.05, 1.17</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>no-haters × source</td><td class='fam'>hybrid</td><td class='n'>1/3</td><td class='n'>1.080</td><td class='n'>1.057</td><td class='n'>0.102</td><td class='n'>0.297</td><td class='tiny'>1.01, 1.06, 1.17</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>power × source</td><td class='fam'>hybrid</td><td class='n'>1/3</td><td class='n'>1.076</td><td class='n'>1.057</td><td class='n'>0.109</td><td class='n'>0.294</td><td class='tiny'>1.01, 1.05, 1.16</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>source prior f1k</td><td class='fam'>source</td><td class='n'>1/3</td><td class='n'>1.073</td><td class='n'>1.057</td><td class='n'>0.094</td><td class='n'>0.306</td><td class='tiny'>1.05, 1.01, 1.16</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>engaged × source</td><td class='fam'>hybrid</td><td class='n'>0/3</td><td class='n'>1.070</td><td class='n'>1.057</td><td class='n'>0.123</td><td class='n'>0.303</td><td class='tiny'>1.03, 1.05, 1.13</td><td><span class='pill no'>no</span></td></tr><tr class='base'><td>v4 all likes</td><td class='fam'>volume</td><td class='n'>0/3</td><td class='n'>1.057</td><td class='n'>1.057</td><td class='n'>0.062</td><td class='n'>0.285</td><td class='tiny'>1.07, 1.02, 1.08</td><td><span class='pill base'>BASE</span></td></tr><tr class=''><td>mid+ users (top50%)</td><td class='fam'>cohort</td><td class='n'>0/3</td><td class='n'>1.057</td><td class='n'>1.057</td><td class='n'>0.062</td><td class='n'>0.285</td><td class='tiny'>1.07, 1.02, 1.08</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>exclude rare users</td><td class='fam'>cohort</td><td class='n'>0/3</td><td class='n'>1.057</td><td class='n'>1.057</td><td class='n'>0.062</td><td class='n'>0.285</td><td class='tiny'>1.07, 1.02, 1.08</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>power users (top20% likes)</td><td class='fam'>cohort</td><td class='n'>0/3</td><td class='n'>1.051</td><td class='n'>1.057</td><td class='n'>0.059</td><td class='n'>0.279</td><td class='tiny'>1.06, 1.02, 1.07</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>mods/admins only</td><td class='fam'>cohort</td><td class='n'>0/3</td><td class='n'>1.048</td><td class='n'>1.057</td><td class='n'>0.058</td><td class='n'>0.282</td><td class='tiny'>1.05, 1.00, 1.09</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>premium likers</td><td class='fam'>cohort</td><td class='n'>0/3</td><td class='n'>1.048</td><td class='n'>1.057</td><td class='n'>0.061</td><td class='n'>0.273</td><td class='tiny'>1.04, 1.01, 1.09</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>maturity band volume</td><td class='fam'>maturity</td><td class='n'>0/3</td><td class='n'>1.043</td><td class='n'>1.057</td><td class='n'>0.061</td><td class='n'>0.264</td><td class='tiny'>1.06, 0.99, 1.08</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>exclude serial haters</td><td class='fam'>cohort</td><td class='n'>0/3</td><td class='n'>1.037</td><td class='n'>1.057</td><td class='n'>0.053</td><td class='n'>0.276</td><td class='tiny'>1.04, 1.00, 1.07</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>super-lovers only</td><td class='fam'>cohort</td><td class='n'>0/3</td><td class='n'>1.036</td><td class='n'>1.057</td><td class='n'>0.044</td><td class='n'>0.267</td><td class='tiny'>1.04, 1.00, 1.07</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>engaged likes only</td><td class='fam'>cohort</td><td class='n'>0/3</td><td class='n'>1.026</td><td class='n'>1.057</td><td class='n'>0.084</td><td class='n'>0.264</td><td class='tiny'>1.02, 0.97, 1.09</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>power × engaged</td><td class='fam'>cohort</td><td class='n'>0/3</td><td class='n'>1.018</td><td class='n'>1.057</td><td class='n'>0.082</td><td class='n'>0.261</td><td class='tiny'>1.02, 0.96, 1.08</td><td><span class='pill no'>no</span></td></tr><tr class=''><td>volume / source scale</td><td class='fam'>hybrid</td><td class='n'>0/3</td><td class='n'>1.001</td><td class='n'>1.057</td><td class='n'>0.010</td><td class='n'>0.228</td><td class='tiny'>0.99, 0.99, 1.02</td><td><span class='pill no'>no</span></td></tr></tbody></table>
+</div>
+
+<div class="card">
+<h2>Как читать → что в прод</h2>
+<ol>
+<li><b>PASS offline</b> → shadow score в <code>decision_log</code> (не меняет pick).</li>
+<li>14 дней: corr(score, 24h f1k) + lift на реальных постах.</li>
+<li>Canary: soft multiply (cap) на 10–20% слотов / kill switch env.</li>
+<li>Тюнинг только на shadow-метриках, не на «ощущениях».</li>
+<li>Если PASS только на lifetime, а кросспост оптимизирует 24h — <b>не шипить</b>.</li>
+</ol>
+</div>
+<footer class="sub" style="margin-top:24px;text-align:center">hypothesis_battery.py · offline only</footer>
+</div></body></html>

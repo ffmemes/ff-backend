@@ -1,0 +1,722 @@
+[
+  {
+    "label": "24h",
+    "id": "s_v4_all",
+    "name": "v4 all likes",
+    "family": "volume",
+    "desc": "ln(all pre likes+1) \u2014 prod-like",
+    "n": 625,
+    "n_folds": 3,
+    "mean_lift": 1.0791623710657825,
+    "mean_spearman": 0.06466533377100055,
+    "mean_hit_top20": 0.425925925925926,
+    "mean_v4_lift": 1.0791623710657825,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.0287316908319943,
+      1.0195830139897173,
+      1.1891724083756359
+    ],
+    "PASS": false
+  },
+  {
+    "label": "24h",
+    "id": "s_src_prior",
+    "name": "source prior f1k",
+    "family": "source",
+    "desc": "historical same-source channel f1k",
+    "n": 625,
+    "n_folds": 3,
+    "mean_lift": 1.0173646782487278,
+    "mean_spearman": 0.042190126625088274,
+    "mean_hit_top20": 0.3333333333333333,
+    "mean_v4_lift": 1.0791623710657825,
+    "wins_vs_v4": 1,
+    "lifts": [
+      1.0134297503258463,
+      1.1127778532650607,
+      0.9258864311552764
+    ],
+    "PASS": false
+  },
+  {
+    "label": "24h",
+    "id": "s_v4_x_src",
+    "name": "v4 \u00d7 source",
+    "family": "hybrid",
+    "desc": "volume \u00d7 source prior",
+    "n": 625,
+    "n_folds": 3,
+    "mean_lift": 1.098277967761538,
+    "mean_spearman": 0.14946833378094754,
+    "mean_hit_top20": 0.4259259259259259,
+    "mean_v4_lift": 1.0791623710657825,
+    "wins_vs_v4": 1,
+    "lifts": [
+      1.0926567679538868,
+      1.0627507736556014,
+      1.139426361675126
+    ],
+    "PASS": false
+  },
+  {
+    "label": "24h",
+    "id": "s_engaged",
+    "name": "engaged likes only",
+    "family": "cohort",
+    "desc": "likes with dwell 5\u201360s",
+    "n": 625,
+    "n_folds": 3,
+    "mean_lift": 1.072700058374215,
+    "mean_spearman": 0.1080292043408632,
+    "mean_hit_top20": 0.425925925925926,
+    "mean_v4_lift": 1.0791623710657825,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.0287316908319946,
+      1.0118383316281203,
+      1.17753015266253
+    ],
+    "PASS": false
+  },
+  {
+    "label": "24h",
+    "id": "s_premium",
+    "name": "premium likers",
+    "family": "cohort",
+    "desc": "Telegram Premium users only",
+    "n": 625,
+    "n_folds": 3,
+    "mean_lift": 1.044599279084939,
+    "mean_spearman": 0.08781196224125411,
+    "mean_hit_top20": 0.3888888888888889,
+    "mean_v4_lift": 1.0791623710657825,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.0287316908319946,
+      0.9723237114490494,
+      1.1327424349737727
+    ],
+    "PASS": false
+  },
+  {
+    "label": "24h",
+    "id": "s_power",
+    "name": "power users (top20% likes)",
+    "family": "cohort",
+    "desc": "high-activity likers only",
+    "n": 625,
+    "n_folds": 3,
+    "mean_lift": 1.0791623710657825,
+    "mean_spearman": 0.06784836819750727,
+    "mean_hit_top20": 0.425925925925926,
+    "mean_v4_lift": 1.0791623710657825,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.0287316908319946,
+      1.0195830139897173,
+      1.189172408375636
+    ],
+    "PASS": false
+  },
+  {
+    "label": "24h",
+    "id": "s_mid_plus",
+    "name": "mid+ users (top50%)",
+    "family": "cohort",
+    "desc": "drop lowest-activity half",
+    "n": 625,
+    "n_folds": 3,
+    "mean_lift": 1.0791623710657825,
+    "mean_spearman": 0.06573463439865515,
+    "mean_hit_top20": 0.425925925925926,
+    "mean_v4_lift": 1.0791623710657825,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.0287316908319943,
+      1.0195830139897173,
+      1.1891724083756359
+    ],
+    "PASS": false
+  },
+  {
+    "label": "24h",
+    "id": "s_not_hater",
+    "name": "exclude serial haters",
+    "family": "cohort",
+    "desc": "drop users with LR<0.35 & n\u226520",
+    "n": 625,
+    "n_folds": 3,
+    "mean_lift": 1.0791623710657825,
+    "mean_spearman": 0.06550585379924999,
+    "mean_hit_top20": 0.425925925925926,
+    "mean_v4_lift": 1.0791623710657825,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.0287316908319946,
+      1.0195830139897173,
+      1.1891724083756359
+    ],
+    "PASS": false
+  },
+  {
+    "label": "24h",
+    "id": "s_not_rare",
+    "name": "exclude rare users",
+    "family": "cohort",
+    "desc": "drop bottom 20% by react count",
+    "n": 625,
+    "n_folds": 3,
+    "mean_lift": 1.0791623710657825,
+    "mean_spearman": 0.06496374324848556,
+    "mean_hit_top20": 0.425925925925926,
+    "mean_v4_lift": 1.0791623710657825,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.0287316908319943,
+      1.0195830139897173,
+      1.1891724083756359
+    ],
+    "PASS": false
+  },
+  {
+    "label": "24h",
+    "id": "s_lover",
+    "name": "super-lovers only",
+    "family": "cohort",
+    "desc": "users LR>0.65 & n\u226520",
+    "n": 625,
+    "n_folds": 3,
+    "mean_lift": 1.0791623710657825,
+    "mean_spearman": 0.05655356947469984,
+    "mean_hit_top20": 0.425925925925926,
+    "mean_v4_lift": 1.0791623710657825,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.0287316908319946,
+      1.0195830139897173,
+      1.1891724083756359
+    ],
+    "PASS": false
+  },
+  {
+    "label": "24h",
+    "id": "s_power_engaged",
+    "name": "power \u00d7 engaged",
+    "family": "cohort",
+    "desc": "power users + dwell window",
+    "n": 625,
+    "n_folds": 3,
+    "mean_lift": 1.072700058374215,
+    "mean_spearman": 0.10514955288313288,
+    "mean_hit_top20": 0.425925925925926,
+    "mean_v4_lift": 1.0791623710657825,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.0287316908319946,
+      1.0118383316281203,
+      1.17753015266253
+    ],
+    "PASS": false
+  },
+  {
+    "label": "24h",
+    "id": "s_mod",
+    "name": "mods/admins only",
+    "family": "cohort",
+    "desc": "internal raters (sparse)",
+    "n": 625,
+    "n_folds": 3,
+    "mean_lift": 1.0839969173771828,
+    "mean_spearman": 0.0874240299205236,
+    "mean_hit_top20": 0.425925925925926,
+    "mean_v4_lift": 1.0791623710657825,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.0287316908319946,
+      1.0118383316281203,
+      1.2114207296714332
+    ],
+    "PASS": false
+  },
+  {
+    "label": "24h",
+    "id": "s_power_x_src",
+    "name": "power \u00d7 source",
+    "family": "hybrid",
+    "desc": "power volume \u00d7 source",
+    "n": 625,
+    "n_folds": 3,
+    "mean_lift": 1.098277967761538,
+    "mean_spearman": 0.14790168402415124,
+    "mean_hit_top20": 0.4259259259259259,
+    "mean_v4_lift": 1.0791623710657825,
+    "wins_vs_v4": 1,
+    "lifts": [
+      1.0926567679538868,
+      1.0627507736556014,
+      1.139426361675126
+    ],
+    "PASS": false
+  },
+  {
+    "label": "24h",
+    "id": "s_engaged_x_src",
+    "name": "engaged \u00d7 source",
+    "family": "hybrid",
+    "desc": "engaged \u00d7 source",
+    "n": 625,
+    "n_folds": 3,
+    "mean_lift": 1.111996481588483,
+    "mean_spearman": 0.16808908517601184,
+    "mean_hit_top20": 0.425925925925926,
+    "mean_v4_lift": 1.0791623710657825,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.0780055013038772,
+      1.0688115350859364,
+      1.1891724083756359
+    ],
+    "PASS": false
+  },
+  {
+    "label": "24h",
+    "id": "s_clean_x_src",
+    "name": "no-haters \u00d7 source",
+    "family": "hybrid",
+    "desc": "clean volume \u00d7 source",
+    "n": 625,
+    "n_folds": 3,
+    "mean_lift": 1.0930146643230785,
+    "mean_spearman": 0.1499706564013806,
+    "mean_hit_top20": 0.40740740740740744,
+    "mean_v4_lift": 1.0791623710657825,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.076866857638508,
+      1.0627507736556014,
+      1.139426361675126
+    ],
+    "PASS": false
+  },
+  {
+    "label": "24h",
+    "id": "s_maturity_band",
+    "name": "maturity band volume",
+    "family": "maturity",
+    "desc": "boost mid 15\u2013120 likes, soft demote >200",
+    "n": 625,
+    "n_folds": 3,
+    "mean_lift": 1.0510938051737388,
+    "mean_spearman": 0.03788805665801278,
+    "mean_hit_top20": 0.40740740740740744,
+    "mean_v4_lift": 1.0791623710657825,
+    "wins_vs_v4": 0,
+    "lifts": [
+      0.9538205932609057,
+      1.010288413884675,
+      1.1891724083756359
+    ],
+    "PASS": false
+  },
+  {
+    "label": "24h",
+    "id": "s_maturity_x_src",
+    "name": "maturity \u00d7 source",
+    "family": "hybrid",
+    "desc": "band \u00d7 source",
+    "n": 625,
+    "n_folds": 3,
+    "mean_lift": 1.1088205496214278,
+    "mean_spearman": 0.13827797837525985,
+    "mean_hit_top20": 0.4259259259259259,
+    "mean_v4_lift": 1.0791623710657825,
+    "wins_vs_v4": 1,
+    "lifts": [
+      1.1242845135335562,
+      1.0627507736556014,
+      1.139426361675126
+    ],
+    "PASS": false
+  },
+  {
+    "label": "24h",
+    "id": "s_vol_over_src",
+    "name": "volume / source scale",
+    "family": "hybrid",
+    "desc": "ln(likes) adjusted by prior",
+    "n": 625,
+    "n_folds": 3,
+    "mean_lift": 1.0476933959222208,
+    "mean_spearman": 0.024086618324331305,
+    "mean_hit_top20": 0.4259259259259259,
+    "mean_v4_lift": 1.0791623710657825,
+    "wins_vs_v4": 0,
+    "lifts": [
+      0.9812037605781954,
+      0.9926615031661815,
+      1.1692149240222856
+    ],
+    "PASS": false
+  },
+  {
+    "label": "lifetime",
+    "id": "s_v4_all",
+    "name": "v4 all likes",
+    "family": "volume",
+    "desc": "ln(all pre likes+1) \u2014 prod-like",
+    "n": 3712,
+    "n_folds": 3,
+    "mean_lift": 1.0568925378068268,
+    "mean_spearman": 0.06168497779776081,
+    "mean_hit_top20": 0.28528528528528524,
+    "mean_v4_lift": 1.0568925378068268,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.070117284620339,
+      1.016851157346793,
+      1.083709171453348
+    ],
+    "PASS": false
+  },
+  {
+    "label": "lifetime",
+    "id": "s_src_prior",
+    "name": "source prior f1k",
+    "family": "source",
+    "desc": "historical same-source channel f1k",
+    "n": 3712,
+    "n_folds": 3,
+    "mean_lift": 1.0727363916441661,
+    "mean_spearman": 0.09432530059217219,
+    "mean_hit_top20": 0.3063063063063063,
+    "mean_v4_lift": 1.0568925378068268,
+    "wins_vs_v4": 1,
+    "lifts": [
+      1.0512120662156843,
+      1.010279013095879,
+      1.1567180956209353
+    ],
+    "PASS": false
+  },
+  {
+    "label": "lifetime",
+    "id": "s_v4_x_src",
+    "name": "v4 \u00d7 source",
+    "family": "hybrid",
+    "desc": "volume \u00d7 source prior",
+    "n": 3712,
+    "n_folds": 3,
+    "mean_lift": 1.0806292737517693,
+    "mean_spearman": 0.11037865810995241,
+    "mean_hit_top20": 0.3033033033033033,
+    "mean_v4_lift": 1.0568925378068268,
+    "wins_vs_v4": 1,
+    "lifts": [
+      1.0174788995784894,
+      1.051772999672307,
+      1.1726359220045115
+    ],
+    "PASS": false
+  },
+  {
+    "label": "lifetime",
+    "id": "s_engaged",
+    "name": "engaged likes only",
+    "family": "cohort",
+    "desc": "likes with dwell 5\u201360s",
+    "n": 3712,
+    "n_folds": 3,
+    "mean_lift": 1.025570482518775,
+    "mean_spearman": 0.08443746434266047,
+    "mean_hit_top20": 0.26426426426426425,
+    "mean_v4_lift": 1.0568925378068268,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.017508661925703,
+      0.9720660774300353,
+      1.087136708200587
+    ],
+    "PASS": false
+  },
+  {
+    "label": "lifetime",
+    "id": "s_premium",
+    "name": "premium likers",
+    "family": "cohort",
+    "desc": "Telegram Premium users only",
+    "n": 3712,
+    "n_folds": 3,
+    "mean_lift": 1.0477749534226912,
+    "mean_spearman": 0.061358399330319814,
+    "mean_hit_top20": 0.2732732732732733,
+    "mean_v4_lift": 1.0568925378068268,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.0432520195986206,
+      1.0117334816615249,
+      1.088339359007928
+    ],
+    "PASS": false
+  },
+  {
+    "label": "lifetime",
+    "id": "s_power",
+    "name": "power users (top20% likes)",
+    "family": "cohort",
+    "desc": "high-activity likers only",
+    "n": 3712,
+    "n_folds": 3,
+    "mean_lift": 1.0507833895823726,
+    "mean_spearman": 0.059130926129104956,
+    "mean_hit_top20": 0.27927927927927926,
+    "mean_v4_lift": 1.0568925378068268,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.06467753542573,
+      1.016851157346793,
+      1.0708214759745946
+    ],
+    "PASS": false
+  },
+  {
+    "label": "lifetime",
+    "id": "s_mid_plus",
+    "name": "mid+ users (top50%)",
+    "family": "cohort",
+    "desc": "drop lowest-activity half",
+    "n": 3712,
+    "n_folds": 3,
+    "mean_lift": 1.0568925378068268,
+    "mean_spearman": 0.06218544597579251,
+    "mean_hit_top20": 0.28528528528528524,
+    "mean_v4_lift": 1.0568925378068268,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.070117284620339,
+      1.016851157346793,
+      1.083709171453348
+    ],
+    "PASS": false
+  },
+  {
+    "label": "lifetime",
+    "id": "s_not_hater",
+    "name": "exclude serial haters",
+    "family": "cohort",
+    "desc": "drop users with LR<0.35 & n\u226520",
+    "n": 3712,
+    "n_folds": 3,
+    "mean_lift": 1.0367055554101843,
+    "mean_spearman": 0.05282118717661127,
+    "mean_hit_top20": 0.27627627627627627,
+    "mean_v4_lift": 1.0568925378068268,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.0402494601231616,
+      0.9954097862806878,
+      1.074457419826704
+    ],
+    "PASS": false
+  },
+  {
+    "label": "lifetime",
+    "id": "s_not_rare",
+    "name": "exclude rare users",
+    "family": "cohort",
+    "desc": "drop bottom 20% by react count",
+    "n": 3712,
+    "n_folds": 3,
+    "mean_lift": 1.0568925378068268,
+    "mean_spearman": 0.061754724513852936,
+    "mean_hit_top20": 0.28528528528528524,
+    "mean_v4_lift": 1.0568925378068268,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.070117284620339,
+      1.016851157346793,
+      1.083709171453348
+    ],
+    "PASS": false
+  },
+  {
+    "label": "lifetime",
+    "id": "s_lover",
+    "name": "super-lovers only",
+    "family": "cohort",
+    "desc": "users LR>0.65 & n\u226520",
+    "n": 3712,
+    "n_folds": 3,
+    "mean_lift": 1.0360884080186314,
+    "mean_spearman": 0.04359428076928044,
+    "mean_hit_top20": 0.2672672672672673,
+    "mean_v4_lift": 1.0568925378068268,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.0360027409589676,
+      0.9977137084294293,
+      1.0745487746674978
+    ],
+    "PASS": false
+  },
+  {
+    "label": "lifetime",
+    "id": "s_power_engaged",
+    "name": "power \u00d7 engaged",
+    "family": "cohort",
+    "desc": "power users + dwell window",
+    "n": 3712,
+    "n_folds": 3,
+    "mean_lift": 1.017719672908829,
+    "mean_spearman": 0.08206149137655278,
+    "mean_hit_top20": 0.26126126126126126,
+    "mean_v4_lift": 1.0568925378068268,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.0164234140474426,
+      0.9593615220052264,
+      1.0773740826738174
+    ],
+    "PASS": false
+  },
+  {
+    "label": "lifetime",
+    "id": "s_mod",
+    "name": "mods/admins only",
+    "family": "cohort",
+    "desc": "internal raters (sparse)",
+    "n": 3712,
+    "n_folds": 3,
+    "mean_lift": 1.0482177306664835,
+    "mean_spearman": 0.057619188748181414,
+    "mean_hit_top20": 0.2822822822822823,
+    "mean_v4_lift": 1.0568925378068268,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.0546383108900155,
+      0.9959619429308338,
+      1.094052938178601
+    ],
+    "PASS": false
+  },
+  {
+    "label": "lifetime",
+    "id": "s_power_x_src",
+    "name": "power \u00d7 source",
+    "family": "hybrid",
+    "desc": "power volume \u00d7 source",
+    "n": 3712,
+    "n_folds": 3,
+    "mean_lift": 1.0758097970011482,
+    "mean_spearman": 0.10890341150341408,
+    "mean_hit_top20": 0.2942942942942943,
+    "mean_v4_lift": 1.0568925378068268,
+    "wins_vs_v4": 1,
+    "lifts": [
+      1.0146183976844525,
+      1.0520049162197367,
+      1.1608060770992554
+    ],
+    "PASS": false
+  },
+  {
+    "label": "lifetime",
+    "id": "s_engaged_x_src",
+    "name": "engaged \u00d7 source",
+    "family": "hybrid",
+    "desc": "engaged \u00d7 source",
+    "n": 3712,
+    "n_folds": 3,
+    "mean_lift": 1.0697928972534676,
+    "mean_spearman": 0.12283585912094236,
+    "mean_hit_top20": 0.3033033033033033,
+    "mean_v4_lift": 1.0568925378068268,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.02880722886925,
+      1.054282935853293,
+      1.1262885270378598
+    ],
+    "PASS": false
+  },
+  {
+    "label": "lifetime",
+    "id": "s_clean_x_src",
+    "name": "no-haters \u00d7 source",
+    "family": "hybrid",
+    "desc": "clean volume \u00d7 source",
+    "n": 3712,
+    "n_folds": 3,
+    "mean_lift": 1.079671027397434,
+    "mean_spearman": 0.10177872743776932,
+    "mean_hit_top20": 0.2972972972972973,
+    "mean_v4_lift": 1.0568925378068268,
+    "wins_vs_v4": 1,
+    "lifts": [
+      1.0127939604139005,
+      1.0573103457427004,
+      1.1689087760357004
+    ],
+    "PASS": false
+  },
+  {
+    "label": "lifetime",
+    "id": "s_maturity_band",
+    "name": "maturity band volume",
+    "family": "maturity",
+    "desc": "boost mid 15\u2013120 likes, soft demote >200",
+    "n": 3712,
+    "n_folds": 3,
+    "mean_lift": 1.042834959057557,
+    "mean_spearman": 0.06091720538848653,
+    "mean_hit_top20": 0.26426426426426425,
+    "mean_v4_lift": 1.0568925378068268,
+    "wins_vs_v4": 0,
+    "lifts": [
+      1.056342481110224,
+      0.9884532246090996,
+      1.0837091714533476
+    ],
+    "PASS": false
+  },
+  {
+    "label": "lifetime",
+    "id": "s_maturity_x_src",
+    "name": "maturity \u00d7 source",
+    "family": "hybrid",
+    "desc": "band \u00d7 source",
+    "n": 3712,
+    "n_folds": 3,
+    "mean_lift": 1.081484848324285,
+    "mean_spearman": 0.10752772327239862,
+    "mean_hit_top20": 0.30030030030030036,
+    "mean_v4_lift": 1.0568925378068268,
+    "wins_vs_v4": 1,
+    "lifts": [
+      1.029116401212335,
+      1.055590752733848,
+      1.1597473910266722
+    ],
+    "PASS": false
+  },
+  {
+    "label": "lifetime",
+    "id": "s_vol_over_src",
+    "name": "volume / source scale",
+    "family": "hybrid",
+    "desc": "ln(likes) adjusted by prior",
+    "n": 3712,
+    "n_folds": 3,
+    "mean_lift": 1.000561334817042,
+    "mean_spearman": 0.010071360641604627,
+    "mean_hit_top20": 0.22822822822822827,
+    "mean_v4_lift": 1.0568925378068268,
+    "wins_vs_v4": 0,
+    "lifts": [
+      0.9938098082308275,
+      0.9919146267957266,
+      1.0159595694245716
+    ],
+    "PASS": false
+  }
+]
