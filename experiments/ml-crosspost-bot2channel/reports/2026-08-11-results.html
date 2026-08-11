@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Бот → канал · ML lab · 2026-08-11</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --card2: #243044;
+      --text: #e7ecf3;
+      --muted: #8b9bb4;
+      --accent: #5b9fd4;
+      --good: #3dcf8e;
+      --bad: #f07178;
+      --warn: #e6c07b;
+      --line: #2d3a4f;
+      --radius: 14px;
+      --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      background: radial-gradient(1200px 600px at 10% -10%, #1a3050 0%, transparent 50%),
+                  radial-gradient(900px 500px at 100% 0%, #1a2838 0%, transparent 45%),
+                  var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 20px 64px; }
+    header {
+      margin-bottom: 28px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--line);
+    }
+    header h1 {
+      margin: 0 0 8px;
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    header .sub { color: var(--muted); font-size: 0.95rem; }
+    .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
+      background: var(--card2); color: var(--text); border: 1px solid var(--line);
+    }
+    .badge.pass { background: rgba(61, 207, 142, 0.15); color: var(--good); border-color: rgba(61,207,142,0.35); }
+    .badge.fail { background: rgba(240, 113, 120, 0.12); color: var(--bad); border-color: rgba(240,113,120,0.3); }
+    .badge.warn { background: rgba(230, 192, 123, 0.12); color: var(--warn); border-color: rgba(230,192,123,0.3); }
+    .badge.muted { color: var(--muted); }
+
+    .grid { display: grid; gap: 16px; }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    @media (max-width: 800px) {
+      .grid-4, .grid-2 { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 520px) {
+      .grid-4, .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .kpi {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+    }
+    .kpi .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+    .kpi .value { font-size: 1.65rem; font-weight: 700; margin-top: 4px; letter-spacing: -0.03em; }
+    .kpi .hint { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+    .kpi.good .value { color: var(--good); }
+    .kpi.bad .value { color: var(--bad); }
+
+    section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 22px 24px;
+      margin-top: 16px;
+    }
+    section h2 {
+      margin: 0 0 6px;
+      font-size: 1.15rem;
+      font-weight: 650;
+    }
+    section .lead { color: var(--muted); font-size: 0.9rem; margin: 0 0 16px; }
+    h3 { font-size: 0.95rem; margin: 18px 0 10px; color: var(--accent); font-weight: 600; }
+
+    .chart-box {
+      position: relative;
+      height: 260px;
+      margin: 8px 0 4px;
+    }
+    .chart-box.tall { height: 300px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    tr:last-child td { border-bottom: none; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tr.pass td { background: rgba(61, 207, 142, 0.06); }
+    tr.fail td { background: rgba(240, 113, 120, 0.05); }
+    tr.base td { color: var(--muted); }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .pill.yes { background: rgba(61,207,142,0.2); color: var(--good); }
+    .pill.no { background: rgba(240,113,120,0.15); color: var(--bad); }
+    .pill.base { background: var(--card2); color: var(--muted); }
+
+    ul.clean { margin: 0; padding-left: 1.15rem; color: var(--text); }
+    ul.clean li { margin: 6px 0; }
+    ul.clean li strong { color: var(--accent); }
+
+    .verdict {
+      margin-top: 16px;
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(61,207,142,0.12), rgba(91,159,212,0.08));
+      border: 1px solid rgba(61,207,142,0.35);
+    }
+    .verdict h3 { margin: 0 0 8px; color: var(--good); }
+    .verdict p { margin: 0; color: var(--text); font-size: 0.95rem; }
+
+    .callout {
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: var(--card2);
+      border-left: 3px solid var(--warn);
+      color: var(--muted);
+      font-size: 0.88rem;
+      margin-top: 12px;
+    }
+
+    footer {
+      margin-top: 28px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      text-align: center;
+    }
+    code { font-size: 0.85em; background: var(--card2); padding: 1px 6px; border-radius: 4px; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 720px) { .two-col { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Бот → канал: разведка и простые модели</h1>
+      <div class="sub">
+        @fastfoodmemes (RU) · оффлайн lab · 2026-08-11 · n = 624 зрелых поста (картинки, ~180 дней)
+      </div>
+      <div class="badge-row">
+        <span class="badge pass">Walk-forward: PASS (logreg / ridge)</span>
+        <span class="badge fail">Деревья: overfit → reject</span>
+        <span class="badge warn">Прод-ранкер не меняли</span>
+        <span class="badge muted">H8 · bot2channel_ml_lab_v1</span>
+      </div>
+    </header>
+
+    <div class="grid grid-4">
+      <div class="kpi">
+        <div class="label">Постов в датасете</div>
+        <div class="value">624</div>
+        <div class="hint">апр → авг 2026</div>
+      </div>
+      <div class="kpi">
+        <div class="label">f1k медиана / p75</div>
+        <div class="value">23.5 / 31</div>
+        <div class="hint">forwards на 1k views</div>
+      </div>
+      <div class="kpi good">
+        <div class="label">LogReg mean lift</div>
+        <div class="value">1.19×</div>
+        <div class="hint">топ-20% vs среднее</div>
+      </div>
+      <div class="kpi">
+        <div class="label">v4 baseline lift</div>
+        <div class="value">1.08×</div>
+        <div class="hint">ln(лайки в боте + 1)</div>
+      </div>
+    </div>
+
+    <!-- TASK -->
+    <section>
+      <h2>1. Задача одной фразой</h2>
+      <p class="lead">Можно ли по поведению <strong>в боте до поста</strong> предсказать, насколько мем «зайдёт» <strong>в канале</strong> (репосты / f1k)?</p>
+      <ul class="clean">
+        <li><strong>Цель:</strong> f1k ≈ 24h, HIT = высокий f1k или forwards ≥ 12</li>
+        <li><strong>Фичи:</strong> только события <code>reacted_at &lt; posted_at</code> (без утечки будущего)</li>
+        <li><strong>Baseline:</strong> как в проде v4 — «чем больше лайков в боте, тем лучше»</li>
+        <li><strong>Модели:</strong> только простые (Ridge, LogReg, мелкие деревья)</li>
+      </ul>
+    </section>
+
+    <!-- EDA -->
+    <section>
+      <h2>2. Разведка (EDA)</h2>
+      <p class="lead">Сначала SQL-агрегаты и корреляции — без моделей.</p>
+
+      <div class="grid grid-4" style="margin-bottom: 16px;">
+        <div class="kpi">
+          <div class="label">Покрытие ≥5 лайков</div>
+          <div class="value">100%</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Ср. лайков в боте</div>
+          <div class="value">54.6</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Доля Premium среди лайков</div>
+          <div class="value">42%</div>
+          <div class="hint">proxy «платящих»</div>
+        </div>
+        <div class="kpi">
+          <div class="label">HIT rate (канал)</div>
+          <div class="value">27%</div>
+        </div>
+      </div>
+
+      <h3>Like rate в боте почти не работает</h3>
+      <p class="lead" style="margin-bottom: 8px;">Квинтили pre_lr → f1k почти плоские (~23–25). «Любят в боте %» ≠ «форвардят в канале».</p>
+      <div class="chart-box">
+        <canvas id="chartLr"></canvas>
+      </div>
+
+      <h3>Объём лайков — кривой сигнал (насыщение)</h3>
+      <p class="lead" style="margin-bottom: 8px;">Q4 (средне-много) хуже Q3; только самый верх (Q5) чуть лучше. Перегретые мемы — не идеал для канала.</p>
+      <div class="chart-box">
+        <canvas id="chartLikes"></canvas>
+      </div>
+
+      <div class="two-col" style="margin-top: 20px;">
+        <div>
+          <h3>Корреляции со Spearman (vs f1k)</h3>
+          <table>
+            <thead><tr><th>Фича</th><th class="num">ρ f1k</th><th class="num">ρ residual</th></tr></thead>
+            <tbody>
+              <tr><td>src_prior_f1k</td><td class="num">0.18</td><td class="num">−0.15</td></tr>
+              <tr><td>pre_engaged_likes</td><td class="num">0.16</td><td class="num">0.22</td></tr>
+              <tr><td>pre_reacts / likes</td><td class="num">0.10</td><td class="num">0.17–0.18</td></tr>
+              <tr><td>pre_lr (like rate)</td><td class="num">0.04</td><td class="num">0.01</td></tr>
+              <tr><td>premium_frac</td><td class="num">≈0</td><td class="num">0.03</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h3>Что запомнили из EDA</h3>
+          <ul class="clean">
+            <li>Like rate <strong>не</strong> предсказывает канал</li>
+            <li>Объём помогает слабо и не монотонно</li>
+            <li>Source prior — слабый, но реальный пол</li>
+            <li>Premium сам по себе слабый</li>
+            <li>Комменты канала ≈ 0 — мусор</li>
+            <li>После канала в боте почти нет новых реакций (мем уже «выжали»)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- MODELS -->
+    <section>
+      <h2>3. Обучение и walk-forward</h2>
+      <p class="lead">
+        3 временных фолда (expanding train → test ~93 поста).
+        Успех: top-20% lift f1k ≥ v4 + 0.05 минимум на <strong>2 из 3</strong> фолдах
+        и разрыв train/test Spearman &lt; 0.25 (анти-overfit).
+      </p>
+
+      <div class="chart-box tall">
+        <canvas id="chartLift"></canvas>
+      </div>
+
+      <h3>Итог по моделям</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Модель</th>
+            <th class="num">Wins vs v4</th>
+            <th class="num">Mean lift f1k</th>
+            <th class="num">Overfit gap</th>
+            <th>Вердикт</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="pass">
+            <td><strong>logreg_hit</strong></td>
+            <td class="num">2 / 3</td>
+            <td class="num"><strong>1.190</strong></td>
+            <td class="num">0.00</td>
+            <td><span class="pill yes">PASS</span></td>
+          </tr>
+          <tr class="pass">
+            <td><strong>ridge_f1k</strong></td>
+            <td class="num">2 / 3</td>
+            <td class="num">1.171</td>
+            <td class="num">0.06</td>
+            <td><span class="pill yes">PASS</span></td>
+          </tr>
+          <tr class="base">
+            <td>v4_proxy (baseline)</td>
+            <td class="num">—</td>
+            <td class="num">1.080</td>
+            <td class="num">0.03</td>
+            <td><span class="pill base">BASE</span></td>
+          </tr>
+          <tr class="fail">
+            <td>hgb_reg (depth 3)</td>
+            <td class="num">1 / 3</td>
+            <td class="num">1.143</td>
+            <td class="num">0.54</td>
+            <td><span class="pill no">FAIL</span></td>
+          </tr>
+          <tr class="fail">
+            <td>hgb_clf (depth 3)</td>
+            <td class="num">1 / 3</td>
+            <td class="num">1.073</td>
+            <td class="num">0.45</td>
+            <td><span class="pill no">FAIL</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>По фолдам: lift f1k</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Fold</th>
+            <th>Test window</th>
+            <th class="num">v4</th>
+            <th class="num">logreg</th>
+            <th class="num">ridge</th>
+            <th class="num">hgb_reg</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>14 июн → 1 июл</td>
+            <td class="num">1.03</td>
+            <td class="num">1.07</td>
+            <td class="num">1.13</td>
+            <td class="num">1.04</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>1 июл → 17 июл</td>
+            <td class="num">1.02</td>
+            <td class="num">1.20</td>
+            <td class="num">1.21</td>
+            <td class="num">1.17</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>18 июл → 4 авг</td>
+            <td class="num">1.19</td>
+            <td class="num">1.30</td>
+            <td class="num">1.18</td>
+            <td class="num">1.22</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="verdict">
+        <h3>✓ Offline PASS — logreg и ridge</h3>
+        <p>
+          Линейные модели стабильно чуть лучше, чем «просто больше лайков».
+          Улучшение <strong>не огромное</strong> (~+0.1 к lift), но проходит честный walk-forward.
+          Деревья на n≈600 переобучаются — в прод не берём.
+        </p>
+      </div>
+
+      <div class="callout">
+        Один разрез 70/30 выглядел красивее — <strong>доверяем walk-forward</strong>.
+        В production pick пока не лезем: следующий шаг только shadow-score в decision_log.
+      </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section>
+      <h2>4. Какие фичи в модели</h2>
+      <p class="lead">≤10 штук, реестр в <code>FEATURE_REGISTRY.md</code></p>
+      <table>
+        <thead><tr><th>Фича</th><th>Смысл</th><th>Роль</th></tr></thead>
+        <tbody>
+          <tr><td><code>pre_reacts</code> / <code>pre_ln_likes</code></td><td>Нагрев в боте</td><td>Сильный линейный</td></tr>
+          <tr><td><code>src_prior_f1k</code></td><td>Как ходил источник раньше</td><td>Пол ранкера</td></tr>
+          <tr><td><code>pre_engaged_likes</code></td><td>Лайк не мгновенный (5–60 с)</td><td>Лучший residual</td></tr>
+          <tr><td><code>premium_*</code></td><td>Telegram Premium</td><td>Слабо, в комбо</td></tr>
+          <tr><td><code>pre_lr</code></td><td>Like rate</td><td>Почти мёртвый, оставлен для честности</td></tr>
+          <tr><td><code>has_caption</code>, hours in bot</td><td>Мета / зрелость</td><td>Слабо</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- NEXT -->
+    <section>
+      <h2>5. Что дальше</h2>
+      <ul class="clean">
+        <li><strong>Сейчас:</strong> v4 в проде остаётся; H6 keep/kill по календарю (~17.08)</li>
+        <li><strong>ML:</strong> shadow <code>ml_score</code> в лог (считать, не выбирать пост)</li>
+        <li><strong>После H7:</strong> добавить taste-cohort в фичи и пересчитать validate</li>
+        <li><strong>Не делать:</strong> нейросети, taste-only ranker, смена 5 постов/день из-за lab</li>
+      </ul>
+    </section>
+
+    <footer>
+      Источники: eda-sql.md · eda-local.md · 2026-08-11-walkforward.md · otchet-ru.md<br />
+      experiments/ml-crosspost-bot2channel · offline only · open locally in browser
+    </footer>
+  </div>
+
+  <script>
+    const colors = {
+      accent: '#5b9fd4',
+      good: '#3dcf8e',
+      bad: '#f07178',
+      warn: '#e6c07b',
+      muted: '#8b9bb4',
+      grid: 'rgba(45, 58, 79, 0.8)',
+    };
+    Chart.defaults.color = '#8b9bb4';
+    Chart.defaults.borderColor = colors.grid;
+    Chart.defaults.font.family = '"Segoe UI", system-ui, sans-serif';
+
+    // Like rate quintiles — flat f1k
+    new Chart(document.getElementById('chartLr'), {
+      type: 'bar',
+      data: {
+        labels: ['Q1 · LR 0.44', 'Q2 · 0.48', 'Q3 · 0.51', 'Q4 · 0.54', 'Q5 · 0.61'],
+        datasets: [{
+          label: 'avg f1k в канале',
+          data: [23.31, 24.21, 24.43, 24.43, 24.78],
+          backgroundColor: 'rgba(91, 159, 212, 0.55)',
+          borderColor: colors.accent,
+          borderWidth: 1,
+          borderRadius: 6,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          title: { display: true, text: 'Like rate в боте (квинтили) → f1k канала ≈ flat', color: '#e7ecf3', font: { size: 13 } }
+        },
+        scales: {
+          y: {
+            min: 20, max: 28,
+            title: { display: true, text: 'avg f1k' },
+            grid: { color: colors.grid }
+          },
+          x: { grid: { display: false } }
+        }
+      }
+    });
+
+    // pre_likes quintiles — non-monotonic
+    new Chart(document.getElementById('chartLikes'), {
+      type: 'line',
+      data: {
+        labels: ['Q1 · ~8 likes', 'Q2 · ~12', 'Q3 · ~19', 'Q4 · ~37', 'Q5 · ~198'],
+        datasets: [
+          {
+            label: 'avg f1k',
+            data: [22.89, 23.85, 25.54, 22.73, 26.17],
+            borderColor: colors.good,
+            backgroundColor: 'rgba(61, 207, 142, 0.12)',
+            fill: true,
+            tension: 0.25,
+            pointRadius: 5,
+            pointBackgroundColor: colors.good,
+            yAxisID: 'y',
+          },
+          {
+            label: 'avg forwards',
+            data: [8.91, 8.64, 9.03, 7.93, 9.44],
+            borderColor: colors.warn,
+            tension: 0.25,
+            pointRadius: 4,
+            pointBackgroundColor: colors.warn,
+            yAxisID: 'y1',
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          title: { display: true, text: 'Объём лайков в боте → канал (Q4 проседает — saturation)', color: '#e7ecf3', font: { size: 13 } }
+        },
+        scales: {
+          y: {
+            position: 'left',
+            title: { display: true, text: 'f1k' },
+            min: 20, max: 28,
+            grid: { color: colors.grid }
+          },
+          y1: {
+            position: 'right',
+            title: { display: true, text: 'forwards' },
+            min: 6, max: 11,
+            grid: { drawOnChartArea: false }
+          },
+          x: { grid: { display: false } }
+        }
+      }
+    });
+
+    // Model lifts grouped
+    new Chart(document.getElementById('chartLift'), {
+      type: 'bar',
+      data: {
+        labels: ['v4 baseline', 'LogReg HIT', 'Ridge f1k', 'HGB reg', 'HGB clf'],
+        datasets: [{
+          label: 'Mean top-20% lift (f1k)',
+          data: [1.080, 1.190, 1.171, 1.143, 1.073],
+          backgroundColor: [
+            'rgba(139, 155, 180, 0.45)',
+            'rgba(61, 207, 142, 0.65)',
+            'rgba(61, 207, 142, 0.45)',
+            'rgba(240, 113, 120, 0.4)',
+            'rgba(240, 113, 120, 0.35)',
+          ],
+          borderColor: [
+            colors.muted,
+            colors.good,
+            colors.good,
+            colors.bad,
+            colors.bad,
+          ],
+          borderWidth: 1.5,
+          borderRadius: 8,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          title: {
+            display: true,
+            text: 'Walk-forward: средний lift топ-20% (1.0 = как среднее по test)',
+            color: '#e7ecf3',
+            font: { size: 13 }
+          },
+          annotation: undefined,
+        },
+        scales: {
+          y: {
+            min: 0.95, max: 1.25,
+            title: { display: true, text: 'lift' },
+            grid: { color: colors.grid },
+            ticks: {
+              callback: (v) => v.toFixed(2)
+            }
+          },
+          x: { grid: { display: false } }
+        }
+      }
+    });
+  </script>
+</body>
+</html>
