@@ -3,8 +3,8 @@
 **Purpose:** When an agent (or human) resumes after days/weeks, this file answers:
 what is live, what we expected, when to re-measure, and what “good / kill” means.
 
-**Last updated:** 2026-08-09 (UTC) — added H5 cold-start + H3b HQ broadcast pick  
-**Prod DB clock at last interim:** `2026-08-09 15:44 UTC`
+**Last updated:** 2026-08-11 (UTC) — H8 bot→channel offline ML lab  
+**Prod DB clock at last interim:** `2026-08-10 ~17 UTC` (v4 early WATCH; H7 not yet deployed)
 
 How to use on resume:
 
@@ -21,9 +21,12 @@ How to use on resume:
 
 | Date (UTC) | What to run | Hypotheses |
 |------------|-------------|------------|
-| **2026-08-12** (day ~3) | Smoke only — not a ship decision | H1, H2, H3/H3b, H5 |
-| **2026-08-16** (day ~7) | **Primary readout** | H1, H2, H3/H3b, H5 |
-| **2026-08-23** (day ~14) | Final keep/kill if day-7 underpowered | H1 primarily; H3b/H5 if thin |
+| **2026-08-12** | Smoke + mature v4 if n≥8 | H1, H2, H3b, H5, **H6** |
+| **2026-08-16** | Primary feed/reco day-7 | H1, H2, H3b, H5 |
+| **2026-08-17** | **Crosspost v4 mature keep/kill** | **H6** |
+| **2026-08-23** | Feed exp finals if needed | H1 primarily |
+| **2026-08-24** | Taste shadow readout | **H7** |
+| Ad-hoc | Bot→channel ML re-run / walk-forward | **H8** |
 | Ad-hoc | After any ranking/deploy incident | all active |
 
 Agent prompt on resume (copy-paste):
@@ -302,12 +305,128 @@ Compare v4 mature posts vs last 30d v2 baseline:
 - avg views_24h not &lt; v2 − 15%
 - Kill if hit_rate collapses or empty slots spike
 
+### Online early (2026-08-10 ~17 UTC)
+
+- 4 v4 posts live; **0 mature** yet — WATCH
+- age-matched ~6h: v4 f1k **30.0** vs v2 **32.6** (n=4, not RED)
+- Frequency: **keep 5/day** (do not post more/less until mature readout)
+
 ### Next check
 
-- **2026-08-12** smoke: score_version=4 rows appear  
-- **2026-08-17** (~7d): `crossposting-v4-like-volume.sql` keep/kill
+- **2026-08-12**: mature n≥8 if possible  
+- **2026-08-17** (~7d): `crossposting-v4-like-volume.sql` keep/kill  
+- Full plan: `experiments/active/2026-08-10-crosspost-v4-and-taste-cohort.md`
 
 ---
+
+## H7 — Taste cohort soft signal (SHADOW)
+
+| Field | Value |
+|-------|--------|
+| **ID** | `crosspost_taste_cohort_v1` |
+| **Status** | **shadow only** — ranking unchanged |
+| **Cohort** | `src/crossposting/data/ru_taste_cohort_v1.json` (top 50) |
+| **Code** | `taste_cohort.py`, `_enrich_candidates_with_taste_shadow` |
+| **SQL** | `docs/analyst/crossposting-taste-shadow.sql` |
+| **Experiment note** | `experiments/active/2026-08-10-crosspost-v4-and-taste-cohort.md` |
+
+### Hypothesis
+
+A fixed set of ~50 users whose historical likes co-occur with high channel
+fwd/1k provide a **weak but real** additional signal (soft boost), not a
+replacement for like volume.
+
+### Offline (2026-08-10)
+
+- top50 likes top-20% lift **1.19** vs all-likes **1.10**; beats random-50 p95 **1.14**
+- coverage ≥1 taste like ~**18%** of posts → never sole filter
+
+### Shadow fields on decision candidates
+
+`n_taste_likes`, `taste_boost_shadow` (= `1+0.15*min(n,5)`), `taste_cohort_version`
+
+### Predictions
+
+| Date | Pass if |
+|------|---------|
+| **2026-08-24** | Among mature picks with n_taste≥1, higher n_taste half has higher mean f1k (n≥20) |
+| Canary | Only if H6 not RED and shadow pass → optional soft boost flag |
+
+### Not doing
+
+- Hardcode 50 users as only ranker  
+- Post less often until H6 mature fails  
+
+### Refresh
+
+`python scripts/crosspost_taste_cohort.py`
+
+---
+
+
+---
+
+## H8 — Bot→channel ML lab (OFFLINE)
+
+| Field | Value |
+|-------|--------|
+| **ID** | `bot2channel_ml_lab_v1` |
+| **Status** | **offline only** — no prod ranker change |
+| **Code** | `experiments/ml-crosspost-bot2channel/` |
+| **Note** | `experiments/active/2026-08-11-bot2channel-ml-lab.md` |
+| **Report** | `experiments/ml-crosspost-bot2channel/reports/2026-08-11-models.md` |
+
+### Hypothesis
+
+Simple linear/logistic models on pre-post bot features + source prior beat
+`ln(pre_likes+1)` on time-holdout top-20% f1k lift without tree overfit.
+
+### First result (2026-08-11)
+
+- n=624 labeled; single 70/30: logreg lift 1.187 vs v4 1.114 (looked good once)
+- HGB depth3 **overfits** — discard for ship
+
+### Walk-forward (authoritative, 2026-08-11)
+
+- 3 expanding folds (~93 test each); bar: lift ≥ v4+0.05 on ≥2/3 + spearman gap &lt;0.25
+- **logreg PASS** (2/3, mean lift 1.190 vs v4 1.080)
+- **ridge PASS** (2/3, mean lift 1.171)
+- HGB FAIL (overfit gap ~0.5)
+- Report: `experiments/ml-crosspost-bot2channel/reports/2026-08-11-walkforward.md`
+- RU summary: `.../reports/2026-08-11-otchet-ru.md`
+- **No production pick change** — next is shadow score only
+
+
+### Deep lifetime re-run (2026-08-11 evening)
+
+- Telethon full crawl: 11928 msgs, 4897 sc_ joinable → dataset **n=3889** (2023-11..2026-08)
+- Label = lifetime f1k (TG now); HIT = f1k≥train p75
+- Walk-forward: **HOLD** — logreg/ridge/HGB do **not** beat v4 on ≥2/3 folds
+- Source prior often ≥ volume on long history; bot volume ~flat on lifetime
+- HTML: `experiments/ml-crosspost-bot2channel/reports/2026-08-11-results.html`
+- Hypothesis battery: hybrids volume×source lead mean lift; **no bar PASS**
+  (`reports/2026-08-11-hypothesis-battery.html`)
+
+### Shadow hybrid in decision_log (shipping)
+
+| Field | Value |
+|-------|--------|
+| **Status** | **shadow only** — pick unchanged |
+| **Formula** | `shadow_score = ln(nlikes+1) * src_quality_mult` |
+| **Version** | `v4_x_src_v1` (+ `shadow_score_maturity` band) |
+| **Code** | `src/crossposting/shadow_score.py`, `_build_decision_log` |
+| **SQL** | `docs/analyst/crossposting-shadow-hybrid.sql` |
+
+Also logs `shadow_rank`, `shadow_pick_meme_id`, `shadow_vs_prod_disagree`.
+
+### Next check
+
+- After deploy: decision_log has `shadow_score` on candidates
+- **2026-08-25**: `crossposting-shadow-hybrid.sql` — disagree rate + corr(shadow, f1k_24h)
+- Canary soft boost only if live corr/lift clearly > v4 alone
+- After H7 merge: re-export + optional taste feature
+- Do not schedule as feed experiment
+
 
 ## Explicitly not open experiments
 
@@ -317,6 +436,8 @@ Compare v4 mature posts vs last 30d v2 baseline:
 | Hard-block majority-dislike | **Rejected** as default; opt-in flag only |
 | Full Feed Turn rewrite | Not doing |
 | New blender A/B | Do not start until H1 day-7 done |
+| Crosspost rank by bot LR only | **Rejected** |
+| Crosspost taste-only ranker | **Rejected** (coverage); soft boost only after H7 |
 | Crosspost rank by bot LR | **Rejected** offline (H6) |
 
 ---
@@ -330,8 +451,12 @@ psql "$ANALYST_DATABASE_URL" -f docs/analyst/viral-shares-blender-v1.sql
 psql "$ANALYST_DATABASE_URL" -f docs/analyst/source-affinity-demote-guardrails.sql
 psql "$ANALYST_DATABASE_URL" -f docs/analyst/dwell-feed-vs-broadcast.sql
 psql "$ANALYST_DATABASE_URL" -f docs/analyst/broadcast-reengagement.sql
+psql "$ANALYST_DATABASE_URL" -f docs/analyst/crossposting-v4-like-volume.sql   # H6
+psql "$ANALYST_DATABASE_URL" -f docs/analyst/crossposting-taste-shadow.sql    # H7
 # 3) Update this file Status/Decision + write
 #    docs/analyst/readouts/YYYY-MM-DD-weekly-hypotheses.md
+# 4) Crosspost plan tables:
+#    experiments/active/2026-08-10-crosspost-v4-and-taste-cohort.md
 ```
 
 Healthy product snapshot (rough, not ship gates):

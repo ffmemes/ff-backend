@@ -6,6 +6,12 @@ from sqlalchemy.dialects.postgresql import insert
 
 from src.config import settings
 from src.crossposting.constants import Channel
+from src.crossposting.shadow_score import attach_shadow_ranks, hybrid_shadow_fields
+from src.crossposting.taste_cohort import (
+    cohort_meta,
+    load_ru_taste_cohort,
+    taste_boost_multiplier,
+)
 from src.database import (
     crossposting,
     crossposting_decision_log,
@@ -133,6 +139,11 @@ def _build_decision_log(
     log_candidates = []
     for i, row in enumerate(candidates):
         breakdown = _compute_score_breakdown(row, channel, like_volume_enabled=like_volume_enabled)
+        # Shadow hybrid (log only): ln(nlikes+1) * src_quality_mult — does not re-rank.
+        shadow = hybrid_shadow_fields(
+            nlikes=row.get("nlikes"),
+            src_quality_mult=breakdown.get("src_quality_mult"),
+        )
         log_candidate = {
             "rank": i + 1,
             "meme_id": row["id"],
@@ -145,11 +156,15 @@ def _build_decision_log(
             "invited_count": row.get("invited_count"),
             "pre_inbot_share_clicks": row.get("pre_inbot_share_clicks") or 0,
             "pre_inbot_share_click_users": row.get("pre_inbot_share_click_users") or 0,
+            "n_taste_likes": int(row.get("n_taste_likes") or 0),
+            "taste_boost_shadow": float(row.get("taste_boost_shadow") or 1.0),
+            "taste_cohort_version": row.get("taste_cohort_version"),
             "caption_present": row.get("caption") is not None,
             "src_signal": (
                 round(float(row["src_signal"]), 4) if row.get("src_signal") is not None else None
             ),
             **breakdown,
+            **shadow,
         }
         for key in (
             "share_max_base_score",
@@ -161,6 +176,11 @@ def _build_decision_log(
             if row.get(key) is not None:
                 log_candidate[key] = round(float(row[key]), 6)
         log_candidates.append(log_candidate)
+
+    # Shadow ranks among this top-N only (production order unchanged).
+    # Keep shadow_* only inside candidates[] — log_ranker_decision kwargs are fixed columns.
+    log_candidates = attach_shadow_ranks(log_candidates)
+
     return {
         "channel": channel,
         "picked_meme_id": picked["id"],
@@ -173,6 +193,49 @@ def _build_decision_log(
         "pool_size": picked.get("candidate_pool_size"),
         "candidates": log_candidates,
     }
+
+
+async def _enrich_candidates_with_taste_shadow(
+    candidates: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Attach n_taste_likes + shadow boost for top-N (does not re-rank)."""
+    cohort = load_ru_taste_cohort()
+    if not candidates:
+        return candidates
+    if not cohort:
+        for c in candidates:
+            c["n_taste_likes"] = 0
+            c["taste_boost_shadow"] = 1.0
+            c["taste_cohort_version"] = None
+        return candidates
+
+    meme_ids = [int(c["id"]) for c in candidates if c.get("id") is not None]
+    counts: dict[int, int] = {}
+    if meme_ids:
+        rows = await fetch_all(
+            text(
+                """
+                SELECT meme_id, COUNT(DISTINCT user_id)::int AS n_taste
+                FROM user_meme_reaction
+                WHERE reaction_id = 1
+                  AND meme_id = ANY(:meme_ids)
+                  AND user_id = ANY(:cohort_ids)
+                GROUP BY meme_id
+                """
+            ),
+            {"meme_ids": meme_ids, "cohort_ids": list(cohort)},
+        )
+        counts = {int(r["meme_id"]): int(r["n_taste"]) for r in rows}
+
+    meta = cohort_meta()
+    version = meta.get("version")
+    for c in candidates:
+        mid = int(c["id"]) if c.get("id") is not None else None
+        n = counts.get(mid, 0) if mid is not None else 0
+        c["n_taste_likes"] = n
+        c["taste_boost_shadow"] = round(taste_boost_multiplier(n), 4)
+        c["taste_cohort_version"] = version
+    return candidates
 
 
 async def log_ranker_decision(
@@ -546,6 +609,15 @@ async def _get_next_meme_for_channel(
     rows = await fetch_all(text(_STANDARD_RANKER_QUERY), params)
     if not rows:
         return None, None
+    # Shadow: taste cohort counts on top-N only (no re-rank). RU cohort file.
+    if channel == "tgchannelru":
+        try:
+            rows = await _enrich_candidates_with_taste_shadow(rows)
+        except Exception:
+            # Logging enrichment must never block posting.
+            import logging
+
+            logging.getLogger(__name__).warning("taste shadow enrichment failed", exc_info=True)
     return (
         _picked_meme_dict(rows[0]),
         _build_decision_log(
