@@ -404,12 +404,27 @@ Simple linear/logistic models on pre-post bot features + source prior beat
 - Walk-forward: **HOLD** — logreg/ridge/HGB do **not** beat v4 on ≥2/3 folds
 - Source prior often ≥ volume on long history; bot volume ~flat on lifetime
 - HTML: `experiments/ml-crosspost-bot2channel/reports/2026-08-11-results.html`
-- **No production pick change**
+- Hypothesis battery: hybrids volume×source lead mean lift; **no bar PASS**
+  (`reports/2026-08-11-hypothesis-battery.html`)
+
+### Shadow hybrid in decision_log (shipping)
+
+| Field | Value |
+|-------|--------|
+| **Status** | **shadow only** — pick unchanged |
+| **Formula** | `shadow_score = ln(nlikes+1) * src_quality_mult` |
+| **Version** | `v4_x_src_v1` (+ `shadow_score_maturity` band) |
+| **Code** | `src/crossposting/shadow_score.py`, `_build_decision_log` |
+| **SQL** | `docs/analyst/crossposting-shadow-hybrid.sql` |
+
+Also logs `shadow_rank`, `shadow_pick_meme_id`, `shadow_vs_prod_disagree`.
 
 ### Next check
 
+- After deploy: decision_log has `shadow_score` on candidates
+- **2026-08-25**: `crossposting-shadow-hybrid.sql` — disagree rate + corr(shadow, f1k_24h)
+- Canary soft boost only if live corr/lift clearly > v4 alone
 - After H7 merge: re-export + optional taste feature
-- Shadow ml_score on decision_log if we open a canary PR
 - Do not schedule as feed experiment
 
 

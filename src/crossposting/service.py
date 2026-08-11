@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from src.config import settings
 from src.crossposting.constants import Channel
+from src.crossposting.shadow_score import attach_shadow_ranks, hybrid_shadow_fields
 from src.crossposting.taste_cohort import (
     cohort_meta,
     load_ru_taste_cohort,
@@ -138,6 +139,11 @@ def _build_decision_log(
     log_candidates = []
     for i, row in enumerate(candidates):
         breakdown = _compute_score_breakdown(row, channel, like_volume_enabled=like_volume_enabled)
+        # Shadow hybrid (log only): ln(nlikes+1) * src_quality_mult — does not re-rank.
+        shadow = hybrid_shadow_fields(
+            nlikes=row.get("nlikes"),
+            src_quality_mult=breakdown.get("src_quality_mult"),
+        )
         log_candidate = {
             "rank": i + 1,
             "meme_id": row["id"],
@@ -158,6 +164,7 @@ def _build_decision_log(
                 round(float(row["src_signal"]), 4) if row.get("src_signal") is not None else None
             ),
             **breakdown,
+            **shadow,
         }
         for key in (
             "share_max_base_score",
@@ -169,6 +176,10 @@ def _build_decision_log(
             if row.get(key) is not None:
                 log_candidate[key] = round(float(row[key]), 6)
         log_candidates.append(log_candidate)
+
+    # Shadow ranks among this top-N only (production order unchanged).
+    log_candidates = attach_shadow_ranks(log_candidates)
+
     return {
         "channel": channel,
         "picked_meme_id": picked["id"],
@@ -180,6 +191,10 @@ def _build_decision_log(
         ),
         "pool_size": picked.get("candidate_pool_size"),
         "candidates": log_candidates,
+        "shadow_version": log_candidates[0].get("shadow_version") if log_candidates else None,
+        "shadow_vs_prod_disagree": (
+            log_candidates[0].get("shadow_vs_prod_disagree") if log_candidates else None
+        ),
     }
 
 
