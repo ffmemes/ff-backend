@@ -41,18 +41,32 @@ async def update_user_meme_reaction(
     meme_id: int,
     reaction_id: int,
 ) -> bool:
+    """Persist a reaction.
+
+    Returns True when the stored reaction changed:
+    - first reaction (NULL → value), or
+    - re-reaction with a different value (e.g. accidental skip → like via /last).
+
+    Same-value double taps return False so the feed does not advance twice.
+    """
     update_query = (
         user_meme_reaction.update()
         .where(user_meme_reaction.c.user_id == user_id)
         .where(user_meme_reaction.c.meme_id == meme_id)
-        .where(user_meme_reaction.c.reaction_id.is_(None))  # not sure abot that
+        # NULL or a different reaction_id — allow corrections after /last re-show.
+        .where(user_meme_reaction.c.reaction_id.is_distinct_from(reaction_id))
         .values(reaction_id=reaction_id, reacted_at=datetime.utcnow())
     )
     res = await execute(update_query)
-    reaction_is_new = res.rowcount > 0
-    if not reaction_is_new:
-        logging.debug(f"User {user_id} already reacted to meme {meme_id}!")
-    return reaction_is_new  # I can filter double clicks
+    reaction_changed = res.rowcount > 0
+    if not reaction_changed:
+        logging.debug(
+            "User %s already has reaction %s on meme %s",
+            user_id,
+            reaction_id,
+            meme_id,
+        )
+    return reaction_changed
 
 
 async def update_user_last_active_at(

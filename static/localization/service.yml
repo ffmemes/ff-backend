@@ -1,3 +1,75 @@
+help.text:
+  en: |-
+    <b>Fast Food Memes</b>
+
+    Feed: like ❤️ / skip ⏬ under each meme.
+
+    /last — show the previous meme again (with buttons; you can change your reaction)
+
+    Upload — just send a meme to the bot
+    /uploads — your uploads
+
+    Share — button under the meme, or @ffmemesbot in any chat
+
+    /lang — meme languages
+    /kitchen — burgers 🍔
+    /balance · /leaderboard · /nickname
+
+    /chat — message us
+    /delete — delete your data
+  ru: |-
+    <b>Fast Food Memes</b>
+
+    Лента: лайк ❤️ / скип ⏬ под мемом.
+
+    /last — показать прошлый мем (с кнопками; реакцию можно поменять)
+
+    Загрузка — просто пришли мем боту
+    /uploads — твои загрузки
+
+    Поделиться — кнопка под мемом или @ffmemesbot в любом чате
+
+    /lang — языки мемов
+    /kitchen — бургеры 🍔
+    /balance · /leaderboard · /nickname
+
+    /chat — написать нам
+    /delete — удалить данные
+  uk: |-
+    <b>Fast Food Memes</b>
+
+    Стрічка: лайк ❤️ / скіп ⏬ під мемом.
+
+    /last — показати попередній мем (з кнопками; реакцію можна змінити)
+
+    Завантаження — просто надішли мем боту
+    /uploads — твої завантаження
+
+    Поділитися — кнопка під мемом або @ffmemesbot у будь-якому чаті
+
+    /lang — мови мемів
+    /kitchen — бургери 🍔
+    /balance · /leaderboard · /nickname
+
+    /chat — написати нам
+    /delete — видалити дані
+
+last.none:
+  en: |-
+    No previous meme yet — press /start and watch a few first.
+  ru: |-
+    Пока нечего возвращать — жми /start и посмотри пару мемов.
+  uk: |-
+    Поки немає попереднього мема — натисни /start і подивись кілька мемів.
+
+last.unavailable:
+  en: |-
+    Couldn't re-send that meme. Try /start for a new one.
+  ru: |-
+    Не получилось показать прошлый мем. Жми /start за новым.
+  uk: |-
+    Не вийшло показати попередній мем. Тисни /start за новим.
+
 service.out_of_memes:
   en: |-
     🚀 You've watched all the memes we've prepared for you! 

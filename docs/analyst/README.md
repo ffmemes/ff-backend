@@ -10,6 +10,7 @@ The Analyst agent monitors product health, tracks experiments, and produces dail
 
 ## Key Files
 - `docs/analyst/metrics.sql` — SQL queries organized by section (health, north star, engines, retention, etc.)
+- `docs/analyst/command-surface-proxies.sql` — private slash commands from `message_tg` (`chat_id > 0`) + secondary feature proxies. Notes: [`docs/product/surface-and-commands.md`](../product/surface-and-commands.md).
 - `docs/analyst/viral-shares-blender-v1.sql` — readout for `viral_shares_blender_v1` (share clickers + invites vs control + session guardrail).
 - `docs/analyst/dwell-feed-vs-broadcast.sql` — `sec_to_react` percentiles: like vs skip × feed vs broadcast; dwell buckets; demote inventory risk.
 - `docs/analyst/source-affinity-demote-guardrails.sql` — post-deploy volume / LR checks for soft-demote (#340).
@@ -40,7 +41,7 @@ Key tables for analytics:
 | `user_deep_link_log` | Share click tracking (growth proxy) | user_id, deep_link, created_at |
 | `chat_agent_usage` | AI agent calls in group chats | chat_id, user_id, prompt_tokens, completion_tokens, tool_calls, response_time_ms, trigger_type |
 | `chat_meme_reaction` | Like/dislike votes on memes in group chats | chat_id, meme_id, user_id, reaction (1=like, 2=dislike) |
-| `message_tg` | All group messages (AI context) | chat_id, message_id, user_id, text, date |
+| `message_tg` | Group messages (AI context) **and private inbound DMs** (commands/text/media) | chat_id (>0 private), message_id, user_id, text, date |
 
 ## Reaction ID Mapping
 - `reaction_id = 1` → Like (👍)

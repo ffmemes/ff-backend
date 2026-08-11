@@ -33,6 +33,7 @@ from src.tgbot.repo.meme_sources import (
     update_meme_source,
 )
 from src.tgbot.repo.memes import (
+    get_last_sent_meme_for_user,
     get_meme_by_id,
     get_meme_stats,
     get_meme_stats_for_meme_ids,
@@ -72,6 +73,7 @@ __all__ = [
     "dismiss_source_candidate",
     "get_experiment_assignment",
     "get_experiment_variant",
+    "get_last_sent_meme_for_user",
     "get_meme_by_id",
     "get_meme_source_by_id",
     "get_meme_source_stats_by_id",

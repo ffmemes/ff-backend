@@ -92,10 +92,10 @@ async def test_update_reaction_returns_true_on_new(setup):
 
 
 @pytest.mark.asyncio
-async def test_update_reaction_returns_false_on_duplicate(setup):
+async def test_update_reaction_returns_false_on_same_value_double_tap(setup):
     await create_user_meme_reaction(10001, 10001, "test")
     await update_user_meme_reaction(10001, 10001, reaction_id=1)
-    result = await update_user_meme_reaction(10001, 10001, reaction_id=2)
+    result = await update_user_meme_reaction(10001, 10001, reaction_id=1)
     assert result is False
 
 
@@ -109,12 +109,13 @@ async def test_update_reaction_sets_reacted_at(setup):
 
 
 @pytest.mark.asyncio
-async def test_update_reaction_does_not_overwrite(setup):
+async def test_update_reaction_allows_change_skip_to_like(setup):
+    """Accidental skip can be corrected after /last re-shows the meme."""
     await create_user_meme_reaction(
-        10001, 10001, "test", reaction_id=1, reacted_at=datetime.utcnow()
+        10001, 10001, "test", reaction_id=2, reacted_at=datetime.utcnow()
     )
-    result = await update_user_meme_reaction(10001, 10001, reaction_id=2)
-    assert result is False
+    result = await update_user_meme_reaction(10001, 10001, reaction_id=1)
+    assert result is True
     row = await _get_reaction(10001, 10001)
     assert row["reaction_id"] == 1
 

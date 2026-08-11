@@ -142,6 +142,28 @@ async def test_duplicate_reaction_skips_next_message(
 @patch(f"{HANDLER_MODULE}.update_user_last_active_at", new_callable=AsyncMock)
 @patch(f"{HANDLER_MODULE}.maybe_send_moderator_invite", new_callable=AsyncMock)
 @patch(f"{HANDLER_MODULE}.update_user_info_counters", new_callable=AsyncMock)
+async def test_re_reaction_skip_to_like_advances_feed(
+    mock_counters, mock_mod_invite, mock_active, mock_reward, mock_next, setup
+):
+    """After /last, user can flip accidental skip → like and get the next meme."""
+    from src.tgbot.handlers.reaction import handle_reaction
+
+    await create_user_meme_reaction(10001, 10001, "test", reaction_id=2)
+    mock_counters.return_value = {"nmemes_sent": 51, "memes_watched_today": 1}
+
+    update = _make_update(meme_id=10001, reaction_id=1)
+    context = _make_context()
+    await handle_reaction(update, context)
+
+    mock_next.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch(f"{HANDLER_MODULE}.next_message", new_callable=AsyncMock)
+@patch(f"{HANDLER_MODULE}.reward_user_for_daily_activity", new_callable=AsyncMock)
+@patch(f"{HANDLER_MODULE}.update_user_last_active_at", new_callable=AsyncMock)
+@patch(f"{HANDLER_MODULE}.maybe_send_moderator_invite", new_callable=AsyncMock)
+@patch(f"{HANDLER_MODULE}.update_user_info_counters", new_callable=AsyncMock)
 async def test_calls_update_user_info_counters(
     mock_counters, mock_mod_invite, mock_active, mock_reward, mock_next, setup
 ):
