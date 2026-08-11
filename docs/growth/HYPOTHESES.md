@@ -383,14 +383,23 @@ Simple linear/logistic models on pre-post bot features + source prior beat
 
 ### First result (2026-08-11)
 
-- n=624 labeled; test n=188 time split
-- logreg top20 f1k lift **1.187** vs v4 **1.114** (bar v4+0.05: PASS once)
-- HGB depth3 **overfits** (train spearman 0.67 vs test 0.14) — discard for ship
-- **No production change** until walk-forward / shadow design
+- n=624 labeled; single 70/30: logreg lift 1.187 vs v4 1.114 (looked good once)
+- HGB depth3 **overfits** — discard for ship
+
+### Walk-forward (authoritative, 2026-08-11)
+
+- 3 expanding folds (~93 test each); bar: lift ≥ v4+0.05 on ≥2/3 + spearman gap &lt;0.25
+- **logreg PASS** (2/3, mean lift 1.190 vs v4 1.080)
+- **ridge PASS** (2/3, mean lift 1.171)
+- HGB FAIL (overfit gap ~0.5)
+- Report: `experiments/ml-crosspost-bot2channel/reports/2026-08-11-walkforward.md`
+- RU summary: `.../reports/2026-08-11-otchet-ru.md`
+- **No production pick change** — next is shadow score only
 
 ### Next check
 
-- Ad-hoc: re-run after more mature v4 data or walk-forward split
+- After H7 merge: re-export + optional taste feature
+- Shadow ml_score on decision_log if we open a canary PR
 - Do not schedule as feed experiment
 
 

@@ -34,20 +34,36 @@ source prior + premium composition** can rank RU channel candidates better than
 3. **premium_frac** weak / non-monotonic alone  
 4. **src_prior_f1k** corr ≈ 0.17 with outcome  
 
-## Model results (time split 70/30, n_test=188)
+## Model results
+
+### A) Single 70/30 (exploratory only)
 
 | model | top20 lift f1k | AUC (HIT) | notes |
 |-------|---------------:|----------:|-------|
 | v4_proxy | 1.114 | 0.54 | baseline |
 | src_prior only | 1.023 | 0.51 | weak alone |
-| **logreg_hit** | **1.187** | **0.62** | best test lift |
-| ridge_f1k | 1.142 | 0.60 | close second |
-| hgb depth3 | 1.086 / 1.018 | ~0.54 | **train≫test → overfit** |
+| logreg_hit | 1.187 | 0.62 | looked good once |
+| ridge_f1k | 1.142 | 0.60 | close |
+| hgb depth3 | 1.086 / 1.018 | ~0.54 | **overfit** |
 
-Offline bar (lift ≥ v4 + 0.05): **PASS** for logreg (1.187 vs 1.114).  
-**Do not ship to prod ranker yet** — single split, small n_test, HGB overfit warning.
+### B) Walk-forward (authoritative) — 2026-08-11
 
-### Ridge direction (standardized)
+Report: `experiments/ml-crosspost-bot2channel/reports/2026-08-11-walkforward.md`  
+Registry: `FEATURE_REGISTRY.md` · `validate.py`
+
+| model | wins vs v4 (≥+0.05 lift) | mean lift f1k | mean gap ρ | PASS |
+|-------|-------------------------:|--------------:|-----------:|:----:|
+| **logreg_hit** | **2/3** | **1.190** | 0.00 | **YES** |
+| **ridge_f1k** | **2/3** | **1.171** | 0.06 | **YES** |
+| hgb | 1/3 | ~1.07–1.14 | **0.45–0.54** | no |
+| v4_proxy | — | **1.080** | 0.03 | baseline |
+
+**Offline verdict: PASS** (logreg + ridge).  
+**Still do not change production pick** — next step is decision_log **shadow score only**.
+
+Russian review writeup: `reports/2026-08-11-otchet-ru.md`
+
+### Ridge direction (standardized, single split)
 
 Positive: `pre_reacts`, `src_prior_f1k`, `src_prior_n_log`, `pre_premium_like_frac`  
 Negative/weak: caption, raw `pre_ln_likes` once reacts in model (collinear)
@@ -56,10 +72,10 @@ Negative/weak: caption, raw `pre_ln_likes` once reacts in model (collinear)
 
 | Outcome | Action |
 |---------|--------|
-| Hold production v4 | **Yes** until shadow canary designed |
-| Next offline | Optional second time split / walk-forward; drop collinear volume features |
-| Shadow score (later) | `logreg_hit` or ridge linear form on decision_log only — **not** sole pick |
-| Kill lab | If walk-forward fails to beat v4 |
+| Hold production v4 pick | **Yes** (H6 calendar still owns keep/kill) |
+| Walk-forward | **Done PASS** logreg/ridge |
+| Next | Shadow `ml_score` on decision_log (not sole ranker); add H7 taste after deploy |
+| Kill lab models | If live shadow fails to correlate with 24h f1k |
 
 ## Explicitly not doing
 

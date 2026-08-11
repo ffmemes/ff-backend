@@ -39,15 +39,21 @@ python build_dataset.py
 # 4) Local EDA extras
 python eda_local.py
 
-# 5) Simple models vs v4 baseline
+# 5) Simple models vs v4 baseline (single 70/30 — exploratory)
 python train_eval.py
+
+# 6) Walk-forward validation (authoritative offline verdict)
+python validate.py
 ```
+
+**Feature list:** `FEATURE_REGISTRY.md` + `features.py` (must stay in sync).
 
 Outputs:
 
 - `data/raw/*.parquet` (gitignored)
 - `data/dataset.parquet`
 - `reports/eda-sql.md`, `reports/eda-local.md`, `reports/*-models.md`
+- `reports/*-walkforward.md` (pass/fail vs v4)
 
 ## Anti-overfit
 

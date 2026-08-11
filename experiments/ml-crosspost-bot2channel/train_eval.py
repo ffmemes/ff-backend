@@ -14,22 +14,11 @@ from sklearn.metrics import average_precision_score, roc_auc_score
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
+from features import FEATURES
+
 ROOT = Path(__file__).resolve().parent
 DS = ROOT / "data" / "dataset.parquet"
 OUT = ROOT / "reports" / f"{datetime.now(timezone.utc).strftime('%Y-%m-%d')}-models.md"
-
-FEATURES = [
-    "pre_ln_likes",
-    "pre_lr",
-    "pre_reacts",
-    "pre_engaged_likes",
-    "pre_premium_like_frac",
-    "pre_premium_likes",
-    "src_prior_f1k",
-    "src_prior_n_log",
-    "has_caption_i",
-    "log1p_hours_in_bot",
-]
 
 
 def spearman(a: np.ndarray, b: np.ndarray) -> float:
