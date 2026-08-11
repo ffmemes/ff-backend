@@ -396,6 +396,16 @@ Simple linear/logistic models on pre-post bot features + source prior beat
 - RU summary: `.../reports/2026-08-11-otchet-ru.md`
 - **No production pick change** — next is shadow score only
 
+
+### Deep lifetime re-run (2026-08-11 evening)
+
+- Telethon full crawl: 11928 msgs, 4897 sc_ joinable → dataset **n=3889** (2023-11..2026-08)
+- Label = lifetime f1k (TG now); HIT = f1k≥train p75
+- Walk-forward: **HOLD** — logreg/ridge/HGB do **not** beat v4 on ≥2/3 folds
+- Source prior often ≥ volume on long history; bot volume ~flat on lifetime
+- HTML: `experiments/ml-crosspost-bot2channel/reports/2026-08-11-results.html`
+- **No production pick change**
+
 ### Next check
 
 - After H7 merge: re-export + optional taste feature

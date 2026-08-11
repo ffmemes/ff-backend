@@ -95,3 +95,10 @@ python build_dataset.py
 python eda_local.py
 python train_eval.py
 ```
+
+
+## Deep lifetime re-run (same day)
+
+- n=3889 (Telethon∪DB), walk-forward **HOLD** vs v4
+- See `reports/2026-08-11-results.html` and `reports/2026-08-11-otchet-ru.md`
+- Production: no change

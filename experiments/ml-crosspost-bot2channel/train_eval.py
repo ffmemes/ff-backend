@@ -66,6 +66,8 @@ def fill_X(df: pl.DataFrame, cols: list[str]) -> np.ndarray:
 
 def main() -> None:
     df = pl.read_parquet(DS).sort("posted_at")
+    if "pre_likes" in df.columns:
+        df = df.filter(pl.col("pre_likes") >= 5)
     n = df.height
     # time split ~70/30
     cut_idx = int(n * 0.7)
@@ -78,8 +80,9 @@ def main() -> None:
     fwd_te = test["forwards_24h"].to_numpy().astype(float)
 
     p75 = float(np.nanpercentile(y_tr, 75))
-    hit_tr = ((y_tr >= p75) | (train["forwards_24h"].to_numpy() >= 12)).astype(int)
-    hit_te = ((y_te >= p75) | (fwd_te >= 12)).astype(int)
+    # f1k top-quartile only (forwards≥12 is useless on high-view lifetime stats)
+    hit_tr = (y_tr >= p75).astype(int)
+    hit_te = (y_te >= p75).astype(int)
 
     X_tr = fill_X(train, FEATURES)
     X_te = fill_X(test, FEATURES)

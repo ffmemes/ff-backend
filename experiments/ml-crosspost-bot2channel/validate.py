@@ -105,7 +105,11 @@ def eval_fold(
 
 def main() -> None:
     df = pl.read_parquet(DS).sort("posted_at")
+    # Prefer rows with real bot pre-signal (deep dataset flag if present)
+    if "pre_likes" in df.columns:
+        df = df.filter(pl.col("pre_likes") >= 5)
     n = df.height
+    print(f"rows after pre_likes>=5 filter: {n}")
     all_rows: list[dict] = []
     fold_meta: list[dict] = []
 
@@ -126,12 +130,13 @@ def main() -> None:
 
         y_tr = train["f1k_24h"].to_numpy().astype(float)
         y_te = test["f1k_24h"].to_numpy().astype(float)
+        fwd_tr = train["forwards_24h"].to_numpy().astype(float)
         fwd_te = test["forwards_24h"].to_numpy().astype(float)
         p75 = float(np.nanpercentile(y_tr, 75))
-        hit_tr = (
-            (y_tr >= p75) | (train["forwards_24h"].to_numpy().astype(float) >= 12)
-        ).astype(int)
-        hit_te = ((y_te >= p75) | (fwd_te >= 12)).astype(int)
+        # Lifetime labels: absolute forwards≥12 is almost always true on big
+        # channels — use f1k top-quartile only (rate, not volume of reach).
+        hit_tr = (y_tr >= p75).astype(int)
+        hit_te = (y_te >= p75).astype(int)
 
         X_tr = fill_X(train, FEATURES)
         X_te = fill_X(test, FEATURES)
