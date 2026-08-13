@@ -16,7 +16,8 @@ override current Codex or Paperclip decisions.
 | Routine health and outcomes | [Routine observability](routine-observability.md) and [Outcome ledger](outcome-ledger.md) | Prefer business outcome checks over generic liveness checks. |
 | PR review automation | [PR review cycle](pr-review-cycle.md) | Keep GitHub payloads narrow and Paperclip issue links explicit. |
 | Moderator source scouting | [Moderator community loop spec](../../specs/moderator-community-loop.md), [CONTEXT.md](../../CONTEXT.md), and [ADR-0003](../adr/0003-prepared-source-etl-guard.md) | Use the Russian domain vocabulary; prepared sources stay parked until enabled. |
-| Describe Memes / vision OCR | [AGENTS.md](../../AGENTS.md) and [Describe Memes spec](../../specs/describe-memes.md) | Free OpenRouter vision models only. |
+| Describe Memes / vision OCR | [AGENTS.md](../../AGENTS.md), [Describe Memes spec](../../specs/describe-memes.md), [health SQL](../analyst/describe-memes-health.sql) | Free OpenRouter vision models only. |
+| Inspect a meme (info + media) | [Admin meme inspect](../admin-meme-inspect.md) | `ADMIN_API_TOKEN` + `GET /admin/memes/{id}` (+ `/media`). |
 | In-bot meme share button | [Share readout (archive)](../archive/2026-q2/meme-share-button-readout-2026-06-04.md), [CONTEXT.md](../../CONTEXT.md), [growth/virality-loop](../growth/virality-loop.md), and [Analyst README](../analyst/README.md) | Count non-self `m_`/`s_` deep-link starts; raw share-click counts include self-clicks. |
 | Crossposting / channel shares | [Crossposting share readout](../../specs/crossposting-share-optimization-2026-05-18.md), [Analyst crossposting SQL](../analyst/crossposting.sql), and [CONTEXT.md](../../CONTEXT.md) | Separate in-bot share clicks, channel deep links, and Telegram channel forwards/views. |
 

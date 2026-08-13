@@ -61,9 +61,20 @@ prefect deployment resume "Describe Memes (OpenRouter Vision)/Describe Memes (Op
 
 Before resuming, verify the root cause is fixed (check recent flow run logs).
 
+## Admin meme inspect (agents)
+
+HTTP API for compact meme cards + media download (Telegram `file_id` needs the
+production bot token). Auth: `ADMIN_API_TOKEN`.
+
+- Docs: [`docs/admin-meme-inspect.md`](docs/admin-meme-inspect.md)
+- `GET /admin/memes/{id}` — status, source, stats, OCR summary
+- `GET /admin/memes/{id}/media` — raw image/video bytes
+- OCR health SQL: [`docs/analyst/describe-memes-health.sql`](docs/analyst/describe-memes-health.sql)
+
 ## Key settings & environment toggles
 - Redis, Postgres, and Telegram configuration live in [`src/config.py`](src/config.py).
 - `OPENROUTER_API_KEY` — required for describe_memes. Balance must stay >= $0.
+- `ADMIN_API_TOKEN` — shared secret for `/admin/*` inspect endpoints (optional; 503 if unset).
 
 ## Public repo hygiene
 - This repository is public. Follow [`docs/public-repo-rule.md`](docs/public-repo-rule.md).
