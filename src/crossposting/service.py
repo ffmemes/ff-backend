@@ -18,6 +18,7 @@ from src.database import (
     execute,
     fetch_all,
 )
+from src.tgbot.constants import TELEGRAM_CHANNEL_EN_CHAT_ID, TELEGRAM_CHANNEL_RU_CHAT_ID
 
 # score_version in crossposting + decision_log
 SCORE_VERSION_V2 = 2
@@ -159,6 +160,7 @@ def _build_decision_log(
             "n_taste_likes": int(row.get("n_taste_likes") or 0),
             "taste_boost_shadow": float(row.get("taste_boost_shadow") or 1.0),
             "taste_cohort_version": row.get("taste_cohort_version"),
+            "n_sub_likes": int(row.get("n_sub_likes") or 0),
             "caption_present": row.get("caption") is not None,
             "src_signal": (
                 round(float(row["src_signal"]), 4) if row.get("src_signal") is not None else None
@@ -235,6 +237,58 @@ async def _enrich_candidates_with_taste_shadow(
         c["n_taste_likes"] = n
         c["taste_boost_shadow"] = round(taste_boost_multiplier(n), 4)
         c["taste_cohort_version"] = version
+    return candidates
+
+
+async def _enrich_candidates_with_sub_likes(
+    candidates: list[dict[str, Any]],
+    *,
+    channel: str,
+) -> list[dict[str, Any]]:
+    """Attach n_sub_likes: pre-existing likes from known channel members (shadow).
+
+    Membership comes from ``user_tg_chat_membership`` (bot-observed). Does not re-rank.
+    """
+    if not candidates:
+        return candidates
+    chat_id = (
+        TELEGRAM_CHANNEL_RU_CHAT_ID
+        if channel == "tgchannelru"
+        else TELEGRAM_CHANNEL_EN_CHAT_ID
+        if channel == "tgchannelen"
+        else None
+    )
+    if chat_id is None:
+        for c in candidates:
+            c["n_sub_likes"] = 0
+        return candidates
+
+    meme_ids = [int(c["id"]) for c in candidates if c.get("id") is not None]
+    counts: dict[int, int] = {}
+    if meme_ids:
+        rows = await fetch_all(
+            text(
+                """
+                SELECT umr.meme_id, COUNT(DISTINCT umr.user_id)::int AS n_sub
+                FROM user_meme_reaction umr
+                WHERE umr.reaction_id = 1
+                  AND umr.meme_id = ANY(:meme_ids)
+                  AND EXISTS (
+                    SELECT 1
+                    FROM user_tg_chat_membership m
+                    WHERE m.user_tg_id = umr.user_id
+                      AND m.chat_id = :chat_id
+                  )
+                GROUP BY umr.meme_id
+                """
+            ),
+            {"meme_ids": meme_ids, "chat_id": int(chat_id)},
+        )
+        counts = {int(r["meme_id"]): int(r["n_sub"]) for r in rows}
+
+    for c in candidates:
+        mid = int(c["id"]) if c.get("id") is not None else None
+        c["n_sub_likes"] = counts.get(mid, 0) if mid is not None else 0
     return candidates
 
 
@@ -609,15 +663,20 @@ async def _get_next_meme_for_channel(
     rows = await fetch_all(text(_STANDARD_RANKER_QUERY), params)
     if not rows:
         return None, None
-    # Shadow: taste cohort counts on top-N only (no re-rank). RU cohort file.
+    # Shadow enrichments must never block posting (log-only signals).
     if channel == "tgchannelru":
         try:
             rows = await _enrich_candidates_with_taste_shadow(rows)
         except Exception:
-            # Logging enrichment must never block posting.
             import logging
 
             logging.getLogger(__name__).warning("taste shadow enrichment failed", exc_info=True)
+    try:
+        rows = await _enrich_candidates_with_sub_likes(rows, channel=channel)
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).warning("sub-likes shadow enrichment failed", exc_info=True)
     return (
         _picked_meme_dict(rows[0]),
         _build_decision_log(
