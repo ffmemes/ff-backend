@@ -1,0 +1,37 @@
+<!DOCTYPE html><html lang=ru><head><meta charset=utf-8>
+<title>Next-wave experiments</title>
+<style>
+body{font-family:system-ui;background:#0c1017;color:#e8eef7;margin:0;padding:24px}
+.wrap{max-width:900px;margin:auto}
+.card{background:#151c28;border:1px solid #2a3548;border-radius:12px;padding:16px;margin:12px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:8px;border-bottom:1px solid #2a3548;text-align:left}
+td.n,th.n{text-align:right}
+tr.pass td{background:rgba(61,214,140,.08)}
+.yes{color:#3dd68c;font-weight:700}.no{color:#f07178}.base{color:#8b9bb4}
+.muted{color:#8b9bb4} h1{margin:0 0 8px}
+</style></head><body><div class=wrap>
+<h1>Next-wave: maturity · gems · subscribers</h1>
+<p class=muted>2026-08-13 · walk-forward top20 f1k lift · bar v4+0.05 on ≥2/3 folds</p>
+<div class=card>
+<p><b>Subs tracked:</b> 1984 ·
+<b>active in bot:</b> 299 ·
+<b>posts w/ sub-like:</b> 100.0% ·
+<b>n labeled:</b> 625</p>
+<p class=muted>Online v4: v4 n=10 fwd=8.30 f1k=22.89 hit=20.0% | v2 n=52 fwd=9.00 f1k=26.74 hit=42.3%</p>
+</div>
+<div class=card>
+<table><thead><tr><th>Scorer</th><th class=n>Wins</th><th class=n>Lift</th>
+<th class=n>v4</th><th class=n>ρ</th><th></th></tr></thead>
+<tbody><tr class=''><td><code>core_likes</code></td><td class=n>1/3</td><td class=n>1.081</td><td class=n>1.051</td><td class=n>0.077</td><td><span class=no>no</span></td></tr><tr class=''><td><code>core_x_src</code></td><td class=n>1/3</td><td class=n>1.055</td><td class=n>1.051</td><td class=n>0.152</td><td><span class=no>no</span></td></tr><tr class=''><td><code>likes_7d_x_src</code></td><td class=n>1/3</td><td class=n>0.966</td><td class=n>1.051</td><td class=n>-0.047</td><td><span class=no>no</span></td></tr><tr class=''><td><code>src_prior</code></td><td class=n>1/3</td><td class=n>0.947</td><td class=n>1.051</td><td class=n>0.016</td><td><span class=no>no</span></td></tr><tr class=''><td><code>early_gem</code></td><td class=n>1/3</td><td class=n>0.941</td><td class=n>1.051</td><td class=n>-0.029</td><td><span class=no>no</span></td></tr><tr class=''><td><code>sub_x_src</code></td><td class=n>0/3</td><td class=n>1.069</td><td class=n>1.051</td><td class=n>0.118</td><td><span class=no>no</span></td></tr><tr class=''><td><code>v4_x_src</code></td><td class=n>0/3</td><td class=n>1.062</td><td class=n>1.051</td><td class=n>0.132</td><td><span class=no>no</span></td></tr><tr class=''><td><code>sub_likes</code></td><td class=n>0/3</td><td class=n>1.056</td><td class=n>1.051</td><td class=n>0.033</td><td><span class=no>no</span></td></tr><tr class='base'><td><code>v4_all</code></td><td class=n>0/3</td><td class=n>1.051</td><td class=n>1.051</td><td class=n>0.051</td><td><span class=base>BASE</span></td></tr><tr class=''><td><code>sub_engaged_x_src</code></td><td class=n>0/3</td><td class=n>1.051</td><td class=n>1.051</td><td class=n>0.157</td><td><span class=no>no</span></td></tr><tr class=''><td><code>maturity</code></td><td class=n>0/3</td><td class=n>1.051</td><td class=n>1.051</td><td class=n>0.031</td><td><span class=no>no</span></td></tr><tr class=''><td><code>maturity_x_src</code></td><td class=n>0/3</td><td class=n>1.027</td><td class=n>1.051</td><td class=n>0.103</td><td><span class=no>no</span></td></tr><tr class=''><td><code>likes_7d</code></td><td class=n>0/3</td><td class=n>0.847</td><td class=n>1.051</td><td class=n>-0.124</td><td><span class=no>no</span></td></tr></tbody></table>
+</div>
+<div class=card>
+<h3>Как читать</h3>
+<ul>
+<li><code>sub_*</code> = лайки от людей, которые есть в membership канала (бот знает, что они в @fastfoodmemes).</li>
+<li><code>early_gem</code> = не выжатые мемы (sends 15–180) × LR × source.</li>
+<li><code>maturity_*</code> = soft boost mid volume, demote super-heated.</li>
+<li>PASS → кандидат в shadow decision_log; не hard pick.</li>
+</ul>
+</div>
+</div></body></html>

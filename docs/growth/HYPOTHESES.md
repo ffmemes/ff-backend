@@ -428,6 +428,45 @@ Also logs `shadow_rank`, `shadow_pick_meme_id`, `shadow_vs_prod_disagree`.
 - Do not schedule as feed experiment
 
 
+
+---
+
+## H9 — Channel subscriber ∩ bot likes (OFFLINE → shadow later)
+
+| Field | Value |
+|-------|--------|
+| **ID** | `channel_sub_bot_likes_v1` |
+| **Status** | **offline tested 2026-08-13** — no walk-forward PASS |
+| **Idea** | Users in `user_tg_chat_membership` for @fastfoodmemes who also use the bot are a proxy for channel taste; rank by their pre-post likes |
+| **Report** | `experiments/ml-crosspost-bot2channel/reports/2026-08-13-next-wave.md` |
+
+### Offline result
+
+- Members tracked: ~1984; active in bot 30d: ~299
+- 100% of labeled channel posts had ≥1 sub-like (mean ~39 vs ~61 all)
+- `sub_likes` / `sub_x_src` mean lift ~1.06 (similar to v4 ~1.05); **0/3 wins** vs v4+0.05
+- Slightly higher Spearman when × source (ρ~0.12) but not stable enough for ship
+- Caveat: membership table is bot-observed only (not full channel census)
+
+### Next
+
+- Improve membership coverage (periodic check for active bot users)
+- Shadow-log `n_sub_likes` if we re-test after denser membership
+- Do not hard-rank by sub cohort alone
+
+---
+
+## H10 — Maturity band / early-gem / v4×src (OFFLINE)
+
+| Field | Value |
+|-------|--------|
+| **Status** | offline 2026-08-13 — no PASS vs v4 bar |
+| **Report** | same next-wave report |
+
+Maturity / early_gem / v4×src did not beat all-time volume on walk-forward.
+Keep production: v4 live WATCH + shadow hybrid log only.
+
+
 ## Explicitly not open experiments
 
 | Item | State |
