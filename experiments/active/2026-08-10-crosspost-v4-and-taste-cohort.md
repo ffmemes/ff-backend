@@ -112,8 +112,10 @@ python scripts/crosspost_taste_cohort.py --days 120 --top 50 --min-n 8
 | Date | v4 n mature | avg_fwd | avg_f1k | hit% | v2 baseline hit% | H6 |
 |------|-------------|---------|---------|------|------------------|-----|
 | 2026-08-10 early | 0 | — | — | — | 38% | WATCH |
-| 2026-08-12 | | | | | | |
+| 2026-08-13 interim | **10** (≥36h) | **8.30** | **22.89** | **20%** | 34.5% (n=87, −6% fwd / −12% f1k) | **WATCH** (not RED; not a win) |
 | 2026-08-17 | | | | | | |
+
+Full interim writeup: `docs/analyst/crossposting-v4-interim-readout.md`
 
 | Date | posts with n_taste≥1 | top half f1k | bottom half f1k | H7 |
 |------|----------------------|--------------|-----------------|-----|
