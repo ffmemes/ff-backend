@@ -9,6 +9,7 @@ from sentry_sdk.integrations.logging import LoggingIntegration
 from starlette.middleware.cors import CORSMiddleware
 
 from src import redis
+from src.admin.router import router as admin_router
 from src.config import app_configs, settings
 from src.observability.sentry import before_send, before_send_log
 from src.tgbot import app as tgbot_app
@@ -160,3 +161,4 @@ async def prefect_deployments():
 
 
 app.include_router(tgbot_router, prefix="/tgbot", tags=["Telegram Bot"])
+app.include_router(admin_router)

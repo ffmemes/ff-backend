@@ -37,6 +37,9 @@ class Config(BaseSettings):
     MEME_STORAGE_TELEGRAM_CHAT_ID: str | None = None
     UPLOADED_MEMES_REVIEW_CHAT_ID: str | None = None
     ADMIN_LOGS_CHAT_ID: str | None = None
+    # Shared secret for internal /admin/* HTTP inspect endpoints (agents/operators).
+    # When unset, those routes return 503. Prefer a long random token; never commit it.
+    ADMIN_API_TOKEN: str | None = None
 
     VK_TOKEN: str | None = None
     VK_USER_TOKEN: str | None = None
