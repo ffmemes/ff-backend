@@ -454,7 +454,7 @@ async def _collect_post_stats(client: TelegramClient, channel_key: str, channel_
     """Full sweep: views/forwards/reactions for recent posts in a channel.
 
     Posts may be tracked in two places: `crossposting` (meme cross-posts, high
-    volume) or `editorial_posts` (agent-written updates, ~1/day). A single
+    volume) or `editorial_posts` (editorial updates, ~1/day). A single
     Telegram message cannot be both, so we dispatch by source.
     """
     log = get_run_logger()

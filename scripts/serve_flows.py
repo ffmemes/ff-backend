@@ -11,6 +11,8 @@ Usage:
 from prefect import serve
 from prefect.client.schemas.schedules import CronSchedule
 
+from src.comms.performance import write_channel_stats_report
+
 # Broadcasts
 from src.flows.broadcasts.meme import (
     broadcast_next_meme_to_active_1w_ago,
@@ -181,13 +183,19 @@ if __name__ == "__main__":
             name="Collect Young Channel Stats",
             schedules=[CronSchedule(cron="30 * * * *", timezone=LON)],
         ),
-        # ── Editorial (on-demand + weekly report + daily stats digest) ──
+        # ── Editorial (on-demand + weekly report) ──
         post_editorial_to_channel.to_deployment(
             name="Post Editorial",
         ),
         post_weekly_burger_report.to_deployment(
             name="Weekly Burger Report",
             schedules=[CronSchedule(cron="0 14 * * 0", timezone=MSK)],
+        ),
+        # Keep the useful report available on demand. `paused=True` also
+        # converges the previously scheduled deployment to a paused state.
+        write_channel_stats_report.to_deployment(
+            name="Write Channel Stats Report",
+            paused=True,
         ),
         # ── Rewards (weekly) ──
         reward_ru_users_for_weekly_top_uploaded_memes.to_deployment(

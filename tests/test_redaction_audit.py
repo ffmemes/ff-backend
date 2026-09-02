@@ -148,6 +148,14 @@ def test_private_key_block_flagged(tmp_path: Path) -> None:
     assert any(f.pattern == "private_key_block" for f in findings)
 
 
+def test_secret_reference_uuid_flagged(tmp_path: Path) -> None:
+    findings = _scan_file(
+        tmp_path,
+        "service_secret_id: 96ee7b2e-6df2-43c8-bbe3-53e19297308a",
+    )
+    assert any(f.pattern == "secret_reference_uuid" for f in findings)
+
+
 def test_real_repo_audit_clean() -> None:
     """End-to-end: scanning the actual tracked file list must come back clean."""
     paths = _module.list_tracked_files()

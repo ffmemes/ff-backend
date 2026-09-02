@@ -1,7 +1,7 @@
 #!/bin/bash
 # Pre-commit hook: blocks commits containing secrets
 # Install: cp scripts/pre-commit-secrets-check.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
-# Purpose: Safety rail for public repo with autonomous AI agents
+# Purpose: Safety rail for this public repository
 #
 # Patterns checked:
 #   - PostgreSQL connection strings (postgresql://)

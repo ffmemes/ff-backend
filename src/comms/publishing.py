@@ -69,7 +69,7 @@ BANNED_SUBSTRINGS: tuple[str, ...] = (
     "fixed bug",
     "ab test",
     "a/b test",
-    # Russian forms — agent writes in Russian for @ffmemes.
+    # Russian forms — editorial posts are written in Russian for @ffmemes.
     "а/б тест",
     "аб-тест",
     "сплит-тест",

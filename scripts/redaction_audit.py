@@ -134,6 +134,17 @@ PATTERNS: tuple[Pattern, ...] = (
         regex=re.compile(r"-----BEGIN (?:RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----"),
         description="Inlined private key.",
     ),
+    Pattern(
+        name="secret_reference_uuid",
+        regex=re.compile(
+            r"""(?ix)
+            [a-z0-9_-]*secret(?:[_-]id)?
+            \s*[:=]\s*
+            ['"]?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
+            """,
+        ),
+        description="Secret reference UUID assignment. Reference secrets by name only.",
+    ),
 )
 
 # Files where the patterns themselves must appear: the audit code, the

@@ -64,7 +64,7 @@ def _build_parser() -> argparse.ArgumentParser:
         required=True,
         help=(
             "Stable identifier for who/what is moderating "
-            "(e.g. 'agent:cto'). Persisted to the audit trail."
+            "(e.g. 'operator:maintenance'). Persisted to the audit trail."
         ),
     )
     parser.add_argument(
