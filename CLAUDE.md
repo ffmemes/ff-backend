@@ -7,7 +7,6 @@ for this repo. Prefer:
 |------|-----------------|
 | Repo rules for agents | [`AGENTS.md`](AGENTS.md) |
 | Domain vocabulary (RU) | [`CONTEXT.md`](CONTEXT.md) |
-| Task routing / agent docs | [`docs/agents/README.md`](docs/agents/README.md) |
 | Product + data overview | [`SPEC.md`](SPEC.md) |
 | Virality / growth thesis | [`docs/growth/virality-loop.md`](docs/growth/virality-loop.md) |
 | Public-repo redaction | [`docs/public-repo-rule.md`](docs/public-repo-rule.md) |

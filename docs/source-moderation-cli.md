@@ -1,4 +1,4 @@
-# Source moderation CLI (agent-driven)
+# Source moderation CLI (operator-driven)
 
 `scripts/admin/advance_source.py` advances a `meme_source` row through
 moderation states (`in_moderation` → `parsing_enabled`, snooze, unsnooze,
@@ -6,19 +6,16 @@ language assignment) without driving the Telegram moderator UI.
 
 ## When to use
 
-The moderator UI in `@ffmemesbot` requires a real Telegram identity, so
-agent runtimes (CTO, QA) cannot promote sources discovered by
-`/discoveredsources`. This CLI gives them a server-side path that calls
-the same business logic as the bot — see
+The moderator UI in `@ffmemesbot` requires a real Telegram identity. This CLI
+gives operators and trusted automation a server-side path for sources discovered
+by `/discoveredsources`, while calling the same business logic as the bot — see
 `src/storage/moderation.py::advance_meme_source`.
 
 Typical triggers:
-- Source candidates surge in the discovery queue and Daniil hasn't had
-  time to review (FFM-1153/FFM-1114). CTO heartbeat clears the
-  promoted-but-stuck rows.
-- QA needs to re-enable a source after a regression test.
-- Auto-snooze fires on a source that was misclassified; the CTO
-  un-snoozes it after fixing the parser.
+- Source candidates surge in the discovery queue and require an operator pass.
+- An operator needs to re-enable a source after a regression test.
+- Auto-snooze fires on a source that was misclassified; an operator un-snoozes
+  it after fixing the parser.
 
 ## How it runs
 
@@ -30,7 +27,7 @@ docker compose exec app python -m scripts.admin.advance_source \
     --id <meme_source_id> \
     --language ru \
     --status parsing_enabled \
-    --moderator-id agent:cto
+    --moderator-id operator:maintenance
 ```
 
 Flags:
@@ -39,9 +36,9 @@ Flags:
   re-classify.
 - `--status`: one of `in_moderation`, `parsing_enabled`,
   `parsing_disabled`, `snoozed`. Skip to leave unchanged.
-- `--moderator-id` (required): stable identifier of the caller. Use
-  `agent:<role>` (e.g. `agent:cto`) so the audit trail can distinguish
-  human moderators (numeric Telegram user_id) from agents.
+- `--moderator-id` (required): stable identifier of the caller. Use a namespaced
+  value such as `operator:maintenance` so the audit trail can distinguish CLI
+  actions from human moderators (numeric Telegram user IDs).
 - `--no-trigger-parse`: skip the platform parser kick-off after a flip
   to `parsing_enabled`. Default behavior is to trigger parsing for TG
   and VK sources (matches the bot moderator path).

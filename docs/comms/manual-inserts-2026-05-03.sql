@@ -1,5 +1,5 @@
 -- One-off backfill for editorial_posts rows that were posted to @ffmemes
--- before the Comms agent had write access (see FFM-919 / FFM-918).
+-- before the editorial publisher had write access (see FFM-919 / FFM-918).
 --
 -- Run once on prod against the ff database as a superuser (or as the app's
 -- writer role — comms_writer cannot upsert here because the rows pre-date

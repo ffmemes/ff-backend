@@ -1,15 +1,15 @@
--- comms_writer Postgres role for the Comms agent.
+-- comms_writer Postgres role for editorial publishing.
 --
 -- Why: src/comms/publishing.py:publish_editorial_post() must SELECT, INSERT,
 -- and UPDATE rows on editorial_posts (rotation check + idempotent claim row
 -- + telegram_message_id backfill). Granting it the full app DATABASE_URL is
--- overkill; this role is the least-privilege handle the Comms env should use.
+-- overkill; this role is the least-privilege handle the publishing runtime should use.
 --
--- The Comms agent receives ANALYST_DATABASE_URL for read-only analysis and
+-- Editorial tooling may receive ANALYST_DATABASE_URL for read-only analysis and
 -- DATABASE_URL for the narrow publishing write path. DATABASE_URL must NOT be
 -- mapped to ANALYST_DATABASE_URL or to the full app FFMEMES_DATABASE_URL.
 -- Run this once on prod against the ff database as a superuser. After this,
--- create/update the Comms Paperclip secret binding:
+-- configure the publishing runtime secret:
 --   DATABASE_URL=postgresql+asyncpg://comms_writer:<password>@<host>:<port>/ff
 -- (use the asyncpg driver — src/database.py builds an async engine).
 --

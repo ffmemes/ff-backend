@@ -18,6 +18,8 @@ jobs:
       - run: pip install ruff==0.15.*
       - run: ruff check src/ tests/
       - run: ruff format --check src/ tests/
+      - name: Run public-repo redaction audit
+        run: python3 scripts/redaction_audit.py
 
       # Catch multi-head migrations BEFORE the slow test job. After a rebase,
       # two migrations can both point at the same down_revision and produce

@@ -13,8 +13,8 @@ The v1 failure is therefore treated as an experiment-design failure, not proof t
 ## Changes Made
 
 - 2026-05-09 CEO decision from [FFM-1093](/FFM/issues/FFM-1093): open a redesigned v2 A/B instead of immediately re-enabling the v1 weights.
-- CTO implementation delegated in Paperclip to build LR-stratified assignment, high-volume-skipper handling, and explicit sample gates before the experiment can be read.
-- Analyst measurement delegated in Paperclip and blocked on deployment.
+- Implementation delegated to build LR-stratified assignment, high-volume-skipper handling, and explicit sample gates before the experiment can be read.
+- Measurement work was blocked on deployment.
 - 2026-07-23T18:05:54Z freeze applied in code via `RECENTLY_LIKED_BLENDER_V2_ENROLLMENT_FROZEN = True`: existing assignment rows remain readable, but new/unassigned mature users use control weights without creating new experiment assignments. Rollback path: set the freeze constant to `False` and redeploy.
 
 ## Metrics Before

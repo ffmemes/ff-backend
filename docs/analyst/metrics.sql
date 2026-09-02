@@ -1,7 +1,7 @@
 -- =============================================================================
--- ANALYST AGENT: SQL METRICS REFERENCE
+-- ANALYTICS: SQL METRICS REFERENCE
 -- =============================================================================
--- Usage: Analyst agent runs these queries against prod DB via ANALYST_DATABASE_URL
+-- Usage: run these queries against prod DB via ANALYST_DATABASE_URL
 -- Connection: read-only user (analyst_readonly), statement_timeout = 30s
 -- Reference: CLAUDE.md "Production Health Checklist" for base health query
 -- =============================================================================

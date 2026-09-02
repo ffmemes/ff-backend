@@ -1,6 +1,6 @@
 # Database Connection Pool Exhaustion — 2026-04-01
 
-Status: resolved; prevention guidance retained from Paperclip issue FFM-187
+Status: resolved; prevention guidance retained from issue FFM-187
 
 ## Impact
 

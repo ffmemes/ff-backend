@@ -1,7 +1,7 @@
 # Exact-Meme Inline Share Canary Readout
 
 Date: 2026-06-25
-Paperclip source: FFM-1590
+Historical issue: FFM-1590
 Decision: end the canary; do not expand
 
 ## Result

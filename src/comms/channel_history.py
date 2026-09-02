@@ -1,8 +1,8 @@
 """
 Read recent @ffmemes channel post history via Telethon.
 
-Bot API cannot read a channel's own post history, so Comms Agent uses the
-existing Telethon session (same one used by crossposting stats collector)
+Bot API cannot read a channel's own post history, so this module uses the
+existing Telethon session (same one used by the crossposting stats collector)
 to pull the last N posts and enforce topic rotation.
 """
 

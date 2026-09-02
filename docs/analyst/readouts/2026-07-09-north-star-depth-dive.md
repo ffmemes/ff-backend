@@ -1,7 +1,7 @@
 # North Star Session-Depth Dive
 
 Date: 2026-07-09
-Paperclip source: FFM-1861
+Historical issue: FFM-1861
 Decision: no emergency engine rollback; investigate middle-position quality
 
 ## Finding

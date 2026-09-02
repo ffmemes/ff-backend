@@ -29,8 +29,7 @@
 ## Operational notes
 - Manual upload review happens entirely inside the designated Telegram upload review chat. Keep communications and escalations there for traceability.
 - Weekly maintenance (Prefect flow health checks, data hygiene jobs, etc.) runs through Prefect deployment definitions. Use Prefect CLI to trigger flows during scheduled operations.
-- Paperclip inspection should use the project-local CLI skill at `.codex/skills/paperclip/SKILL.md` and wrapper `.codex/paperclip-tools/paperclipai-ffmemes.sh`. Do not enable Paperclip MCP globally; it adds a large always-on tool surface.
-- Agent architecture decisions and task entrypoints live in [`docs/adr/`](docs/adr/) and [`docs/agents/README.md`](docs/agents/README.md).
+- Architecture decisions live in [`docs/adr/`](docs/adr/).
 - Telegram-facing DB helpers are split under [`src/tgbot/repo/`](src/tgbot/repo/); [`src/tgbot/service.py`](src/tgbot/service.py) re-exports them for compatibility.
 
 ## Describe Memes (OpenRouter Vision)

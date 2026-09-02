@@ -1,9 +1,9 @@
 """
-Brand-styled matplotlib primitives for Comms Agent posts.
+Brand-styled matplotlib primitives for editorial posts.
 
-Agent composes on-the-fly by calling these primitives instead of writing raw
-matplotlib. This enforces the brand constraints uniformly: palette, typography,
-no chart junk. See docs/comms/brand-guide.md for the design rules.
+Call these primitives instead of writing raw matplotlib so the brand constraints
+stay uniform: palette, typography, and no chart junk. See
+docs/comms/brand-guide.md for the design rules.
 """
 
 from __future__ import annotations

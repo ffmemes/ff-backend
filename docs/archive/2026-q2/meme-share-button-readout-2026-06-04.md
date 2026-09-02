@@ -121,7 +121,7 @@ post share users is weaker on a very small sample.
 
 ## Next Measurement
 
-Future Analyst or Paperclip agents should:
+Future analysis should:
 
 1. Re-run after at least 21 full post-launch days or 100 non-self share clicks.
 2. Always exclude the current partial UTC day from before/after comparisons.

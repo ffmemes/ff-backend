@@ -1,6 +1,6 @@
 # Experiments
 
-Structured experiment tracking for AI agents and manual development.
+Structured experiment tracking for product development.
 
 ## Start here on resume
 
@@ -24,9 +24,9 @@ experiments/
 
 ## Experiment Lifecycle
 
-1. **Create**: CEO agent creates `active/YYYY-MM-DD-name.md`
-2. **Monitor**: Analyst agent tracks metrics in daily reports
-3. **Complete**: CEO moves from `active/` to `completed/` with results
+1. **Create**: The experiment owner creates `active/YYYY-MM-DD-name.md`
+2. **Monitor**: The owner or analyst tracks metrics in daily reports
+3. **Complete**: The owner moves the file from `active/` to `completed/` with results
 4. **Never delete**: Completed experiments are historical artifacts
 
 ## Experiment File Format

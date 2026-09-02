@@ -1,7 +1,7 @@
 # `recently_liked` Blender V2 Guardrail Checkpoint
 
 Date: 2026-06-17
-Paperclip source: FFM-1570
+Historical issue: FFM-1570
 Decision: continue passive measurement; no winner, expansion, or rollback
 
 ## What The Checkpoint Showed

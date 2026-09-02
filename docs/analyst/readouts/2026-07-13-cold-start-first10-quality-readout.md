@@ -1,7 +1,7 @@
 # Cold-Start First-10 Quality Readout
 
 Date: 2026-07-13
-Paperclip source: FFM-1871, consolidating the FFM-1744 measurement log
+Historical issue: FFM-1871, consolidating the FFM-1744 measurement log
 Decision: test candidate-source guardrails for positions 2–10
 
 ## Cohort

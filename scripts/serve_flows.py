@@ -183,7 +183,7 @@ if __name__ == "__main__":
             name="Collect Young Channel Stats",
             schedules=[CronSchedule(cron="30 * * * *", timezone=LON)],
         ),
-        # ── Editorial (on-demand + weekly report + daily stats digest) ──
+        # ── Editorial (on-demand + weekly report) ──
         post_editorial_to_channel.to_deployment(
             name="Post Editorial",
         ),
@@ -191,13 +191,11 @@ if __name__ == "__main__":
             name="Weekly Burger Report",
             schedules=[CronSchedule(cron="0 14 * * 0", timezone=MSK)],
         ),
-        # Materialize channel-stats-ffmemes-YYYY-MM-DD.md 5 minutes before
-        # Comms Agent fires at 07:00 UTC (10:00 MSK) so agent reads a fresh
-        # @ffmemes digest.
+        # Keep the useful report available on demand. `paused=True` also
+        # converges the previously scheduled deployment to a paused state.
         write_channel_stats_report.to_deployment(
             name="Write Channel Stats Report",
-            schedules=[CronSchedule(cron="55 6 * * *", timezone=LON)],
-            parameters={"channel": "ffmemes", "days": 30},
+            paused=True,
         ),
         # ── Rewards (weekly) ──
         reward_ru_users_for_weekly_top_uploaded_memes.to_deployment(
