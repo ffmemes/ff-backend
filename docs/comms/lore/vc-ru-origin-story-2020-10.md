@@ -91,4 +91,4 @@
 | Revenue model | Targeted ads | Burger economy (Stars) | Pivoted |
 
 ### Narrative arc for B1 post
-The bot grew massively in content (10x memes, 12x reactions, 7.5x sources) but WAU declined from peak. The "GIPHY for memes" vision partially realized with inline search. Multi-platform expansion never happened — focused on Telegram. Monetization pivoted from ads to burger economy. AI agents now run the bot autonomously. The build-in-public spirit continues.
+The bot grew massively in content (10x memes, 12x reactions, 7.5x sources) but WAU declined from peak. The "GIPHY for memes" vision partially realized with inline search. Multi-platform expansion never happened — focused on Telegram. Monetization pivoted from ads to burger economy. The build-in-public spirit continues.

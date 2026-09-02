@@ -39,21 +39,20 @@ def test_clean_file(tmp_path: Path) -> None:
     findings = _scan_file(
         tmp_path,
         """
-        Reference triggers by env var: $PAPERCLIP_PR_REVIEW_TRIGGER_URL.
-        Mention secrets by env var name: PAPERCLIP_API_KEY, ANALYST_DATABASE_URL.
+        Mention secrets by env var name: ANALYST_DATABASE_URL.
         Issue: FFM-1234. Routine: QA Log Scan.
         """,
     )
     assert findings == []
 
 
-def test_trigger_public_path_is_flagged(tmp_path: Path) -> None:
+def test_legacy_public_trigger_path_is_flagged(tmp_path: Path) -> None:
     findings = _scan_file(
         tmp_path,
-        "POST https://org.ffmemes.com/api/routine-triggers/public/910d844a954042dc060c56bf/fire",
+        "POST https://automation.example/api/routine-triggers/public/910d844a954042dc060c56bf/fire",
     )
     assert len(findings) == 1
-    assert findings[0].pattern == "paperclip_trigger_public_path"
+    assert findings[0].pattern == "legacy_public_trigger_path"
 
 
 def test_bearer_literal_flagged(tmp_path: Path) -> None:
@@ -69,8 +68,8 @@ def test_bearer_envvar_reference_is_clean(tmp_path: Path) -> None:
     findings = _scan_file(
         tmp_path,
         """
-        -H "Authorization: Bearer $PAPERCLIP_API_KEY"
-        -H "Authorization: Bearer ${PAPERCLIP_API_KEY}"
+        -H "Authorization: Bearer $SERVICE_API_KEY"
+        -H "Authorization: Bearer ${SERVICE_API_KEY}"
         -H "Authorization: Bearer <token>"
         """,
     )
@@ -147,14 +146,6 @@ def test_private_key_block_flagged(tmp_path: Path) -> None:
         "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIB...\n-----END RSA PRIVATE KEY-----",
     )
     assert any(f.pattern == "private_key_block" for f in findings)
-
-
-def test_paperclip_secret_uuid_flagged(tmp_path: Path) -> None:
-    findings = _scan_file(
-        tmp_path,
-        "paperclip_secret_id: 96ee7b2e-6df2-43c8-bbe3-53e19297308a",
-    )
-    assert any(f.pattern == "paperclip_secret_uuid" for f in findings)
 
 
 def test_real_repo_audit_clean() -> None:

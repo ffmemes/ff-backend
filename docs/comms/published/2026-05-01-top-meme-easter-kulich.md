@@ -23,4 +23,4 @@
 - This is a fun meme finding, so the main RU meme channel is an acceptable
   target. Product/process/build-in-public updates should still target
   @ffmemes.
-- Paperclip issue: FFM-866.
+- Historical issue: FFM-866.

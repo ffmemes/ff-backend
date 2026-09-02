@@ -8,7 +8,7 @@ Content workspace for FFmemes Telegram channels:
 **Target cadence**: ~1 post per day
 **Language**: Russian only
 **Tone**: dania-zip rules (https://github.com/ohld/dania-zip)
-**Approval**: All posts require CEO approval before publishing
+**Approval**: All posts require owner approval before publishing
 
 ## Structure
 
@@ -17,18 +17,18 @@ docs/comms/
   content-plan.md    # Post categories, ideas, suggested schedule
   brand-guide.md     # Visual identity: colors, font, chart palette
   lore/              # Historical archive (channel history, vc.ru article, milestones)
-  drafts/            # Comms agent drafts awaiting CEO approval
+  drafts/            # Drafts awaiting owner approval
   published/         # Published post archive for reference
 ```
 
 ## Workflow
 
-1. Comms agent reads content plan + Analyst reports
-2. Picks next post from schedule or creates data-driven post
-3. Drafts post as Paperclip issue with text + visual description
-4. CEO reviews and approves
-5. Agent posts to the selected public channel and records the exact Telegram URL
-6. Post moved to `published/` with date prefix
+1. Read the content plan and relevant analytics reports
+2. Pick the next post from the schedule or create a data-driven post
+3. Saves the draft with text + visual description under `drafts/`
+4. The owner reviews and approves
+5. The approved post is published to the selected public channel and records the exact Telegram URL
+6. The post is moved to `published/` with a date prefix
 
 ## Links
 
@@ -36,4 +36,3 @@ docs/comms/
 - Brand guide: [brand-guide.md](brand-guide.md)
 - Lore archive: [lore/](lore/)
 - Tone of voice: https://github.com/ohld/dania-zip
-- Comms agent spec: [../../agents/comms/AGENTS.md](../../agents/comms/AGENTS.md)

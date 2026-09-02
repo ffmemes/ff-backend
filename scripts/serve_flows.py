@@ -11,8 +11,6 @@ Usage:
 from prefect import serve
 from prefect.client.schemas.schedules import CronSchedule
 
-from src.comms.performance import write_channel_stats_report
-
 # Broadcasts
 from src.flows.broadcasts.meme import (
     broadcast_next_meme_to_active_1w_ago,
@@ -190,14 +188,6 @@ if __name__ == "__main__":
         post_weekly_burger_report.to_deployment(
             name="Weekly Burger Report",
             schedules=[CronSchedule(cron="0 14 * * 0", timezone=MSK)],
-        ),
-        # Materialize channel-stats-ffmemes-YYYY-MM-DD.md 5 minutes before
-        # Comms Agent fires at 07:00 UTC (10:00 MSK) so agent reads a fresh
-        # @ffmemes digest.
-        write_channel_stats_report.to_deployment(
-            name="Write Channel Stats Report",
-            schedules=[CronSchedule(cron="55 6 * * *", timezone=LON)],
-            parameters={"channel": "ffmemes", "days": 30},
         ),
         # ── Rewards (weekly) ──
         reward_ru_users_for_weekly_top_uploaded_memes.to_deployment(

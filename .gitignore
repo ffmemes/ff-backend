@@ -150,14 +150,6 @@ test.py
 .codex/
 !.codex/
 /.codex/*
-!.codex/skills/
-/.codex/skills/*
-!.codex/skills/paperclip/
-/.codex/skills/paperclip/*
-!.codex/skills/paperclip/SKILL.md
-!.codex/paperclip-tools/
-/.codex/paperclip-tools/*
-!.codex/paperclip-tools/paperclipai-ffmemes.sh
 .agents/
 
 # Per-developer git worktrees (in-progress feature branches)
@@ -167,9 +159,6 @@ test.py
 experiments/log.jsonl
 # Agent daily reports (generated per heartbeat, can be large)
 experiments/reports/
-# Paperclip state snapshots (may contain sensitive config)
-agents/backup/*.json
-
 # Ralphex local audit snapshots (redacted summaries committed elsewhere)
 .ralphex/
 

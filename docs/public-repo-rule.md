@@ -6,12 +6,9 @@ so a single leaked secret can also become a worked example for future runs.
 
 ## Allowed in tracked files
 
-- Environment variable names (e.g. `PAPERCLIP_API_KEY`, `ANALYST_DATABASE_URL`).
-- Paperclip secret names (the human-readable handle, not the UUID id).
+- Environment variable names (for example `ANALYST_DATABASE_URL`).
 - Public dashboard hostnames (`org.ffmemes.com`, `t.me/ffmemes`).
 - Redacted issue identifiers (`FFM-1234`) and routine titles (`QA Log Scan`).
-- Stable lookup paths (e.g. "Sentry Internal Integration → Paperclip QA
-  trigger public URL in the Paperclip dashboard").
 
 ## Forbidden in tracked files
 
@@ -20,10 +17,8 @@ so a single leaked secret can also become a worked example for future runs.
   `app:app@`, `changeme`, or `<password>` in `.env.example` are fine).
 - Authorization headers with a literal bearer token. Use `$VAR_NAME` or a
   `${VAR_NAME}` reference; never `Bearer eyJ...`.
-- Paperclip routine trigger public paths or public IDs
-  (`/api/routine-triggers/public/<publicId>/fire`). The `publicId` itself
-  acts as a shared secret. Reference triggers by routine title, not URL.
-- Paperclip secret UUIDs. Reference secrets by their env var name.
+- Legacy routine trigger public paths or IDs. Their public identifier acts as
+  a shared secret even after the integration that created it is retired.
 - Internal hostnames, private webhook URLs, or anything else that grants
   access to production by knowing the URL.
 - Inlined private keys.
@@ -45,8 +40,7 @@ Do not silence individual lines.
 
 ## When something does leak
 
-1. Rotate the secret immediately (Paperclip dashboard → Settings → Secrets,
-   GitHub Actions → Secrets, Coolify → Environment).
+1. Rotate the secret immediately in the system that owns it.
 2. Remove the value from the working tree and commit a redacted version.
 3. Note the rotation in the relevant runbook section so the next agent
    knows the lookup path is now clean.

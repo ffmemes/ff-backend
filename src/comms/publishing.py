@@ -1,11 +1,10 @@
 """
 Single entry point for publishing editorial posts to @ffmemes channels.
 
-The Comms Agent calls `publish_editorial_post(...)` — that function validates
-the draft, posts it as ONE Telegram message via `post_editorial_to_channel`,
-and persists metadata to `editorial_posts` so the stats collector can track
-it. Raw `curl`/Bot API calls are banned; this module is the only sanctioned
-path.
+Call `publish_editorial_post(...)` to validate a draft, post it as ONE Telegram
+message via `post_editorial_to_channel`, and persist metadata to
+`editorial_posts` so the stats collector can track it. Raw `curl`/Bot API calls
+are banned; this module is the only sanctioned path.
 
 Invariants enforced here (not in prompt):
 - One-message publishing (sendPhoto with caption, single call).
@@ -490,8 +489,8 @@ async def publish_editorial_post(
         )
     editorial_post_id = claim_row["id"]
 
-    # Import lazily — avoids pulling python-telegram-bot into the Comms agent
-    # runtime for dry-run / validation-only calls in tests.
+    # Import lazily so dry-run and validation-only calls do not load
+    # python-telegram-bot.
     from src.flows.crossposting.editorial import post_editorial_to_channel
 
     message_id = await post_editorial_to_channel(

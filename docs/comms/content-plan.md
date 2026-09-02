@@ -33,7 +33,6 @@ The journey. Build-in-public spirit. Reference the archive in `lore/`.
 | B2 | "535K memes collected, 205K approved" | Infographic: funnel from sources to ok |
 | B3 | "22M reactions and counting" | Chart: reactions growth over time |
 | B4 | "9 recommendation engines" | Simple diagram of engine names |
-| B5 | "AI agents now run the bot" | Agent org chart from COMPANY.md |
 | B6 | Channel milestones throwback | Screenshots of old posts from archive |
 | B7 | "From 2.5K to 22K users" | Timeline graphic |
 
@@ -101,7 +100,7 @@ Nerdy content. How things work under the hood.
 | 9 | 77 burger giveaway (D1) | Engagement | Drive clicks |
 | 10 | Meme of the week (C2) | Data | The actual best meme |
 | 11 | Group chat AI (A2) | Feature | "Add to chat" button |
-| 12 | AI agents run the bot (B5) | Lore | Mind-blowing for audience |
+| 12 | AI describes every meme (F5) | Engineering | Show the vision pipeline in action |
 | 13 | Weekly engagement snapshot (C1) | Data | DAU/WAU/MAU chart |
 | 14 | What we shipped this week (E3) | Recurring | Friday digest |
 

@@ -1,7 +1,7 @@
 # Cold-Start Candidate Filter Early Spot Check
 
 Date: 2026-07-18
-Paperclip source: FFM-1883
+Historical issue: FFM-1883
 Decision: continue measuring; sample too small for rollout or rollback
 
 ## Result

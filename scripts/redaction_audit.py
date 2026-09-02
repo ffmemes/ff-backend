@@ -5,8 +5,7 @@ Scans tracked files for secret values and live trigger material that must
 never land in this public repo. Allowed: env var names, redacted issue
 slugs, public dashboard hostnames. Forbidden: API keys, full DB URLs with
 real passwords, Telegram bot tokens, raw bearer auth headers, Telethon
-session strings, Paperclip routine trigger public paths/IDs, and private
-keys.
+session strings, and private keys.
 
 Exit code 0 == clean. Exit code 1 == at least one finding (or error).
 
@@ -76,9 +75,9 @@ class Pattern:
 
 PATTERNS: tuple[Pattern, ...] = (
     Pattern(
-        name="paperclip_trigger_public_path",
+        name="legacy_public_trigger_path",
         regex=re.compile(r"routine-triggers/public/[A-Za-z0-9_-]{8,}"),
-        description="Paperclip routine trigger public path (the publicId acts as a shared secret).",
+        description="Legacy routine trigger URL whose public id acts as a shared secret.",
     ),
     Pattern(
         name="bearer_literal",
@@ -135,17 +134,6 @@ PATTERNS: tuple[Pattern, ...] = (
         regex=re.compile(r"-----BEGIN (?:RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----"),
         description="Inlined private key.",
     ),
-    Pattern(
-        name="paperclip_secret_uuid",
-        regex=re.compile(
-            r"""(?ix)
-            paperclip[_-]?secret(?:[_-]id)?
-            \s*[:=]\s*
-            ['"]?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
-            """,
-        ),
-        description="Paperclip secret UUID assignment. Reference by env var name only.",
-    ),
 )
 
 # Files where the patterns themselves must appear: the audit code, the
@@ -155,11 +143,6 @@ ALLOWLIST_PATHS: frozenset[str] = frozenset(
         "scripts/redaction_audit.py",
         "scripts/pre-commit-secrets-check.sh",
         "tests/test_redaction_audit.py",
-        # Audit-fixture tests that intentionally embed `Bearer <literal>` to
-        # prove the redaction code path strips it; these are the fakes
-        # referenced in `docs/public-repo-rule.md`.
-        "tests/test_paperclip_http.py",
-        "tests/test_paperclip_execution_audit.py",
         "docs/public-repo-rule.md",
     }
 )
@@ -195,7 +178,6 @@ SKIP_SUFFIXES: frozenset[str] = frozenset(
 SKIP_DIR_PREFIXES: tuple[str, ...] = (
     ".ralphex/",
     ".worktrees/",
-    "agents/images/",
 )
 
 

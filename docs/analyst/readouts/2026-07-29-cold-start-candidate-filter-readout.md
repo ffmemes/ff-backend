@@ -1,7 +1,7 @@
 # Cold-Start Candidate Filter Post-Gate Readout
 
 Date: 2026-07-29
-Paperclip source: FFM-1939
+Historical issue: FFM-1939
 Decision: complete as a directional success; retain the guarded behavior
 
 ## Result
