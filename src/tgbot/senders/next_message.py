@@ -5,6 +5,10 @@ from telegram import Bot, InlineKeyboardMarkup, Message, Update
 from telegram.error import BadRequest, Forbidden, NetworkError, TimedOut
 
 from src.recommendations import meme_queue
+from src.recommendations.channel_hits import (
+    RECOMMENDED_BY as CHANNEL_HIT_RECOMMENDED_BY,
+)
+from src.recommendations.channel_hits import channel_hit_is_sendable, maybe_get_channel_hit
 from src.recommendations.service import (
     create_user_meme_reaction,
     user_meme_reaction_exists,
@@ -85,7 +89,9 @@ async def next_message(
     no_memes_left = False
 
     while attempt < max_attempts:
-        meme = await get_next_meme_for_user(user_id)
+        meme = await maybe_get_channel_hit(user_id)
+        if meme is None:
+            meme = await get_next_meme_for_user(user_id)
         if not meme:
             no_memes_left = True
             break
@@ -96,6 +102,13 @@ async def next_message(
             user_info=user_info,
         )
         meme.caption = prepared.caption
+
+        if meme.recommended_by == CHANNEL_HIT_RECOMMENDED_BY and not await channel_hit_is_sendable(
+            user_id, meme.id
+        ):
+            # A membership event or moderation change may arrive during preparation.
+            attempt += 1
+            continue
 
         try:
             if should_replace_previous and previous_message is not None:

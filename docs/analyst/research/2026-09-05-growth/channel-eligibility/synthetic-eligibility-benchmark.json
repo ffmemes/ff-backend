@@ -1,0 +1,172 @@
+{
+  "as_of_utc": "2026-09-05T17:45:11.132740+00:00",
+  "postgres": "PostgreSQL 16.14 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+  "machine": "arm64",
+  "database_bytes": 128934415,
+  "counts": {
+    "memes": 250000,
+    "canonical_memes": 225000,
+    "duplicate_aliases": 25000,
+    "reaction_rows": 402000,
+    "crossposts": 10100,
+    "pool_candidates": 400
+  },
+  "query_sha256": "79c00d9af1e73999b47364db1df36336daff3078abf64fcfc96123cf60a7c3fb",
+  "runs": {
+    "indexed_pool400": {
+      "samples": [
+        {
+          "planning_ms": 2.426,
+          "execution_ms": 4125.713
+        },
+        {
+          "planning_ms": 1.76,
+          "execution_ms": 3790.219
+        },
+        {
+          "planning_ms": 1.825,
+          "execution_ms": 3851.518
+        },
+        {
+          "planning_ms": 2.472,
+          "execution_ms": 4427.785
+        },
+        {
+          "planning_ms": 2.241,
+          "execution_ms": 4129.962
+        }
+      ],
+      "warm_median_ms": 3990.7400000000002,
+      "returned_rows": 1,
+      "meme_nodes": [
+        {
+          "Node Type": "Recursive Union",
+          "Actual Rows": 490,
+          "Actual Loops": 1,
+          "Actual Total Time": 0.717
+        },
+        {
+          "Node Type": "Index Scan",
+          "Relation Name": "meme",
+          "Alias": "m_1",
+          "Index Name": "ix_meme_duplicate_of",
+          "Actual Rows": 0,
+          "Actual Loops": 490,
+          "Actual Total Time": 0.001
+        },
+        {
+          "Node Type": "Index Scan",
+          "Relation Name": "meme",
+          "Alias": "m",
+          "Index Name": "meme_pkey",
+          "Actual Rows": 1,
+          "Actual Loops": 400,
+          "Actual Total Time": 0.001
+        }
+      ]
+    },
+    "noindex_pool400": {
+      "samples": [
+        {
+          "planning_ms": 1.983,
+          "execution_ms": 4702.701
+        },
+        {
+          "planning_ms": 1.796,
+          "execution_ms": 3963.921
+        },
+        {
+          "planning_ms": 1.834,
+          "execution_ms": 3961.797
+        },
+        {
+          "planning_ms": 1.911,
+          "execution_ms": 3977.277
+        },
+        {
+          "planning_ms": 1.934,
+          "execution_ms": 3969.252
+        }
+      ],
+      "warm_median_ms": 3966.5865,
+      "returned_rows": 1,
+      "meme_nodes": [
+        {
+          "Node Type": "Recursive Union",
+          "Actual Rows": 490,
+          "Actual Loops": 1,
+          "Actual Total Time": 238.688
+        },
+        {
+          "Node Type": "Seq Scan",
+          "Relation Name": "meme",
+          "Alias": "m_1",
+          "Actual Rows": 250000,
+          "Actual Loops": 3,
+          "Actual Total Time": 57.406
+        },
+        {
+          "Node Type": "Index Scan",
+          "Relation Name": "meme",
+          "Alias": "m",
+          "Index Name": "meme_pkey",
+          "Actual Rows": 1,
+          "Actual Loops": 400,
+          "Actual Total Time": 0.001
+        }
+      ]
+    },
+    "indexed_single_revalidation": {
+      "samples": [
+        {
+          "planning_ms": 2.068,
+          "execution_ms": 58.788
+        },
+        {
+          "planning_ms": 1.759,
+          "execution_ms": 56.804
+        },
+        {
+          "planning_ms": 1.853,
+          "execution_ms": 54.386
+        },
+        {
+          "planning_ms": 1.773,
+          "execution_ms": 54.821
+        },
+        {
+          "planning_ms": 1.789,
+          "execution_ms": 54.559
+        }
+      ],
+      "warm_median_ms": 54.69,
+      "returned_rows": 1,
+      "meme_nodes": [
+        {
+          "Node Type": "Recursive Union",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 0.025
+        },
+        {
+          "Node Type": "Index Scan",
+          "Relation Name": "meme",
+          "Alias": "m_1",
+          "Index Name": "ix_meme_duplicate_of",
+          "Actual Rows": 0,
+          "Actual Loops": 1,
+          "Actual Total Time": 0.011
+        },
+        {
+          "Node Type": "Index Scan",
+          "Relation Name": "meme",
+          "Alias": "m",
+          "Index Name": "meme_pkey",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 0.025
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,800 @@
+{
+  "as_of_utc": "2026-09-05T17:50:23.074392",
+  "postgres": "PostgreSQL 16.14 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+  "database_bytes": 128934415,
+  "synthetic_counts": {
+    "memes": 250000,
+    "aliases": 25000,
+    "reactions": 402000,
+    "crossposts": 10100,
+    "pool": 400
+  },
+  "query_hashes": {
+    "original": "79c00d9af1e73999b47364db1df36336daff3078abf64fcfc96123cf60a7c3fb",
+    "optimized": "7a867021b125e6b7b36a75f04e10037da7e8a2e070ab3bb52fd68ca2d851f96c"
+  },
+  "runs": {
+    "original_pool400": {
+      "execution_ms": [
+        4476.137,
+        4322.489,
+        4069.226,
+        3904.887
+      ],
+      "warm_median_ms": 4069.226,
+      "planning_ms": 1.964,
+      "nodes": [
+        {
+          "Node Type": "Limit",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 3900.246
+        },
+        {
+          "Node Type": "Sort",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 3858.844
+        },
+        {
+          "Node Type": "Subquery Scan",
+          "Actual Rows": 396,
+          "Actual Loops": 1,
+          "Actual Total Time": 3858.705
+        },
+        {
+          "Node Type": "Aggregate",
+          "Actual Rows": 396,
+          "Actual Loops": 1,
+          "Actual Total Time": 3858.643
+        },
+        {
+          "Node Type": "Incremental Sort",
+          "Actual Rows": 396,
+          "Actual Loops": 1,
+          "Actual Total Time": 3857.653
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 396,
+          "Actual Loops": 1,
+          "Actual Total Time": 3856.68,
+          "Rows Removed by Join Filter": 0
+        },
+        {
+          "Node Type": "Hash Join",
+          "Actual Rows": 0,
+          "Actual Loops": 396,
+          "Actual Total Time": 9.689,
+          "Rows Removed by Filter": 10100
+        },
+        {
+          "Node Type": "Seq Scan",
+          "Relation Name": "crossposting",
+          "Actual Rows": 10100,
+          "Actual Loops": 396,
+          "Actual Total Time": 1.653,
+          "Rows Removed by Filter": 0
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 396,
+          "Actual Loops": 1,
+          "Actual Total Time": 18.556
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 396,
+          "Actual Loops": 1,
+          "Actual Total Time": 16.703
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 396,
+          "Actual Loops": 1,
+          "Actual Total Time": 13.584
+        },
+        {
+          "Node Type": "Merge Join",
+          "Actual Rows": 396,
+          "Actual Loops": 1,
+          "Actual Total Time": 9.927
+        },
+        {
+          "Node Type": "Sort",
+          "Actual Rows": 400,
+          "Actual Loops": 1,
+          "Actual Total Time": 7.472
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 400,
+          "Actual Loops": 1,
+          "Actual Total Time": 6.957,
+          "Rows Removed by Join Filter": 0
+        },
+        {
+          "Node Type": "Hash Join",
+          "Actual Rows": 400,
+          "Actual Loops": 1,
+          "Actual Total Time": 6.436
+        },
+        {
+          "Node Type": "Aggregate",
+          "Actual Rows": 10100,
+          "Actual Loops": 1,
+          "Actual Total Time": 4.525
+        },
+        {
+          "Node Type": "Index Only Scan",
+          "Relation Name": "user_language",
+          "Index Name": "user_language_pkey",
+          "Actual Rows": 1,
+          "Actual Loops": 396,
+          "Actual Total Time": 0.006
+        },
+        {
+          "Node Type": "Index Scan",
+          "Relation Name": "meme_stats",
+          "Index Name": "meme_stats_pkey",
+          "Actual Rows": 1,
+          "Actual Loops": 396,
+          "Actual Total Time": 0.006
+        },
+        {
+          "Node Type": "Sort",
+          "Actual Rows": 4,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.608
+        },
+        {
+          "Node Type": "Seq Scan",
+          "Relation Name": "crossposting",
+          "Actual Rows": 10100,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.597,
+          "Rows Removed by Filter": 0
+        },
+        {
+          "Node Type": "Hash Join",
+          "Actual Rows": 4,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.592
+        },
+        {
+          "Node Type": "Index Scan",
+          "Relation Name": "user_meme_source_stats",
+          "Index Name": "user_meme_source_stats_pkey",
+          "Actual Rows": 1,
+          "Actual Loops": 396,
+          "Actual Total Time": 0.003
+        },
+        {
+          "Node Type": "Hash",
+          "Actual Rows": 400,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.06
+        },
+        {
+          "Node Type": "CTE Scan",
+          "Actual Rows": 400,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.007
+        },
+        {
+          "Node Type": "Function Scan",
+          "Subplan Name": "CTE candidates",
+          "Actual Rows": 400,
+          "Actual Loops": 1,
+          "Actual Total Time": 0.951
+        }
+      ],
+      "jit": {
+        "Functions": 105,
+        "Options": {
+          "Inlining": false,
+          "Optimization": false,
+          "Expressions": true,
+          "Deforming": true
+        },
+        "Timing": {
+          "Generation": 3.83,
+          "Inlining": 0.0,
+          "Optimization": 1.251,
+          "Emission": 40.316,
+          "Total": 45.397
+        }
+      }
+    },
+    "original_pool1": {
+      "execution_ms": [
+        66.336,
+        61.49,
+        55.44,
+        56.181
+      ],
+      "warm_median_ms": 56.181,
+      "planning_ms": 1.872,
+      "nodes": [
+        {
+          "Node Type": "Limit",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 52.919
+        },
+        {
+          "Node Type": "Sort",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 15.154
+        },
+        {
+          "Node Type": "Subquery Scan",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 15.143
+        },
+        {
+          "Node Type": "Aggregate",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 15.14
+        },
+        {
+          "Node Type": "Incremental Sort",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 15.118
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 15.109,
+          "Rows Removed by Join Filter": 0
+        },
+        {
+          "Node Type": "Hash Join",
+          "Actual Rows": 0,
+          "Actual Loops": 1,
+          "Actual Total Time": 9.452,
+          "Rows Removed by Filter": 10100
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 5.625
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 5.612
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 5.596
+        },
+        {
+          "Node Type": "Merge Join",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 5.579
+        },
+        {
+          "Node Type": "Sort",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 4.979
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 4.974,
+          "Rows Removed by Join Filter": 0
+        },
+        {
+          "Node Type": "Hash Join",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 4.949
+        },
+        {
+          "Node Type": "Aggregate",
+          "Actual Rows": 10100,
+          "Actual Loops": 1,
+          "Actual Total Time": 4.24
+        },
+        {
+          "Node Type": "Seq Scan",
+          "Relation Name": "crossposting",
+          "Actual Rows": 10100,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.671,
+          "Rows Removed by Filter": 0
+        },
+        {
+          "Node Type": "Seq Scan",
+          "Relation Name": "crossposting",
+          "Actual Rows": 10100,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.533,
+          "Rows Removed by Filter": 0
+        },
+        {
+          "Node Type": "Sort",
+          "Actual Rows": 0,
+          "Actual Loops": 1,
+          "Actual Total Time": 0.581
+        },
+        {
+          "Node Type": "Hash Join",
+          "Actual Rows": 0,
+          "Actual Loops": 1,
+          "Actual Total Time": 0.561
+        },
+        {
+          "Node Type": "Hash",
+          "Actual Rows": 2000,
+          "Actual Loops": 1,
+          "Actual Total Time": 0.513
+        },
+        {
+          "Node Type": "Bitmap Heap Scan",
+          "Relation Name": "user_meme_reaction",
+          "Actual Rows": 2000,
+          "Actual Loops": 1,
+          "Actual Total Time": 0.238
+        },
+        {
+          "Node Type": "Bitmap Index Scan",
+          "Index Name": "user_meme_reaction_pkey",
+          "Actual Rows": 2000,
+          "Actual Loops": 1,
+          "Actual Total Time": 0.056
+        },
+        {
+          "Node Type": "Hash",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 0.038
+        },
+        {
+          "Node Type": "Recursive Union",
+          "Subplan Name": "CTE family",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 0.034
+        },
+        {
+          "Node Type": "CTE Scan",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 0.034
+        }
+      ],
+      "jit": {
+        "Functions": 105,
+        "Options": {
+          "Inlining": false,
+          "Optimization": false,
+          "Expressions": true,
+          "Deforming": true
+        },
+        "Timing": {
+          "Generation": 2.874,
+          "Inlining": 0.0,
+          "Optimization": 0.824,
+          "Emission": 37.028,
+          "Total": 40.726
+        }
+      }
+    },
+    "optimized_pool400": {
+      "execution_ms": [
+        15.704,
+        17.945,
+        15.086,
+        14.87
+      ],
+      "warm_median_ms": 15.086,
+      "planning_ms": 2.433,
+      "nodes": [
+        {
+          "Node Type": "Limit",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 14.621
+        },
+        {
+          "Node Type": "Sort",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 14.613
+        },
+        {
+          "Node Type": "Subquery Scan",
+          "Actual Rows": 396,
+          "Actual Loops": 1,
+          "Actual Total Time": 14.496
+        },
+        {
+          "Node Type": "Aggregate",
+          "Actual Rows": 396,
+          "Actual Loops": 1,
+          "Actual Total Time": 14.4
+        },
+        {
+          "Node Type": "Incremental Sort",
+          "Actual Rows": 396,
+          "Actual Loops": 1,
+          "Actual Total Time": 13.92
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 396,
+          "Actual Loops": 1,
+          "Actual Total Time": 13.828,
+          "Rows Removed by Join Filter": 0
+        },
+        {
+          "Node Type": "Aggregate",
+          "Subplan Name": "CTE blocked_roots",
+          "Actual Rows": 0,
+          "Actual Loops": 1,
+          "Actual Total Time": 7.165
+        },
+        {
+          "Node Type": "Hash Join",
+          "Actual Rows": 0,
+          "Actual Loops": 1,
+          "Actual Total Time": 7.162
+        },
+        {
+          "Node Type": "Hash",
+          "Actual Rows": 0,
+          "Actual Loops": 1,
+          "Actual Total Time": 7.153
+        },
+        {
+          "Node Type": "Hash Join",
+          "Actual Rows": 0,
+          "Actual Loops": 1,
+          "Actual Total Time": 7.153,
+          "Rows Removed by Filter": 10100
+        },
+        {
+          "Node Type": "CTE Scan",
+          "Actual Rows": 0,
+          "Actual Loops": 396,
+          "Actual Total Time": 0.018
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 396,
+          "Actual Loops": 1,
+          "Actual Total Time": 6.58,
+          "Rows Removed by Join Filter": 1590
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 400,
+          "Actual Loops": 1,
+          "Actual Total Time": 5.127
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 400,
+          "Actual Loops": 1,
+          "Actual Total Time": 4.72
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 400,
+          "Actual Loops": 1,
+          "Actual Total Time": 4.283,
+          "Rows Removed by Join Filter": 200
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 400,
+          "Actual Loops": 1,
+          "Actual Total Time": 3.994
+        },
+        {
+          "Node Type": "Merge Join",
+          "Actual Rows": 400,
+          "Actual Loops": 1,
+          "Actual Total Time": 3.473
+        },
+        {
+          "Node Type": "Sort",
+          "Actual Rows": 400,
+          "Actual Loops": 1,
+          "Actual Total Time": 2.32
+        },
+        {
+          "Node Type": "CTE Scan",
+          "Actual Rows": 400,
+          "Actual Loops": 1,
+          "Actual Total Time": 2.247
+        },
+        {
+          "Node Type": "Aggregate",
+          "Subplan Name": "CTE root_publications",
+          "Actual Rows": 400,
+          "Actual Loops": 1,
+          "Actual Total Time": 2.193
+        },
+        {
+          "Node Type": "Hash Join",
+          "Actual Rows": 400,
+          "Actual Loops": 1,
+          "Actual Total Time": 2.073
+        },
+        {
+          "Node Type": "Seq Scan",
+          "Relation Name": "crossposting",
+          "Actual Rows": 10100,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.42,
+          "Rows Removed by Filter": 0
+        },
+        {
+          "Node Type": "Seq Scan",
+          "Relation Name": "crossposting",
+          "Actual Rows": 10100,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.269,
+          "Rows Removed by Filter": 0
+        },
+        {
+          "Node Type": "CTE Scan",
+          "Actual Rows": 4,
+          "Actual Loops": 400,
+          "Actual Total Time": 0.003
+        },
+        {
+          "Node Type": "Unique",
+          "Subplan Name": "CTE seen_roots",
+          "Actual Rows": 4,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.167
+        }
+      ],
+      "jit": null
+    },
+    "optimized_pool1": {
+      "execution_ms": [
+        10.888,
+        10.673,
+        10.28,
+        9.855
+      ],
+      "warm_median_ms": 10.28,
+      "planning_ms": 2.276,
+      "nodes": [
+        {
+          "Node Type": "Limit",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 9.598
+        },
+        {
+          "Node Type": "Sort",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 9.587
+        },
+        {
+          "Node Type": "Subquery Scan",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 9.582
+        },
+        {
+          "Node Type": "Aggregate",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 9.579
+        },
+        {
+          "Node Type": "Incremental Sort",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 9.564
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 9.555,
+          "Rows Removed by Join Filter": 0
+        },
+        {
+          "Node Type": "Aggregate",
+          "Subplan Name": "CTE blocked_roots",
+          "Actual Rows": 0,
+          "Actual Loops": 1,
+          "Actual Total Time": 7.204
+        },
+        {
+          "Node Type": "CTE Scan",
+          "Actual Rows": 0,
+          "Actual Loops": 1,
+          "Actual Total Time": 7.203
+        },
+        {
+          "Node Type": "Hash Join",
+          "Actual Rows": 0,
+          "Actual Loops": 1,
+          "Actual Total Time": 7.2
+        },
+        {
+          "Node Type": "Hash",
+          "Actual Rows": 0,
+          "Actual Loops": 1,
+          "Actual Total Time": 7.195
+        },
+        {
+          "Node Type": "Hash Join",
+          "Actual Rows": 0,
+          "Actual Loops": 1,
+          "Actual Total Time": 7.194,
+          "Rows Removed by Filter": 10100
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 2.348,
+          "Rows Removed by Join Filter": 0
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.906
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.897
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.889,
+          "Rows Removed by Join Filter": 0
+        },
+        {
+          "Node Type": "Nested Loop",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.885
+        },
+        {
+          "Node Type": "Merge Join",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.873
+        },
+        {
+          "Node Type": "Sort",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.85
+        },
+        {
+          "Node Type": "Aggregate",
+          "Subplan Name": "CTE root_publications",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.846
+        },
+        {
+          "Node Type": "CTE Scan",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.845
+        },
+        {
+          "Node Type": "Hash Join",
+          "Actual Rows": 1,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.844
+        },
+        {
+          "Node Type": "Seq Scan",
+          "Relation Name": "crossposting",
+          "Actual Rows": 10100,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.47,
+          "Rows Removed by Filter": 0
+        },
+        {
+          "Node Type": "Seq Scan",
+          "Relation Name": "crossposting",
+          "Actual Rows": 10100,
+          "Actual Loops": 1,
+          "Actual Total Time": 1.223,
+          "Rows Removed by Filter": 0
+        },
+        {
+          "Node Type": "Unique",
+          "Subplan Name": "CTE seen_roots",
+          "Actual Rows": 0,
+          "Actual Loops": 1,
+          "Actual Total Time": 0.443
+        },
+        {
+          "Node Type": "Sort",
+          "Actual Rows": 0,
+          "Actual Loops": 1,
+          "Actual Total Time": 0.443
+        }
+      ],
+      "jit": null
+    }
+  },
+  "equivalence_checks": [
+    {
+      "case": "baseline",
+      "matched_rows": 396
+    },
+    {
+      "case": "current_channel_member",
+      "matched_rows": 176
+    },
+    {
+      "case": "unknown_including_alias_publication",
+      "matched_rows": 176
+    },
+    {
+      "case": "missing_membership",
+      "matched_rows": 198
+    },
+    {
+      "case": "expired_membership",
+      "matched_rows": 198
+    },
+    {
+      "case": "historical_positive",
+      "matched_rows": 198
+    },
+    {
+      "case": "sticky_ever_member",
+      "matched_rows": 176
+    },
+    {
+      "case": "direct_alias_seen",
+      "matched_rows": 395
+    },
+    {
+      "case": "two_hop_alias_seen",
+      "matched_rows": 395
+    },
+    {
+      "case": "status_changed",
+      "matched_rows": 395
+    },
+    {
+      "case": "canonical_changed",
+      "matched_rows": 395
+    },
+    {
+      "case": "explicit_exclusions",
+      "matched_rows": 394
+    },
+    {
+      "case": "duplicate_pool_id",
+      "matched_rows": 396
+    }
+  ]
+}

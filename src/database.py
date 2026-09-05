@@ -5,6 +5,7 @@ from typing import Any, Awaitable, Callable, TypeVar
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     Column,
     CursorResult,
     Date,
@@ -374,7 +375,7 @@ meme = Table(
     Column("caption", String),
     Column("language_code", String, index=True),
     Column("ocr_result", JSONB),
-    Column("duplicate_of", ForeignKey("meme.id", ondelete="SET NULL")),
+    Column("duplicate_of", ForeignKey("meme.id", ondelete="SET NULL"), index=True),
     Column("published_at", DateTime, nullable=False),
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
     Column("updated_at", DateTime, onupdate=func.now()),
@@ -417,6 +418,32 @@ user_tg_chat_membership = Table(
         onupdate=func.now(),
         nullable=False,
     ),
+)
+
+
+user_channel_membership = Table(
+    "user_channel_membership",
+    metadata,
+    Column("user_id", BigInteger, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True),
+    Column("chat_id", BigInteger, primary_key=True),
+    Column("status", String(16), nullable=False, server_default="unknown"),
+    Column("observed_at", DateTime),
+    Column("source", String(16), nullable=False, server_default="queued"),
+    Column("last_event_update_id", BigInteger),
+    Column("last_event_received_at", DateTime),
+    Column("ever_member", Boolean, nullable=False, server_default=text("false")),
+    Column("last_member_at", DateTime),
+    Column("checked_at", DateTime),
+    Column("next_check_at", DateTime, nullable=False, server_default=func.now()),
+    Column("last_error", String(40)),
+    CheckConstraint(
+        "status IN ('unknown', 'member', 'nonmember')", name="user_channel_membership_status"
+    ),
+    CheckConstraint(
+        "source IN ('queued', 'event', 'snapshot', 'access_lost')",
+        name="user_channel_membership_source",
+    ),
+    Index("ix_user_channel_membership_next_check", "next_check_at", "user_id"),
 )
 
 

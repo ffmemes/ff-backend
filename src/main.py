@@ -13,6 +13,7 @@ from src.admin.router import router as admin_router
 from src.config import app_configs, settings
 from src.observability.sentry import before_send, before_send_log
 from src.tgbot import app as tgbot_app
+from src.tgbot.channel_workers import start_channel_workers, stop_channel_workers
 from src.tgbot.router import router as tgbot_router
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,7 @@ async def lifespan(_application: FastAPI) -> AsyncGenerator:
     # Startup
     tgbot_app.application = tgbot_app.setup_application(settings.ENVIRONMENT.is_deployed)
     await tgbot_app.application.initialize()
+    channel_workers = start_channel_workers(tgbot_app.application.bot)
 
     # flush all redis keys on startup for debug
     # await redis.redis_client.flushall()
@@ -30,7 +32,10 @@ async def lifespan(_application: FastAPI) -> AsyncGenerator:
     # if is_webhook:  # all gunicorn workers will call this and hit rate limit
     #     await bot.setup_webhook(bot.application)
 
-    yield
+    try:
+        yield
+    finally:
+        await stop_channel_workers(channel_workers)
 
     if settings.ENVIRONMENT.is_testing:
         return

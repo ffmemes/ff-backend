@@ -37,7 +37,7 @@ async def _canonical_original_id(conn: AsyncConnection, meme_id: int) -> int:
     while True:
         row = await _fetch_one(
             conn,
-            text("SELECT id, duplicate_of FROM meme WHERE id = :meme_id"),
+            text("SELECT id, duplicate_of FROM meme WHERE id = :meme_id FOR UPDATE"),
             {"meme_id": current_id},
         )
         if not row or row["duplicate_of"] is None:
@@ -45,7 +45,7 @@ async def _canonical_original_id(conn: AsyncConnection, meme_id: int) -> int:
 
         current_id = row["duplicate_of"]
         if current_id in seen:
-            return current_id
+            raise ValueError("Existing cycle in meme duplicate links")
         seen.add(current_id)
 
 
@@ -72,6 +72,7 @@ async def resolve_duplicate_if_current_status(
     *,
     reason: str,
     allowed_dupe_statuses: Collection[str],
+    prefer_canonical: bool = False,
 ) -> DuplicateResolution | None:
     """Resolve only if the dupe still has one of the expected current statuses."""
     return await _resolve_duplicate(
@@ -79,6 +80,7 @@ async def resolve_duplicate_if_current_status(
         original_id,
         reason=reason,
         allowed_dupe_statuses=allowed_dupe_statuses,
+        prefer_canonical=prefer_canonical,
     )
 
 
@@ -88,27 +90,67 @@ async def _resolve_duplicate(
     *,
     reason: str,
     allowed_dupe_statuses: Collection[str] | None,
+    prefer_canonical: bool = False,
 ) -> DuplicateResolution | None:
     """Mark a meme as duplicate and move all safe reaction history to the original."""
 
     async def _resolve(conn: AsyncConnection) -> DuplicateResolution | None:
+        # Dedup runs infrequently. One transaction lock also covers file-id and
+        # upload merges, preventing two workers from creating opposite links.
+        await conn.execute(text("SELECT pg_advisory_xact_lock(1179012429, 1)"))
+        current = await _fetch_one(
+            conn,
+            text("SELECT id, status FROM meme WHERE id = :meme_id FOR UPDATE"),
+            {"meme_id": dupe_id},
+        )
+        if allowed_dupe_statuses is not None and (
+            not current or current["status"] not in allowed_dupe_statuses
+        ):
+            return None
+
         canonical_original_id = await _canonical_original_id(conn, original_id)
+        if dupe_id == canonical_original_id:
+            # A stale candidate may already have been merged into this meme.
+            # Never turn an original into its own duplicate or move/delete its history.
+            if allowed_dupe_statuses is not None:
+                return None
+            return DuplicateResolution(dupe_id, canonical_original_id, reason, 0, 0, 0, 0)
+
+        resolved_dupe_id = dupe_id
+        if prefer_canonical:
+            original = await _fetch_one(
+                conn,
+                text("SELECT id, status FROM meme WHERE id = :meme_id FOR UPDATE"),
+                {"meme_id": canonical_original_id},
+            )
+            if not original or original["status"] not in {"ok", "published"}:
+                return None
+            # Two approved copies: preserve published identity, otherwise the
+            # oldest ID. Unreviewed uploads keep their existing directional policy.
+            if (current["status"] != "published", dupe_id) < (
+                original["status"] != "published",
+                canonical_original_id,
+            ):
+                resolved_dupe_id, canonical_original_id = canonical_original_id, dupe_id
+
         if not await _mark_duplicate(
             conn,
-            dupe_id,
+            resolved_dupe_id,
             canonical_original_id,
             allowed_dupe_statuses=allowed_dupe_statuses,
         ):
             return None
 
-        reactions_moved = await _move_user_reactions(conn, dupe_id, canonical_original_id)
-        chat_reactions_moved = await _move_chat_reactions(conn, dupe_id, canonical_original_id)
-        reactions_dropped = await _delete_user_reactions(conn, dupe_id)
-        chat_reactions_dropped = await _delete_chat_reactions(conn, dupe_id)
+        reactions_moved = await _move_user_reactions(conn, resolved_dupe_id, canonical_original_id)
+        chat_reactions_moved = await _move_chat_reactions(
+            conn, resolved_dupe_id, canonical_original_id
+        )
+        reactions_dropped = await _delete_user_reactions(conn, resolved_dupe_id)
+        chat_reactions_dropped = await _delete_chat_reactions(conn, resolved_dupe_id)
 
         await conn.execute(
             text("DELETE FROM meme_stats WHERE meme_id = :dupe_id"),
-            {"dupe_id": dupe_id},
+            {"dupe_id": resolved_dupe_id},
         )
         await conn.execute(
             text(
@@ -118,12 +160,12 @@ async def _resolve_duplicate(
                 WHERE duplicate_of = :dupe_id
             """
             ),
-            {"dupe_id": dupe_id, "original_id": canonical_original_id},
+            {"dupe_id": resolved_dupe_id, "original_id": canonical_original_id},
         )
         await _refresh_original_stats(conn, canonical_original_id)
 
         return DuplicateResolution(
-            dupe_id=dupe_id,
+            dupe_id=resolved_dupe_id,
             original_id=canonical_original_id,
             reason=reason,
             reactions_moved=reactions_moved,

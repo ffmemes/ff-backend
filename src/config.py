@@ -34,6 +34,9 @@ class Config(BaseSettings):
     TELEGRAM_BOT_WEBHOOK_SECRET: str | None = None
     TELEGRAM_INLINE_SHARE_ENABLED: bool = True
     TELEGRAM_INLINE_SHARE_CANARY_PERCENT: int = 0
+    # Enable after membership backfill and fixed channel-hit cohort enrollment.
+    CHANNEL_HITS_ENABLED: bool = False
+    CHANNEL_MEMBERSHIP_SYNC_ENABLED: bool = False
     MEME_STORAGE_TELEGRAM_CHAT_ID: str | None = None
     UPLOADED_MEMES_REVIEW_CHAT_ID: str | None = None
     ADMIN_LOGS_CHAT_ID: str | None = None
