@@ -8,10 +8,19 @@ promise.
 ## Delivered behavior
 
 The `channel_hits_v1` experiment replaces one ordinary meme within the first
-five sends of the first voluntary session of each UTC day. There is at most one
-attempt per day. Only pre-enrolled treatment users qualify; control uses the
-existing feed. Assignment has a common 14-day exposure window. The toggle is
+five sends of any voluntary session separated by more than 30 minutes of
+inactivity. There is at most one attempt per session and three attempts in a
+rolling 24-hour window; midnight does not reset the quota or split a session.
+Only pre-enrolled treatment users qualify; control uses the existing feed.
+Assignment has a common 14-day exposure window. The toggle is
 `CHANNEL_HITS_ENABLED` (default false); enrollment alone cannot activate it.
+
+The initial September 5 release permitted only the first session of a UTC day,
+with delivery label `channel_hit_v1`. The session cadence revision uses
+`channel_hit_session_v2` while preserving the same experiment, assignments,
+baseline and exposure window. Readout totals include both labels and report
+each cadence separately. Existing hit deliveries also count toward the quota.
+See [cadence evidence and revision](channel-hit-session-cadence.md).
 
 Channel labels use the snapshot nearest 24 hours, within 20–36 hours, for posts
 at least 36 hours old in the last 120 days. Images require at least 50 views;
@@ -80,7 +89,7 @@ existing application environment; no secret arguments or files are needed.
    all ordinary, unblocked core users with at least eight active clean-feed days,
    20 likes in the preceding 28 days, and at least 14 eligible hits. Allocate
    reproducibly 50/50, keeping all assigned users in the outcome denominator.
-5. Enable `CHANNEL_HITS_ENABLED`. Confirm actual `channel_hit_v1` deliveries,
+5. Enable `CHANNEL_HITS_ENABLED`. Confirm actual `channel_hit_session_v2` deliveries,
    subscription exclusions, normal-feed fallback and error/latency behavior.
 6. `python scripts/channel_hit_experiment.py readout` reports actual exposure,
    unique non-self meme-link starts, new attributed invitees, and invitees who

@@ -131,6 +131,25 @@ async def test_guest_window_is_complete_before_retention_and_acquisition_end_exc
     assert (await outcome(conn))["treatment"]["retained_invitees"] == 1
 
 
+async def test_cadence_versions_share_cohort_outcomes_but_keep_separate_delivery_counts(conn):
+    await react(conn, HOST_T, 990101, day=1, origin="channel_hit_v1")
+    await react(conn, HOST_T, 990102, day=1, origin="channel_hit_session_v2")
+    await react(conn, HOST_T, 990103, day=2, origin="channel_hit_session_v2")
+    await react(conn, HOST_C, 990101, day=1)
+    result = await outcome(conn)
+    treatment = result["treatment"]
+    assert treatment["assigned_users"] == 2
+    assert treatment["exposed_users"] == 1
+    assert treatment["hit_delivery_rows"] == 3
+    assert treatment["daily_hit_delivery_rows"] == 1
+    assert treatment["session_hit_delivery_rows"] == 2
+    assert treatment["hit_delivery_user_days"] == 2
+    assert treatment["normal_feed_delivery_rows"] == 3
+    assert result["control"]["hit_delivery_rows"] == 0
+    assert result["control"]["daily_hit_delivery_rows"] == 0
+    assert result["control"]["session_hit_delivery_rows"] == 0
+
+
 async def test_retention_excludes_push_game_and_synthetic_reactions(conn):
     await acquire(conn, 990010, HOST_T)
     await react(conn, 990010, 990101, day=7)

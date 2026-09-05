@@ -48,6 +48,7 @@ WITH seeds AS MATERIALIZED (
     SELECT s.*, u.blocked_bot_at,
            g.new_invitees, g.mature_invitees, g.retained_invitees,
            d.feed_delivery_rows, d.hit_delivery_rows, d.hit_delivery_days,
+           d.daily_hit_delivery_rows, d.session_hit_delivery_rows,
            h.normal_reactions, h.normal_likes, h.normal_active_days,
            h.normal_reactions_d7_13
     FROM seeds s JOIN "user" u ON u.id = s.user_id
@@ -60,9 +61,15 @@ WITH seeds AS MATERIALIZED (
     ) g
     CROSS JOIN LATERAL (
         SELECT count(*) AS feed_delivery_rows,
-               count(*) FILTER (WHERE recommended_by = 'channel_hit_v1') AS hit_delivery_rows,
+               count(*) FILTER (WHERE recommended_by IN (
+                   'channel_hit_v1', 'channel_hit_session_v2'
+               )) AS hit_delivery_rows,
+               count(*) FILTER (WHERE recommended_by = 'channel_hit_v1')
+                   AS daily_hit_delivery_rows,
+               count(*) FILTER (WHERE recommended_by = 'channel_hit_session_v2')
+                   AS session_hit_delivery_rows,
                count(DISTINCT r.sent_at::date) FILTER (
-                   WHERE recommended_by = 'channel_hit_v1'
+                   WHERE recommended_by IN ('channel_hit_v1', 'channel_hit_session_v2')
                ) AS hit_delivery_days
         FROM user_meme_reaction r
         WHERE r.user_id = s.user_id AND r.sent_at >= s.start_at
@@ -89,6 +96,8 @@ WITH seeds AS MATERIALIZED (
     SELECT variant, count(*) AS assigned_users,
            count(*) FILTER (WHERE hit_delivery_rows > 0) AS exposed_users,
            sum(hit_delivery_rows)::bigint AS hit_delivery_rows,
+           sum(daily_hit_delivery_rows)::bigint AS daily_hit_delivery_rows,
+           sum(session_hit_delivery_rows)::bigint AS session_hit_delivery_rows,
            sum(hit_delivery_days)::bigint AS hit_delivery_user_days,
            sum(feed_delivery_rows)::bigint AS normal_feed_delivery_rows,
            round(sum(hit_delivery_rows)::numeric / nullif(sum(feed_delivery_rows), 0), 4)

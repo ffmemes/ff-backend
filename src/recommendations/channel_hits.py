@@ -19,7 +19,11 @@ from src.tgbot.constants import TELEGRAM_CHANNEL_EN_CHAT_ID, TELEGRAM_CHANNEL_RU
 
 logger = logging.getLogger(__name__)
 EXPERIMENT_ID = "channel_hits_v1"
-RECOMMENDED_BY = "channel_hit_v1"
+RECOMMENDED_BY = "channel_hit_session_v2"
+HIT_RECOMMENDERS = ("channel_hit_v1", RECOMMENDED_BY)
+SESSION_GAP_SECONDS = 30 * 60
+ROLLING_QUOTA = 3
+ROLLING_WINDOW_SECONDS = 24 * 60 * 60
 POOL_KEY = "channel_hits:v1:pool"
 COHORT_KEY = "channel_hits:v1:treatment_users"
 CHANNEL_CHAT_IDS = {
@@ -218,31 +222,99 @@ async def eligible_channel_hits(
     )
 
 
-DAILY_OPPORTUNITY_SQL = """
-WITH sends AS (
-    SELECT sent_at, recommended_by,
-           lag(sent_at) OVER (ORDER BY sent_at) AS previous_sent_at
-    FROM user_meme_reaction
-    WHERE user_id = :user_id AND sent_at >= :day_start
-      AND coalesce(recommended_by, '') NOT LIKE 'broadcast%'
-      AND coalesce(recommended_by, '')
-          NOT IN ('share_link', 'last', 'uploaded_meme', 'friend_challenge')
-), activity AS (
-    SELECT count(*) AS sent, max(sent_at) AS last_sent,
-           count(*) FILTER (WHERE recommended_by = :recommended_by) AS hits,
-           count(*) FILTER (WHERE sent_at - previous_sent_at > interval '30 minutes') AS gaps
-    FROM sends
-)
-SELECT ea.variant
-FROM experiment_assignment ea JOIN "user" u ON u.id = ea.user_id CROSS JOIN activity a
+SESSION_OPPORTUNITY_SQL = """
+SELECT ea.variant,
+       coalesce((
+           SELECT jsonb_agg(jsonb_build_object(
+               'id', s.meme_id, 'sent_at', extract(epoch FROM s.sent_at),
+               'recommended_by', s.recommended_by) ORDER BY s.sent_at DESC)
+           FROM (
+               SELECT meme_id, sent_at, recommended_by FROM user_meme_reaction
+               WHERE user_id = :user_id
+                 AND sent_at >= CAST(:as_of AS timestamp) - interval '3 hours'
+                 AND sent_at <= CAST(:as_of AS timestamp)
+                 AND coalesce(recommended_by, '') NOT LIKE 'broadcast%'
+                 AND coalesce(recommended_by, '') NOT LIKE 'friend_challenge%'
+                 AND coalesce(recommended_by, '') NOT IN
+                     ('share_link', 'last', 'uploaded_meme', 'low_sent_pool')
+               ORDER BY sent_at DESC LIMIT 6
+           ) s
+       ), '[]'::jsonb) AS recent_sends,
+       coalesce((
+           SELECT jsonb_agg(jsonb_build_object(
+               'id', h.meme_id, 'sent_at', extract(epoch FROM h.sent_at)))
+           FROM (
+               SELECT meme_id, sent_at FROM user_meme_reaction
+               WHERE user_id = :user_id
+                 AND sent_at > CAST(:as_of AS timestamp) - interval '24 hours'
+                 AND sent_at <= CAST(:as_of AS timestamp)
+                 AND recommended_by = ANY(CAST(:hit_recommenders AS text[]))
+               ORDER BY sent_at DESC LIMIT 3
+           ) h
+       ), '[]'::jsonb) AS recent_hits
+FROM experiment_assignment ea JOIN "user" u ON u.id = ea.user_id
 WHERE ea.user_id = :user_id AND ea.experiment_id = :experiment_id
   AND u.type = 'user' AND u.blocked_bot_at IS NULL
-  AND CAST(ea.assignment_metadata->>'experiment_start_at' AS timestamptz) <= NOW()
-  AND CAST(ea.assignment_metadata->>'exposure_end_at' AS timestamptz) > NOW()
-  AND a.sent < 5 AND a.hits = 0 AND a.gaps = 0
-  AND (a.last_sent IS NULL
-       OR a.last_sent >= (NOW() AT TIME ZONE 'UTC') - interval '30 minutes')
+  AND CAST(ea.assignment_metadata->>'experiment_start_at' AS timestamptz)
+      <= CAST(:as_of AS timestamp) AT TIME ZONE 'UTC'
+  AND CAST(ea.assignment_metadata->>'exposure_end_at' AS timestamptz)
+      > CAST(:as_of AS timestamp) AT TIME ZONE 'UTC'
 """
+
+
+def _session_reservation_cutoff(recent_sends: list[dict], now: float) -> float | None:
+    """Find the first-five window from six sends, independent of calendar dates.
+
+    An attempt may precede the first persisted delivery. Including the preceding
+    30 minutes keeps its reservation valid after that delivery creates a session.
+    Five connected sends span at most 2.5 hours including the gap to now, so the
+    query's three-hour bound cannot hide an ineligible sixth-slot request.
+    """
+    previous = now
+    session = []
+    for row in recent_sends:
+        sent_at = float(row["sent_at"])
+        if previous - sent_at > SESSION_GAP_SECONDS:
+            break
+        session.append(row)
+        previous = sent_at
+    if len(session) >= 5 or any(row["recommended_by"] in HIT_RECOMMENDERS for row in session):
+        return None
+    return previous - SESSION_GAP_SECONDS
+
+
+RESERVE_SESSION_HIT_LUA = """
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
+local session_cutoff = tonumber(ARGV[3])
+local quota = tonumber(ARGV[4])
+local candidate = ARGV[5]
+local deliveries = cjson.decode(ARGV[6])
+redis.call('ZREMRANGEBYSCORE', key, '-inf', now - window)
+for _, delivery in ipairs(deliveries) do
+    local member = tostring(delivery.id)
+    local timestamp = tonumber(delivery.sent_at)
+    local reserved_at = redis.call('ZSCORE', key, member)
+    -- The same meme's reservation and delivery consume one quota unit.
+    if not reserved_at or timestamp > tonumber(reserved_at) then
+        redis.call('ZADD', key, timestamp, member)
+    end
+end
+redis.call('EXPIRE', key, window + 3600)
+if redis.call('ZCOUNT', key, session_cutoff, '+inf') > 0
+    or redis.call('ZCARD', key) >= quota
+    or redis.call('ZSCORE', key, candidate) then
+    return 0
+end
+redis.call('ZADD', key, now, candidate)
+redis.call('EXPIRE', key, window + 3600)
+return 1
+"""
+
+
+def _attempts_key(user_id: int) -> str:
+    return f"channel_hits:v2:attempts:{user_id}"
 
 
 async def maybe_get_channel_hit(
@@ -251,30 +323,52 @@ async def maybe_get_channel_hit(
     if not settings.CHANNEL_HITS_ENABLED:
         return None
     try:
-        now = datetime.now(timezone.utc)
-        key = f"channel_hits:v1:day:{now.date()}:{user_id}"
-        reserved, cohort = await redis.redis_client.mget([key, COHORT_KEY])
-        if reserved or not cohort or user_id not in json.loads(cohort):
+        cohort = await redis.redis_client.get(COHORT_KEY)
+        if not cohort or user_id not in json.loads(cohort):
             return None
+        now = datetime.now(timezone.utc)
         row = await fetch_one(
-            text(DAILY_OPPORTUNITY_SQL),
+            text(SESSION_OPPORTUNITY_SQL),
             {
                 "user_id": user_id,
-                "day_start": now.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None),
-                "recommended_by": RECOMMENDED_BY,
+                "as_of": now.replace(tzinfo=None),
+                "hit_recommenders": list(HIT_RECOMMENDERS),
                 "experiment_id": EXPERIMENT_ID,
             },
         )
         if not row or row["variant"] != "treatment":
             return None
-        candidates = await eligible_channel_hits(user_id, exclude_meme_ids=exclude_meme_ids)
+        cutoff = _session_reservation_cutoff(row["recent_sends"], now.timestamp())
+        if cutoff is None or len(row["recent_hits"]) >= ROLLING_QUOTA:
+            return None
+        attempts = await redis.redis_client.zrangebyscore(
+            _attempts_key(user_id),
+            f"({now.timestamp() - ROLLING_WINDOW_SECONDS}",
+            "+inf",
+            withscores=True,
+        )
+        if len(attempts) >= ROLLING_QUOTA or any(timestamp >= cutoff for _, timestamp in attempts):
+            return None
+        # An uncertain old attempt must not pin the next visit to the same meme.
+        excluded = list(set(exclude_meme_ids or []) | {int(member) for member, _ in attempts})
+        candidates = await eligible_channel_hits(user_id, exclude_meme_ids=excluded)
         if not candidates:
             return None
-        ttl = 86400 - (now.hour * 3600 + now.minute * 60 + now.second)
-        if not await redis.redis_client.set(key, "reserved", nx=True, ex=ttl):
+        selected = MemeData(**candidates[0])
+        if not await redis.redis_client.eval(
+            RESERVE_SESSION_HIT_LUA,
+            1,
+            _attempts_key(user_id),
+            now.timestamp(),
+            ROLLING_WINDOW_SECONDS,
+            cutoff,
+            ROLLING_QUOTA,
+            str(selected.id),
+            json.dumps(row["recent_hits"]),
+        ):
             return None
         # Reserve before Telegram; an ambiguous network result must not cause retries.
-        return MemeData(**candidates[0])
+        return selected
     except Exception:
         logger.warning("Channel-hit slot unavailable; using regular feed", exc_info=True)
         return None

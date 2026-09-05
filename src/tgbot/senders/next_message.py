@@ -6,9 +6,10 @@ from telegram.error import BadRequest, Forbidden, NetworkError, TimedOut
 
 from src.recommendations import meme_queue
 from src.recommendations.channel_hits import (
-    RECOMMENDED_BY as CHANNEL_HIT_RECOMMENDED_BY,
+    HIT_RECOMMENDERS,
+    channel_hit_is_sendable,
+    maybe_get_channel_hit,
 )
-from src.recommendations.channel_hits import channel_hit_is_sendable, maybe_get_channel_hit
 from src.recommendations.service import (
     create_user_meme_reaction,
     user_meme_reaction_exists,
@@ -103,7 +104,7 @@ async def next_message(
         )
         meme.caption = prepared.caption
 
-        if meme.recommended_by == CHANNEL_HIT_RECOMMENDED_BY and not await channel_hit_is_sendable(
+        if meme.recommended_by in HIT_RECOMMENDERS and not await channel_hit_is_sendable(
             user_id, meme.id
         ):
             # A membership event or moderation change may arrive during preparation.
