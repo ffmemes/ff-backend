@@ -17,6 +17,7 @@ from telegram.ext import (
 
 from src.config import settings
 from src.observability.sentry import telegram_update_scope
+from src.tgbot.channel_workers import start_channel_workers, stop_channel_workers
 from src.tgbot.commands_catalog import sync_bot_commands
 from src.tgbot.constants import (
     LANG_SETTINGS_END_CALLBACK_DATA,
@@ -51,6 +52,10 @@ from src.tgbot.handlers.admin.user_info import (
     delete_user_data,
     delete_user_data_confirmation_page,
     handle_show_user_info,
+)
+from src.tgbot.handlers.chat.channel_membership import (
+    handle_channel_membership_update,
+    handle_membership_bot_status_update,
 )
 from src.tgbot.handlers.chat.chat import handle_group_message
 from src.tgbot.handlers.chat.chat_member import handle_chat_member_update
@@ -442,6 +447,13 @@ def add_handlers(application: Application) -> None:
     application.add_handler(
         ChatMemberHandler(handle_chat_member_update, ChatMemberHandler.MY_CHAT_MEMBER)
     )
+    application.add_handler(
+        ChatMemberHandler(handle_channel_membership_update, ChatMemberHandler.CHAT_MEMBER)
+    )
+    application.add_handler(
+        ChatMemberHandler(handle_membership_bot_status_update, ChatMemberHandler.MY_CHAT_MEMBER),
+        group=-2,
+    )
 
     # inline search
     application.add_handlers(
@@ -539,12 +551,18 @@ async def setup_webhook(application: Application) -> None:
 
 async def _post_init(application: Application) -> None:
     await sync_bot_commands(application.bot)
+    application.bot_data["channel_workers"] = start_channel_workers(application.bot)
+
+
+async def _post_stop(application: Application) -> None:
+    await stop_channel_workers(application.bot_data.pop("channel_workers", []))
 
 
 def setup_application(is_webhook: bool = False) -> Application:
     application_builder = Application.builder().token(settings.TELEGRAM_BOT_TOKEN)
     application_builder.rate_limiter(AIORateLimiter(max_retries=10))
     application_builder.post_init(_post_init)
+    application_builder.post_stop(_post_stop)
 
     if is_webhook:
         application_builder.updater(None)

@@ -3,7 +3,6 @@ from typing import Any
 from sqlalchemy import select, text
 
 from src.database import fetch_all, fetch_one, meme, meme_stats
-from src.storage.constants import MemeStatus
 
 
 async def get_meme_by_id(
@@ -15,6 +14,13 @@ async def get_meme_by_id(
 
 async def get_shareable_meme_by_id(id: int) -> dict[str, Any] | None:
     query = """
+        WITH RECURSIVE resolved AS (
+            SELECT id, status, duplicate_of FROM meme WHERE id = :id
+            UNION
+            SELECT m.id, m.status, m.duplicate_of
+            FROM resolved r JOIN meme m ON m.id = r.duplicate_of
+            WHERE r.status = 'duplicate'
+        )
         SELECT
             M.id,
             M.type,
@@ -26,11 +32,12 @@ async def get_shareable_meme_by_id(id: int) -> dict[str, Any] | None:
         FROM meme M
         LEFT JOIN meme_stats MS
             ON MS.meme_id = M.id
-        WHERE M.id = :id
-            AND M.status = :status
+        WHERE M.id IN (SELECT id FROM resolved)
+            AND M.status IN ('ok', 'published')
+            AND M.duplicate_of IS NULL
             AND M.telegram_file_id IS NOT NULL
     """
-    return await fetch_one(text(query), {"id": id, "status": MemeStatus.OK.value})
+    return await fetch_one(text(query), {"id": id})
 
 
 async def get_last_reacted_meme_for_user(user_id: int) -> dict[str, Any] | None:
@@ -55,14 +62,14 @@ async def get_last_reacted_meme_for_user(user_id: int) -> dict[str, Any] | None:
             ON MS.meme_id = M.id
         WHERE R.user_id = :user_id
             AND R.reaction_id IS NOT NULL
-            AND M.status = :status
+            AND M.status IN ('ok', 'published')
             AND M.telegram_file_id IS NOT NULL
         ORDER BY R.reacted_at DESC NULLS LAST, R.sent_at DESC
         LIMIT 1
     """
     return await fetch_one(
         text(query),
-        {"user_id": user_id, "status": MemeStatus.OK.value},
+        {"user_id": user_id},
     )
 
 

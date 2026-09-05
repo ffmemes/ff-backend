@@ -31,6 +31,7 @@ async def find_duplicate_by_file_id(meme_id: int, telegram_file_id: str) -> int 
 
 
 async def find_duplicate_by_ocr_text(meme_id: int, image_text: Any) -> int | None:
+    """Find an approved OCR match, regardless of which copy was described first."""
     if not isinstance(image_text, str):
         return None
 
@@ -42,7 +43,7 @@ async def find_duplicate_by_ocr_text(meme_id: int, image_text: Any) -> int | Non
         SELECT
             M.id
         FROM meme M
-        WHERE M.id < :meme_id
+        WHERE M.id != :meme_id
             AND M.status IN ('ok', 'published')
             AND M.type = 'image'
             AND M.ocr_result IS NOT NULL

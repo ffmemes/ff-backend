@@ -54,7 +54,8 @@ async def deduplicate_described_meme(
         duplicate_of,
         reason="ocr_text",
         allowed_dupe_statuses={MemeStatus.OK.value},
+        prefer_canonical=True,
     )
     if resolution is None:
         return DeduplicationResult(meme_id)
-    return DeduplicationResult(meme_id, duplicate_of, "ocr_text", resolution)
+    return DeduplicationResult(resolution.dupe_id, resolution.original_id, "ocr_text", resolution)

@@ -109,7 +109,7 @@ async def describe_single_meme(meme_row: dict, log, *, deadline: float | None = 
     if dedup_result.duplicate_found:
         log.info(
             "Meme %s resolved as OCR duplicate of %s after describe: %s",
-            meme_id,
+            dedup_result.meme_id,
             dedup_result.duplicate_of,
             dedup_result.resolution,
         )

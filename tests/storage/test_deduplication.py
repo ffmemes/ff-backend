@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock
 
@@ -344,6 +345,7 @@ async def test_deduplicate_described_meme_skips_when_current_status_changed(monk
         10001,
         reason="ocr_text",
         allowed_dupe_statuses={MemeStatus.OK.value},
+        prefer_canonical=True,
     )
 
 
@@ -439,3 +441,178 @@ async def test_sweep_file_id_duplicates_resolves_ok_meme_to_published_original(d
     published_stats = await _row(meme_stats, meme_id=10002)
     assert published_stats["nlikes"] == 1
     assert published_stats["nmemes_sent"] == 1
+
+
+@pytest.mark.asyncio
+async def test_reverse_ocr_order_keeps_oldest_and_preserves_seen_history(dedup_setup):
+    ocr_text = "a sufficiently distinctive visible meme text for the reverse order test"
+    sent_at = datetime(2024, 6, 1, 12)
+    async with engine.begin() as conn:
+        await create_meme(conn, id=10001, meme_source_id=10001, telegram_file_id="old-file")
+        await create_meme(conn, id=10002, meme_source_id=10001, telegram_file_id="new-file")
+        await create_reaction(conn, user_id=10001, meme_id=10001, reaction_id=1)
+        await create_reaction(conn, user_id=10002, meme_id=10002, sent_at=sent_at)
+        await create_reaction(conn, user_id=10003, meme_id=10002, reaction_id=1)
+        await conn.execute(
+            insert(chat_meme_reaction).values(chat_id=1, meme_id=10002, user_id=10003, reaction=1)
+        )
+        await conn.execute(
+            meme.update().where(meme.c.id == 10002).values(ocr_result={"text": ocr_text})
+        )
+
+    first = await deduplicate_described_meme(10002, ocr_text, status="ok")
+    assert not first.duplicate_found
+
+    async with engine.begin() as conn:
+        await conn.execute(
+            meme.update().where(meme.c.id == 10001).values(ocr_result={"text": ocr_text})
+        )
+
+    second = await deduplicate_described_meme(10001, ocr_text, status="ok")
+
+    assert second.meme_id == 10002
+    assert second.duplicate_of == 10001
+    assert (await _row(meme, id=10001))["status"] == "ok"
+    assert (await _row(meme, id=10001))["duplicate_of"] is None
+    assert (await _row(meme, id=10002))["duplicate_of"] == 10001
+    seen = await _row(user_meme_reaction, user_id=10002, meme_id=10001)
+    assert seen["sent_at"] == sent_at
+    assert seen["reaction_id"] is None
+    assert (await _row(user_meme_reaction, user_id=10003, meme_id=10001))["reaction_id"] == 1
+    assert await _row(chat_meme_reaction, chat_id=1, user_id=10003, meme_id=10001)
+    assert (await _row(meme_stats, meme_id=10001))["nmemes_sent"] == 3
+
+
+@pytest.mark.asyncio
+async def test_ocr_dedup_prefers_newer_published_original(dedup_setup):
+    ocr_text = "the same visible meme text in a newer published original"
+    async with engine.begin() as conn:
+        await create_meme(conn, id=10001, meme_source_id=10001, ocr_result={"text": ocr_text})
+        await create_meme(
+            conn,
+            id=10002,
+            meme_source_id=10001,
+            status="published",
+            ocr_result={"text": ocr_text},
+        )
+
+    result = await deduplicate_described_meme(10001, ocr_text, status="ok")
+
+    assert result.duplicate_of == 10002
+    assert (await _row(meme, id=10001))["duplicate_of"] == 10002
+    assert (await _row(meme, id=10002))["status"] == "published"
+    assert (await _row(meme, id=10002))["duplicate_of"] is None
+
+
+@pytest.mark.asyncio
+async def test_pending_ocr_dedup_keeps_approved_match_over_older_pending_copy(dedup_setup):
+    ocr_text = "a newer approved copy must survive the older unapproved upload"
+    async with engine.begin() as conn:
+        pending = await create_meme(
+            conn,
+            id=10001,
+            meme_source_id=10001,
+            status="created",
+            telegram_file_id="pending-file",
+            ocr_result={"text": ocr_text},
+        )
+        await create_meme(
+            conn,
+            id=10002,
+            meme_source_id=10001,
+            telegram_file_id="approved-file",
+            ocr_result={"text": ocr_text},
+        )
+
+    result = await deduplicate_pending_meme(pending)
+
+    assert result.duplicate_of == 10002
+    assert (await _row(meme, id=10002))["status"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_concurrent_ocr_dedup_cannot_create_opposite_links(dedup_setup, monkeypatch):
+    ocr_text = "both descriptions complete concurrently with identical visible text"
+    async with engine.begin() as conn:
+        for meme_id in (10001, 10002):
+            await create_meme(conn, id=meme_id, meme_source_id=10001, ocr_result={"text": ocr_text})
+        await create_reaction(conn, user_id=10001, meme_id=10002, reaction_id=1)
+
+    both_selected = asyncio.Event()
+    selections = []
+
+    async def select_before_either_merge(meme_id, image_text):
+        candidate = await find_duplicate_by_ocr_text(meme_id, image_text)
+        selections.append(candidate)
+        if len(selections) == 2:
+            both_selected.set()
+        await both_selected.wait()
+        return candidate
+
+    monkeypatch.setattr(
+        "src.storage.deduplication.policies.find_duplicate_by_ocr_text",
+        select_before_either_merge,
+    )
+    results = await asyncio.wait_for(
+        asyncio.gather(
+            deduplicate_described_meme(10001, ocr_text, status="ok"),
+            deduplicate_described_meme(10002, ocr_text, status="ok"),
+        ),
+        timeout=10,
+    )
+
+    assert sum(result.duplicate_found for result in results) == 1
+    assert (await _row(meme, id=10001))["status"] == "ok"
+    assert (await _row(meme, id=10001))["duplicate_of"] is None
+    assert (await _row(meme, id=10002))["duplicate_of"] == 10001
+    assert (await _row(user_meme_reaction, user_id=10001, meme_id=10001))["reaction_id"] == 1
+
+
+@pytest.mark.asyncio
+async def test_stale_opposite_merge_preserves_original_and_history(dedup_setup):
+    async with engine.begin() as conn:
+        await create_meme(conn, id=10001, meme_source_id=10001)
+        await create_meme(conn, id=10002, meme_source_id=10001)
+        await create_reaction(conn, user_id=10001, meme_id=10002, reaction_id=1)
+
+    await resolve_duplicate(10002, 10001, reason="first")
+    await resolve_duplicate(10001, 10002, reason="stale_opposite")
+
+    assert (await _row(meme, id=10001))["status"] == "ok"
+    assert (await _row(meme, id=10001))["duplicate_of"] is None
+    assert (await _row(meme, id=10002))["duplicate_of"] == 10001
+    assert (await _row(user_meme_reaction, user_id=10001, meme_id=10001))["reaction_id"] == 1
+
+
+@pytest.mark.asyncio
+async def test_ocr_dedup_rechecks_candidate_status(dedup_setup, monkeypatch):
+    async with engine.begin() as conn:
+        await create_meme(conn, id=10001, meme_source_id=10001)
+        await create_meme(conn, id=10002, meme_source_id=10001, status="rejected")
+    monkeypatch.setattr(
+        "src.storage.deduplication.policies.find_duplicate_by_ocr_text",
+        AsyncMock(return_value=10002),
+    )
+
+    result = await deduplicate_described_meme(10001, "some distinctive text", status="ok")
+
+    assert not result.duplicate_found
+    assert (await _row(meme, id=10001))["status"] == "ok"
+    assert (await _row(meme, id=10002))["status"] == "rejected"
+
+
+@pytest.mark.asyncio
+async def test_existing_duplicate_cycle_aborts_without_losing_history(dedup_setup):
+    async with engine.begin() as conn:
+        for meme_id in (10001, 10002, 10003):
+            await create_meme(conn, id=meme_id, meme_source_id=10001)
+        await create_reaction(conn, user_id=10001, meme_id=10003, reaction_id=1)
+        await conn.execute(meme.update().where(meme.c.id == 10001).values(duplicate_of=10002))
+        await conn.execute(meme.update().where(meme.c.id == 10002).values(duplicate_of=10001))
+
+    with pytest.raises(ValueError, match="cycle"):
+        await resolve_duplicate(10003, 10001, reason="existing_cycle")
+
+    assert (await _row(meme, id=10003))["status"] == "ok"
+    assert (await _row(meme, id=10003))["duplicate_of"] is None
+    assert (await _row(user_meme_reaction, user_id=10001, meme_id=10003))["reaction_id"] == 1
