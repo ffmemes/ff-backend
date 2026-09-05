@@ -1,0 +1,420 @@
+{
+  "sends": {
+    "from": "2026-08-12T00:00:00Z",
+    "to_exclusive": "2026-09-05T00:00:00Z",
+    "basis": "ordinary_sends",
+    "extracted_at": "2026-09-05 19:22:17.722541+00:00",
+    "summary": [
+      {
+        "segment": "all",
+        "minutes": 15,
+        "active_user_days": 2706,
+        "sessions": "8179",
+        "days_with_2plus": 1605,
+        "days_with_3plus": 1108,
+        "mean_sessions_per_active_day": "3.0225424981522542",
+        "sessions_per_day_p50_p75_p90_p95": [
+          2,
+          4,
+          6,
+          9
+        ],
+        "cap2_opportunities": "4311",
+        "cap3_opportunities": "5419",
+        "cap4_opportunities": "6221",
+        "users": 402,
+        "users_with_multi_session_day": 234,
+        "median_user_mean_sessions_per_active_day": 1.4,
+        "reactions": "238889",
+        "reactions_per_session_p50_p75_p90": [
+          11,
+          34,
+          76
+        ],
+        "active_session_minutes_p50_p75_p90": [
+          2.382883533333333,
+          9.029252558333333,
+          19.80284363333333
+        ],
+        "sessions_with_3plus_reactions": 6255
+      },
+      {
+        "segment": "all",
+        "minutes": 30,
+        "active_user_days": 2705,
+        "sessions": "6841",
+        "days_with_2plus": 1501,
+        "days_with_3plus": 967,
+        "mean_sessions_per_active_day": "2.5290203327171904",
+        "sessions_per_day_p50_p75_p90_p95": [
+          2,
+          3,
+          5,
+          6
+        ],
+        "cap2_opportunities": "4206",
+        "cap3_opportunities": "5173",
+        "cap4_opportunities": "5798",
+        "users": 402,
+        "users_with_multi_session_day": 221,
+        "median_user_mean_sessions_per_active_day": 1.275,
+        "reactions": "238889",
+        "reactions_per_session_p50_p75_p90": [
+          13,
+          41,
+          93
+        ],
+        "active_session_minutes_p50_p75_p90": [
+          3.8057513666666667,
+          16.260555766666666,
+          35.872532316666664
+        ],
+        "sessions_with_3plus_reactions": 5376
+      },
+      {
+        "segment": "all",
+        "minutes": 60,
+        "active_user_days": 2703,
+        "sessions": "5491",
+        "days_with_2plus": 1330,
+        "days_with_3plus": 709,
+        "mean_sessions_per_active_day": "2.0314465408805031",
+        "sessions_per_day_p50_p75_p90_p95": [
+          1,
+          3,
+          4,
+          5
+        ],
+        "cap2_opportunities": "4033",
+        "cap3_opportunities": "4742",
+        "cap4_opportunities": "5091",
+        "users": 402,
+        "users_with_multi_session_day": 200,
+        "median_user_mean_sessions_per_active_day": 1,
+        "reactions": "238889",
+        "reactions_per_session_p50_p75_p90": [
+          17,
+          52,
+          115
+        ],
+        "active_session_minutes_p50_p75_p90": [
+          6.22597465,
+          33.659861633333335,
+          74.18283861666667
+        ],
+        "sessions_with_3plus_reactions": 4443
+      },
+      {
+        "segment": "pilot",
+        "minutes": 15,
+        "active_user_days": 1343,
+        "sessions": "4912",
+        "days_with_2plus": 959,
+        "days_with_3plus": 695,
+        "mean_sessions_per_active_day": "3.6574832464631422",
+        "sessions_per_day_p50_p75_p90_p95": [
+          3,
+          5,
+          8,
+          10
+        ],
+        "cap2_opportunities": "2302",
+        "cap3_opportunities": "2997",
+        "cap4_opportunities": "3514",
+        "users": 85,
+        "users_with_multi_session_day": 85,
+        "median_user_mean_sessions_per_active_day": 2.5714285714285716,
+        "reactions": "146421",
+        "reactions_per_session_p50_p75_p90": [
+          11,
+          35,
+          78
+        ],
+        "active_session_minutes_p50_p75_p90": [
+          2.4163823666666664,
+          9.526255341666666,
+          21.32794980666669
+        ],
+        "sessions_with_3plus_reactions": 3677
+      },
+      {
+        "segment": "pilot",
+        "minutes": 30,
+        "active_user_days": 1342,
+        "sessions": "4075",
+        "days_with_2plus": 904,
+        "days_with_3plus": 609,
+        "mean_sessions_per_active_day": "3.0365126676602086",
+        "sessions_per_day_p50_p75_p90_p95": [
+          2,
+          4,
+          6,
+          7
+        ],
+        "cap2_opportunities": "2246",
+        "cap3_opportunities": "2855",
+        "cap4_opportunities": "3267",
+        "users": 85,
+        "users_with_multi_session_day": 85,
+        "median_user_mean_sessions_per_active_day": 2.25,
+        "reactions": "146421",
+        "reactions_per_session_p50_p75_p90": [
+          13,
+          42,
+          96
+        ],
+        "active_session_minutes_p50_p75_p90": [
+          3.8689148166666665,
+          17.612419841666668,
+          36.86466538
+        ],
+        "sessions_with_3plus_reactions": 3127
+      },
+      {
+        "segment": "pilot",
+        "minutes": 60,
+        "active_user_days": 1341,
+        "sessions": "3179",
+        "days_with_2plus": 800,
+        "days_with_3plus": 450,
+        "mean_sessions_per_active_day": "2.3706189410887397",
+        "sessions_per_day_p50_p75_p90_p95": [
+          2,
+          3,
+          4,
+          5
+        ],
+        "cap2_opportunities": "2141",
+        "cap3_opportunities": "2591",
+        "cap4_opportunities": "2827",
+        "users": 85,
+        "users_with_multi_session_day": 84,
+        "median_user_mean_sessions_per_active_day": 1.8,
+        "reactions": "146421",
+        "reactions_per_session_p50_p75_p90": [
+          18,
+          55,
+          118.20000000000027
+        ],
+        "active_session_minutes_p50_p75_p90": [
+          7.38480025,
+          37.464029125,
+          80.77192748000002
+        ],
+        "sessions_with_3plus_reactions": 2519
+      }
+    ],
+    "gaps": [
+      {
+        "segment": "all",
+        "gap": "01: <5s",
+        "intervals": 87346
+      },
+      {
+        "segment": "all",
+        "gap": "02: 5-15s",
+        "intervals": 99883
+      },
+      {
+        "segment": "all",
+        "gap": "03: 15-60s",
+        "intervals": 36908
+      },
+      {
+        "segment": "all",
+        "gap": "04: 1-5m",
+        "intervals": 4718
+      },
+      {
+        "segment": "all",
+        "gap": "05: 5-15m",
+        "intervals": 1855
+      },
+      {
+        "segment": "all",
+        "gap": "06: 15-30m",
+        "intervals": 1338
+      },
+      {
+        "segment": "all",
+        "gap": "07: 30-60m",
+        "intervals": 1350
+      },
+      {
+        "segment": "all",
+        "gap": "08: 1-2h",
+        "intervals": 1221
+      },
+      {
+        "segment": "all",
+        "gap": "09: 2-4h",
+        "intervals": 809
+      },
+      {
+        "segment": "all",
+        "gap": "10: 4-8h",
+        "intervals": 617
+      },
+      {
+        "segment": "all",
+        "gap": "11: 8-12h",
+        "intervals": 555
+      },
+      {
+        "segment": "all",
+        "gap": "12: 12-24h",
+        "intervals": 823
+      },
+      {
+        "segment": "all",
+        "gap": "13: >=24h",
+        "intervals": 1172
+      },
+      {
+        "segment": "pilot",
+        "gap": "01: <5s",
+        "intervals": 53693
+      },
+      {
+        "segment": "pilot",
+        "gap": "02: 5-15s",
+        "intervals": 60140
+      },
+      {
+        "segment": "pilot",
+        "gap": "03: 15-60s",
+        "intervals": 23283
+      },
+      {
+        "segment": "pilot",
+        "gap": "04: 1-5m",
+        "intervals": 3068
+      },
+      {
+        "segment": "pilot",
+        "gap": "05: 5-15m",
+        "intervals": 1325
+      },
+      {
+        "segment": "pilot",
+        "gap": "06: 15-30m",
+        "intervals": 837
+      },
+      {
+        "segment": "pilot",
+        "gap": "07: 30-60m",
+        "intervals": 896
+      },
+      {
+        "segment": "pilot",
+        "gap": "08: 1-2h",
+        "intervals": 872
+      },
+      {
+        "segment": "pilot",
+        "gap": "09: 2-4h",
+        "intervals": 510
+      },
+      {
+        "segment": "pilot",
+        "gap": "10: 4-8h",
+        "intervals": 372
+      },
+      {
+        "segment": "pilot",
+        "gap": "11: 8-12h",
+        "intervals": 357
+      },
+      {
+        "segment": "pilot",
+        "gap": "12: 12-24h",
+        "intervals": 464
+      },
+      {
+        "segment": "pilot",
+        "gap": "13: >=24h",
+        "intervals": 572
+      }
+    ]
+  },
+  "replay": {
+    "users": 85,
+    "totals": {
+      "sessions": 4075,
+      "active_user_days": 1342,
+      "calendar_cap2": 2246,
+      "calendar_cap3": 2855,
+      "rolling24_cap2": 1929,
+      "rolling24_cap3": 2539
+    },
+    "first_session_delivery_quantiles": {
+      "min": 1,
+      "median": 17,
+      "p90": 108,
+      "max": 1173
+    },
+    "later_session_delivery_quantiles": {
+      "min": 1,
+      "median": 11,
+      "p90": 88,
+      "max": 1036
+    },
+    "within_day_return_pause_hours_quantiles": {
+      "min": 0.500003695,
+      "median": 1.2990672399999998,
+      "p90": 6.523106125555556,
+      "max": 22.22487409
+    },
+    "direct_deliveries": 0,
+    "per_user_24d_opportunity_quantiles": {
+      "rolling24_cap2": {
+        "min": 8,
+        "median": 21,
+        "p90": 34,
+        "max": 43
+      },
+      "rolling24_cap3": {
+        "min": 9,
+        "median": 26,
+        "p90": 50,
+        "max": 60
+      }
+    }
+  },
+  "reaction_sensitivity": {
+    "from": "2026-08-12",
+    "to_exclusive": "2026-09-05",
+    "pilot": [
+      {
+        "gap_minutes": 15,
+        "active_user_days": 1282,
+        "sessions": 4037,
+        "multi_session_days": 868
+      },
+      {
+        "gap_minutes": 30,
+        "active_user_days": 1282,
+        "sessions": 3371,
+        "multi_session_days": 822
+      },
+      {
+        "gap_minutes": 60,
+        "active_user_days": 1281,
+        "sessions": 2699,
+        "multi_session_days": 737
+      }
+    ]
+  },
+  "inventory": {
+    "as_of": "2026-09-05T19:23:00Z",
+    "pool": 308,
+    "treatment_users": 42,
+    "minimum": 37,
+    "median": 128.5,
+    "users_gte_28": 42,
+    "users_gte_42": 40,
+    "users_gte_56": 37,
+    "source": "production eligible_channel_hits limit 400; aggregate only; no reservations"
+  }
+}
+
