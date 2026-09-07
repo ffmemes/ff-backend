@@ -16,6 +16,10 @@ from src.recommendations.blender_experiments import (
 from src.recommendations.candidates import (
     CandidatesRetriever,
 )
+from src.recommendations.cold_start_experiments import (
+    fresh_max_age_days_for_variant,
+    get_or_assign_cold_start_fresh_variant,
+)
 from src.recommendations.pipeline import (
     RecommendationBatchPipeline,
     RecommendationBatchRequest,
@@ -31,12 +35,15 @@ COLD_START_RECOMMENDED_BY = frozenset(
         "cold_start_adapt",
         "cold_start_explore_guarded",
         "cold_start_adapt_guarded",
+        "cold_start_explore_fresh",
+        "cold_start_explore_fresh_guarded",
     }
 )
 COLD_START_GUARDED_RECOMMENDED_BY = frozenset(
     {
         "cold_start_explore_guarded",
         "cold_start_adapt_guarded",
+        "cold_start_explore_fresh_guarded",
     }
 )
 
@@ -255,6 +262,29 @@ async def check_queue(user_id: int) -> bool:
     return True
 
 
+async def _cold_start_fresh_max_age_days(
+    user_id: int,
+    *,
+    nmemes_sent: int,
+    nsessions: int,
+    cold_start_account_too_old: bool,
+) -> int | None:
+    if settings.COLD_START_FRESH_VIRAL_EXPERIMENT_ENABLED is not True:
+        return None
+    variant = await get_or_assign_cold_start_fresh_variant(
+        user_id,
+        nmemes_sent=nmemes_sent,
+        nsessions=nsessions,
+        cold_start_account_too_old=cold_start_account_too_old,
+    )
+    return fresh_max_age_days_for_variant(
+        variant,
+        nmemes_sent=nmemes_sent,
+        nsessions=nsessions,
+        cold_start_account_too_old=cold_start_account_too_old,
+    )
+
+
 async def generate_recommendations(
     user_id: int,
     limit: int,
@@ -324,6 +354,12 @@ async def generate_recommendations(
             cold_start_nsessions_gate_enabled=settings.COLD_START_NSESSIONS_GATE_ENABLED,
             cold_start_candidate_guardrails_enabled=(
                 settings.COLD_START_CANDIDATE_GUARDRAILS_ENABLED
+            ),
+            cold_start_fresh_max_age_days=await _cold_start_fresh_max_age_days(
+                user_id,
+                nmemes_sent=nmemes_sent,
+                nsessions=nsessions,
+                cold_start_account_too_old=cold_start_account_too_old,
             ),
             # FFM-1357: stop new exposure until this overlay has a CEO-owned
             # active experiment record. Existing assignment rows remain readable.
