@@ -83,19 +83,17 @@ async def test_new_reaction_calls_next_message(
 
 
 @pytest.mark.asyncio
-@patch(f"{HANDLER_MODULE}.onboarding_flow", new_callable=AsyncMock)
 @patch(f"{HANDLER_MODULE}.next_message", new_callable=AsyncMock)
 @patch(f"{HANDLER_MODULE}.reward_user_for_daily_activity", new_callable=AsyncMock)
 @patch(f"{HANDLER_MODULE}.update_user_last_active_at", new_callable=AsyncMock)
 @patch(f"{HANDLER_MODULE}.maybe_send_moderator_invite", new_callable=AsyncMock)
 @patch(f"{HANDLER_MODULE}.update_user_info_counters", new_callable=AsyncMock)
-async def test_onboard_reaction_context_calls_onboarding(
+async def test_onboard_reaction_context_continues_feed(
     mock_counters,
     mock_mod_invite,
     mock_active,
     mock_reward,
     mock_next,
-    mock_onboarding,
     setup,
 ):
     from src.tgbot.handlers.reaction import handle_reaction
@@ -107,8 +105,7 @@ async def test_onboard_reaction_context_calls_onboarding(
     context = _make_context()
     await handle_reaction(update, context)
 
-    mock_onboarding.assert_called_once()
-    mock_next.assert_not_called()
+    mock_next.assert_called_once()
 
 
 @pytest.mark.asyncio

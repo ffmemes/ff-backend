@@ -79,6 +79,7 @@ class RecommendationBatchRequest:
     random_seed: int | None = None
     cold_start_nsessions_gate_enabled: bool = False
     cold_start_candidate_guardrails_enabled: bool = False
+    cold_start_fresh_max_age_days: int | None = None
     text_light_blender_v1_enabled: bool = False
     source_diversity_enabled: bool = False
     shadow_scoring_enabled: bool = True
@@ -144,6 +145,7 @@ class RecommendationBatchDiagnostics:
     cold_start_nsessions_gate_enabled: bool = False
     cold_start_candidate_guardrails_enabled: bool = False
     cold_start_candidate_guardrails_applied: bool = False
+    cold_start_fresh_applied: bool = False
     diagnostics_sample_rate: float = 0.01
     maturity_stage: str | None = None
     duration_ms: int = 0
@@ -194,6 +196,7 @@ class RecommendationBatchDiagnostics:
             "cold_start_candidate_guardrails_applied": (
                 self.cold_start_candidate_guardrails_applied
             ),
+            "cold_start_fresh_applied": self.cold_start_fresh_applied,
             "queue_len_before": self.queue_len_before,
             "exclude_count": self.exclude_count,
             "selected_count": self.selected_count,
@@ -475,6 +478,18 @@ class RecommendationBatchPipeline:
             diagnostics,
             queued_or_selected_ahead=len(exclude_ids),
         )
+        if request.cold_start_fresh_max_age_days and engine == "cold_start_explore":
+            diagnostics.cold_start_fresh_applied = True
+            segments = [
+                (
+                    segment_limit,
+                    {
+                        **kwargs,
+                        "max_age_days": request.cold_start_fresh_max_age_days,
+                    },
+                )
+                for segment_limit, kwargs in segments
+            ]
 
         for segment_limit, kwargs in segments:
             if segment_limit <= 0:
@@ -514,6 +529,23 @@ class RecommendationBatchPipeline:
                         )
                     )
                 return selected
+
+        if (
+            engine == "cold_start_explore"
+            and request.cold_start_fresh_max_age_days
+            and len(selected) < limit
+        ):
+            fill_limit = limit - len(selected)
+            fill = await self._fetch_engine(
+                engine,
+                request.user_id,
+                fill_limit,
+                segment_exclude_ids,
+                diagnostics,
+            )
+            excluded = set(segment_exclude_ids)
+            fill = [candidate for candidate in fill if candidate.get("id") not in excluded]
+            selected.extend(fill[:fill_limit])
 
         return selected
 

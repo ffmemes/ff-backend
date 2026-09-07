@@ -12,7 +12,6 @@ from src.recommendations.service import (
     update_user_meme_reaction,
 )
 from src.tgbot.handlers.moderator.invite import maybe_send_moderator_invite
-from src.tgbot.handlers.onboarding import onboarding_flow
 from src.tgbot.senders.next_message import next_message
 from src.tgbot.sharing import MEME_REACTION_CONTEXT_ONBOARD
 from src.tgbot.user_info import update_user_info_counters
@@ -45,8 +44,15 @@ async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     )
 
     if reaction_is_new:
+        # Share-link first meme already taught the product. Skip welcome +
+        # countdown and continue the feed (H11).
         if reaction_context == MEME_REACTION_CONTEXT_ONBOARD:
-            return await onboarding_flow(update, context.bot)
+            return await next_message(
+                context.bot,
+                user_id,
+                prev_update=update,
+                prev_reaction_id=int(reaction_id),
+            )
 
         return await next_message(
             context.bot,

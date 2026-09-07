@@ -3,8 +3,10 @@
 **Purpose:** When an agent (or human) resumes after days/weeks, this file answers:
 what is live, what we expected, when to re-measure, and what “good / kill” means.
 
-**Last updated:** 2026-08-11 (UTC) — H8 bot→channel offline ML lab  
-**Prod DB clock at last interim:** `2026-08-10 ~17 UTC` (v4 early WATCH; H7 not yet deployed)
+**Last updated:** 2026-09-07 (UTC) — H9 scoreboard, H10/H11 onboarding ship  
+**Prod DB clock at last interim:** `2026-09-07 ~12:32 UTC`
+
+**Growth bar (all new Hs):** ship only if the funnel gets less leaky (first-tap / first-like / reached-5) **and/or** k-factor moves (unique non-self share clicks, new-user invites). Session length and block rate are guardrails. See [`docs/growth/virality-loop.md`](virality-loop.md).
 
 How to use on resume:
 
@@ -21,6 +23,8 @@ How to use on resume:
 
 | Date (UTC) | What to run | Hypotheses |
 |------------|-------------|------------|
+| **2026-09-08** | Dormant blast T+24h | **H3c** |
+| **2026-09-14** | Onboarding funnel + fresh CS split | **H9**, **H10**, **H11** |
 | **2026-08-12** | Smoke + mature v4 if n≥8 | H1, H2, H3b, H5, **H6** |
 | **2026-08-16** | Primary feed/reco day-7 | H1, H2, H3b, H5 |
 | **2026-08-17** | **Crosspost v4 mature keep/kill** | **H6** |
@@ -236,6 +240,18 @@ without a like-rate drop >3 pp on reacted rows.
 **Disable** (`BROADCAST_CHANNEL_VIRAL_PICK_ENABLED=false`) if viral share of
 broadcasts is <10% (always empty) or 1h reactivation is worse than HQ by >5 pp
 with ≥200 viral sends.
+
+### One-shot idle blast (2026-09-07)
+
+`scripts/broadcast_dormant.py` id `dormant-channel-viral-2026-09-07`.
+**Let it finish.** Next extra wave: 7–28d + holdout, not 90d+ never-reacted.
+Readout: `docs/analyst/readouts/2026-09-07-onboarding-and-dormant-blast.md`.
+
+### Cadence doctrine (founder 2026-09-07)
+
+Keep **15m / 24h / 48h / 1w / 2w / 4w** while the user is still fresh.
+After that, **one monthly** reminder for people who already reacted.
+Lever inside the cadence is meme quality (H3c), not fewer early nudges.
 
 ---
 
@@ -460,6 +476,88 @@ Also logs `shadow_rank`, `shadow_pick_meme_id`, `shadow_vs_prod_disagree`.
 - After H7 merge: re-export + optional taste feature
 - Do not schedule as feed experiment
 
+---
+
+## H9 — First-tap is the onboarding leak
+
+| Field | Value |
+|-------|--------|
+| **ID** | `onboarding_first_tap_v1` |
+| **Status** | **scoreboard** for H10/H11 |
+| **Readout** | `docs/analyst/readouts/2026-09-07-onboarding-and-dormant-blast.md` |
+| **SQL** | `docs/analyst/onboarding-funnel.sql` |
+
+### Hypothesis
+
+New-user growth is gated by **first meme → first tap**, not language picker
+and not share skipping welcome. 90d (2026-09-07): 402 got a meme, 252 reacted,
+**150** silent. Empty start 61% vs share 71%.
+
+### Growth bar
+
+First-tap % of got-meme; first-like %; reached-5. Secondary: non-self share
+clicks and invites from the same cohort. Guardrail: block-in-1h.
+
+### Next check
+
+**2026-09-14** re-run `onboarding-funnel.sql`.
+
+---
+
+## H10 — Fresh channel-quality memes as CS1 (A/B)
+
+| Field | Value |
+|-------|--------|
+| **ID** | `cold_start_fresh_viral_v1` |
+| **Status** | **shipping** |
+| **Kill switch** | `COLD_START_FRESH_VIRAL_EXPERIMENT_ENABLED` |
+| **Code** | `src/recommendations/cold_start_experiments.py`, `cold_start_explore(max_age_days=)` |
+| **Labels** | `cold_start_explore_fresh` / `_guarded` vs classic `cold_start_explore` |
+
+### Hypothesis
+
+Same CS floors, but only memes **created in the last 30 days**, newest first,
+lifts first-tap / first-like vs all-time `lr_smoothed` hits. Empty fresh pool
+fills from classic CS so we never starve the first session.
+
+50/50 `sha256(experiment_id:user_id)%2` on true-new CS1 (`nmemes_sent < 6`,
+`nsessions <= 1`). Observational 90d did **not** show an age→like gap (~22%
+both); this A/B is the actual test.
+
+### Decision rules (day-7, ≥80 new users/arm if we get them)
+
+**Keep treatment / ship default** if first-tap ≥ control +5 pp (or first-like
++3 pp), reached-5 not down, invites/1k not down.  
+**Disable flag** if first-tap down, block-in-1h up, or empty-queue for new users.
+
+### Next check
+
+**2026-09-14** — assignment counts + first-tap by variant.
+
+---
+
+## H11 — Drop empty-start 3-2-1 countdown
+
+| Field | Value |
+|-------|--------|
+| **ID** | `onboarding_skip_countdown_v1` |
+| **Status** | **shipping as default** |
+| **Code** | `src/tgbot/handlers/onboarding.py`, share tap in `reaction.py` |
+
+### Hypothesis
+
+Removing the ~9s 3-2-1 (p50 11.6s to first meme) and sending the first meme
+right after welcome raises first-tap. Share path already did this at 0.2s and
+converted better; after a share tap we now continue the feed (no second welcome).
+
+Not an A/B — UX debt. Score with H9. Rollback = restore the countdown block.
+
+### Next check
+
+**2026-09-14** empty-start p50 seconds to first meme should drop toward ~1s;
+first-tap of empty start vs 61% baseline.
+
+---
 
 ## Explicitly not open experiments
 
@@ -472,6 +570,9 @@ Also logs `shadow_rank`, `shadow_pick_meme_id`, `shadow_vs_prod_disagree`.
 | Crosspost rank by bot LR only | **Rejected** |
 | Crosspost taste-only ranker | **Rejected** (coverage); soft boost only after H7 |
 | Crosspost rank by bot LR | **Rejected** offline (H6) |
+| Kill 15m–4w reengagement cadence | **Rejected** 2026-09-07 (habit while fresh; monthly after) |
+| Rewrite new-user language as multi-select | **Already one-tap**; `/lang` is settings |
+| “Fix” share skipping welcome/picker | **Rejected** — 90d share converts better than empty start |
 
 ---
 
@@ -484,6 +585,7 @@ psql "$ANALYST_DATABASE_URL" -f docs/analyst/viral-shares-blender-v1.sql
 psql "$ANALYST_DATABASE_URL" -f docs/analyst/source-affinity-demote-guardrails.sql
 psql "$ANALYST_DATABASE_URL" -f docs/analyst/dwell-feed-vs-broadcast.sql
 psql "$ANALYST_DATABASE_URL" -f docs/analyst/broadcast-reengagement.sql
+psql "$ANALYST_DATABASE_URL" -f docs/analyst/onboarding-funnel.sql            # H9–H11
 psql "$ANALYST_DATABASE_URL" -f docs/analyst/crossposting-v4-like-volume.sql   # H6
 psql "$ANALYST_DATABASE_URL" -f docs/analyst/crossposting-taste-shadow.sql    # H7
 # 3) Update this file Status/Decision + write

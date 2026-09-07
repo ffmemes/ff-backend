@@ -36,6 +36,8 @@ COLD_START_EXPLORE_RECOMMENDED_BY = "cold_start_explore"
 COLD_START_ADAPT_RECOMMENDED_BY = "cold_start_adapt"
 COLD_START_EXPLORE_GUARDED_RECOMMENDED_BY = "cold_start_explore_guarded"
 COLD_START_ADAPT_GUARDED_RECOMMENDED_BY = "cold_start_adapt_guarded"
+COLD_START_EXPLORE_FRESH_RECOMMENDED_BY = "cold_start_explore_fresh"
+COLD_START_EXPLORE_FRESH_GUARDED_RECOMMENDED_BY = "cold_start_explore_fresh_guarded"
 
 _OCR_TEXT_SQL = "trim(coalesce(M.ocr_result->>'text', M.ocr_result->'raw_result'->>'ocr_text', ''))"
 TEXT_LIGHT_OCR_FILTER_SQL = f"""
@@ -64,9 +66,19 @@ def _build_params(
     return params
 
 
-def _cold_start_recommended_by(engine: str, candidate_guardrails_enabled: bool) -> str:
-    if engine == COLD_START_EXPLORE_RECOMMENDED_BY and candidate_guardrails_enabled:
-        return COLD_START_EXPLORE_GUARDED_RECOMMENDED_BY
+def _cold_start_recommended_by(
+    engine: str,
+    candidate_guardrails_enabled: bool,
+    *,
+    max_age_days: int | None = None,
+) -> str:
+    if engine == COLD_START_EXPLORE_RECOMMENDED_BY:
+        if max_age_days:
+            if candidate_guardrails_enabled:
+                return COLD_START_EXPLORE_FRESH_GUARDED_RECOMMENDED_BY
+            return COLD_START_EXPLORE_FRESH_RECOMMENDED_BY
+        if candidate_guardrails_enabled:
+            return COLD_START_EXPLORE_GUARDED_RECOMMENDED_BY
     if engine == COLD_START_ADAPT_RECOMMENDED_BY and candidate_guardrails_enabled:
         return COLD_START_ADAPT_GUARDED_RECOMMENDED_BY
     return engine
@@ -83,16 +95,23 @@ def _cold_start_params(
     *,
     engine: str,
     candidate_guardrails_enabled: bool,
+    max_age_days: int | None = None,
 ) -> dict[str, Any]:
     params = _build_params(
         user_id,
         limit,
         exclude_meme_ids,
-        recommended_by=_cold_start_recommended_by(engine, candidate_guardrails_enabled),
+        recommended_by=_cold_start_recommended_by(
+            engine,
+            candidate_guardrails_enabled,
+            max_age_days=max_age_days,
+        ),
         text_light_max_ocr_words=TEXT_LIGHT_MAX_OCR_WORDS,
     )
     if candidate_guardrails_enabled:
         params["cold_start_guardrail_source_urls"] = list(COLD_START_GUARDRAIL_SOURCE_URLS)
+    if max_age_days:
+        params["cold_start_max_age_days"] = max_age_days
     return params
 
 
@@ -490,6 +509,7 @@ async def cold_start_explore(
     limit: int = 5,
     exclude_meme_ids: list[int] = [],
     candidate_guardrails_enabled: bool = False,
+    max_age_days: int | None = None,
 ):
     """Phase 1 cold start: quality-first selection for new user first impression.
 
@@ -507,7 +527,25 @@ async def cold_start_explore(
     correction.
 
     Used for memes 1-5 (first impression).
+
+    ``max_age_days`` (H10 treatment) keeps the same quality floors but only
+    among memes created in that window, ranked newest first. Empty pool is
+    filled by the pipeline from unfiltered cold_start_explore.
     """
+
+    age_filter_sql = ""
+    if max_age_days:
+        age_filter_sql = "AND M.created_at >= NOW() - (:cold_start_max_age_days * INTERVAL '1 day')"
+    order_sql = (
+        """M.created_at DESC,
+                 MS.lr_smoothed DESC NULLS LAST,
+                 (MS.nlikes::float / NULLIF(MS.nlikes + MS.ndislikes, 0)) DESC,
+                 (MS.nlikes + MS.ndislikes) DESC"""
+        if max_age_days
+        else """MS.lr_smoothed DESC NULLS LAST,
+                 (MS.nlikes::float / NULLIF(MS.nlikes + MS.ndislikes, 0)) DESC,
+                 (MS.nlikes + MS.ndislikes) DESC"""
+    )
 
     query = f"""
         SELECT
@@ -535,14 +573,13 @@ async def cold_start_explore(
             AND MS.lr_smoothed >= :cold_start_explore_min_lr_smoothed
             AND (MS.nlikes::float / NULLIF(MS.nlikes + MS.ndislikes, 0))
                 >= :cold_start_explore_min_raw_like_rate
+            {age_filter_sql}
             {TEXT_LIGHT_OCR_FILTER_SQL}
             {_cold_start_guardrail_source_filter(candidate_guardrails_enabled)}
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
             {block_disliked_sources_sql_filter()}
 
-        ORDER BY MS.lr_smoothed DESC NULLS LAST,
-                 (MS.nlikes::float / NULLIF(MS.nlikes + MS.ndislikes, 0)) DESC,
-                 (MS.nlikes + MS.ndislikes) DESC
+        ORDER BY {order_sql}
         LIMIT :limit
     """
     params = _cold_start_params(
@@ -551,6 +588,7 @@ async def cold_start_explore(
         exclude_meme_ids,
         engine=COLD_START_EXPLORE_RECOMMENDED_BY,
         candidate_guardrails_enabled=candidate_guardrails_enabled,
+        max_age_days=max_age_days,
     )
     params.update(
         {

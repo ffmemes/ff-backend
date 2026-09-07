@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Changed
+
+- Онбординг: убран 3-2-1, первый мем сразу после welcome; шара после лайка/скипа идёт в ленту без второго welcome.
+- Холодный старт: A/B `cold_start_fresh_viral_v1` — половине новых юзеров в CS1 показываем качественные мемы младше 30 дней.
+
 ## [0.0.0.1] - 2026-07-17
 
 ### Added

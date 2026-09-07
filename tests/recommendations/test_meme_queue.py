@@ -27,6 +27,16 @@ def _patch_user_info(nsessions: int = 0, nmemes_sent: int = 0, **extra):
 
 
 @pytest.fixture(autouse=True)
+def disable_cold_start_fresh_experiment():
+    with patch(
+        "src.recommendations.meme_queue._cold_start_fresh_max_age_days",
+        new_callable=AsyncMock,
+        return_value=None,
+    ):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def mock_redis():
     """Mock Redis and user_info calls — these tests validate blending logic, not Redis."""
     user_info = defaultdict(int, {"nmemes_sent": 0})
