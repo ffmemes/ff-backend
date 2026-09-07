@@ -83,6 +83,9 @@ class Config(BaseSettings):
     # Retention broadcasts: pick high-confidence meme (affinity + LR) instead of
     # blind Redis queue pop. Kill switch rolls back to queue path.
     BROADCAST_HIGH_QUALITY_PICK_ENABLED: bool = True
+    # Prefer last-7-day channel posts ranked by forwards (community-verified).
+    # Falls back to HQ/queue. Skips channel-hit experiment users and members.
+    BROADCAST_CHANNEL_VIRAL_PICK_ENABLED: bool = True
     # RU crosspost ranker: multiply score by ln(nlikes+1) (meme volume, not LR).
     # Offline 2026-08-09: src×log1p(likes) top-20% lift ~1.14 on time-split.
     # Kill switch reverts @fastfoodmemes to score_version=2 behavior.

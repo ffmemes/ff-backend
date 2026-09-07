@@ -1,6 +1,7 @@
 -- Retention broadcast effectiveness readout
 --
 -- Labels (after HQ pick ship):
+--   broadcast_channel_viral    — last-7-day channel posts ranked by forwards
 --   broadcast_reengagement_hq  — affinity + proven-LR picker
 --   broadcast_reengagement     — feed-queue fallback (or pre-HQ era)
 --
@@ -49,6 +50,7 @@ ORDER BY sends DESC;
 WITH base AS (
   SELECT
     CASE
+      WHEN recommended_by = 'broadcast_channel_viral' THEN 'broadcast_channel_viral'
       WHEN recommended_by = 'broadcast_reengagement_hq' THEN 'broadcast_hq'
       WHEN recommended_by LIKE 'broadcast%' THEN 'broadcast_queue_or_legacy'
       ELSE 'feed'

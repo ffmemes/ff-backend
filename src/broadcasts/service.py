@@ -115,6 +115,31 @@ async def get_users_active_more_than_days_ago(
     return await fetch_all(text(select_query))
 
 
+async def get_users_inactive_since_days(days: int) -> list[int]:
+    """Users who have not been active for at least ``days`` days.
+
+    Excludes waitlist and anyone already marked blocked. Bound ``days`` so the
+    interval cannot come from a string-concatenated query.
+    """
+    if days < 1:
+        raise ValueError("days must be >= 1")
+    rows = await fetch_all(
+        text(
+            """
+            SELECT id AS user_id
+            FROM "user"
+            WHERE blocked_bot_at IS NULL
+              AND type NOT IN ('waitlist', 'blocked_bot')
+              AND last_active_at IS NOT NULL
+              AND last_active_at < NOW() - (:days * INTERVAL '1 day')
+            ORDER BY last_active_at DESC
+            """
+        ),
+        {"days": days},
+    )
+    return [row["user_id"] for row in rows]
+
+
 async def get_all_non_blocked_users() -> list[dict]:
     """Get all users with their bot content language (from user_language table).
 
@@ -244,5 +269,95 @@ async def send_broadcast(
         await asyncio.sleep(delay)
 
     result = {"sent": sent, "blocked": blocked, "failed": failed, "skipped": skipped}
+    print(f"\nDone! {result}")
+    return result
+
+
+async def send_meme_broadcast(
+    broadcast_id: str,
+    user_ids: list[int],
+    delay: float = 0.3,
+    dry_run: bool = False,
+) -> dict:
+    """Send one per-user picked meme with Redis dedup. Safe to re-run."""
+    from src.recommendations.broadcast_pick import pick_reengagement_meme
+    from src.tgbot.senders.meme import send_meme_to_user
+
+    redis_key = _broadcast_redis_key(broadcast_id)
+    already_sent = await redis_client.scard(redis_key)
+    print(f"Meme broadcast '{broadcast_id}': {len(user_ids)} users, {already_sent} already sent")
+
+    if dry_run:
+        print("--- DRY RUN ---")
+        return {
+            "sent": 0,
+            "blocked": 0,
+            "failed": 0,
+            "skipped": int(already_sent),
+            "no_meme": 0,
+            "audience": len(user_ids),
+        }
+
+    sent = 0
+    blocked = 0
+    failed = 0
+    skipped = 0
+    no_meme = 0
+
+    for user_id in user_ids:
+        if await redis_client.sismember(redis_key, str(user_id)):
+            skipped += 1
+            continue
+
+        try:
+            meme, label = await pick_reengagement_meme(user_id)
+            if meme is None:
+                no_meme += 1
+                continue
+            await send_meme_to_user(bot, user_id, meme, recommended_by=label)
+            sent += 1
+            await redis_client.sadd(redis_key, str(user_id))
+            if sent % 100 == 0:
+                print(
+                    f"  sent:{sent} blocked:{blocked} failed:{failed} "
+                    f"skipped:{skipped} no_meme:{no_meme}"
+                )
+        except (Forbidden, BadRequest) as e:
+            err_msg = str(e).lower()
+            if isinstance(e, Forbidden) or "not found" in err_msg:
+                blocked += 1
+                await redis_client.sadd(redis_key, str(user_id))
+                try:
+                    await mark_user_blocked(user_id, source="forbidden_broadcast")
+                except Exception as mark_exc:  # noqa: BLE001
+                    logger.warning(
+                        "mark_user_blocked failed for %d in broadcast %s: %s",
+                        user_id,
+                        broadcast_id,
+                        mark_exc,
+                    )
+            else:
+                failed += 1
+                if failed <= 10:
+                    logger.warning("Broadcast %s error for %d: %s", broadcast_id, user_id, e)
+        except RetryAfter as e:
+            sleep_for = e.retry_after + 1
+            print(f"  rate limited, sleeping {sleep_for}s...")
+            await asyncio.sleep(sleep_for)
+            failed += 1
+        except Exception as e:
+            failed += 1
+            if failed <= 10:
+                logger.warning("Broadcast %s error for %d: %s", broadcast_id, user_id, e)
+
+        await asyncio.sleep(delay)
+
+    result = {
+        "sent": sent,
+        "blocked": blocked,
+        "failed": failed,
+        "skipped": skipped,
+        "no_meme": no_meme,
+    }
     print(f"\nDone! {result}")
     return result
