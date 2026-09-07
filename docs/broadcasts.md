@@ -5,7 +5,7 @@ Guide for sending bulk messages to bot users. Written after the April 2026 wrapp
 ## Architecture
 
 - **Engine**: `src/broadcasts/service.py` — `send_broadcast()` function with Redis SET dedup
-- **Scripts**: `scripts/broadcast_wrapped.py` — example broadcast script
+- **Scripts**: `scripts/broadcast_wrapped.py` (text), `scripts/broadcast_dormant.py` (per-user meme)
 - **Bot**: uses `src/tgbot/bot.bot` (python-telegram-bot) to send messages
 - **Dedup**: Redis SET `broadcast:{id}:sent` tracks which user_ids were already sent to
 - **Rate**: configurable delay between sends (default 0.15s = ~7 msg/sec)
@@ -39,6 +39,18 @@ ssh "$PROD_SSH" "docker exec -e PYTHONPATH=/src <container> \
 ```
 
 Verify counts in dry run output. Then run without `--dry-run`.
+
+### Meme broadcast to idle users
+
+`scripts/broadcast_dormant.py` sends one meme per user (channel-viral last 7
+days, then HQ, then queue). Same Redis `broadcast_id` dedup. Default delay 0.3s.
+
+```bash
+python scripts/broadcast_dormant.py dormant-channel-viral-2026-09-07 --dry-run
+python scripts/broadcast_dormant.py dormant-channel-viral-2026-09-07 --min-days 7 --delay 0.3
+```
+
+Never reuse a `broadcast_id` for a different audience.
 
 ### 3. Monitor
 

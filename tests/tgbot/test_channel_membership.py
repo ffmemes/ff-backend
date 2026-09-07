@@ -36,6 +36,16 @@ async def membership_data():
         await conn.execute(insert(user_tg).values(id=SUBJECT, first_name="Test"))
     yield
     async with engine.begin() as conn:
+        await conn.execute(
+            delete(user_channel_membership).where(
+                user_channel_membership.c.user_id.in_([SUBJECT, ACTOR, OUTSIDER])
+            )
+        )
+        await conn.execute(
+            delete(user_tg_chat_membership).where(
+                user_tg_chat_membership.c.user_tg_id.in_([SUBJECT, ACTOR, OUTSIDER])
+            )
+        )
         await conn.execute(delete(user).where(user.c.id.in_([SUBJECT, ACTOR, OUTSIDER])))
         await conn.execute(delete(user_tg).where(user_tg.c.id == SUBJECT))
 
@@ -144,7 +154,7 @@ async def test_older_http_response_cannot_undo_newer_snapshot_in_same_second():
 
 
 async def test_unknown_api_result_is_not_nonmembership_and_keeps_history():
-    await event()
+    await event(received_at=WHEN)
     await repo.persist_snapshot(
         SUBJECT, CHANNEL, "unknown", WHEN + timedelta(days=1), error="BadRequest"
     )

@@ -206,6 +206,39 @@ most users (fallback rate &gt;80%) or LR collapses &gt;5 pp vs fallback.
 
 ---
 
+## H3c — Channel-viral memes for retention broadcasts
+
+| Field | Value |
+|-------|--------|
+| **ID** | `broadcast_channel_viral_pick` |
+| **Status** | **shipping** |
+| **Code** | `src/recommendations/broadcast_pick.py`, kill switch `BROADCAST_CHANNEL_VIRAL_PICK_ENABLED` |
+| **Labels** | `broadcast_channel_viral` vs `broadcast_reengagement_hq` vs queue |
+| **SQL** | `docs/analyst/broadcast-reengagement.sql` |
+
+### Hypothesis
+
+A meme that the channel audience already forwarded is a better single push than
+bot-internal HQ (affinity × like rate), because forwards are a community check
+that the joke is worth sending onward.
+
+### Rules
+
+- Last 7 days of `tgchannelru` / `tgchannelen` posts, at least 24h old, ranked
+  by latest snapshot forwards. Unseen, matching language, image, `published`.
+- Skip known channel members (they already got the channel push).
+- Skip `channel_hits_v1` assignees until exposure ends (feed test stays clean).
+- Empty pool → existing HQ → queue. Never skip a user because viral is empty.
+
+**Keep ON** if `broadcast_channel_viral` react_within_1h ≥ HQ (same 14d window)
+without a like-rate drop >3 pp on reacted rows.
+
+**Disable** (`BROADCAST_CHANNEL_VIRAL_PICK_ENABLED=false`) if viral share of
+broadcasts is <10% (always empty) or 1h reactivation is worse than HQ by >5 pp
+with ≥200 viral sends.
+
+---
+
 ## H4 — Skip ≠ hate (measurement contract, not a ship)
 
 | Field | Value |
