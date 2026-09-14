@@ -9,14 +9,15 @@ Populates meme.ocr_result JSONB with:
 - calculated_at: timestamp (use this field, NOT meme.created_at, for monitoring)
 
 Processes recent user uploads first, then most popular memes (by nlikes DESC).
-Runs every 15 min via Prefect cron, 9 memes per scheduled batch.
+Runs every 15 min via Prefect cron, 18 memes per scheduled batch.
 
 IMPORTANT — OpenRouter free tier rules:
 - Need $10+ lifetime purchases for 1,000 free-model req/day (otherwise 50/day).
 - NEVER add paid models — this client refuses any model not ending in ":free".
 - Current balance must stay >= $0. Monitor at https://openrouter.ai/settings/credits
 - Free model rate limit: 20 rpm across all free models.
-- Local safety budget: 900 OpenRouter attempts/day to leave room for uploads/retries.
+- Daily safety budgets are per verified OpenRouter account (900 at $10+ lifetime
+  credits, otherwise 45), plus a shared aggregate guard that includes uploads.
 - Free-model 429s/timeouts are normal. Cool down the model and retry in later runs.
 - See specs/describe-memes.md for full constraints.
 
@@ -29,8 +30,8 @@ import base64
 import time
 
 from prefect import flow, get_run_logger
+from prefect.states import Completed
 
-from src.config import settings
 from src.flows.events import safe_emit
 from src.flows.hooks import notify_telegram_on_failure
 from src.flows.storage.describe_memes_repository import (
@@ -45,7 +46,8 @@ from src.flows.storage.openrouter_vision import (
     RATE_LIMITED,
     VISION_MODELS,
     call_openrouter_vision,
-    check_openrouter_key_health,
+    get_configured_openrouter_keys,
+    get_usable_openrouter_keys,
 )
 from src.storage.deduplication import deduplicate_described_meme
 from src.storage.upload import download_meme_content_from_tg
@@ -53,7 +55,9 @@ from src.storage.upload import download_meme_content_from_tg
 __all__ = ["VISION_MODELS", "describe_memes_flow", "describe_single_meme"]
 
 
-async def describe_single_meme(meme_row: dict, log, *, deadline: float | None = None) -> str:
+async def describe_single_meme(
+    meme_row: dict, log, *, deadline: float | None = None, keys=None
+) -> str:
     """Download, analyze, and update a single meme.
 
     Returns: "ok", "rate_limited", "failed"
@@ -74,7 +78,7 @@ async def describe_single_meme(meme_row: dict, log, *, deadline: float | None = 
 
     # Call vision model
     try:
-        result = await call_openrouter_vision(image_b64, log, deadline=deadline)
+        result = await call_openrouter_vision(image_b64, log, deadline=deadline, keys=keys)
     except Exception as e:
         log.warning("Meme %s: OpenRouter error: %s", meme_id, e)
         await increment_describe_failures(meme_id, existing_ocr, str(e))
@@ -132,18 +136,22 @@ async def describe_memes_flow(batch_size: int = 20) -> None:
     # ticks from here, so our deadline must be relative to this moment.
     flow_start = time.monotonic()
 
-    if not settings.OPENROUTER_API_KEY:
-        log.warning("OPENROUTER_API_KEY not set. Skipping.")
-        return
+    if not get_configured_openrouter_keys():
+        log.warning("No OpenRouter OCR key is configured. No work performed.")
+        safe_emit("ff.describe_memes.no_work", "ff.describe_memes", {"reason": "no_configured_key"})
+        return Completed(name="OCR unavailable", message="no OpenRouter OCR key is configured")
 
-    if not await check_openrouter_key_health(log):
-        log.warning("OpenRouter key is not usable. Skipping Describe Memes batch.")
-        return
+    usable_keys = await get_usable_openrouter_keys(log)
+    if not usable_keys:
+        log.warning("No usable OpenRouter OCR key. No work performed; inspect key-health logs.")
+        safe_emit("ff.describe_memes.no_work", "ff.describe_memes", {"reason": "no_usable_key"})
+        return Completed(name="OCR unavailable", message="no usable OpenRouter OCR key")
 
     memes = await get_memes_to_describe(limit=batch_size)
     log.info("Found %d memes to describe.", len(memes))
 
     if not memes:
+        safe_emit("ff.describe_memes.no_work", "ff.describe_memes", {"reason": "no_pending_memes"})
         return
 
     ok = 0
@@ -179,7 +187,7 @@ async def describe_memes_flow(batch_size: int = 20) -> None:
 
         try:
             status = await asyncio.wait_for(
-                describe_single_meme(meme_row, log, deadline=meme_deadline),
+                describe_single_meme(meme_row, log, deadline=meme_deadline, keys=usable_keys),
                 timeout=effective_timeout,
             )
         except asyncio.TimeoutError:

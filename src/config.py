@@ -52,6 +52,8 @@ class Config(BaseSettings):
 
     OPENAI_API_KEY: str | None = None
     OPENROUTER_API_KEY: str | None = None
+    # Optional independent account for free-only OCR redundancy.
+    OPENROUTER_API_KEY_SECONDARY: str | None = None
 
     DEEPSEEK_API_KEY: str | None = None
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
