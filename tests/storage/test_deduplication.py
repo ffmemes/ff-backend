@@ -6,7 +6,14 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import insert, select
 
-from src.database import chat_meme_reaction, engine, meme, meme_stats, user_meme_reaction
+from src.database import (
+    chat_meme_reaction,
+    engine,
+    meme,
+    meme_stats,
+    user_meme_reaction,
+    user_meme_source_stats,
+)
 from src.storage.constants import MemeStatus
 from src.storage.deduplication import (
     deduplicate_described_meme,
@@ -24,6 +31,7 @@ from tests.factories import (
     create_meme_stats,
     create_reaction,
     create_user,
+    create_user_meme_source_stats,
 )
 
 
@@ -255,6 +263,263 @@ async def test_resolve_duplicate_moves_chat_reactions(dedup_setup):
 
     assert [row._asdict()["user_id"] for row in original_rows.all()] == [10001, 10002]
     assert dupe_rows.all() == []
+
+
+@pytest.mark.asyncio
+async def test_resolve_duplicate_keeps_first_explicit_user_reaction_and_refreshes_preferences(
+    dedup_setup,
+):
+    base_time = datetime(2024, 1, 1, 12)
+    async with engine.begin() as conn:
+        await create_meme_source(conn, id=10002, url="https://t.me/test_source_10002")
+        await create_meme_source(conn, id=10003, url="https://t.me/test_source_10003")
+        await create_meme(conn, id=10001, meme_source_id=10001)
+        await create_meme(conn, id=10002, meme_source_id=10002)
+
+        # The duplicate was delivered later but has the earlier explicit
+        # reaction.  Its whole row, including attribution, must survive.
+        await create_reaction(
+            conn,
+            user_id=10001,
+            meme_id=10001,
+            reaction_id=2,
+            recommended_by="canonical",
+            sent_at=base_time,
+            reacted_at=base_time + timedelta(seconds=30),
+        )
+        await create_reaction(
+            conn,
+            user_id=10001,
+            meme_id=10002,
+            reaction_id=1,
+            recommended_by="duplicate",
+            sent_at=base_time + timedelta(seconds=20),
+            reacted_at=base_time + timedelta(seconds=10),
+        )
+        # A null exposure never replaces a reaction, even when sent first.
+        await create_reaction(
+            conn,
+            user_id=10002,
+            meme_id=10001,
+            reaction_id=1,
+            sent_at=base_time + timedelta(seconds=10),
+            reacted_at=base_time + timedelta(seconds=20),
+        )
+        await create_reaction(
+            conn,
+            user_id=10002,
+            meme_id=10002,
+            sent_at=base_time,
+        )
+        # With no reaction, preserve the first exposure.
+        await create_reaction(
+            conn,
+            user_id=10003,
+            meme_id=10001,
+            sent_at=base_time + timedelta(seconds=10),
+        )
+        await create_reaction(
+            conn,
+            user_id=10003,
+            meme_id=10002,
+            recommended_by="first-exposure",
+            sent_at=base_time,
+        )
+        # Equal reaction events use sent_at, then retain the canonical row.
+        for user_id, duplicate_sent_at in (
+            (10004, base_time),
+            (10005, base_time + timedelta(seconds=10)),
+        ):
+            await create_user(conn, id=user_id)
+            await create_reaction(
+                conn,
+                user_id=user_id,
+                meme_id=10001,
+                reaction_id=2,
+                recommended_by="canonical",
+                sent_at=base_time + timedelta(seconds=10),
+                reacted_at=base_time + timedelta(seconds=40),
+            )
+            await create_reaction(
+                conn,
+                user_id=user_id,
+                meme_id=10002,
+                reaction_id=1,
+                recommended_by="duplicate",
+                sent_at=duplicate_sent_at,
+                reacted_at=base_time + timedelta(seconds=40),
+            )
+
+        await create_user_meme_source_stats(conn, 10001, 10001, nlikes=0, ndislikes=1)
+        await create_user_meme_source_stats(conn, 10001, 10002, nlikes=1, ndislikes=0)
+        await create_user_meme_source_stats(conn, 10001, 10003, nlikes=7, ndislikes=8)
+
+    result = await resolve_duplicate(10002, 10001, reason="test")
+
+    assert result.reactions_moved == 3
+    assert result.reactions_dropped == 5
+
+    first_reaction = await _row(user_meme_reaction, user_id=10001, meme_id=10001)
+    assert first_reaction["recommended_by"] == "duplicate"
+    assert first_reaction["sent_at"] == base_time + timedelta(seconds=20)
+    assert first_reaction["reaction_id"] == 1
+    assert first_reaction["reacted_at"] == base_time + timedelta(seconds=10)
+    assert (await _row(user_meme_reaction, user_id=10002, meme_id=10001))["reaction_id"] == 1
+    first_exposure = await _row(user_meme_reaction, user_id=10003, meme_id=10001)
+    assert first_exposure["recommended_by"] == "first-exposure"
+    assert first_exposure["sent_at"] == base_time
+    assert (await _row(user_meme_reaction, user_id=10004, meme_id=10001))["reaction_id"] == 1
+    assert (await _row(user_meme_reaction, user_id=10005, meme_id=10001))["reaction_id"] == 2
+
+    source_one = await _row(user_meme_source_stats, user_id=10001, meme_source_id=10001)
+    assert source_one["nlikes"] == 1
+    assert source_one["ndislikes"] == 0
+    assert await _row(user_meme_source_stats, user_id=10001, meme_source_id=10002) is None
+    source_three = await _row(user_meme_source_stats, user_id=10001, meme_source_id=10003)
+    assert source_three["nlikes"] == 7
+    assert source_three["ndislikes"] == 8
+
+    original_stats = await _row(meme_stats, meme_id=10001)
+    assert original_stats["nlikes"] == 3
+    assert original_stats["ndislikes"] == 1
+
+
+@pytest.mark.asyncio
+async def test_resolve_duplicate_keeps_first_chat_reaction(dedup_setup):
+    base_time = datetime(2024, 1, 1, 12)
+    async with engine.begin() as conn:
+        await create_meme(conn, id=10001, meme_source_id=10001)
+        await create_meme(conn, id=10002, meme_source_id=10001)
+        await conn.execute(
+            insert(chat_meme_reaction),
+            [
+                {
+                    "chat_id": 1,
+                    "meme_id": 10001,
+                    "user_id": 10001,
+                    "reaction": 2,
+                    "reacted_at": base_time + timedelta(seconds=20),
+                },
+                {
+                    "chat_id": 1,
+                    "meme_id": 10002,
+                    "user_id": 10001,
+                    "reaction": 1,
+                    "reacted_at": base_time + timedelta(seconds=10),
+                },
+                {
+                    "chat_id": 1,
+                    "meme_id": 10001,
+                    "user_id": 10002,
+                    "reaction": 2,
+                    "reacted_at": base_time + timedelta(seconds=10),
+                },
+                {
+                    "chat_id": 1,
+                    "meme_id": 10002,
+                    "user_id": 10002,
+                    "reaction": 1,
+                    "reacted_at": base_time + timedelta(seconds=10),
+                },
+                {
+                    "chat_id": 1,
+                    "meme_id": 10002,
+                    "user_id": 10003,
+                    "reaction": 1,
+                    "reacted_at": base_time,
+                },
+            ],
+        )
+
+    result = await resolve_duplicate(10002, 10001, reason="test")
+
+    assert result.chat_reactions_moved == 2
+    assert result.chat_reactions_dropped == 3
+    first_chat_reaction = await _row(chat_meme_reaction, chat_id=1, user_id=10001, meme_id=10001)
+    assert first_chat_reaction["reaction"] == 1
+    assert first_chat_reaction["reacted_at"] == base_time + timedelta(seconds=10)
+    tied_chat_reaction = await _row(chat_meme_reaction, chat_id=1, user_id=10002, meme_id=10001)
+    assert tied_chat_reaction["reaction"] == 2
+    assert tied_chat_reaction["reacted_at"] == base_time + timedelta(seconds=10)
+    assert (await _row(chat_meme_reaction, chat_id=1, user_id=10003, meme_id=10001))[
+        "reaction"
+    ] == 1
+
+
+@pytest.mark.asyncio
+async def test_sequential_duplicate_merges_keep_the_earliest_coherent_reaction(
+    dedup_setup,
+):
+    base_time = datetime(2024, 1, 1, 12)
+    async with engine.begin() as conn:
+        for meme_id in (10001, 10002, 10003):
+            await create_meme(conn, id=meme_id, meme_source_id=10001)
+
+        await create_reaction(
+            conn,
+            user_id=10001,
+            meme_id=10001,
+            reaction_id=2,
+            recommended_by="canonical",
+            sent_at=base_time,
+            reacted_at=base_time + timedelta(seconds=30),
+        )
+        await create_reaction(
+            conn,
+            user_id=10001,
+            meme_id=10002,
+            reaction_id=1,
+            recommended_by="first-duplicate",
+            sent_at=base_time + timedelta(seconds=10),
+            reacted_at=base_time + timedelta(seconds=10),
+        )
+        await create_reaction(
+            conn,
+            user_id=10001,
+            meme_id=10003,
+            reaction_id=2,
+            recommended_by="later-duplicate",
+            sent_at=base_time + timedelta(seconds=20),
+            reacted_at=base_time + timedelta(seconds=20),
+        )
+        await conn.execute(
+            insert(chat_meme_reaction),
+            [
+                {
+                    "chat_id": 1,
+                    "meme_id": 10001,
+                    "user_id": 10001,
+                    "reaction": 2,
+                    "reacted_at": base_time + timedelta(seconds=30),
+                },
+                {
+                    "chat_id": 1,
+                    "meme_id": 10002,
+                    "user_id": 10001,
+                    "reaction": 1,
+                    "reacted_at": base_time + timedelta(seconds=10),
+                },
+                {
+                    "chat_id": 1,
+                    "meme_id": 10003,
+                    "user_id": 10001,
+                    "reaction": 2,
+                    "reacted_at": base_time + timedelta(seconds=20),
+                },
+            ],
+        )
+
+    await resolve_duplicate(10002, 10001, reason="test")
+    await resolve_duplicate(10003, 10001, reason="test")
+
+    reaction = await _row(user_meme_reaction, user_id=10001, meme_id=10001)
+    assert reaction["recommended_by"] == "first-duplicate"
+    assert reaction["sent_at"] == base_time + timedelta(seconds=10)
+    assert reaction["reaction_id"] == 1
+    assert reaction["reacted_at"] == base_time + timedelta(seconds=10)
+    chat_reaction = await _row(chat_meme_reaction, chat_id=1, user_id=10001, meme_id=10001)
+    assert chat_reaction["reaction"] == 1
+    assert chat_reaction["reacted_at"] == base_time + timedelta(seconds=10)
 
 
 @pytest.mark.asyncio
