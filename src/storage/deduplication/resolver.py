@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from src.database import run_in_transaction
 from src.stats.meme import calculate_meme_reactions_and_engagement_on_connection
+from src.stats.user_meme_source import refresh_user_meme_source_stats_on_connection
 from src.storage.deduplication.models import DuplicateResolution
 
 
@@ -100,7 +101,7 @@ async def _resolve_duplicate(
         await conn.execute(text("SELECT pg_advisory_xact_lock(1179012429, 1)"))
         current = await _fetch_one(
             conn,
-            text("SELECT id, status FROM meme WHERE id = :meme_id FOR UPDATE"),
+            text("SELECT id, status, meme_source_id FROM meme WHERE id = :meme_id FOR UPDATE"),
             {"meme_id": dupe_id},
         )
         if allowed_dupe_statuses is not None and (
@@ -116,14 +117,17 @@ async def _resolve_duplicate(
                 return None
             return DuplicateResolution(dupe_id, canonical_original_id, reason, 0, 0, 0, 0)
 
+        original = await _fetch_one(
+            conn,
+            text("SELECT id, status, meme_source_id FROM meme WHERE id = :meme_id FOR UPDATE"),
+            {"meme_id": canonical_original_id},
+        )
+        if not original:
+            return None
+
         resolved_dupe_id = dupe_id
         if prefer_canonical:
-            original = await _fetch_one(
-                conn,
-                text("SELECT id, status FROM meme WHERE id = :meme_id FOR UPDATE"),
-                {"meme_id": canonical_original_id},
-            )
-            if not original or original["status"] not in {"ok", "published"}:
+            if original["status"] not in {"ok", "published"}:
                 return None
             # Two approved copies: preserve published identity, otherwise the
             # oldest ID. Unreviewed uploads keep their existing directional policy.
@@ -141,6 +145,7 @@ async def _resolve_duplicate(
         ):
             return None
 
+        affected_user_ids = await _affected_user_ids(conn, resolved_dupe_id)
         reactions_moved = await _move_user_reactions(conn, resolved_dupe_id, canonical_original_id)
         chat_reactions_moved = await _move_chat_reactions(
             conn, resolved_dupe_id, canonical_original_id
@@ -163,6 +168,11 @@ async def _resolve_duplicate(
             {"dupe_id": resolved_dupe_id, "original_id": canonical_original_id},
         )
         await _refresh_original_stats(conn, canonical_original_id)
+        await refresh_user_meme_source_stats_on_connection(
+            conn,
+            user_ids=affected_user_ids,
+            meme_source_ids=(current["meme_source_id"], original["meme_source_id"]),
+        )
 
         return DuplicateResolution(
             dupe_id=resolved_dupe_id,
@@ -221,12 +231,41 @@ async def _move_user_reactions(
                 SELECT user_id, :original_id, recommended_by, sent_at, reaction_id, reacted_at
                 FROM user_meme_reaction source
                 WHERE source.meme_id = :dupe_id
-                  AND NOT EXISTS (
-                      SELECT 1 FROM user_meme_reaction existing
-                      WHERE existing.user_id = source.user_id
-                        AND existing.meme_id = :original_id
-                  )
-                ON CONFLICT (user_id, meme_id) DO NOTHING
+                ON CONFLICT (user_id, meme_id) DO UPDATE SET
+                    recommended_by = EXCLUDED.recommended_by,
+                    sent_at = EXCLUDED.sent_at,
+                    reaction_id = EXCLUDED.reaction_id,
+                    reacted_at = EXCLUDED.reacted_at
+                WHERE
+                    -- An explicit reaction always beats a mere exposure.
+                    (
+                        user_meme_reaction.reaction_id IS NULL
+                        AND EXCLUDED.reaction_id IS NOT NULL
+                    )
+                    OR (
+                        user_meme_reaction.reaction_id IS NOT NULL
+                        AND EXCLUDED.reaction_id IS NOT NULL
+                        AND (
+                            -- Prefer the first reaction event.  A malformed
+                            -- explicit row with no timestamp loses to one
+                            -- with a timestamp, then sent_at breaks ties.
+                            (
+                                user_meme_reaction.reacted_at IS NULL
+                                AND EXCLUDED.reacted_at IS NOT NULL
+                            )
+                            OR EXCLUDED.reacted_at < user_meme_reaction.reacted_at
+                            OR (
+                                EXCLUDED.reacted_at IS NOT DISTINCT FROM
+                                    user_meme_reaction.reacted_at
+                                AND EXCLUDED.sent_at < user_meme_reaction.sent_at
+                            )
+                        )
+                    )
+                    OR (
+                        user_meme_reaction.reaction_id IS NULL
+                        AND EXCLUDED.reaction_id IS NULL
+                        AND EXCLUDED.sent_at < user_meme_reaction.sent_at
+                    )
                 RETURNING 1
             )
             SELECT count(*) AS moved FROM moved
@@ -252,13 +291,15 @@ async def _move_chat_reactions(
                 SELECT chat_id, :original_id, user_id, reaction, reacted_at
                 FROM chat_meme_reaction source
                 WHERE source.meme_id = :dupe_id
-                  AND NOT EXISTS (
-                      SELECT 1 FROM chat_meme_reaction existing
-                      WHERE existing.chat_id = source.chat_id
-                        AND existing.user_id = source.user_id
-                        AND existing.meme_id = :original_id
-                  )
-                ON CONFLICT (chat_id, meme_id, user_id) DO NOTHING
+                ON CONFLICT (chat_id, meme_id, user_id) DO UPDATE SET
+                    reaction = EXCLUDED.reaction,
+                    reacted_at = EXCLUDED.reacted_at
+                WHERE
+                    (
+                        chat_meme_reaction.reacted_at IS NULL
+                        AND EXCLUDED.reacted_at IS NOT NULL
+                    )
+                    OR EXCLUDED.reacted_at < chat_meme_reaction.reacted_at
                 RETURNING 1
             )
             SELECT count(*) AS moved FROM moved
@@ -267,6 +308,20 @@ async def _move_chat_reactions(
         {"dupe_id": dupe_id, "original_id": original_id},
         "moved",
     )
+
+
+async def _affected_user_ids(conn: AsyncConnection, dupe_id: int) -> list[int]:
+    result = await conn.execute(
+        text(
+            """
+            SELECT DISTINCT user_id
+            FROM user_meme_reaction
+            WHERE meme_id = :dupe_id
+            """
+        ),
+        {"dupe_id": dupe_id},
+    )
+    return [row.user_id for row in result]
 
 
 async def _delete_user_reactions(conn: AsyncConnection, dupe_id: int) -> int:
