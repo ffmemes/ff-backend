@@ -2,7 +2,7 @@ from datetime import datetime
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import delete, insert, select
+from sqlalchemy import delete, insert, select, text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from src.database import (
@@ -118,6 +118,40 @@ async def test_calculate_meme_reactions_stats(conn: AsyncConnection):
             assert abs(row["lr_smoothed"] - 1) < eps
         if row["meme_id"] == 2:
             assert abs(row["lr_smoothed"]) < eps
+
+
+@pytest.mark.asyncio
+async def test_incremental_stats_target_originals_of_recent_duplicates(conn: AsyncConnection):
+    # Every reaction in the fixture is from 2024, so nothing is inside the
+    # lookback window. A recently marked duplicate must still pull its
+    # original into the recompute, and nothing else.
+    await conn.execute(
+        text(
+            """
+            UPDATE meme
+            SET status = 'duplicate', duplicate_of = 1, updated_at = NOW()
+            WHERE id = 2
+            """
+        )
+    )
+    await conn.execute(
+        text(
+            """
+            UPDATE meme
+            SET status = 'duplicate', duplicate_of = 3,
+                updated_at = NOW() - INTERVAL '2 days'
+            WHERE id = 4
+            """
+        )
+    )
+    await conn.commit()
+
+    await calculate_meme_reactions_and_engagement(lookback_hours=3)
+
+    rows = await fetch_all(
+        select(meme_stats.c.meme_id, meme_stats.c.nlikes, meme_stats.c.ndislikes)
+    )
+    assert [(row["meme_id"], row["nlikes"], row["ndislikes"]) for row in rows] == [(1, 2, 0)]
 
 
 @pytest.mark.asyncio

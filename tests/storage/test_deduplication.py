@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
@@ -14,6 +14,7 @@ from src.database import (
     user_meme_reaction,
     user_meme_source_stats,
 )
+from src.stats.meme import calculate_meme_reactions_and_engagement
 from src.storage.constants import MemeStatus
 from src.storage.deduplication import (
     deduplicate_described_meme,
@@ -146,6 +147,18 @@ async def test_resolve_duplicate_moves_reactions_and_refreshes_stats(dedup_setup
     assert result.reactions_moved == 2
     assert result.reactions_dropped == 3
 
+    # The merge itself no longer recomputes the original's stats inline: the
+    # pre-merge row survives until the scheduled incremental flow runs.
+    original_stats = await _row(meme_stats, meme_id=10001)
+    assert original_stats["nlikes"] == 1
+    assert original_stats["ndislikes"] == 1
+    assert original_stats["nmemes_sent"] == 2
+    assert original_stats["lr_smoothed"] == 99
+    assert original_stats["engagement_score"] == 99
+    assert await _row(meme_stats, meme_id=10002) is None
+
+    await calculate_meme_reactions_and_engagement(lookback_hours=3)
+
     original_stats = await _row(meme_stats, meme_id=10001)
     assert original_stats["nlikes"] == 2
     assert original_stats["ndislikes"] == 2
@@ -167,7 +180,8 @@ async def test_resolve_duplicate_moves_reactions_and_refreshes_stats(dedup_setup
 
 @pytest.mark.asyncio
 async def test_resolve_duplicate_recomputes_derived_original_stats(dedup_setup):
-    base_sent_at = datetime(2024, 1, 1, 12, 0, 0)
+    # Naive UTC, matching the DateTime (no tz) columns and the UTC test DB.
+    base_sent_at = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=2)
     affected_users = [10001, 10002, 10003]
 
     async with engine.connect() as conn:
@@ -205,12 +219,58 @@ async def test_resolve_duplicate_recomputes_derived_original_stats(dedup_setup):
         await conn.commit()
 
     await resolve_duplicate(10002, 10001, reason="test")
+    await calculate_meme_reactions_and_engagement(lookback_hours=3)
 
     original_stats = await _row(meme_stats, meme_id=10001)
     assert original_stats["nlikes"] == 3
     assert original_stats["nmemes_sent"] == 3
     assert original_stats["lr_smoothed"] == pytest.approx(1.8)
     assert original_stats["engagement_score"] == pytest.approx(1.8)
+
+
+@pytest.mark.asyncio
+async def test_incremental_stats_pick_up_original_after_merge_outside_lookback(dedup_setup):
+    # All reaction history is far outside the lookback window, so only the
+    # duplicate_of + updated_at arm can make the original a recompute target.
+    stale_sent_at = datetime(2024, 1, 1, 12, 0, 0)
+    async with engine.begin() as conn:
+        await create_meme(conn, id=10001, meme_source_id=10001)
+        await create_meme(conn, id=10002, meme_source_id=10001)
+        await create_meme(conn, id=10003, meme_source_id=10001)
+        await create_meme_stats(conn, meme_id=10001, nlikes=0, ndislikes=0, nmemes_sent=0)
+        await create_meme_stats(conn, meme_id=10003, nlikes=7, ndislikes=7, nmemes_sent=7)
+        await create_reaction(
+            conn, user_id=10001, meme_id=10001, reaction_id=1, sent_at=stale_sent_at
+        )
+        await create_reaction(
+            conn, user_id=10002, meme_id=10002, reaction_id=1, sent_at=stale_sent_at
+        )
+        await create_reaction(
+            conn, user_id=10003, meme_id=10002, reaction_id=2, sent_at=stale_sent_at
+        )
+        # Unrelated control meme with equally stale history and stale stats.
+        await create_reaction(
+            conn, user_id=10004, meme_id=10003, reaction_id=1, sent_at=stale_sent_at
+        )
+
+    await resolve_duplicate(10002, 10001, reason="test")
+
+    dupe = await _row(meme, id=10002)
+    assert dupe["duplicate_of"] == 10001
+    assert dupe["updated_at"] is not None
+    assert dupe["updated_at"] > datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=5)
+
+    await calculate_meme_reactions_and_engagement(lookback_hours=3)
+
+    original_stats = await _row(meme_stats, meme_id=10001)
+    assert original_stats["nlikes"] == 2
+    assert original_stats["ndislikes"] == 1
+    assert original_stats["nmemes_sent"] == 3
+    control_stats = await _row(meme_stats, meme_id=10003)
+    assert control_stats["nlikes"] == 7
+    assert control_stats["ndislikes"] == 7
+    assert control_stats["nmemes_sent"] == 7
+    assert await _row(meme_stats, meme_id=10002) is None
 
 
 @pytest.mark.asyncio
@@ -379,6 +439,7 @@ async def test_resolve_duplicate_keeps_first_explicit_user_reaction_and_refreshe
     assert source_three["nlikes"] == 7
     assert source_three["ndislikes"] == 8
 
+    await calculate_meme_reactions_and_engagement(lookback_hours=3)
     original_stats = await _row(meme_stats, meme_id=10001)
     assert original_stats["nlikes"] == 3
     assert original_stats["ndislikes"] == 1
@@ -667,6 +728,7 @@ async def test_sweep_file_id_duplicates_resolves_ok_exact_duplicates(dedup_setup
     assert result["resolved"] == 1
     assert result["reactions_moved"] == 1
 
+    await calculate_meme_reactions_and_engagement(lookback_hours=3)
     original_stats = await _row(meme_stats, meme_id=10001)
     assert original_stats["nlikes"] == 1
     assert original_stats["ndislikes"] == 1
@@ -703,6 +765,7 @@ async def test_sweep_file_id_duplicates_resolves_ok_meme_to_published_original(d
     assert dupe["status"] == MemeStatus.DUPLICATE.value
     assert dupe["duplicate_of"] == 10002
 
+    await calculate_meme_reactions_and_engagement(lookback_hours=3)
     published_stats = await _row(meme_stats, meme_id=10002)
     assert published_stats["nlikes"] == 1
     assert published_stats["nmemes_sent"] == 1
@@ -745,6 +808,7 @@ async def test_reverse_ocr_order_keeps_oldest_and_preserves_seen_history(dedup_s
     assert seen["reaction_id"] is None
     assert (await _row(user_meme_reaction, user_id=10003, meme_id=10001))["reaction_id"] == 1
     assert await _row(chat_meme_reaction, chat_id=1, user_id=10003, meme_id=10001)
+    await calculate_meme_reactions_and_engagement(lookback_hours=3)
     assert (await _row(meme_stats, meme_id=10001))["nmemes_sent"] == 3
 
 

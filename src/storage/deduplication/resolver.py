@@ -167,7 +167,13 @@ async def _resolve_duplicate(
             ),
             {"dupe_id": resolved_dupe_id, "original_id": canonical_original_id},
         )
-        await _refresh_original_stats(conn, canonical_original_id)
+        # No inline meme_stats refresh for the original: the full-user-history
+        # recompute scanned every reaction of every user who ever touched the
+        # original (millions of rows per merge). The scheduled
+        # "Calculate meme_stats" flow picks the original up within its
+        # lookback_hours window via meme.duplicate_of + meme.updated_at and
+        # recomputes it with the same incremental semantics every active meme
+        # gets. Until then the original keeps its pre-merge stats row.
         await refresh_user_meme_source_stats_on_connection(
             conn,
             user_ids=affected_user_ids,
@@ -205,7 +211,9 @@ async def _mark_duplicate(
         text(
             f"""
             UPDATE meme
-            SET status = 'duplicate', duplicate_of = :original_id
+            SET status = 'duplicate',
+                duplicate_of = :original_id,
+                updated_at = NOW()
             WHERE id = :dupe_id
               {status_filter}
             RETURNING id
@@ -357,6 +365,12 @@ async def _delete_chat_reactions(conn: AsyncConnection, dupe_id: int) -> int:
 
 
 async def refresh_original_stats(original_id: int) -> None:
+    """Explicit full recompute of one original's meme_stats (manual/ops use).
+
+    Expensive: rebuilds user baselines from the complete reaction history of
+    every user who touched the meme. Not called by the dedup flow.
+    """
+
     async def _refresh(conn: AsyncConnection) -> None:
         await _refresh_original_stats(conn, original_id)
 
