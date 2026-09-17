@@ -21,10 +21,16 @@ prevents repeated exposures or conflicting votes from inflating live counters.
 
 ## Aggregate refreshes
 
-The resolver refreshes canonical `meme_stats` in the merge transaction using the
-full history of users who touched that meme. It also immediately recalculates
-`user_meme_source_stats` for duplicate-side participants and both involved
-sources, including older reactions. Source pairs with no surviving reactions are
+The resolver no longer refreshes canonical `meme_stats` in the merge
+transaction: the full-user-history recompute scanned millions of
+`user_meme_reaction` rows per merge. Instead the merge stamps the duplicate's
+`updated_at`, and the scheduled incremental `Calculate meme_stats` flow treats
+any `duplicate_of` target whose duplicate was updated within its lookback window
+as a recompute target, so the canonical meme is refreshed on the next run with
+the same incremental semantics as every other active meme. The merge still
+immediately recalculates `user_meme_source_stats` for duplicate-side
+participants and both involved sources, including older reactions. Source pairs
+with no surviving reactions are
 removed; unrelated preferences are preserved. The periodic source-preference
 batch shares the merge transaction lock so it cannot overwrite the refresh with
 a pre-merge snapshot.

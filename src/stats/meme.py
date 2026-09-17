@@ -63,11 +63,15 @@ async def _execute_meme_reactions_and_engagement(
     """Combined lr_smoothed + engagement_score + basic counts — incremental mode.
 
     Only recomputes stats for memes that received reactions in the last
-    `lookback_hours` hours. Memes with no recent activity keep their existing
-    meme_stats rows unchanged unless explicitly included in `meme_ids`.
+    `lookback_hours` hours, plus originals that absorbed a duplicate within
+    that window (`meme.duplicate_of` set and `meme.updated_at` recent), so
+    reactions moved by deduplication are folded in without an inline full
+    recompute. Memes with no recent activity keep their existing meme_stats
+    rows unchanged unless explicitly included in `meme_ids`.
     When `include_user_history` is true, user baselines are built from all
-    reactions by users who touched the target memes; this is used after moving
-    historical reactions during deduplication.
+    reactions by users who touched the target memes. This scans the full
+    history of every affected user and is reserved for the explicit
+    `refresh_original_stats` tool; the scheduled flow never sets it.
 
     lr_smoothed algorithm:
         1. like_symmetrical: reaction_id=1 → +1, else → -1
@@ -96,6 +100,13 @@ async def _execute_meme_reactions_and_engagement(
             SELECT meme_id
             FROM user_meme_reaction
             WHERE reacted_at > NOW() - :lookback_hours * INTERVAL '1 hour'
+
+            UNION
+
+            SELECT M.duplicate_of AS meme_id
+            FROM meme M
+            WHERE M.duplicate_of IS NOT NULL
+              AND M.updated_at > NOW() - :lookback_hours * INTERVAL '1 hour'
         """
 
     if include_user_history:
