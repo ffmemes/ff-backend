@@ -504,13 +504,14 @@ def add_handlers(application: Application) -> None:
     )
 
     ############## friend challenge (H12)
-    application.add_handler(
-        CommandHandler(
-            "friend",
-            handle_friend_command,
-            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+    if settings.FRIEND_CHALLENGE_ENABLED:
+        application.add_handler(
+            CommandHandler(
+                "friend",
+                handle_friend_command,
+                filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+            )
         )
-    )
     application.add_handler(
         CallbackQueryHandler(handle_friend_callback, pattern=FRIEND_CHALLENGE_CALLBACK_PATTERN)
     )

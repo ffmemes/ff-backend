@@ -121,6 +121,30 @@ async def test_calculate_meme_reactions_stats(conn: AsyncConnection):
 
 
 @pytest.mark.asyncio
+async def test_meme_stats_exclude_friend_challenge_answers(conn: AsyncConnection):
+    await conn.execute(
+        insert(user_meme_reaction),
+        {
+            "user_id": 3,
+            "meme_id": 1,
+            "reaction_id": 2,
+            "recommended_by": "friend_challenge",
+            "sent_at": datetime(2024, 1, 1),
+            "reacted_at": datetime(2024, 1, 1, 0, 10),
+        },
+    )
+    await conn.commit()
+
+    await calculate_meme_reactions_and_engagement(
+        min_meme_reactions=0, min_user_reactions=0, lookback_hours=999_999
+    )
+
+    row = (await fetch_all(select(meme_stats).where(meme_stats.c.meme_id == 1)))[0]
+    assert (row["nlikes"], row["ndislikes"], row["nmemes_sent"]) == (2, 0, 2)
+    assert abs(row["lr_smoothed"] - 1) < 1e-3
+
+
+@pytest.mark.asyncio
 async def test_incremental_stats_target_originals_of_recent_duplicates(conn: AsyncConnection):
     # Every reaction in the fixture is from 2024, so nothing is inside the
     # lookback window. A recently marked duplicate must still pull its

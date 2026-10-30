@@ -229,8 +229,9 @@ async def candidate_meme_ids(user_id: int) -> list[int]:
 async def seed_answers_as_reactions(pack_id: int, user_id: int) -> None:
     """Expose game answers to the recommender (like=1, pass=2, the feed's skip).
 
-    Never overwrites existing reactions; the label keeps seeds out of feed metrics
-    and also keeps played memes out of the friend's own feed.
+    Never overwrites existing reactions. The row keeps played memes out of the
+    friend's own feed and counts toward per-user taste stats; meme and source
+    stats (src/stats/meme.py, meme_source.py) filter the label out.
     """
     await execute(
         text(

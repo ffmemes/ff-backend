@@ -1,7 +1,7 @@
 """Friend challenge: fixed five-meme packs, participations and first answers.
 
 Revision ID: a7c9e2f5b8d1
-Revises: d4e6f8a1b3c5
+Revises: e7a1c3f5b9d2
 Create Date: 2026-10-30
 """
 
@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "a7c9e2f5b8d1"
-down_revision = "d4e6f8a1b3c5"
+down_revision = "e7a1c3f5b9d2"
 branch_labels = None
 depends_on = None
 
