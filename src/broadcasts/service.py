@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import logging
 
 from sqlalchemy import text
@@ -7,7 +8,7 @@ from telegram.error import BadRequest, Forbidden, RetryAfter
 from src.database import fetch_all
 from src.redis import redis_client
 from src.tgbot.bot import bot
-from src.tgbot.service import mark_user_blocked
+from src.tgbot.service import assign_experiment, mark_user_blocked
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +32,63 @@ async def get_user_ids_active_minutes_ago(
                 NOW() - INTERVAL '{to_minutes_ago} MINUTES'
                 AND
                 NOW() - INTERVAL '{from_minutes_ago} MINUTES'
+            -- last_active_at moves without reactions (/start, buttons), so
+            -- anchor the cadence on a real reaction near the step window.
+            AND EXISTS (
+                SELECT 1 FROM user_meme_reaction R
+                WHERE R.user_id = "user".id
+                  AND R.reacted_at >= NOW() - INTERVAL '{to_minutes_ago + 60} MINUTES'
+            )
     """
     res = await fetch_all(text(insert_query))
     return [r["id"] for r in res]
+
+
+async def get_monthly_reminder_user_ids() -> list[int]:
+    """Non-blocked users whose last reaction was 29-365 days ago.
+
+    Never-reacted users have no user_stats.last_reaction_at, so they are out.
+    """
+    rows = await fetch_all(
+        text(
+            """
+            SELECT u.id
+            FROM "user" u
+            JOIN user_stats us ON us.user_id = u.id
+            WHERE u.blocked_bot_at IS NULL
+              AND u.type NOT IN ('waitlist', 'blocked_bot')
+              AND us.last_reaction_at BETWEEN NOW() - INTERVAL '365 days'
+                                          AND NOW() - INTERVAL '29 days'
+            ORDER BY us.last_reaction_at DESC
+            """
+        )
+    )
+    return [r["id"] for r in rows]
+
+
+def holdout_variant(experiment_id: str, user_id: int, holdout_pct: int) -> str:
+    key = f"{experiment_id}:{user_id}"
+    bucket = int.from_bytes(hashlib.sha256(key.encode("utf-8")).digest()[:8], "big") % 100
+    return "holdout" if bucket < holdout_pct else "treatment"
+
+
+async def drop_holdout(experiment_id: str, user_ids: list[int], holdout_pct: int) -> list[int]:
+    """Log each user's first exposure in experiment_assignment; return treated ids."""
+    treated = []
+    for user_id in user_ids:
+        variant = holdout_variant(experiment_id, user_id, holdout_pct)
+        await assign_experiment(
+            user_id,
+            experiment_id,
+            variant,
+            {
+                "assignment_strategy": "sha256(experiment_id:user_id)%100 < holdout_pct",
+                "holdout_pct": holdout_pct,
+            },
+        )
+        if variant == "treatment":
+            treated.append(user_id)
+    return treated
 
 
 async def get_users_to_broadcast_meme_from_tgchannelru(
