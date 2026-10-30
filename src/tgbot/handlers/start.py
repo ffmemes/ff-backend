@@ -3,6 +3,7 @@ import asyncio
 from telegram import Bot, Update
 from telegram.ext import ContextTypes
 
+from src.config import settings
 from src.recommendations.meme_queue import clear_meme_queue_for_user
 from src.storage.schemas import MemeData
 from src.tgbot.handlers.deep_link import handle_invited_user, handle_shared_meme_reward
@@ -167,6 +168,11 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not has_languages and not created:
         await init_user_languages_from_tg_user(update.effective_user)
         has_languages = bool(await get_user_languages(user_id))
+
+    if settings.FRIEND_CHALLENGE_ENABLED and deep_link and deep_link.startswith("fc_"):
+        from src.tgbot.handlers.friend_challenge import handle_challenge_start
+
+        return await handle_challenge_start(update, context, deep_link, created=created)
 
     if deep_link == "kitchen":
         if not has_languages:

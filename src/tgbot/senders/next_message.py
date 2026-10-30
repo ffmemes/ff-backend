@@ -62,11 +62,13 @@ async def next_message(
     user_id: int,
     prev_update: Update,
     prev_reaction_id: int | None = None,
+    *,
+    skip_popups: bool = False,
 ) -> Message:
     user_info = await get_user_info(user_id)
     # TODO: if watched > 30 memes / day show paywall / tasks / donate
 
-    popup = await get_popup_to_send(user_id, user_info)
+    popup = None if skip_popups else await get_popup_to_send(user_id, user_info)
     if popup:
         return await send_popup(user_id, popup)
 

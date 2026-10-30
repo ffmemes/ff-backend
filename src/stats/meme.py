@@ -171,6 +171,8 @@ async def _execute_meme_reactions_and_engagement(
                 MAX(CASE WHEN R.reaction_id IS NOT NULL THEN R.sent_at END)
                     OVER (PARTITION BY R.user_id) AS user_last_reaction_sent_at
             {base_reactions_from}
+            -- Friend-challenge answers are game picks, not feed impressions.
+            WHERE R.recommended_by IS DISTINCT FROM 'friend_challenge'
         ),
 
         WITH_USER_AVGS AS (
@@ -252,6 +254,7 @@ async def _execute_meme_reactions_and_engagement(
             INNER JOIN TARGET_MEME_IDS T
                 ON T.meme_id = M.id
             LEFT JOIN user_meme_reaction E ON E.meme_id = M.id
+                AND E.recommended_by IS DISTINCT FROM 'friend_challenge'
             GROUP BY 1
         )
 

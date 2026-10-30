@@ -27,6 +27,7 @@ async def calculate_meme_source_stats() -> None:
         FROM meme M
         LEFT JOIN user_meme_reaction E
             ON M.id = E.meme_id
+            AND E.recommended_by IS DISTINCT FROM 'friend_challenge'
         GROUP BY 1
         ORDER BY 1
 

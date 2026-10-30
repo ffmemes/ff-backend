@@ -73,6 +73,13 @@ from src.tgbot.handlers.chat.send_tokens import (
     reward_active_chat_users,
     send_tokens_to_reply,
 )
+from src.tgbot.handlers.friend_challenge import (
+    CALLBACK_PATTERN as FRIEND_CHALLENGE_CALLBACK_PATTERN,
+)
+from src.tgbot.handlers.friend_challenge import (
+    handle_friend_callback,
+    handle_friend_command,
+)
 from src.tgbot.handlers.help import handle_help, handle_last
 from src.tgbot.handlers.moderator.registry import add_moderator_handlers
 from src.tgbot.handlers.payments.purchase import (
@@ -494,6 +501,19 @@ def add_handlers(application: Application) -> None:
             handle_chat_boost,
             block=False,
         )
+    )
+
+    ############## friend challenge (H12)
+    if settings.FRIEND_CHALLENGE_ENABLED:
+        application.add_handler(
+            CommandHandler(
+                "friend",
+                handle_friend_command,
+                filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
+            )
+        )
+    application.add_handler(
+        CallbackQueryHandler(handle_friend_callback, pattern=FRIEND_CHALLENGE_CALLBACK_PATTERN)
     )
 
     # handle all old & broken callback queries
