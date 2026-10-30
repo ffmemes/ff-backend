@@ -180,6 +180,25 @@ def test_low_sent_quota_accepts_enum_like_values_without_importing_tgbot():
     assert low_sent_quota(4, UserTypeLike()) == 3
 
 
+def test_explore_budget_halves_moderator_low_sent_quota():
+    assert low_sent_quota(15, "moderator", explore_budget=True) == 8
+    assert low_sent_quota(15, "user", explore_budget=True) == 0
+
+
+@pytest.mark.parametrize("nmemes_sent", [30, 100])
+def test_idle_return_swaps_lr_smoothed_first_slot(nmemes_sent):
+    plan = plan_candidate_selection_for_user(nmemes_sent, 5, True, idle_return=True)
+
+    assert dict(plan.fixed_pos) == {0: "like_spread_and_recent_memes"}
+    assert dict(plan_candidate_selection(nmemes_sent).fixed_pos) == {0: "lr_smoothed"}
+
+
+def test_idle_return_keeps_cold_start_first_slot():
+    plan = plan_candidate_selection_for_user(16, 1, True, idle_return=True)
+
+    assert dict(plan.fixed_pos) == {0: "cold_start_adapt"}
+
+
 def test_planner_mappings_are_read_only():
     plan = plan_candidate_selection(30)
 

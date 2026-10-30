@@ -48,6 +48,16 @@ TEXT_LIGHT_OCR_FILTER_SQL = f"""
                 END
             ) <= :text_light_max_ocr_words
 """
+# explore_budget_v1 fresh-viral rule (prod 60d: ~45 memes/day, later regular-user
+# LR 0.46 vs 0.436 baseline).
+FRESH_VIRAL_MAX_AGE_HOURS = 72
+FRESH_VIRAL_MIN_REACTIONS = 20
+FRESH_VIRAL_MIN_LIKE_RATE = 0.50
+FRESH_VIRAL_FILTER_SQL = f"""
+            AND M.created_at >= NOW() - INTERVAL '{FRESH_VIRAL_MAX_AGE_HOURS} hours'
+            AND MS.nlikes + MS.ndislikes >= {FRESH_VIRAL_MIN_REACTIONS}
+            AND MS.nlikes >= {FRESH_VIRAL_MIN_LIKE_RATE} * (MS.nlikes + MS.ndislikes)
+"""
 COLD_START_GUARDRAIL_SOURCE_FILTER_SQL = """
             AND NOT (S.url = ANY(:cold_start_guardrail_source_urls))
 """
@@ -167,12 +177,16 @@ async def like_spread_and_recent_memes(
     user_id: int,
     limit: int = 10,
     exclude_meme_ids: list[int] = [],
+    fresh_viral: bool = False,
 ):
+    """``fresh_viral`` (explore_budget_v1): only memes < 72h old whose first
+    >= 20 reactions have raw LR >= 0.50, instead of the top-views quartile."""
+    pool_filter = FRESH_VIRAL_FILTER_SQL if fresh_viral else "AND MS.raw_impr_rank = 0"
     query = f"""
         SELECT
             M.id
             , M.type, M.telegram_file_id, M.caption
-            , 'like_spread_and_recent' AS recommended_by
+            , :recommended_by AS recommended_by
             , COALESCE(MS.nlikes, 0) AS nlikes
 
         FROM meme M
@@ -196,7 +210,7 @@ async def like_spread_and_recent_memes(
             AND R.meme_id IS NULL
 
             AND MS.nlikes > MS.ndislikes
-            AND MS.raw_impr_rank = 0
+            {pool_filter}
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
             {block_disliked_sources_sql_filter()}
         ORDER BY -1
@@ -204,7 +218,19 @@ async def like_spread_and_recent_memes(
             * {disliked_source_demote_sql()}
         LIMIT :limit
     """
-    return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
+    recommended_by = "fresh_viral" if fresh_viral else "like_spread_and_recent"
+    return await fetch_all(
+        text(query),
+        _build_params(user_id, limit, exclude_meme_ids, recommended_by=recommended_by),
+    )
+
+
+async def get_fresh_viral(
+    user_id: int,
+    limit: int = 10,
+    exclude_meme_ids: list[int] = [],
+):
+    return await like_spread_and_recent_memes(user_id, limit, exclude_meme_ids, fresh_viral=True)
 
 
 async def _get_lr_smoothed_candidates(
@@ -752,6 +778,7 @@ class CandidatesRetriever:
         "lr_smoothed": get_lr_smoothed,
         "text_light_lr_smoothed": get_text_light_lr_smoothed,
         "like_spread_and_recent_memes": like_spread_and_recent_memes,
+        "fresh_viral": get_fresh_viral,
         "recently_liked": get_recently_liked,
         "goat": goat,
         "es_ranked": get_es_ranked,

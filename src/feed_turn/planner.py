@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import ceil
 from types import MappingProxyType
 from typing import Any, Mapping
@@ -12,6 +12,13 @@ GROWING = "growing"
 MATURE = "mature"
 
 MODERATOR_USER_TYPES = frozenset({"moderator", "admin"})
+
+# explore_budget_v1 treatment: smaller labeling share for moderators, and the
+# first meme after an idle gap (empty queue; queue TTL is 1h) comes from an
+# engine with lower post-push abandonment than lr_smoothed.
+LOW_SENT_SHARE = 0.75
+EXPLORE_BUDGET_LOW_SENT_SHARE = 0.5
+IDLE_RETURN_FIRST_SLOT_ENGINE = "like_spread_and_recent_memes"
 
 # Single source of truth for default blend weights. Experiments must import
 # these maps rather than re-declaring the control blend.
@@ -130,22 +137,29 @@ def plan_candidate_selection_for_user(
     cold_start_nsessions_gate_enabled: bool,
     limit: int | None = None,
     cold_start_account_too_old: bool = False,
+    idle_return: bool = False,
 ) -> CandidateSelectionPlan:
     """Plan candidate selection with the production cold-start session gate.
 
     ``limit`` is accepted for batch-pipeline call sites that already carry it;
     candidate selection depends on maturity, session count, and account age.
+    ``idle_return`` swaps the lr_smoothed first slot for
+    ``IDLE_RETURN_FIRST_SLOT_ENGINE`` (explore_budget_v1 treatment).
     """
     _ = limit
     dormant_returner = (nsessions or 0) > 1 or cold_start_account_too_old
     if cold_start_nsessions_gate_enabled and dormant_returner and nmemes_sent < 30:
-        return plan_candidate_selection(30)
+        plan = plan_candidate_selection(30)
+    else:
+        plan = plan_candidate_selection(nmemes_sent)
 
-    return plan_candidate_selection(nmemes_sent)
+    if idle_return and plan.fixed_pos.get(0) == "lr_smoothed":
+        return replace(plan, fixed_pos={0: IDLE_RETURN_FIRST_SLOT_ENGINE})
+    return plan
 
 
-def low_sent_quota(limit: int, user_type: str | None) -> int:
+def low_sent_quota(limit: int, user_type: str | None, explore_budget: bool = False) -> int:
     value = getattr(user_type, "value", user_type)
     if value is None or str(value) not in MODERATOR_USER_TYPES:
         return 0
-    return ceil(limit * 0.75)
+    return ceil(limit * (EXPLORE_BUDGET_LOW_SENT_SHARE if explore_budget else LOW_SENT_SHARE))
