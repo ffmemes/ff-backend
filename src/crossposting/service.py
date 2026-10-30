@@ -6,17 +6,13 @@ from sqlalchemy.dialects.postgresql import insert
 
 from src.config import settings
 from src.crossposting.constants import Channel
-from src.crossposting.shadow_score import attach_shadow_ranks, hybrid_shadow_fields
-from src.crossposting.taste_cohort import (
-    cohort_meta,
-    load_ru_taste_cohort,
-    taste_boost_multiplier,
-)
+from src.crossposting.shadow_score import SHADOW_V5_VERSION, attach_v5_ranks, score_v5
 from src.database import (
     crossposting,
     crossposting_decision_log,
     execute,
     fetch_all,
+    fetch_one,
 )
 from src.tgbot.constants import TELEGRAM_CHANNEL_EN_CHAT_ID, TELEGRAM_CHANNEL_RU_CHAT_ID
 
@@ -52,6 +48,26 @@ async def log_meme_sent(
     )
 
     await execute(insert_statement)
+
+
+# Scheduled slots are >= 2h apart; a newer post means late runs are catching up.
+CATCH_UP_GAP_MINUTES = 60
+
+
+async def posted_recently(channel: Channel, minutes: int = CATCH_UP_GAP_MINUTES) -> bool:
+    """True if this channel got a post within ``minutes`` (stops catch-up bursts)."""
+    row = await fetch_one(
+        text(
+            """
+            SELECT 1 FROM crossposting
+            WHERE channel = :channel
+              AND created_at > NOW() - make_interval(mins => :minutes)
+            LIMIT 1
+            """
+        ),
+        {"channel": channel.value, "minutes": minutes},
+    )
+    return row is not None
 
 
 # Per-channel ranker constants (mirror the SQL ORDER BY).
@@ -140,11 +156,6 @@ def _build_decision_log(
     log_candidates = []
     for i, row in enumerate(candidates):
         breakdown = _compute_score_breakdown(row, channel, like_volume_enabled=like_volume_enabled)
-        # Shadow hybrid (log only): ln(nlikes+1) * src_quality_mult — does not re-rank.
-        shadow = hybrid_shadow_fields(
-            nlikes=row.get("nlikes"),
-            src_quality_mult=breakdown.get("src_quality_mult"),
-        )
         log_candidate = {
             "rank": i + 1,
             "meme_id": row["id"],
@@ -157,16 +168,21 @@ def _build_decision_log(
             "invited_count": row.get("invited_count"),
             "pre_inbot_share_clicks": row.get("pre_inbot_share_clicks") or 0,
             "pre_inbot_share_click_users": row.get("pre_inbot_share_click_users") or 0,
-            "n_taste_likes": int(row.get("n_taste_likes") or 0),
-            "taste_boost_shadow": float(row.get("taste_boost_shadow") or 1.0),
-            "taste_cohort_version": row.get("taste_cohort_version"),
             "n_sub_likes": int(row.get("n_sub_likes") or 0),
             "caption_present": row.get("caption") is not None,
             "src_signal": (
                 round(float(row["src_signal"]), 4) if row.get("src_signal") is not None else None
             ),
             **breakdown,
-            **shadow,
+            # v5 shadow (log only): see shadow_score.py; None when enrichment failed.
+            "shadow_version": SHADOW_V5_VERSION,
+            "theta_src": row.get("theta_src"),
+            "user_taste_z": row.get("user_taste_z"),
+            "score_v5": (
+                round(score_v5(channel, row["nlikes"], row["theta_src"], row["user_taste_z"]), 6)
+                if row.get("theta_src") is not None
+                else None
+            ),
         }
         for key in (
             "share_max_base_score",
@@ -181,7 +197,7 @@ def _build_decision_log(
 
     # Shadow ranks among this top-N only (production order unchanged).
     # Keep shadow_* only inside candidates[] — log_ranker_decision kwargs are fixed columns.
-    log_candidates = attach_shadow_ranks(log_candidates)
+    log_candidates = attach_v5_ranks(log_candidates)
 
     return {
         "channel": channel,
@@ -197,46 +213,92 @@ def _build_decision_log(
     }
 
 
-async def _enrich_candidates_with_taste_shadow(
+# v5 shadow inputs per candidate, one bounded query per decision (~1.3s on prod).
+# Labels: zf = ln(1+forwards) - channel×MSK-week mean over image posts 48h..365d old.
+# ``crossposting.forwards`` is the latest Telethon snapshot (frozen once the post
+# leaves the 30d sweep) — the same field the 2026-10-30 study used, not a 24h snapshot.
+# theta_src: Beta(hits + 4·p̄, misses + 4·(1−p̄)) posterior mean / p̄, clip 0.5–2,
+#   hit = top quartile of ln(1+forwards) within its week.
+# user_taste_z: user weight w = Σ zf of liked posts (liked before the post) / (n + 20);
+#   meme taste = Σ w of its likers / n_likes / stddev(w).
+# ponytail: likes limited to sent_at > now()-90d — user_meme_reaction has no valid
+#   meme_id-leading index on prod, so this window keeps the scan bounded. Widen it
+#   (or precompute weights) if user coverage proves too thin.
+_V5_SHADOW_QUERY = """
+    WITH posts AS MATERIALIZED (
+        SELECT cp.meme_id, cp.created_at, m.meme_source_id AS src,
+               LN(1 + cp.forwards) AS lfw,
+               date_trunc('week', cp.created_at + INTERVAL '3 hours') AS wk
+        FROM crossposting cp
+        JOIN meme m ON m.id = cp.meme_id
+        WHERE cp.channel = :channel
+          AND cp.telegram_message_id IS NOT NULL
+          AND cp.views > 0
+          AND cp.forwards IS NOT NULL
+          AND m.type = 'image'
+          AND cp.created_at < NOW() - INTERVAL '48 hours'
+          AND cp.created_at > NOW() - INTERVAL '365 days'
+    ),
+    weeks AS (
+        SELECT wk, AVG(lfw) AS mu,
+               PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY lfw) AS q75
+        FROM posts GROUP BY wk
+    ),
+    labeled AS MATERIALIZED (
+        SELECT p.meme_id, p.created_at, p.src,
+               p.lfw - w.mu AS zf, (p.lfw >= w.q75)::int AS hit
+        FROM posts p JOIN weeks w USING (wk)
+    ),
+    pbar AS (SELECT AVG(hit) AS p FROM labeled),
+    src AS (SELECT src, SUM(hit) AS h, COUNT(*) AS n FROM labeled GROUP BY src),
+    likes AS MATERIALIZED (
+        SELECT r.meme_id, r.user_id, r.reacted_at
+        FROM user_meme_reaction r
+        WHERE r.sent_at > NOW() - INTERVAL '90 days'
+          AND r.reaction_id = 1
+    ),
+    users AS MATERIALIZED (
+        SELECT lk.user_id, SUM(l.zf) / (COUNT(*) + 20) AS w
+        FROM labeled l
+        JOIN likes lk ON lk.meme_id = l.meme_id AND lk.reacted_at < l.created_at
+        GROUP BY lk.user_id
+    ),
+    wsd AS (SELECT NULLIF(STDDEV_POP(w), 0) AS sd FROM users),
+    taste AS (
+        SELECT lk.meme_id, COUNT(*) AS n_likes, SUM(COALESCE(u.w, 0)) AS wsum
+        FROM likes lk LEFT JOIN users u USING (user_id)
+        WHERE lk.meme_id = ANY(:meme_ids)
+        GROUP BY lk.meme_id
+    )
+    SELECT m.id AS meme_id,
+           LEAST(2.0, GREATEST(0.5,
+               (COALESCE(s.h, 0) + 4 * pbar.p) / (COALESCE(s.n, 0) + 4) / pbar.p
+           ))::float AS theta_src,
+           COALESCE(t.wsum / GREATEST(t.n_likes, 1) / wsd.sd, 0)::float AS user_taste_z
+    FROM meme m
+    CROSS JOIN pbar CROSS JOIN wsd
+    LEFT JOIN src s ON s.src = m.meme_source_id
+    LEFT JOIN taste t ON t.meme_id = m.id
+    WHERE m.id = ANY(:meme_ids)
+"""
+
+
+async def _enrich_candidates_with_v5_shadow(
     candidates: list[dict[str, Any]],
+    *,
+    channel: str,
 ) -> list[dict[str, Any]]:
-    """Attach n_taste_likes + shadow boost for top-N (does not re-rank)."""
-    cohort = load_ru_taste_cohort()
-    if not candidates:
+    """Attach theta_src + user_taste_z for top-N (does not re-rank)."""
+    meme_ids = [int(c["id"]) for c in candidates]
+    if not meme_ids:
         return candidates
-    if not cohort:
-        for c in candidates:
-            c["n_taste_likes"] = 0
-            c["taste_boost_shadow"] = 1.0
-            c["taste_cohort_version"] = None
-        return candidates
-
-    meme_ids = [int(c["id"]) for c in candidates if c.get("id") is not None]
-    counts: dict[int, int] = {}
-    if meme_ids:
-        rows = await fetch_all(
-            text(
-                """
-                SELECT meme_id, COUNT(DISTINCT user_id)::int AS n_taste
-                FROM user_meme_reaction
-                WHERE reaction_id = 1
-                  AND meme_id = ANY(:meme_ids)
-                  AND user_id = ANY(:cohort_ids)
-                GROUP BY meme_id
-                """
-            ),
-            {"meme_ids": meme_ids, "cohort_ids": list(cohort)},
-        )
-        counts = {int(r["meme_id"]): int(r["n_taste"]) for r in rows}
-
-    meta = cohort_meta()
-    version = meta.get("version")
+    rows = await fetch_all(text(_V5_SHADOW_QUERY), {"channel": channel, "meme_ids": meme_ids})
+    by_id = {int(r["meme_id"]): r for r in rows}
     for c in candidates:
-        mid = int(c["id"]) if c.get("id") is not None else None
-        n = counts.get(mid, 0) if mid is not None else 0
-        c["n_taste_likes"] = n
-        c["taste_boost_shadow"] = round(taste_boost_multiplier(n), 4)
-        c["taste_cohort_version"] = version
+        r = by_id.get(int(c["id"]))
+        if r is not None:
+            c["theta_src"] = round(float(r["theta_src"]), 4)
+            c["user_taste_z"] = round(float(r["user_taste_z"]), 4)
     return candidates
 
 
@@ -664,13 +726,12 @@ async def _get_next_meme_for_channel(
     if not rows:
         return None, None
     # Shadow enrichments must never block posting (log-only signals).
-    if channel == "tgchannelru":
-        try:
-            rows = await _enrich_candidates_with_taste_shadow(rows)
-        except Exception:
-            import logging
+    try:
+        rows = await _enrich_candidates_with_v5_shadow(rows, channel=channel)
+    except Exception:
+        import logging
 
-            logging.getLogger(__name__).warning("taste shadow enrichment failed", exc_info=True)
+        logging.getLogger(__name__).warning("v5 shadow enrichment failed", exc_info=True)
     try:
         rows = await _enrich_candidates_with_sub_likes(rows, channel=channel)
     except Exception:
