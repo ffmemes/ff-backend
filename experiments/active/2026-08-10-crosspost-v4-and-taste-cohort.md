@@ -6,6 +6,10 @@ Status: **active**
 Channel: `tgchannelru` (@fastfoodmemes)  
 **Predictions frozen:** 2026-08-10 (this file + `experiments/HYPOTHESES.md` H6/H7)
 
+> **Amendment 2026-10-30:** H7 taste cohort and the H8 `v4_x_src_v1` shadow are killed
+> (corr ≈ 0 / −0.09 with zf). Their code was removed. They are replaced by the v5 shadow:
+> [`2026-10-30-crosspost-v5-shadow.md`](../active/2026-10-30-crosspost-v5-shadow.md).
+
 Authoritative calendar also in `experiments/HYPOTHESES.md` (H6, H7).  
 Do **not** edit pass/fail thresholds after freeze without a dated amendment;
 fill **Metrics after** only.
