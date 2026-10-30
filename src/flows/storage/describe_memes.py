@@ -18,6 +18,8 @@ IMPORTANT — OpenRouter free tier rules:
 - Free model rate limit: 20 rpm across all free models.
 - Daily safety budgets are per verified OpenRouter account (900 at $10+ lifetime
   credits, otherwise 45), plus a shared aggregate guard that includes uploads.
+- Each run spends at most remaining_budget / runs_left_today attempts, so the
+  daily budget lasts until midnight UTC instead of burning out by noon.
 - Free-model 429s/timeouts are normal. Cool down the model and retry in later runs.
 - See specs/describe-memes.md for full constraints.
 
@@ -28,6 +30,7 @@ Circuit breaker: auto-paused after 3 failures in 1 hour.
 import asyncio
 import base64
 import time
+from datetime import datetime, timezone
 
 from prefect import flow, get_run_logger
 from prefect.states import Completed
@@ -47,7 +50,9 @@ from src.flows.storage.openrouter_vision import (
     VISION_MODELS,
     call_openrouter_vision,
     get_configured_openrouter_keys,
+    get_free_requests_used_today,
     get_usable_openrouter_keys,
+    run_attempt_cap,
 )
 from src.storage.deduplication import deduplicate_described_meme
 from src.storage.upload import download_meme_content_from_tg
@@ -165,10 +170,25 @@ async def describe_memes_flow(batch_size: int = 20) -> None:
     # Minimum interval between request starts to stay under 20 rpm rate limit.
     # 10s = 6 rpm effective: slower, but friendlier to free model capacity.
     min_request_interval = 10.0
+    used_at_start = await get_free_requests_used_today()
+    attempt_cap = run_attempt_cap(usable_keys, used_at_start, datetime.now(timezone.utc))
+    log.info("Run attempt cap: %d (used today: %d).", attempt_cap, used_at_start)
 
     i = 0
     while i < len(memes):
         meme_row = memes[i]
+        # ponytail: checked between memes, so one meme's fallback chain can overshoot
+        # by a few attempts; the next run's cap absorbs it.
+        run_attempts = await get_free_requests_used_today() - used_at_start
+        if run_attempts >= attempt_cap:
+            log.info(
+                "Run attempt cap reached (%d/%d). Stopping batch at %d/%d.",
+                run_attempts,
+                attempt_cap,
+                i,
+                len(memes),
+            )
+            break
         remaining = batch_deadline - time.monotonic()
         if remaining < per_meme_timeout + 15:
             log.warning(

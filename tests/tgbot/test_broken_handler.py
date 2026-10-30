@@ -10,7 +10,7 @@ from src.tgbot.handlers import broken
 async def test_broken_callback_query_uses_user_interface_language() -> None:
     update = SimpleNamespace(
         effective_user=SimpleNamespace(id=49820636, language_code="en", send_message=AsyncMock()),
-        callback_query=SimpleNamespace(data="ms:203:set_status:old-value"),
+        callback_query=SimpleNamespace(data="ms:203:set_status:old-value", answer=AsyncMock()),
     )
     context = SimpleNamespace()
 

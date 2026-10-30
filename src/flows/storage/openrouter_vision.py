@@ -227,6 +227,27 @@ async def _reserve_openrouter_free_request(
         return False, -1, -1, "unavailable"
 
 
+async def get_free_requests_used_today() -> int:
+    """Shared free-model attempts reserved today (UTC) across all keys and callers."""
+    try:
+        return int(await redis_client.get(_openrouter_free_request_counter_key()) or 0)
+    except Exception:
+        return 0
+
+
+def run_attempt_cap(
+    keys: Sequence[OpenRouterKey],
+    used_today: int,
+    now: datetime,
+    run_interval_seconds: int = 15 * 60,
+) -> int:
+    """Spread the remaining daily budget evenly over the scheduled runs left today."""
+    seconds_left = 86400 - (now.hour * 3600 + now.minute * 60 + now.second)
+    runs_left = max(1, -(-seconds_left // run_interval_seconds))
+    remaining = max(0, _shared_daily_budget(keys) - used_today)
+    return -(-remaining // runs_left)
+
+
 async def _record_openrouter_metric(key: OpenRouterKey, model_id: str, outcome: str) -> None:
     stats_key = _openrouter_stats_key(key.account_id)
     field = f"{model_id}:{outcome}"

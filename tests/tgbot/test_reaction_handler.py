@@ -48,6 +48,7 @@ def _make_update(
         effective_user=SimpleNamespace(id=user_id),
         callback_query=SimpleNamespace(
             data=data,
+            answer=AsyncMock(),
             message=SimpleNamespace(message_id=999, chat=SimpleNamespace(id=user_id)),
         ),
     )
@@ -254,3 +255,26 @@ async def test_passes_reaction_id_to_next_message(
     if prev_id is None:
         prev_id = call_kwargs[1].get("prev_reaction_id")
     assert prev_id == 2
+
+
+@pytest.mark.asyncio
+@patch(f"{HANDLER_MODULE}.next_message", new_callable=AsyncMock)
+@patch(f"{HANDLER_MODULE}.reward_user_for_daily_activity", new_callable=AsyncMock)
+@patch(f"{HANDLER_MODULE}.update_user_last_active_at", new_callable=AsyncMock)
+@patch(f"{HANDLER_MODULE}.maybe_send_moderator_invite", new_callable=AsyncMock)
+@patch(f"{HANDLER_MODULE}.update_user_info_counters", new_callable=AsyncMock)
+async def test_answers_callback_before_heavy_work(
+    mock_counters, mock_mod_invite, mock_active, mock_reward, mock_next, setup
+):
+    """Unanswered callbacks leave a spinner on the client until Telegram times out."""
+    from src.tgbot.handlers.reaction import handle_reaction
+
+    await create_user_meme_reaction(10001, 10001, "test")
+    update = _make_update(meme_id=10001, reaction_id=1)
+    mock_counters.side_effect = lambda _uid: (
+        update.callback_query.answer.assert_awaited_once()
+        or {"nmemes_sent": 51, "memes_watched_today": 1}
+    )
+    await handle_reaction(update, _make_context())
+
+    update.callback_query.answer.assert_awaited_once_with()
