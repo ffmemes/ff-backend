@@ -91,9 +91,6 @@ TELEGRAM_CHAT_EN_CHAT_ID = -1001586135039
 TELEGRAM_FEEDBACK_CHAT_ID = -1001887032998
 TELEGRAM_MODERATOR_CHAT_ID = -1001305866294
 
-# if a user tries the inline search but not used the bot yet
-INLINE_SEARCH_REQUEST_DEEPLINK = "inline_search_request"
-
 # deep link for adding bot to a group chat
 ADD_TO_GROUP_DEEPLINK = "https://t.me/ffmemesbot?startgroup=true"
 

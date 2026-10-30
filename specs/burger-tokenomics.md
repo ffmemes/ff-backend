@@ -22,7 +22,6 @@ Flows and handlers that create burger transactions:
 - Weekly uploaded-meme rewards: [`rewards/uploaded_memes.py`](../src/flows/rewards/uploaded_memes.py)
 - Daily activity reward: [`rewards/daily.py`](../src/flows/rewards/daily.py)
 - Chat transfers and chat reward drops: [`chat/send_tokens.py`](../src/tgbot/handlers/chat/send_tokens.py)
-- Paid chat-agent replies: [`chat/chat.py`](../src/tgbot/handlers/chat/chat.py)
 - Channel boost reward: [`admin/boost.py`](../src/tgbot/handlers/admin/boost.py)
 - Giveaway claims: [`treasury/giveaway.py`](../src/tgbot/handlers/treasury/giveaway.py)
 - Weekly burger economy channel report: [`weekly_report.py`](../src/flows/crossposting/weekly_report.py)
@@ -67,7 +66,7 @@ Current values from `PAYOUTS`:
 | `purchase_token` | variable | Successful Telegram Stars purchase. | Telegram payment charge id |
 | `receive` | variable | User receives a manual group-chat transfer. | Sender user id |
 | `send` | negative variable | User sends burgers in group chat. | Recipient user id |
-| `bot_reply_payment` | -1 | Bot is mentioned/replied to in a group while chat agent is enabled. | Chat id + message id |
+| `bot_reply_payment` | -1 | Legacy: group chat-agent replies (agent removed 2026-10-30). | Chat id + message id |
 
 Important current behavior: leaderboard and weekly economy "minted" totals count
 every positive row. This includes purchases, receives, giveaways, boost rewards,
@@ -182,13 +181,6 @@ Code:
 - Registered in [`tgbot/app.py`](../src/tgbot/app.py)
 - Logic in [`reward_active_chat_users`](../src/tgbot/handlers/chat/send_tokens.py)
 
-### Chat-agent replies in groups
-
-When the chat agent is enabled and the bot is mentioned/replied to, a successful
-agent request charges `bot_reply_payment` (`-1`) from the requester.
-
-Code: [`handle_agent_trigger`](../src/tgbot/handlers/chat/chat.py).
-
 ## Non-Treasury Commands
 
 These are registered commands that are not themselves burger-economy commands:
@@ -198,8 +190,6 @@ These are registered commands that are not themselves burger-economy commands:
 | `/start` | Private | Onboarding, deep links, giveaway links, shared meme links. |
 | `/lang` | Private | Bot meme-language settings in `user_language`. |
 | `/chat`, `/c`, `/с` | Private text prefix | Feedback/chat to admins. Implemented as a message regex, not `CommandHandler`. |
-| `/wrapped` | Private | Wrapped stats flow. |
-| `/wrapped_clear` | Private | Clears wrapped cache/state. |
 | `/stats` | Private | User stats. |
 | `/delete` | Private | User data deletion flow. |
 | `/promotemod` | Private | Admin/moderator operation. |

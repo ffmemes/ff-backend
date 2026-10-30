@@ -23,7 +23,6 @@ def _prepared_delivery() -> PreparedMemeDelivery:
     return PreparedMemeDelivery(
         caption="<b>caption</b>",
         reply_markup=object(),  # type: ignore[arg-type]
-        share_button_variant="url_share",
         languages=frozenset({"en"}),
     )
 

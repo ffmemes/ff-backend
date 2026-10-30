@@ -28,7 +28,6 @@ logger = logging.getLogger(__name__)
 BROADCAST_RECOMMENDED_BY = "broadcast_reengagement"
 BROADCAST_HQ_RECOMMENDED_BY = "broadcast_reengagement_hq"
 BROADCAST_CHANNEL_VIRAL_RECOMMENDED_BY = "broadcast_channel_viral"
-_CHANNEL_HITS_EXPERIMENT_ID = "channel_hits_v1"
 
 # Quality floors for the HQ pick (explicit reactions, not lr_smoothed alone).
 _HQ_MIN_EXPLICIT_REACTIONS = 15
@@ -118,8 +117,8 @@ async def _fetch_high_quality_reengagement_meme(user_id: int) -> MemeData | None
 async def _fetch_channel_viral_reengagement_meme(user_id: int) -> MemeData | None:
     """Unseen image from our channels in the last 7 days, ranked by forwards.
 
-    Skips known subscribers (they already got the channel push) and anyone in
-    the live channel-hits cohort. Empty pool is normal — HQ/queue still fire.
+    Skips known subscribers (they already got the channel push). Empty pool is
+    normal — HQ/queue still fire.
     """
     query = """
         SELECT
@@ -159,20 +158,6 @@ async def _fetch_channel_viral_reengagement_meme(user_id: int) -> MemeData | Non
           AND SNAP.views >= 50
           AND SNAP.forwards >= 1
           AND NOT EXISTS (
-              SELECT 1 FROM experiment_assignment A
-              WHERE A.user_id = :user_id
-                AND A.experiment_id = :experiment_id
-                AND CAST(A.assignment_metadata->>'exposure_end_at' AS timestamptz) > NOW()
-          )
-          AND NOT EXISTS (
-              SELECT 1 FROM user_channel_membership CM
-              WHERE CM.user_id = :user_id
-                AND CM.chat_id = CASE CP.channel
-                    WHEN 'tgchannelru' THEN CAST(:ru_chat_id AS bigint)
-                    ELSE CAST(:en_chat_id AS bigint) END
-                AND (CM.status = 'member' OR CM.ever_member)
-          )
-          AND NOT EXISTS (
               SELECT 1 FROM user_tg_chat_membership OLD
               WHERE OLD.user_tg_id = :user_id
                 AND OLD.chat_id = CASE CP.channel
@@ -186,7 +171,6 @@ async def _fetch_channel_viral_reengagement_meme(user_id: int) -> MemeData | Non
         text(query),
         {
             "user_id": user_id,
-            "experiment_id": _CHANNEL_HITS_EXPERIMENT_ID,
             "ru_chat_id": TELEGRAM_CHANNEL_RU_CHAT_ID,
             "en_chat_id": TELEGRAM_CHANNEL_EN_CHAT_ID,
         },

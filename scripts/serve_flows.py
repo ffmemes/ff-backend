@@ -29,8 +29,6 @@ from src.flows.crossposting.editorial import post_editorial_to_channel
 from src.flows.crossposting.meme import (
     post_meme_to_tgchannelen,
     post_meme_to_tgchannelru,
-    post_share_max_meme_to_tgchannelen,
-    post_share_max_meme_to_tgchannelru,
 )
 from src.flows.crossposting.stats_collector import (
     collect_channel_stats,
@@ -170,15 +168,8 @@ if __name__ == "__main__":
             name="Post to TG Channel EN",
             schedules=[CronSchedule(cron="40 8,10,14,18,20 * * *", timezone=MSK)],
         ),
-        # One-shot crossposting canary flows. Operators trigger these manually.
-        post_share_max_meme_to_tgchannelru.to_deployment(
-            name="Post Share Max Meme to TG Channel RU",
-        ),
-        post_share_max_meme_to_tgchannelen.to_deployment(
-            name="Post Share Max Meme to TG Channel EN",
-        ),
         # ── Channel Stats ──
-        # Full sweep: mature 24h labels + subscribers + lifecycle.
+        # Full sweep: mature 24h labels + subscribers.
         collect_channel_stats.to_deployment(
             name="Collect Channel Stats",
             schedules=[CronSchedule(cron="0 */6 * * *", timezone=LON)],
@@ -215,7 +206,7 @@ if __name__ == "__main__":
         # ── Monitors ──
         monitor_ghost_users.to_deployment(
             name="Monitor ghost users",
-            schedules=[CronSchedule(cron="* * * * *", timezone=LON)],
+            schedules=[CronSchedule(cron="*/10 * * * *", timezone=LON)],
         ),
         # ── Storage ──
         describe_memes_flow.to_deployment(

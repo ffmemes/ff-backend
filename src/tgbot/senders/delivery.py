@@ -16,10 +16,7 @@ from src.storage.schemas import MemeData
 from src.tgbot.senders.keyboards import meme_reaction_keyboard
 from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
 from src.tgbot.senders.utils import collect_user_languages
-from src.tgbot.sharing import (
-    get_meme_share_button_text,
-    get_or_assign_meme_share_button_variant,
-)
+from src.tgbot.sharing import get_meme_share_button_text
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +25,6 @@ logger = logging.getLogger(__name__)
 class PreparedMemeDelivery:
     caption: str
     reply_markup: InlineKeyboardMarkup
-    share_button_variant: str
     languages: frozenset[str]
 
 
@@ -41,28 +37,24 @@ async def prepare_meme_delivery(
 ) -> PreparedMemeDelivery:
     languages = await collect_user_languages(user_id, user_info.get("interface_lang"))
     referral_button_text = get_meme_share_button_text(user_info.get("interface_lang"))
-    share_button_variant = await get_or_assign_meme_share_button_variant(user_id)
     logger.debug(
-        "Prepared meme %s for user %s share_button='%s' variant=%s languages=%s",
+        "Prepared meme %s for user %s share_button='%s' languages=%s",
         meme.id,
         user_id,
         referral_button_text,
-        share_button_variant,
         sorted(languages),
     )
     reply_markup = meme_reaction_keyboard(
         meme.id,
         user_id,
         referral_button_text,
-        share_button_variant=share_button_variant,
+        share_button=True,
         interface_lang=user_info.get("interface_lang"),
         reaction_context=reaction_context,
-        meme_type=meme.type.value,
     )
     caption = await get_meme_caption_for_user_id(meme, user_id, user_info)
     return PreparedMemeDelivery(
         caption=caption,
         reply_markup=reply_markup,
-        share_button_variant=share_button_variant,
         languages=frozenset(languages),
     )

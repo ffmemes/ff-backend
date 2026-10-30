@@ -30,10 +30,9 @@ def meme_reaction_keyboard(
     meme_id: int,
     user_id: int,
     referral_button_text: str,
-    share_button_variant: str | None = None,
+    share_button: bool = False,
     interface_lang: str | None = None,
     reaction_context: str | None = None,
-    meme_type: str | None = None,
 ):
     like = random.choice(HEART_EMOJI)
     dislike = "⏬"
@@ -49,16 +48,14 @@ def meme_reaction_keyboard(
         return callback_data
 
     keyboard = []
-    if share_button_variant:
+    if share_button:
         keyboard.append(
             [
                 build_meme_share_button(
                     meme_id=meme_id,
                     user_id=user_id,
                     text=referral_button_text,
-                    variant=share_button_variant,
                     interface_lang=interface_lang,
-                    meme_type=meme_type,
                     style=select_random_inline_keyboard_button_style(),
                 )
             ]

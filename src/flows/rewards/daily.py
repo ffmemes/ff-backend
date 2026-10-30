@@ -1,6 +1,5 @@
 from datetime import datetime
 
-# from prefect import flow
 from telegram.constants import ParseMode
 
 from src import localizer
@@ -11,7 +10,6 @@ from src.tgbot.logs import log
 from src.tgbot.user_info import get_user_info
 
 
-# @flow
 async def reward_user_for_daily_activity(user_id: int):
     user_info = await get_user_info(user_id)
     if user_info["memes_watched_today"] == 10:

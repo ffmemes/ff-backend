@@ -157,19 +157,6 @@ async def get_users_with_language(
     return await fetch_all(text(select_query))
 
 
-async def get_users_active_more_than_days_ago(
-    days_ago: int,
-):
-    select_query = f"""
-        SELECT id
-        FROM "user"
-        WHERE last_active_at < NOW() - INTERVAL '{days_ago} DAYS'
-        AND blocked_bot_at IS NULL
-        AND type != 'blocked_bot'
-    """
-    return await fetch_all(text(select_query))
-
-
 async def get_users_inactive_since_days(days: int) -> list[int]:
     """Users who have not been active for at least ``days`` days.
 

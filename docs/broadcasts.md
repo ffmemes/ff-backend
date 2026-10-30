@@ -5,7 +5,7 @@ Guide for sending bulk messages to bot users. Written after the April 2026 wrapp
 ## Architecture
 
 - **Engine**: `src/broadcasts/service.py` — `send_broadcast()` function with Redis SET dedup
-- **Scripts**: `scripts/broadcast_wrapped.py` (text), `scripts/broadcast_dormant.py` (per-user meme)
+- **Scripts**: one-off `scripts/broadcast_<name>.py` (see below); past ones are in git history
 - **Bot**: uses `src/tgbot/bot.bot` (python-telegram-bot) to send messages
 - **Dedup**: Redis SET `broadcast:{id}:sent` tracks which user_ids were already sent to
 - **Rate**: configurable delay between sends (default 0.15s = ~7 msg/sec)

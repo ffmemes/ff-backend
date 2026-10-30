@@ -61,38 +61,6 @@ popup.how_invite_to_bot:
     Invia a un amico qualsiasi meme dal bot e chiedi di aprire quel link. Aiuta i tuoi amici a evitare la coda per entrare nel bot! ^^
   
 
-popup.inline_search:
-  ru: |-
-    Мы тут начали делать поиск по мемам, зачекай, мб пригодится на случай важных переговоров:
-
-    Начинай писать сообщение: @ffmemesbot и через пробел введи запрос. 
-    Например: @ffmemesbot котики
-  en: |-
-    You know, we also have a search! 
-    
-    Type @ffmemesbot and then your request.
-
-    Example: @ffmemesbot cats
-  uk: |-
-    Ми тут почали робити пошук по мемам, зачекай, може знадобиться на випадок важливих переговорів:
-
-    Почни писати повідомлення: @ffmemesbot і через пробіл введи запит. 
-    Наприклад: @ffmemesbot котики
-
-
-experiment.upload_promo_day1:
-  en: |-
-    Did you know you can share your own memes? 🤳
-
-    Just send an image to this chat — if other users like it, it'll be shown to more people!
-  ru: |-
-    Знаешь, что ты можешь делиться своими мемами? 🤳
-
-    Просто отправь картинку в этот чат — если другим понравится, мы покажем её всем!
-  uk: |-
-    Знаєш, що ти можеш ділитися своїми мемами? 🤳
-
-    Просто надішли зображення в цей чат — якщо іншим сподобається, ми покажемо його всім!
 
 
 popup.upload_meme:

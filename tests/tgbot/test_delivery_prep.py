@@ -25,11 +25,6 @@ async def test_prepare_meme_delivery_builds_keyboard_and_caption(monkeypatch):
         AsyncMock(return_value={"en"}),
     )
     monkeypatch.setattr(delivery, "get_meme_share_button_text", lambda lang: "Share")
-    monkeypatch.setattr(
-        delivery,
-        "get_or_assign_meme_share_button_variant",
-        AsyncMock(return_value="url_share"),
-    )
     keyboard = MagicMock(name="keyboard")
     monkeypatch.setattr(delivery, "meme_reaction_keyboard", lambda *a, **k: keyboard)
     monkeypatch.setattr(
@@ -47,5 +42,4 @@ async def test_prepare_meme_delivery_builds_keyboard_and_caption(monkeypatch):
 
     assert prepared.caption == "caption with link"
     assert prepared.reply_markup is keyboard
-    assert prepared.share_button_variant == "url_share"
     assert prepared.languages == frozenset({"en"})
