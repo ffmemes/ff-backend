@@ -49,7 +49,10 @@ one engine’s ORDER BY. Soft personalization (affinity multiply) stays in engin
 
 ---
 
-## Playground (offline eval)
+## Playground (offline eval) — not built
+
+`scripts/reco_eval.py` was removed unused on 2026-10-30 (recover from git
+`89af5b71` if needed). The sketch below is the design, not a live tool.
 
 ### Location
 
@@ -57,7 +60,6 @@ one engine’s ORDER BY. Soft personalization (affinity multiply) stays in engin
 src/recommendations/eval/
   metrics.py          # pure functions: LR, continuation, avoided-dislike rate
   replay.py           # load events, apply policy, score
-scripts/reco_eval.py  # CLI: python scripts/reco_eval.py --policy block_disliked --days 7
 ```
 
 ### Inputs (from prod/analyst DB, read-only)
@@ -162,7 +164,7 @@ Primary metrics library:
 | Phase | Deliverable | Effort |
 |-------|-------------|--------|
 | **0** | Soft **demote** disliked sources (×0.15); hard-block opt-in only | S |
-| **1** | `scripts/reco_eval.py counterfactual-block-disliked` | S |
+| **1** | Counterfactual block-disliked CLI (prototype removed unused 2026-10-30) | S |
 | **1b** | Label retention pushes `broadcast_reengagement` for dwell analysis | S |
 | **2** | Candidate-log sampling (top-K engines per refill) for true shadow rank | M |
 | **3** | Experiment registry refactor (one apply path) | M |

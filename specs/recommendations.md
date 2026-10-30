@@ -27,11 +27,11 @@ Key files:
 | `like_spread_and_recent_memes` | High like rate + recent + reach diversity |
 | `recently_liked` | Memes from sources the user recently liked |
 | `goat` | All-time best memes by like rate (see [TODOS.md](../TODOS.md) for per-user recency filter) |
-| `es_ranked` | Ranked by engagement_score (time-weighted, accounts for skips). See [experiment](experiment-2026-03-16-es-ranked.md) |
+| `es_ranked` | Ranked by engagement_score (time-weighted, accounts for skips). See `experiment-2026-03-16-es-ranked` (archived) |
 | `cold_start_explore` | Broad exploration for new users (<30 memes) |
-| `cold_start_adapt` | Adapts to early reactions. See [experiment](experiment-2026-03-20-adaptive-cold-start.md) |
+| `cold_start_adapt` | Adapts to early reactions. See `experiment-2026-03-20-adaptive-cold-start` (archived) |
 
-Removed engines: `fast_dopamine`, `classic`, `multiply_all_scores`, `selected_sources_240513`, `less_seen_meme_and_source`, `low_sent_pool` (for non-moderators). See [experiment-2026-03-14.md](experiment-2026-03-14.md).
+Removed engines: `fast_dopamine`, `classic`, `multiply_all_scores`, `selected_sources_240513`, `less_seen_meme_and_source`, `low_sent_pool` (for non-moderators). See `experiment-2026-03-14` (archived).
 
 ## User Maturity Stages
 
@@ -76,7 +76,7 @@ Gaps:
 - No collaborative filtering (users who liked X also liked Y)
 
 ## Related Specs
-- [experiment-2026-03-14.md](experiment-2026-03-14.md) — removed bad engines, queue threshold fix
-- [experiment-2026-03-16-es-ranked.md](experiment-2026-03-16-es-ranked.md) — engagement_score engine
-- [experiment-2026-03-20-adaptive-cold-start.md](experiment-2026-03-20-adaptive-cold-start.md) — 3-phase cold start
+- `experiment-2026-03-14` (archived) — removed bad engines, queue threshold fix
+- `experiment-2026-03-16-es-ranked` (archived) — engagement_score engine
+- `experiment-2026-03-20-adaptive-cold-start` (archived) — 3-phase cold start
 - [channel-growth-optimization.md](channel-growth-optimization.md) — crossposting scoring (separate from bot recommendations)

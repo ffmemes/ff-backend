@@ -204,8 +204,8 @@ slot into the evening reactivation window. Bot activity in the last 30 days:
 / 349 active users. Use 21:00 first because the active-user base is slightly
 wider and the slot is less late.
 
-ML status: `scripts/eval_crossposting_ml.py` now runs a read-only logistic
-baseline against 24h channel labels. Initial 90-day run:
+ML status: `scripts/eval_crossposting_ml.py` (removed 2026-10-30; in git
+history at `89af5b71`) ran a read-only logistic baseline against 24h channel labels. Initial 90-day run:
 
 | Channel | Labeled images | Logistic AUC | Source-signal AUC | Pre-share top20 lift |
 | --- | ---: | ---: | ---: | ---: |

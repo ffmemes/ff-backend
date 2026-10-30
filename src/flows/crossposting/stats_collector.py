@@ -9,7 +9,7 @@ Schedules (serve_flows.py):
 - Young-posts hourly (<48h) for early canary / score_version reads
 - Single-message refresh after each crosspost (post-hook)
 
-Uses the same Telethon session string as e2e_smoke.py (TELEGRAM_API_ID,
+Uses the Telethon session string (TELEGRAM_API_ID,
 TELEGRAM_API_HASH, TELEGRAM_SESSION_STRING env vars).
 """
 

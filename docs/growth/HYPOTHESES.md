@@ -277,7 +277,7 @@ defaults to `false`. Follow-up: `experiments/active/2026-10-30-broadcast-cadence
 
 ### One-shot idle blast (2026-09-07)
 
-`scripts/broadcast_dormant.py` id `dormant-channel-viral-2026-09-07`.
+`scripts/broadcast_dormant.py` (removed 2026-10-30; in git history) id `dormant-channel-viral-2026-09-07`.
 **Let it finish.** Next extra wave: 7–28d + holdout, not 90d+ never-reacted.
 Readout: `docs/analyst/readouts/2026-09-07-onboarding-and-dormant-blast.md`.
 
@@ -460,7 +460,7 @@ replacement for like volume.
 |-------|--------|
 | **ID** | `bot2channel_ml_lab_v1` |
 | **Status** | **KILLED as signal 2026-10-30**: offline HOLD vs v4, and the live shadow corr is −0.09 (see below) |
-| **Code** | `experiments/ml-crosspost-bot2channel/` |
+| **Code** | `experiments/ml-crosspost-bot2channel/` — removed 2026-10-30; recover from commit `177cad0e` |
 | **Note** | `experiments/completed/2026-08-11-bot2channel-ml-lab.md` |
 | **Report** | `experiments/ml-crosspost-bot2channel/reports/2026-08-11-models.md` |
 
