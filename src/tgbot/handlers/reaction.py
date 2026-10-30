@@ -6,6 +6,7 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from src.config import settings
 from src.flows.rewards.daily import reward_user_for_daily_activity
 from src.recommendations.service import (
     update_user_last_active_at,
@@ -54,9 +55,17 @@ async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 prev_reaction_id=int(reaction_id),
             )
 
-        return await next_message(
+        message = await next_message(
             context.bot,
             user_id,
             prev_update=update,
             prev_reaction_id=int(reaction_id),
         )
+        if settings.FRIEND_CHALLENGE_ENABLED and int(reaction_id) == 1:
+            from src.tgbot.handlers.friend_challenge import maybe_offer_challenge
+
+            try:
+                await maybe_offer_challenge(context.bot, user_id, int(meme_id), user_info)
+            except Exception:
+                logging.warning("Could not offer friend challenge", exc_info=True)
+        return message

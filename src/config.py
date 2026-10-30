@@ -34,6 +34,8 @@ class Config(BaseSettings):
     TELEGRAM_BOT_WEBHOOK_SECRET: str | None = None
     TELEGRAM_INLINE_SHARE_ENABLED: bool = True
     TELEGRAM_INLINE_SHARE_CANARY_PERCENT: int = 0
+    # Friend challenge (H12): 90% treatment / 10% holdout of eligible senders.
+    FRIEND_CHALLENGE_ENABLED: bool = False
     # Enable after membership backfill and fixed channel-hit cohort enrollment.
     CHANNEL_HITS_ENABLED: bool = False
     CHANNEL_MEMBERSHIP_SYNC_ENABLED: bool = False

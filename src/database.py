@@ -12,6 +12,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     Identity,
     Index,
     Insert,
@@ -840,6 +841,62 @@ experiment_assignment = Table(
     ),
     Column("assigned_at", DateTime, server_default=func.now(), nullable=False),
     UniqueConstraint("experiment_id", "user_id", name="uq_experiment_assignment"),
+)
+
+# === Friend challenge ("Пять мемов для друга") ===
+
+friend_challenge_pack = Table(
+    "friend_challenge_pack",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("owner_id", BigInteger, ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
+    Column("token", String(32), nullable=False),
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+    Column("confirmed_at", DateTime),
+    UniqueConstraint("owner_id"),
+    UniqueConstraint("token"),
+)
+
+friend_challenge_item = Table(
+    "friend_challenge_item",
+    metadata,
+    Column("pack_id", ForeignKey("friend_challenge_pack.id", ondelete="CASCADE"), primary_key=True),
+    Column("position", SmallInteger, primary_key=True),
+    # Preserve a fixed slot when content is removed; never silently replace its meme.
+    Column("meme_id", ForeignKey("meme.id", ondelete="SET NULL")),
+    CheckConstraint("position BETWEEN 1 AND 5", name="position"),
+    UniqueConstraint("pack_id", "meme_id", name="friend_challenge_item_pack_meme_key"),
+)
+
+friend_challenge_participation = Table(
+    "friend_challenge_participation",
+    metadata,
+    Column("pack_id", ForeignKey("friend_challenge_pack.id", ondelete="CASCADE"), primary_key=True),
+    Column("user_id", BigInteger, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True),
+    Column("started_at", DateTime, server_default=func.now(), nullable=False),
+    Column("completed_at", DateTime),
+)
+
+friend_challenge_answer = Table(
+    "friend_challenge_answer",
+    metadata,
+    Column("pack_id", Integer, primary_key=True),
+    Column("user_id", BigInteger, primary_key=True),
+    Column("position", SmallInteger, primary_key=True),
+    Column("liked", Boolean, nullable=False),
+    Column("answered_at", DateTime, server_default=func.now(), nullable=False),
+    ForeignKeyConstraint(
+        ["pack_id", "user_id"],
+        ["friend_challenge_participation.pack_id", "friend_challenge_participation.user_id"],
+        name="friend_challenge_answer_participation_fkey",
+        ondelete="CASCADE",
+    ),
+    ForeignKeyConstraint(
+        ["pack_id", "position"],
+        ["friend_challenge_item.pack_id", "friend_challenge_item.position"],
+        name="friend_challenge_answer_item_fkey",
+        ondelete="CASCADE",
+    ),
 )
 
 
