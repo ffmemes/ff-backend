@@ -63,7 +63,11 @@ async def get_memes_to_describe(limit: int = 30) -> list[dict[str, Any]]:
     1. Recent user uploads — enables dedup before they spread further
     2. Images actually sent to users recently — protects the active feed
     3. Freshly parsed images — keeps ingestion close to real time
-    4. One oldest-pending fairness slot per nine items — prevents starvation
+    4. One backlog slot per nine items — channel-published memes first (our
+       viral candidates), then the oldest pending image to prevent starvation
+
+    Both 'ok' and 'published' memes are eligible: crossposting moves a meme to
+    'published', and those must still get OCR.
 
     Unused upload capacity is reassigned to recent deliveries, then unused
     recent-delivery capacity is reassigned to fresh images.  The delivery tier
@@ -92,7 +96,7 @@ async def get_memes_to_describe(limit: int = 30) -> list[dict[str, Any]]:
             WHERE SRC.type = 'user upload'
                 AND M.created_at >= now() - (:recent_window_days * INTERVAL '1 day')
                 AND M.type = 'image'
-                AND M.status = 'ok'
+                AND M.status IN ('ok', 'published')
                 AND M.telegram_file_id IS NOT NULL
                 AND (M.ocr_result IS NULL OR M.ocr_result->>'description' IS NULL)
                 AND COALESCE((M.ocr_result->>'describe_failures')::int, 0) < 3
@@ -123,7 +127,7 @@ async def get_memes_to_describe(limit: int = 30) -> list[dict[str, Any]]:
             FROM recent_served RS
             INNER JOIN meme M ON M.id = RS.meme_id
             WHERE M.type = 'image'
-                AND M.status = 'ok'
+                AND M.status IN ('ok', 'published')
                 AND M.telegram_file_id IS NOT NULL
                 AND (M.ocr_result IS NULL OR M.ocr_result->>'description' IS NULL)
                 AND COALESCE((M.ocr_result->>'describe_failures')::int, 0) < 3
@@ -149,7 +153,7 @@ async def get_memes_to_describe(limit: int = 30) -> list[dict[str, Any]]:
             WHERE M.created_at >= now() - (:recent_window_days * INTERVAL '1 day')
                 AND SRC.type IS DISTINCT FROM 'user upload'
                 AND M.type = 'image'
-                AND M.status = 'ok'
+                AND M.status IN ('ok', 'published')
                 AND M.telegram_file_id IS NOT NULL
                 AND (M.ocr_result IS NULL OR M.ocr_result->>'description' IS NULL)
                 AND COALESCE((M.ocr_result->>'describe_failures')::int, 0) < 3
@@ -180,14 +184,14 @@ async def get_memes_to_describe(limit: int = 30) -> list[dict[str, Any]]:
             FROM meme M
             WHERE M.created_at < now() - (:recent_window_days * INTERVAL '1 day')
                 AND M.type = 'image'
-                AND M.status = 'ok'
+                AND M.status IN ('ok', 'published')
                 AND M.telegram_file_id IS NOT NULL
                 AND (M.ocr_result IS NULL OR M.ocr_result->>'description' IS NULL)
                 AND COALESCE((M.ocr_result->>'describe_failures')::int, 0) < 3
                 AND NOT EXISTS (SELECT 1 FROM recent_uploads U WHERE U.id = M.id)
                 AND NOT EXISTS (SELECT 1 FROM selected_recent_served S WHERE S.id = M.id)
                 AND NOT EXISTS (SELECT 1 FROM selected_fresh F WHERE F.id = M.id)
-            ORDER BY M.created_at ASC
+            ORDER BY (M.status = 'published') DESC, M.created_at ASC
             LIMIT (
                 :oldest_limit
                 + GREATEST(
@@ -216,7 +220,7 @@ async def get_memes_to_describe(limit: int = 30) -> list[dict[str, Any]]:
                 FROM recent_served RS
                 INNER JOIN meme M ON M.id = RS.meme_id
                 WHERE M.type = 'image'
-                    AND M.status = 'ok'
+                    AND M.status IN ('ok', 'published')
                     AND M.telegram_file_id IS NOT NULL
                     AND (M.ocr_result IS NULL OR M.ocr_result->>'description' IS NULL)
                     AND COALESCE((M.ocr_result->>'describe_failures')::int, 0) < 3
@@ -238,7 +242,7 @@ async def get_memes_to_describe(limit: int = 30) -> list[dict[str, Any]]:
                 WHERE M.created_at >= now() - (:recent_window_days * INTERVAL '1 day')
                     AND SRC.type IS DISTINCT FROM 'user upload'
                     AND M.type = 'image'
-                    AND M.status = 'ok'
+                    AND M.status IN ('ok', 'published')
                     AND M.telegram_file_id IS NOT NULL
                     AND (M.ocr_result IS NULL OR M.ocr_result->>'description' IS NULL)
                     AND COALESCE((M.ocr_result->>'describe_failures')::int, 0) < 3
@@ -320,6 +324,8 @@ async def save_meme_description(
     description = _text_or_empty(result.get("description"))
     language = _text_or_empty(result.get("language"))
     model_used = result.get("__model", VISION_MODELS[0])
+    # Models often answer "en" for text-free images; no text means no language.
+    language_code = language.strip().lower() if ocr_text.strip() else "none"
 
     merged = {
         **existing_ocr,
@@ -331,13 +337,14 @@ async def save_meme_description(
             "language": language,
         },
         "description": description,
+        # Meme text language (ISO 639-1) or "none". Older rows lack this key.
+        "language": language_code,
     }
 
     if not existing_ocr.get("text"):
         merged["text"] = ocr_text
 
     update_kwargs: dict[str, Any] = {"ocr_result": merged}
-    language_code = language.strip().lower()
     if language_code in KNOWN_LANGUAGES:
         update_kwargs["language_code"] = language_code
 

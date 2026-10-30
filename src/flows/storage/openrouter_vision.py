@@ -29,15 +29,17 @@ OPENROUTER_FORBIDDEN_MODEL_COOLDOWN_SECONDS = 60 * 60 * 6
 # lifetime purchases for 1,000 req/day (vs 50/day without).
 # See specs/describe-memes.md for full OpenRouter constraints.
 #
-# Verified available on OpenRouter API as of 2026-07-09.
+# Verified available on OpenRouter API as of 2026-10-30 (see specs/describe-memes.md).
 # Ordered by preference. Falls back to next model on 429/403/timeout/bad response.
 # Transient failures set Redis cooldowns so later memes/runs try other free models.
 VISION_MODELS = [
-    "inclusionai/ling-3.0-flash-vl:free",  # verified OCR; requires reasoning disabled
-    "google/gemma-4-31b-it:free",  # 262k context, primary
-    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",  # 256k context, multimodal
-    "google/gemma-4-26b-a4b-it:free",  # 262k context, MoE variant
-    "dots-studio/dots-3-note-preview:free",  # verified OCR fallback
+    "dots-studio/dots-3-note-preview:free",  # best OCR in 2026-10-30 test, keeps typos
+    "nvidia/nemotron-3.5-super-vl:free",  # fast, reliable; may "fix" misspelled text
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",  # accurate, often malformed JSON
+    "google/gemma-4-31b-it:free",  # 429 on every test call; kept for off-peak windows
+    "google/gemma-4-26b-a4b-it:free",  # same as above
+    # inclusionai/ling-3.0-flash-vl:free returns HTTP 404 (removed, 2026-09-24).
+    # thinkingmachines/inkling*:free return 403 "only available on agentic harnesses".
     # Gemma 3 free vision fallbacks are no longer listed by OpenRouter.
     # nex-agi/nex-n2-pro:free is no longer listed by OpenRouter.
     # nvidia/nemotron-3.5-content-safety:free is a guardrail classifier, not
@@ -50,12 +52,12 @@ DESCRIBE_PROMPT = (
     "You are analyzing a meme image. Extract the following:\n\n"
     "1. OCR_TEXT: ALL text visible in the image, exactly as written. "
     "Preserve original language and line breaks. "
-    "If no text, return empty string.\n\n"
+    "Ignore the @ffmemesbot watermark. If no other text, return empty string.\n\n"
     "2. DESCRIPTION: Describe the meme in 1-3 sentences in English. "
     "What's happening visually? What's the joke? "
     "Be specific (panels, characters, reactions, meme format).\n\n"
     "3. LANGUAGE: Primary language of the meme text as ISO 639-1 code "
-    '(e.g. "ru", "en"). If no text, return "en". '
+    '(e.g. "ru", "en"). If no text, return "none". '
     "If mixed, return dominant language.\n\n"
     "Respond with ONLY valid JSON, no markdown fences:\n"
     '{"ocr_text": "...", "description": "...", "language": "..."}'
@@ -753,7 +755,9 @@ async def _handle_status_response(
         )
         return {RATE_LIMITED: True, "__retry_after": cooldown}
 
-    if response.status_code == 403:
+    # 403 = access denied, 404 = model removed from OpenRouter. Neither recovers
+    # within minutes, so skip the model for hours instead of burning quota.
+    if response.status_code in {403, 404}:
         await _record_openrouter_metric(key, model_id, "forbidden")
         await _cool_down_openrouter_model(
             key,
@@ -761,7 +765,7 @@ async def _handle_status_response(
             OPENROUTER_FORBIDDEN_MODEL_COOLDOWN_SECONDS,
             "forbidden",
         )
-        log.warning("Model %s HTTP 403 (access denied), trying next...", model_id)
+        log.warning("Model %s HTTP %s, trying next...", model_id, response.status_code)
         return {TRY_NEXT_MODEL: True}
 
     return None

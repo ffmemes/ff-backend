@@ -219,6 +219,26 @@ async def test_get_memes_to_describe_backfills_an_empty_oldest_tier(describe_que
     assert [row["id"] for row in selected] == [*recent_served_ids, 120080]
 
 
+@pytest.mark.asyncio
+async def test_get_memes_to_describe_serves_published_backlog_first(describe_queue_data):
+    now = datetime.now(UTC).replace(tzinfo=None)
+    async with engine.connect() as conn:
+        old = now - timedelta(days=30)
+        await create_meme(conn, id=120090, meme_source_id=120000, created_at=old)
+        await create_meme(
+            conn,
+            id=120091,
+            meme_source_id=120000,
+            status="published",
+            created_at=now - timedelta(days=10),
+        )
+        await conn.commit()
+
+    selected = await repository.get_memes_to_describe(limit=1)
+
+    assert [row["id"] for row in selected] == [120091]
+
+
 @pytest.mark.parametrize(
     "result",
     [
@@ -245,6 +265,7 @@ async def test_save_meme_description_normalizes_missing_or_non_string_fields(mon
     assert isinstance(merged["text"], str)
     assert isinstance(merged["description"], str)
     assert merged["raw_result"]["language"] == ""
+    assert merged["language"] == ("" if merged["text"] else "none")
     assert "language_code" not in update_params
 
 
@@ -268,3 +289,20 @@ async def test_save_meme_description_normalizes_known_string_language(monkeypatc
     update_params = update_query.compile(dialect=postgresql.dialect()).params
 
     assert update_params["language_code"] == "ru"
+    assert update_params["ocr_result"]["language"] == "ru"
+
+
+@pytest.mark.asyncio
+async def test_save_meme_description_marks_text_free_meme_language_none(monkeypatch):
+    fetch_one = AsyncMock(return_value={})
+    monkeypatch.setattr(repository, "fetch_one", fetch_one)
+
+    merged = await repository.save_meme_description(
+        42,
+        {},
+        {"ocr_text": " ", "description": "a cat", "language": "en", "__model": "m:free"},
+    )
+
+    update_params = fetch_one.await_args.args[0].compile(dialect=postgresql.dialect()).params
+    assert merged["language"] == "none"
+    assert "language_code" not in update_params

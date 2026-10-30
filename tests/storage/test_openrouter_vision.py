@@ -361,5 +361,32 @@ async def test_all_account_guards_exhausted_stops_without_marking_a_meme_failed(
     assert result[openrouter_vision.DAILY_BUDGET_EXHAUSTED] is True
 
 
+@pytest.mark.asyncio
+async def test_removed_model_404_gets_long_model_cooldown(monkeypatch):
+    cooldowns = []
+
+    async def cool_down(_key, model_id, seconds, reason, **_kwargs):
+        cooldowns.append((model_id, seconds, reason))
+
+    async def no_op(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(openrouter_vision, "_cool_down_openrouter_model", cool_down)
+    monkeypatch.setattr(openrouter_vision, "_record_openrouter_metric", no_op)
+    key = openrouter_vision.OpenRouterKey("primary", "key", "account")
+    response = httpx.Response(
+        404,
+        json={"error": {"message": "No endpoints found"}},
+        request=httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions"),
+    )
+
+    result = await openrouter_vision._handle_status_response(response, key, "gone:free", _Log())
+
+    assert result == {openrouter_vision.TRY_NEXT_MODEL: True}
+    assert cooldowns == [
+        ("gone:free", openrouter_vision.OPENROUTER_FORBIDDEN_MODEL_COOLDOWN_SECONDS, "forbidden")
+    ]
+
+
 async def _return_keys(keys):
     return keys
