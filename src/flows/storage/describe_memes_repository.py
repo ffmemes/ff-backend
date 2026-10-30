@@ -325,7 +325,9 @@ async def save_meme_description(
     language = _text_or_empty(result.get("language"))
     model_used = result.get("__model", VISION_MODELS[0])
     # Models often answer "en" for text-free images; no text means no language.
-    language_code = language.strip().lower() if ocr_text.strip() else "none"
+    # The stored image carries our watermark, which is not meme text.
+    has_text = ocr_text.replace("@ffmemesbot", "").strip()
+    language_code = language.strip().lower() if has_text else "none"
 
     merged = {
         **existing_ocr,

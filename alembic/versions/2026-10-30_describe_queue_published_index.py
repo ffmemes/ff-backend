@@ -25,8 +25,12 @@ _PENDING = (
 def upgrade() -> None:
     # Build without blocking meme writes on the large production table.
     with op.get_context().autocommit_block():
+        # A failed CONCURRENTLY build leaves an INVALID index; drop it so reruns rebuild.
         op.execute(
-            "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_meme_describe_pending_published_created_at "
+            "DROP INDEX CONCURRENTLY IF EXISTS ix_meme_describe_pending_published_created_at"
+        )
+        op.execute(
+            "CREATE INDEX CONCURRENTLY ix_meme_describe_pending_published_created_at "
             "ON meme ((status = 'published') DESC, created_at) "
             f"WHERE status IN ('ok', 'published') AND {_PENDING}"
         )

@@ -293,14 +293,15 @@ async def test_save_meme_description_normalizes_known_string_language(monkeypatc
 
 
 @pytest.mark.asyncio
-async def test_save_meme_description_marks_text_free_meme_language_none(monkeypatch):
+@pytest.mark.parametrize("ocr_text", [" ", "@ffmemesbot"])
+async def test_save_meme_description_marks_text_free_meme_language_none(monkeypatch, ocr_text):
     fetch_one = AsyncMock(return_value={})
     monkeypatch.setattr(repository, "fetch_one", fetch_one)
 
     merged = await repository.save_meme_description(
         42,
         {},
-        {"ocr_text": " ", "description": "a cat", "language": "en", "__model": "m:free"},
+        {"ocr_text": ocr_text, "description": "a cat", "language": "en", "__model": "m:free"},
     )
 
     update_params = fetch_one.await_args.args[0].compile(dialect=postgresql.dialect()).params
