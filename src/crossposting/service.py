@@ -62,6 +62,8 @@ async def posted_recently(channel: Channel, minutes: int = CATCH_UP_GAP_MINUTES)
             SELECT 1 FROM crossposting
             WHERE channel = :channel
               AND created_at > NOW() - make_interval(mins => :minutes)
+              -- weekly reward albums (REWARD_ALBUM_SCORE_VERSION = 0) are not ranked slots
+              AND score_version IS DISTINCT FROM 0
             LIMIT 1
             """
         ),
