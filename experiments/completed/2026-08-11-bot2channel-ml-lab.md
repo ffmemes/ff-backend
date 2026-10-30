@@ -1,7 +1,7 @@
 # Experiment: Bot→channel ML lab (offline)
 
 Created: 2026-08-11  
-Status: **active — offline only**  
+Status: **completed (2026-10-30)**: H8 shadow killed as a signal  
 Owner: analyst / engineer  
 Code: `experiments/ml-crosspost-bot2channel/`
 
@@ -102,3 +102,13 @@ python train_eval.py
 - n=3889 (Telethon∪DB), walk-forward **HOLD** vs v4
 - See `reports/2026-08-11-results.html` and `reports/2026-08-11-otchet-ru.md`
 - Production: no change
+
+## Conclusion (2026-10-30)
+
+**KILL `v4_x_src_v1` as a ranking signal, with no canary.** Live shadow (n=388 decisions):
+it disagreed with the prod pick 70.9% of the time. Among posted picks (n=363),
+corr(shadow_score, f1k) = −0.092, and corr(prod final_score, f1k) = −0.047. Both
+are range-restricted and near zero. Agreed vs disagreed picks: f1k 29.01 vs 29.10.
+The "clearly better than v4" bar was not met. Offline lab code stays under
+`experiments/ml-crosspost-bot2channel/` for reference. The decision_log shadow fields
+stay until the crossposting PR that replaces shadow scoring removes them.

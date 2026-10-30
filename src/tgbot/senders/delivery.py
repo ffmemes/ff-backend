@@ -15,7 +15,6 @@ from telegram import InlineKeyboardMarkup
 from src.storage.schemas import MemeData
 from src.tgbot.senders.keyboards import meme_reaction_keyboard
 from src.tgbot.senders.meme_caption import get_meme_caption_for_user_id
-from src.tgbot.senders.meme_like_count_experiment import get_visible_meme_like_count
 from src.tgbot.senders.utils import collect_user_languages
 from src.tgbot.sharing import (
     get_meme_share_button_text,
@@ -55,7 +54,6 @@ async def prepare_meme_delivery(
         meme.id,
         user_id,
         referral_button_text,
-        visible_like_count=await get_visible_meme_like_count(user_id, meme.nlikes),
         share_button_variant=share_button_variant,
         interface_lang=user_info.get("interface_lang"),
         reaction_context=reaction_context,

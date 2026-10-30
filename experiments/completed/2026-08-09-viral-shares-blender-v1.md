@@ -1,7 +1,7 @@
 # Experiment: Viral shares blender v1
 
 Created: 2026-08-09  
-Status: **active** (interim only — do not close)  
+Status: **completed — KILL (2026-10-30)**  
 Owner: engineer / analyst  
 Deployed: 2026-08-09 (~14:20 UTC first assignment)  
 **Measure after: 2026-08-16** (primary)  
@@ -63,12 +63,25 @@ Full numbers: `docs/analyst/readouts/2026-08-09-viral-shares-interim.md`
 | Window | control n | treatment n | clickers/1k C/T | invites/1k C/T | p50 session C/T | Decision |
 |--------|-----------|-------------|-----------------|----------------|-----------------|----------|
 | 2026-08-09 interim | 10 | 12 | 0 / 0 | 0 / 0 | 16.5 / 19.0 | HOLD |
-| 2026-08-16 day-7 | | | | | | TBD |
-| 2026-08-23 day-14 | | | | | | TBD |
+| 2026-10-30 day-82 (final) | 344 | 350 | 0.031 / 0.025 | 0.012 / 0.018 | 14 / 10 (pooled) | KILL |
 
 ## Conclusion
 
-_Filled on completion only._
+**KILL (2026-10-30).** Enrollment stopped in code; every mature user gets the
+shipped default blend (`MATURE_BLEND_WEIGHTS`). Existing assignment rows stay
+for readouts. The `viral_shares` engine stays in `candidates.py` but no blend uses it.
+
+- Primary failed: unique non-self share clickers per 1k sends 0.031 control vs
+  0.025 treatment (13 vs 10 clickers, 426k / 395k sends).
+- Invites 5 vs 7 (0.012 vs 0.018 per 1k). One treatment inviter accounts for 4, so this is noise.
+- Mean per-user LR 49.7% vs 47.5% (−2.2 pp, inside the 3 pp guardrail).
+- The engine reached only 0.76% of treatment sends, so the arms barely differed.
+- Pooled p50 session dropped 14 → 10, which trips the frozen kill trigger. The
+  user-level median of per-user p50 is flat (10 vs 10), so the drop is
+  heavy-user composition. It is not why we killed the test.
+
+Readout: [`docs/analyst/readouts/2026-10-30-experiment-closure.md`](../../docs/analyst/readouts/2026-10-30-experiment-closure.md).
+The canned SQL §4 invite multiplier bug was fixed in the same PR.
 
 ## Readout SQL
 

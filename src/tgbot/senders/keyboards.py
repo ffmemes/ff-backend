@@ -30,14 +30,12 @@ def meme_reaction_keyboard(
     meme_id: int,
     user_id: int,
     referral_button_text: str,
-    visible_like_count: int | None = None,
     share_button_variant: str | None = None,
     interface_lang: str | None = None,
     reaction_context: str | None = None,
     meme_type: str | None = None,
 ):
-    heart = random.choice(HEART_EMOJI)
-    like = f"{heart} {visible_like_count}" if visible_like_count is not None else heart
+    like = random.choice(HEART_EMOJI)
     dislike = "⏬"
     # like, dislike = "👍", "👎"
 

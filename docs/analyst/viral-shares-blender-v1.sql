@@ -94,7 +94,7 @@ clicks AS (
 SELECT
   s.variant,
   count(DISTINCT s.sharer_user_id || ':' || s.meme_id) AS meme_sends_proxy,
-  count(*) AS share_clicks,
+  count(c.clicker_id) AS share_clicks,  -- not count(*): that counts every LEFT-joined send row
   count(DISTINCT c.clicker_id) AS unique_clickers,
   round(
     1000.0 * count(DISTINCT c.clicker_id)
@@ -116,7 +116,7 @@ WITH assigned AS (
   WHERE experiment_id = 'viral_shares_blender_v1'
 ),
 invites AS (
-  SELECT a.variant, u.id AS invitee_id, u.created_at
+  SELECT a.variant, a.user_id AS inviter_id, u.id AS invitee_id, u.created_at
   FROM assigned a
   JOIN "user" u
     ON u.inviter_id = a.user_id
@@ -140,7 +140,9 @@ SELECT
     3
   ) AS invites_per_1k_sends
 FROM assigned a
-LEFT JOIN invites i ON i.variant = a.variant
+-- Join on the inviter, not the variant: a variant-level join multiplied every
+-- invite by cohort size (bug fixed 2026-10-30).
+LEFT JOIN invites i ON i.inviter_id = a.user_id
 GROUP BY a.variant
 ORDER BY 1;
 

@@ -8,11 +8,10 @@
 
 ## P1 — Growth & feed measurement
 
-### ~~Virality score for ranking~~ — SHIPPED as viral_shares_blender_v1
-**What:** Engine `viral_shares` + mature blend A/B (`viral_shares_blender_v1`). See `experiments/active/2026-08-09-viral-shares-blender-v1.md`.
-**Next checks (hard dates):** smoke **2026-08-12**, primary **2026-08-16**, final **2026-08-23**.  
-**Rules + all open hypotheses:** [`experiments/HYPOTHESES.md`](experiments/HYPOTHESES.md).  
-Do **not** close from interim n (~20 users); day-7 needs ≥80/arm or wait day-14.
+### ~~Virality score for ranking~~ — viral_shares_blender_v1 KILLED 2026-10-30
+**What:** Engine `viral_shares` + mature blend A/B (`viral_shares_blender_v1`). See `experiments/completed/2026-08-09-viral-shares-blender-v1.md`.
+**Closed:** clickers/1k 0.031 control vs 0.025 treatment. Enrollment stopped, all users on control.
+**Rules + all open hypotheses:** [`docs/growth/HYPOTHESES.md`](docs/growth/HYPOTHESES.md).
 
 ### Cold-start first-session quality floors — SHIPPING
 **What:** explore raw-LR ≥0.50 / n≥25; CS3 blend uses best_uploaded + text_light (no like_spread).

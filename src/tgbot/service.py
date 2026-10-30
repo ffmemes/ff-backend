@@ -44,7 +44,6 @@ from src.tgbot.repo.memes import (
 )
 from src.tgbot.repo.popups import (
     create_user_popup_log,
-    delete_user_popup_log,
     update_user_popup_log,
     user_popup_already_sent,
 )
@@ -73,7 +72,6 @@ __all__ = [
     "create_or_update_user",
     "create_user_popup_log",
     "del_user_language",
-    "delete_user_popup_log",
     "dismiss_source_candidate",
     "get_experiment_assignment",
     "get_experiment_variant",

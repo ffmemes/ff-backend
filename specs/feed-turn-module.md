@@ -90,7 +90,7 @@ Keep these public functions import-compatible at first:
 ## Safe Implementation Plan
 
 1. Freeze current behavior with characterization tests.
-   Cover reaction idempotency, duplicate callbacks, positive/negative delivery path, stale queue entries, popup branch, first-meme nudge ordering, empty queue alert, `Forbidden`, `TimedOut`, `BadRequest`, and `check_queue` lock behavior.
+   Cover reaction idempotency, duplicate callbacks, positive/negative delivery path, stale queue entries, popup branch, empty queue alert, `Forbidden`, `TimedOut`, `BadRequest`, and `check_queue` lock behavior.
 
 2. Extract a pure planner.
    Move only the decision table from `generate_recommendations()`: cold start phases, growing, mature, moderator/admin quota, fixed positions, weights, and fallback chain. No Redis writes, SQL, or Telegram calls in this step.
@@ -142,7 +142,6 @@ pytest \
   tests/recommendations/test_engine_contracts.py \
   tests/recommendations/test_reaction_service.py \
   tests/tgbot/test_reaction_handler.py \
-  tests/tgbot/test_first_meme_nudge.py \
   tests/test_redis.py
 ```
 

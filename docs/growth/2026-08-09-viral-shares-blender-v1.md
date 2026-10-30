@@ -1,6 +1,6 @@
 # Experiment: Viral shares blender v1
 
-Canonical note: [`experiments/active/2026-08-09-viral-shares-blender-v1.md`](../../experiments/active/2026-08-09-viral-shares-blender-v1.md)  
+Canonical note: [`experiments/completed/2026-08-09-viral-shares-blender-v1.md`](../../experiments/completed/2026-08-09-viral-shares-blender-v1.md)  
 Decision calendar: [`experiments/HYPOTHESES.md`](../../experiments/HYPOTHESES.md) **H1**
 
 Created: 2026-08-09  
