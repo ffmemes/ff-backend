@@ -10,6 +10,7 @@ from telegram.ext import (
 from src import localizer
 from src.tgbot.exceptions import UserNotFound
 from src.tgbot.user_info import get_user_info
+from src.tgbot.utils import safe_answer_callback_query
 
 
 async def _get_interface_lang(update: Update) -> str | None:
@@ -30,5 +31,7 @@ async def handle_broken_callback_query(update: Update, context: ContextTypes.DEF
     cb = update.callback_query.data if update.callback_query else "none"
     sys.stderr.write(f"[broken] catch-all fired: cb={cb}\n")
     sys.stderr.flush()
+    if update.callback_query:
+        await safe_answer_callback_query(update.callback_query)
     lang = await _get_interface_lang(update)
     await update.effective_user.send_message(localizer.t("service.bot_updated", lang))

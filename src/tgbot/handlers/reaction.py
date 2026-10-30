@@ -16,6 +16,7 @@ from src.tgbot.handlers.moderator.invite import maybe_send_moderator_invite
 from src.tgbot.senders.next_message import next_message
 from src.tgbot.sharing import MEME_REACTION_CONTEXT_ONBOARD
 from src.tgbot.user_info import update_user_info_counters
+from src.tgbot.utils import safe_answer_callback_query
 
 
 def _fire_and_forget(coro):
@@ -26,6 +27,8 @@ def _fire_and_forget(coro):
 
 
 async def handle_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Answer first: unanswered callbacks keep a spinner on the button until timeout.
+    await safe_answer_callback_query(update.callback_query)
     user_id = update.effective_user.id
     callback_parts = update.callback_query.data[2:].split(":")
     meme_id, reaction_id = callback_parts[:2]

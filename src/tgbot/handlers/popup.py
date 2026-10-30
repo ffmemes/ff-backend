@@ -14,6 +14,7 @@ from src.flows.events import safe_emit
 from src.recommendations.service import update_user_last_active_at
 from src.tgbot.senders.next_message import next_message
 from src.tgbot.service import update_user_popup_log
+from src.tgbot.utils import safe_answer_callback_query
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,7 @@ async def handle_popup_button(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
+    await safe_answer_callback_query(update.callback_query)
     user_id = update.effective_user.id
     popup_id = update.callback_query.data[2:]
     reaction_is_new = await update_user_popup_log(user_id, popup_id)
