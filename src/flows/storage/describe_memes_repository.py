@@ -22,6 +22,30 @@ KNOWN_LANGUAGES = {
     "uz",
 }
 
+# Content tags for the crosspost shadow multiplier
+# (experiments/active/2026-10-31-crosspost-content-tags.md).
+MEME_FORMATS = {
+    "single_caption",
+    "multi_panel",
+    "tweet_screenshot",
+    "chat_screenshot",
+    "photo_no_text",
+    "drawing_comic",
+    "other",
+}
+
+
+def _content_tags(result: dict[str, Any]) -> dict[str, Any]:
+    """format / relatable / politics_news; invalid or missing values → None."""
+    fmt = result.get("format")
+    fmt = fmt.strip().lower() if isinstance(fmt, str) else None
+    tags: dict[str, Any] = {"format": fmt if fmt in MEME_FORMATS else None}
+    for key in ("relatable", "politics_news"):
+        value = result.get(key)
+        tags[key] = value if isinstance(value, bool) else None
+    return tags
+
+
 RECENT_WINDOW_DAYS = 7
 # The delivery-event index is ordered by sent_at, so this bounded lookback finds
 # images that users are seeing now without aggregating the complete reaction
@@ -341,6 +365,7 @@ async def save_meme_description(
         "description": description,
         # Meme text language (ISO 639-1) or "none". Older rows lack this key.
         "language": language_code,
+        **_content_tags(result),
     }
 
     if not existing_ocr.get("text"):

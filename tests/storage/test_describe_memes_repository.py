@@ -307,3 +307,25 @@ async def test_save_meme_description_marks_text_free_meme_language_none(monkeypa
     update_params = fetch_one.await_args.args[0].compile(dialect=postgresql.dialect()).params
     assert merged["language"] == "none"
     assert "language_code" not in update_params
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("tags", "expected"),
+    [
+        (
+            {"format": " Tweet_Screenshot ", "relatable": True, "politics_news": False},
+            ("tweet_screenshot", True, False),
+        ),
+        ({}, (None, None, None)),
+        ({"format": "meme", "relatable": "yes", "politics_news": 1}, (None, None, None)),
+    ],
+)
+async def test_save_meme_description_stores_content_tags(monkeypatch, tags, expected):
+    monkeypatch.setattr(repository, "fetch_one", AsyncMock(return_value={}))
+
+    merged = await repository.save_meme_description(
+        42, {}, {"ocr_text": "t", "description": "d", "language": "ru", **tags}
+    )
+
+    assert (merged["format"], merged["relatable"], merged["politics_news"]) == expected

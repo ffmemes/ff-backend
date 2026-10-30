@@ -59,8 +59,15 @@ DESCRIBE_PROMPT = (
     "3. LANGUAGE: Primary language of the meme text as ISO 639-1 code "
     '(e.g. "ru", "en"). If no text, return "none". '
     "If mixed, return dominant language.\n\n"
+    "4. FORMAT: one of single_caption, multi_panel, tweet_screenshot "
+    "(tweet/Threads/X post), chat_screenshot, photo_no_text, drawing_comic, other.\n\n"
+    "5. RELATABLE: true if the main joke is recognizing an ordinary everyday "
+    'situation ("that\'s me/us"), else false.\n\n'
+    "6. POLITICS_NEWS: true if about politics, government, laws/bans "
+    "or a news event, else false.\n\n"
     "Respond with ONLY valid JSON, no markdown fences:\n"
-    '{"ocr_text": "...", "description": "...", "language": "..."}'
+    '{"ocr_text": "...", "description": "...", "language": "...", '
+    '"format": "...", "relatable": false, "politics_news": false}'
 )
 
 RATE_LIMITED = "__rate_limited"
@@ -519,13 +526,17 @@ def _parse_vision_response(raw_content: str) -> dict:
         pass
 
     result = {}
-    for key in ("ocr_text", "description", "language"):
+    for key in ("ocr_text", "description", "language", "format"):
         match = re.search(rf'"{key}"\s*:\s*"((?:[^"\\]|\\.)*)"', content, re.DOTALL)
         if match:
             try:
                 result[key] = json.loads(f'"{match.group(1)}"')
             except json.JSONDecodeError:
                 result[key] = match.group(1)
+    for key in ("relatable", "politics_news"):
+        match = re.search(rf'"{key}"\s*:\s*(true|false)', content)
+        if match:
+            result[key] = match.group(1) == "true"
     if result:
         return result
 
