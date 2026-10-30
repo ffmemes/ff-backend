@@ -30,11 +30,6 @@ async def test_prepare_meme_delivery_builds_keyboard_and_caption(monkeypatch):
         "get_or_assign_meme_share_button_variant",
         AsyncMock(return_value="url_share"),
     )
-    monkeypatch.setattr(
-        delivery,
-        "get_visible_meme_like_count",
-        AsyncMock(return_value=None),
-    )
     keyboard = MagicMock(name="keyboard")
     monkeypatch.setattr(delivery, "meme_reaction_keyboard", lambda *a, **k: keyboard)
     monkeypatch.setattr(

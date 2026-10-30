@@ -18,10 +18,6 @@ from src.storage.constants import MemeType
 from src.storage.schemas import MemeData
 from src.tgbot.bot import bot
 from src.tgbot.senders.delivery import prepare_meme_delivery
-from src.tgbot.senders.popups import (
-    get_first_meme_nudge_variant_to_send,
-    maybe_send_first_meme_nudge,
-)
 from src.tgbot.service import mark_user_blocked
 from src.tgbot.telegram_retry import telegram_call_with_retry
 from src.tgbot.user_info import get_user_info
@@ -43,7 +39,6 @@ async def send_meme_to_user(
     (e.g. ``broadcast_reengagement`` for retention pushes).
     """
     user_info = await get_user_info(user_id)
-    is_first_meme = (user_info["nmemes_sent"] or 0) == 0
     if recommended_by:
         meme.recommended_by = recommended_by
     prepared = await prepare_meme_delivery(
@@ -58,15 +53,7 @@ async def send_meme_to_user(
     if sent_message is None:
         return
 
-    delivery_task = asyncio.create_task(
-        _complete_direct_meme_delivery(
-            user_id,
-            meme,
-            user_info,
-            is_first_meme=is_first_meme,
-            first_meme_nudge_tasks=first_meme_nudge_tasks,
-        )
-    )
+    delivery_task = asyncio.create_task(_record_delivered_meme_reaction(user_id, meme))
     if first_meme_nudge_tasks is not None:
         first_meme_nudge_tasks.append(delivery_task)
     try:
@@ -76,42 +63,6 @@ async def send_meme_to_user(
             lambda task: _log_direct_meme_delivery_result(task, user_id, meme.id)
         )
         raise
-
-
-async def _complete_direct_meme_delivery(
-    user_id: int,
-    meme: MemeData,
-    user_info: dict,
-    *,
-    is_first_meme: bool,
-    first_meme_nudge_tasks: list[asyncio.Task[None]] | None,
-) -> None:
-    nudge_assignment_error: Exception | None = None
-    try:
-        nudge_variant = await get_first_meme_nudge_variant_to_send(
-            user_id,
-            is_first_meme=is_first_meme,
-        )
-    except Exception as exc:
-        nudge_variant = None
-        nudge_assignment_error = exc
-        logger.warning(
-            "Failed to assign first-meme nudge before recording delivered meme for user %s meme %s",
-            user_id,
-            meme.id,
-            exc_info=(type(exc), exc, exc.__traceback__),
-        )
-
-    await _record_delivered_meme_reaction(user_id, meme)
-    if nudge_assignment_error is not None:
-        raise nudge_assignment_error
-
-    if nudge_variant == "treatment":
-        nudge_task = asyncio.create_task(maybe_send_first_meme_nudge(user_id, user_info))
-        if first_meme_nudge_tasks is None:
-            await nudge_task
-        else:
-            first_meme_nudge_tasks.append(nudge_task)
 
 
 def _log_direct_meme_delivery_result(

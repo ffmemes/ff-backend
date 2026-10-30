@@ -3,8 +3,10 @@
 **Purpose:** When an agent (or human) resumes after days/weeks, this file answers:
 what is live, what we expected, when to re-measure, and what “good / kill” means.
 
-**Last updated:** 2026-09-07 (UTC) — H9 scoreboard, H10/H11 onboarding ship  
-**Prod DB clock at last interim:** `2026-09-07 ~12:32 UTC`
+**Last updated:** 2026-10-30 (UTC). Experiment closure: H1/H7/H8/H10/channel_hits killed, orphan splits closed  
+**Prod DB clock at last interim:** `2026-10-30 ~16:35 UTC`
+
+This file is the **canonical registry**. `experiments/HYPOTHESES.md` is a pointer here.
 
 **Growth bar (all new Hs):** ship only if the funnel gets less leaky (first-tap / first-like / reached-5) **and/or** k-factor moves (unique non-self share clicks, new-user invites). Session length and block rate are guardrails. See [`docs/growth/virality-loop.md`](virality-loop.md).
 
@@ -16,6 +18,31 @@ How to use on resume:
 3. Write numbers into the linked readout path; update **Status** / **Decision**.
 4. If status becomes `ship` or `kill`, open a code PR (planner weights / freeze
    enrollment) and move the experiment note `active/` → `completed/`.
+
+---
+
+## Decision log: 2026-10-30
+
+Readout: [`docs/analyst/readouts/2026-10-30-experiment-closure.md`](../analyst/readouts/2026-10-30-experiment-closure.md).
+
+| Hypothesis | Decision | Key numbers |
+|------------|----------|-------------|
+| H1 `viral_shares_blender_v1` | **KILL**. Enrollment stopped in code, all users on control | clickers/1k C 0.031 vs T 0.025, mean user LR −2.2 pp, viral engine 0.76% of T sends (n 344/350) |
+| H2 `source_affinity_demote_v1` | **KEEP at 100%** | no send-volume cliff, weekly LR 32.6–36.1% vs 30.7–33.5% pre |
+| H3 broadcast label | **DONE** | broadcast p50 sec-to-react 3.8–5.5k s vs feed 5.7 s |
+| H3b HQ broadcast pick | **KEEP** | 14d LR 57.2%, react<1h 36.5%, queue fallback 0.4% |
+| H3c channel-viral pick | **UNCHANGED**. Confounded, so it waits for a user-randomized readout | pooled 1h −9.6 pp vs HQ, but within-user (67 users) +6.9 pp, LR −5.4 pp |
+| H5 cold-start floors | **KEEP** (no rollback trigger) | first-tap 61.5 → 62.0%, n=100 post, underpowered |
+| H6 crosspost v4 like-volume | **KEEP at 100%** | hit rate 32.1 → 41.0% (+8.9 pp, z≈2.4), f1k 26.2 → 28.9 |
+| H7 taste-cohort shadow | **KILL as signal** (no canary, decision_log fields left for the crossposting PR) | top vs bottom n_taste f1k 28.52 vs 28.72 (n=287) |
+| H8 shadow hybrid `v4_x_src_v1` | **KILL as signal** (no canary, fields left for the crossposting PR) | corr(shadow, f1k) −0.09, agreed vs disagreed f1k 29.01 vs 29.10 |
+| H10 `cold_start_fresh_viral_v1` | **KILL**. Flag default off, so everyone gets control | first tap 60.0% C vs 48.5% T, blocked<1h 19 vs 27 (n 95/99) |
+| H11 skip countdown | **KEEP (neutral)** | p50 to first meme 11.6 → 2.8 s, first-tap flat (H10 control 60.0% vs ~61.5% pre) |
+| `channel_hits_v1` | **KILL** (inconclusive per protocol, window ended 2026-09-19) | retained invitees T 1 vs C 0, host activity −23% T vs −5% C (n 42/43) |
+| `ocr_length_preference_v1` | **INVALID** (quality_failed) | late OCR 23% vs 5% limit |
+| `first_meme_nudge` (orphan, since 2026-04-28) | **KILL**. Control (no nudge) for everyone, code removed | first tap 15.8% C vs 16.0% T, user LR 39.2 vs 36.1%, d1–7 return 5.0 vs 5.0% (n 1526/1456) |
+| `meme_like_count` (orphan, since 2026-05-12) | **KILL**. Control (plain heart) for everyone, code removed | mean user LR 45.6 vs 46.2%, react rate 83.4 vs 83.3%, active days/14d 0.85 vs 0.86 (n 6306/6208) |
+| `text_light_lr_smoothed` sends (~20/wk) | **Not a leftover.** It is the cold-start CS3 blend weight and CS fallback shipped in #271. The disabled overlay is a separate thing | 28d: 75 sends, all to users under 100 prior sends |
 
 ---
 
@@ -36,7 +63,7 @@ How to use on resume:
 Agent prompt on resume (copy-paste):
 
 ```text
-Read experiments/HYPOTHESES.md. For every hypothesis with Next check ≤ today,
+Read docs/growth/HYPOTHESES.md. For every hypothesis with Next check ≤ today,
 run the readout SQL on ANALYST_DATABASE_URL, update the Status/Decision rows
 and the linked readout markdown, then recommend ship/hold/kill with numbers.
 ```
@@ -48,10 +75,10 @@ and the linked readout markdown, then recommend ship/hold/kill with numbers.
 | Field | Value |
 |-------|--------|
 | **ID** | `viral_shares_blender_v1` |
-| **Status** | **active — too early to close** (interim only) |
+| **Status** | **KILLED 2026-10-30**: clickers/1k C 0.031 vs T 0.025. Enrollment stopped, all users on control |
 | **Shipped** | 2026-08-09 ~14:20 UTC (first assignment) |
 | **Code** | `candidates.viral_shares`, `blender_experiments.get_viral_shares_blender_v1_weights` |
-| **Note** | `experiments/active/2026-08-09-viral-shares-blender-v1.md` |
+| **Note** | `experiments/completed/2026-08-09-viral-shares-blender-v1.md` |
 | **SQL** | `docs/analyst/viral-shares-blender-v1.sql` |
 | **Readout log** | `docs/analyst/readouts/2026-08-09-viral-shares-interim.md` |
 
@@ -110,7 +137,7 @@ Do **not** wait for 1000/arm (unrealistic). Prefer:
 | Field | Value |
 |-------|--------|
 | **ID** | `source_affinity_demote_v1` (config flags, not A/B) |
-| **Status** | **shipped default ON** (PR #340) |
+| **Status** | **shipped default ON** (PR #340). **KEEP 2026-10-30**: no volume cliff, LR +1–3 pp |
 | **Shipped** | 2026-08-09 deploy `687fd46a` |
 | **Code** | `RECOMMENDATION_DEMOTE_*`, `disliked_source_demote_sql` |
 | **SQL** | `docs/analyst/source-affinity-demote-guardrails.sql` + inventory section of `dwell-feed-vs-broadcast.sql` |
@@ -147,7 +174,7 @@ volume collapse.
 | Field | Value |
 |-------|--------|
 | **ID** | `broadcast_reengagement_label` |
-| **Status** | **shipped** — labels live (39 rows within hours of #340) |
+| **Status** | **DONE 2026-10-30**: labels live, broadcast p50 sec-to-react 3.8–5.5k s vs feed 5.7 s |
 | **Shipped** | 2026-08-09 with #340 |
 | **Code** | `flows/broadcasts/meme.py` → `recommended_by=broadcast_*` |
 | **SQL** | `docs/analyst/broadcast-reengagement.sql`, dwell SQL |
@@ -174,7 +201,7 @@ in-session `sec_to_react` and optimize broadcast timing for **fast** reaction.
 | Field | Value |
 |-------|--------|
 | **ID** | `broadcast_reengagement_hq_pick` |
-| **Status** | **shipping** (this PR) |
+| **Status** | **KEEP 2026-10-30**: 14d LR 57.2%, react<1h 36.5%, queue fallback 0.4% |
 | **Code** | `src/recommendations/broadcast_pick.py`, kill switch `BROADCAST_HIGH_QUALITY_PICK_ENABLED` |
 | **Labels** | `broadcast_reengagement_hq` (SQL pick) vs `broadcast_reengagement` (queue fallback) |
 | **SQL** | `docs/analyst/broadcast-reengagement.sql` |
@@ -215,7 +242,7 @@ most users (fallback rate &gt;80%) or LR collapses &gt;5 pp vs fallback.
 | Field | Value |
 |-------|--------|
 | **ID** | `broadcast_channel_viral_pick` |
-| **Status** | **disabled 2026-10-30** (default `false`; code path kept) |
+| **Status** | **disabled 2026-10-30** (default `false`; code path kept). Frozen rule trips (1h −9.6 pp vs HQ); arms reach different audiences; within users viral +6.9 pp at 1h but −5.4 pp LR, so HQ is the default (PR #366) |
 | **Code** | `src/recommendations/broadcast_pick.py`, kill switch `BROADCAST_CHANNEL_VIRAL_PICK_ENABLED` |
 | **Labels** | `broadcast_channel_viral` vs `broadcast_reengagement_hq` vs queue |
 | **SQL** | `docs/analyst/broadcast-reengagement.sql` |
@@ -294,7 +321,7 @@ ignore `>1h` reactions in affinity.
 | Field | Value |
 |-------|--------|
 | **ID** | `cold_start_first_impression_v2` |
-| **Status** | **shipping** (this PR) |
+| **Status** | **KEEP 2026-10-30**: no rollback trigger. First-tap 61.5 → 62.0% (n=100 post), so the lift is unproven |
 | **Code** | `cold_start_explore` raw-LR floor; CS3 blend → `best_uploaded` + text-light |
 | **SQL** | engine slice in `docs/analyst/metrics.sql` / cold_start quality scripts |
 
@@ -331,7 +358,7 @@ week CS3 band.
 | Field | Value |
 |-------|--------|
 | **ID** | `crosspost_meme_level_v1` / **score_version=4** |
-| **Status** | **SHIPPING** (RU scheduled ranker default ON) |
+| **Status** | **KEEP at 100% 2026-10-30**: hit rate 32.1 → 41.0% (+8.9 pp, z≈2.4), f1k 26.2 → 28.9 |
 | **Kill switch** | `CROSSPOST_RU_MEME_LIKE_VOLUME_ENABLED=false` → v2 |
 | **Readout offline** | `docs/analyst/readouts/2026-08-09-crosspost-meme-level-offline.md` |
 | **Readout online** | `docs/analyst/crossposting-v4-like-volume.sql` |
@@ -376,7 +403,7 @@ Compare v4 mature posts vs last 30d v2 baseline:
 
 - **2026-08-12**: mature n≥8 if possible  
 - **2026-08-17** (~7d): `crossposting-v4-like-volume.sql` keep/kill  
-- Full plan: `experiments/active/2026-08-10-crosspost-v4-and-taste-cohort.md`
+- Full plan: `experiments/completed/2026-08-10-crosspost-v4-and-taste-cohort.md`
 
 ---
 
@@ -385,11 +412,11 @@ Compare v4 mature posts vs last 30d v2 baseline:
 | Field | Value |
 |-------|--------|
 | **ID** | `crosspost_taste_cohort_v1` |
-| **Status** | **shadow only** — ranking unchanged |
+| **Status** | **KILLED as signal 2026-10-30**: top vs bottom n_taste f1k 28.52 vs 28.72 (n=287). No canary |
 | **Cohort** | `src/crossposting/data/ru_taste_cohort_v1.json` (top 50) |
 | **Code** | `taste_cohort.py`, `_enrich_candidates_with_taste_shadow` |
 | **SQL** | `docs/analyst/crossposting-taste-shadow.sql` |
-| **Experiment note** | `experiments/active/2026-08-10-crosspost-v4-and-taste-cohort.md` |
+| **Experiment note** | `experiments/completed/2026-08-10-crosspost-v4-and-taste-cohort.md` |
 
 ### Hypothesis
 
@@ -432,9 +459,9 @@ replacement for like volume.
 | Field | Value |
 |-------|--------|
 | **ID** | `bot2channel_ml_lab_v1` |
-| **Status** | **offline only** — no prod ranker change |
+| **Status** | **KILLED as signal 2026-10-30**: offline HOLD vs v4, and the live shadow corr is −0.09 (see below) |
 | **Code** | `experiments/ml-crosspost-bot2channel/` |
-| **Note** | `experiments/active/2026-08-11-bot2channel-ml-lab.md` |
+| **Note** | `experiments/completed/2026-08-11-bot2channel-ml-lab.md` |
 | **Report** | `experiments/ml-crosspost-bot2channel/reports/2026-08-11-models.md` |
 
 ### Hypothesis
@@ -472,7 +499,7 @@ Simple linear/logistic models on pre-post bot features + source prior beat
 
 | Field | Value |
 |-------|--------|
-| **Status** | **shadow only** — pick unchanged |
+| **Status** | **KILLED 2026-10-30**: corr(shadow, f1k) −0.092 on 363 posted picks, agreed vs disagreed f1k 29.01 vs 29.10. Fields stay until the crossposting PR replaces shadow scoring |
 | **Formula** | `shadow_score = ln(nlikes+1) * src_quality_mult` |
 | **Version** | `v4_x_src_v1` (+ `shadow_score_maturity` band) |
 | **Code** | `src/crossposting/shadow_score.py`, `_build_decision_log` |
@@ -495,7 +522,7 @@ Also logs `shadow_rank`, `shadow_pick_meme_id`, `shadow_vs_prod_disagree`.
 | Field | Value |
 |-------|--------|
 | **ID** | `onboarding_first_tap_v1` |
-| **Status** | **scoreboard** for H10/H11 |
+| **Status** | **scoreboard** for H10/H11. **2026-10-30 flag:** users who never got a meme rose 3.1% → 12.6% (25/26 have no language row). Investigate the language picker |
 | **Readout** | `docs/analyst/readouts/2026-09-07-onboarding-and-dormant-blast.md` |
 | **SQL** | `docs/analyst/onboarding-funnel.sql` |
 
@@ -521,7 +548,7 @@ clicks and invites from the same cohort. Guardrail: block-in-1h.
 | Field | Value |
 |-------|--------|
 | **ID** | `cold_start_fresh_viral_v1` |
-| **Status** | **shipping** |
+| **Status** | **KILLED 2026-10-30**: first tap 60.0% C vs 48.5% T, blocked<1h 19 vs 27 (n 95/99). Flag default off |
 | **Kill switch** | `COLD_START_FRESH_VIRAL_EXPERIMENT_ENABLED` |
 | **Code** | `src/recommendations/cold_start_experiments.py`, `cold_start_explore(max_age_days=)` |
 | **Labels** | `cold_start_explore_fresh` / `_guarded` vs classic `cold_start_explore` |
@@ -553,7 +580,7 @@ both); this A/B is the actual test.
 | Field | Value |
 |-------|--------|
 | **ID** | `onboarding_skip_countdown_v1` |
-| **Status** | **shipping as default** |
+| **Status** | **KEEP (neutral) 2026-10-30**: p50 to first meme 11.6 → 2.8 s, first-tap flat |
 | **Code** | `src/tgbot/handlers/onboarding.py`, share tap in `reaction.py` |
 
 ### Hypothesis
@@ -585,6 +612,10 @@ first-tap of empty start vs 61% baseline.
 | Kill 15m–4w reengagement cadence | **Rejected** 2026-09-07 (habit while fresh; monthly after) |
 | Rewrite new-user language as multi-select | **Already one-tap**; `/lang` is settings |
 | “Fix” share skipping welcome/picker | **Rejected** — 90d share converts better than empty start |
+| `channel_hits_v1` | **Killed** 2026-10-30. Inconclusive per protocol (retained invitees T 1 vs C 0) |
+| `ocr_length_preference_v1` | **Invalid** 2026-10-05. Late OCR 23% vs the 5% limit |
+| `first_meme_nudge` | **Killed** 2026-10-30. Orphan split, flat first tap (15.8 vs 16.0%). Code removed |
+| `meme_like_count` | **Killed** 2026-10-30. Orphan split, flat LR (45.6 vs 46.2%). Code removed |
 
 ---
 
@@ -603,7 +634,7 @@ psql "$ANALYST_DATABASE_URL" -f docs/analyst/crossposting-taste-shadow.sql    # 
 # 3) Update this file Status/Decision + write
 #    docs/analyst/readouts/YYYY-MM-DD-weekly-hypotheses.md
 # 4) Crosspost plan tables:
-#    experiments/active/2026-08-10-crosspost-v4-and-taste-cohort.md
+#    experiments/completed/2026-08-10-crosspost-v4-and-taste-cohort.md
 ```
 
 Healthy product snapshot (rough, not ship gates):

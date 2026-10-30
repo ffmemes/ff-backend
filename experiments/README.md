@@ -4,7 +4,7 @@ Structured experiment tracking for product development.
 
 ## Start here on resume
 
-**[`HYPOTHESES.md`](HYPOTHESES.md)** — living list of open hypotheses, ship/kill
+**[`docs/growth/HYPOTHESES.md`](../docs/growth/HYPOTHESES.md)** — living list of open hypotheses, ship/kill
 rules, and **hard recheck dates** (day-3 / day-7 / day-14). Read it first when
 picking up the project after a break.
 
@@ -12,7 +12,7 @@ picking up the project after a break.
 
 ```
 experiments/
-├── HYPOTHESES.md     # Check-in schedule + decision rules (authoritative)
+├── HYPOTHESES.md     # Pointer to docs/growth/HYPOTHESES.md (canonical)
 ├── active/           # Currently running experiments
 │   └── YYYY-MM-DD-experiment-name.md
 ├── completed/        # Finished experiments (never deleted)

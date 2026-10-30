@@ -56,3 +56,11 @@ Guardrails:
 Disable the experiment by returning `control` from
 `get_visible_meme_like_count()`, or revert the implementation. The migration only
 adds read-only measurement views.
+
+## Conclusion (2026-10-30)
+
+**KILL.** Treatment was not clearly better, so control (a plain heart) is now the
+default for everyone and the experiment code is removed. The measurement views stay.
+Over a 14-day window per user, excluding broadcasts (n 6306 control / 6208 treatment):
+mean user LR was 45.6% vs 46.2%, mean reaction rate 83.4% vs 83.3%, and mean active
+days 0.85 vs 0.86. See `docs/analyst/readouts/2026-10-30-experiment-closure.md`.

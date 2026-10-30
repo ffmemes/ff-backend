@@ -66,9 +66,9 @@ class Config(BaseSettings):
     # FFM-1882: narrow true-new cold-start positions 2-10 experiment.
     # Roll back by setting this to false in production env.
     COLD_START_CANDIDATE_GUARDRAILS_ENABLED: bool = True
-    # H10: 50/50 true-new users get <30d quality memes in CS1. Kill switch
-    # stops new assignment and treats everyone as control.
-    COLD_START_FRESH_VIRAL_EXPERIMENT_ENABLED: bool = True
+    # H10 cold_start_fresh_viral_v1: KILLED 2026-10-30 (first tap and 1h block
+    # rate both worse in treatment). Off = no new assignment, everyone is control.
+    COLD_START_FRESH_VIRAL_EXPERIMENT_ENABLED: bool = False
 
     # Recommendation batch diagnostics are realtime operational data, not
     # durable product facts. Keep compact logs/spans always on and sample full

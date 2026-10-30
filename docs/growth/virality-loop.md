@@ -91,7 +91,7 @@ Full readout: [docs/analyst/recently-liked-blender-v2-closeout.md](../analyst/re
 | Mature wiring | `get_mature_blend_weights_with_experiments` |
 | Delivery prep | `src/tgbot/senders/delivery.py` |
 | Readout | `docs/analyst/viral-shares-blender-v1.sql` |
-| Experiment note | `experiments/active/2026-08-09-viral-shares-blender-v1.md` |
+| Experiment note | `experiments/completed/2026-08-09-viral-shares-blender-v1.md` |
 
 ## Architecture still wanted
 

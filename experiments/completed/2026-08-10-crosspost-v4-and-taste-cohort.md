@@ -2,7 +2,7 @@
 
 Created: 2026-08-10  
 Owner: engineer / analyst  
-Status: **active**  
+Status: **completed (2026-10-30)**: H6 kept at 100%, H7 killed as a signal  
 Channel: `tgchannelru` (@fastfoodmemes)  
 **Predictions frozen:** 2026-08-10 (this file + `experiments/HYPOTHESES.md` H6/H7)
 
@@ -136,3 +136,16 @@ Full interim writeup: `docs/analyst/crossposting-v4-interim-readout.md`
 | Shadow enrich | `_enrich_candidates_with_taste_shadow` |
 | Recompute | `scripts/crosspost_taste_cohort.py` |
 | Stats density | post-hook + hourly young collector (PR #347) |
+
+## Conclusion (2026-10-30)
+
+- **H6 v4 like-volume: KEEP at 100%.** RU image posts, 24h snapshot: v2 (Jun 11–Aug 10,
+  n=299) f1k 26.2, hit 32.1% → v4 pooled (Aug 10–Oct 29, n=373) f1k 28.9, hit 41.0%
+  (+8.9 pp, z≈2.4). Forwards are up 11% and views are flat. Caveat: manual v0 posts
+  also rose (f1k 17.2 → 20.6), so part of the lift is channel drift.
+- **H7 taste-cohort shadow: KILL as a signal, with no canary.** Across 287 posts with n_taste≥1,
+  the top vs bottom half by n_taste gave f1k 28.52 vs 28.72. taste≥1 vs taste=0 gave 28.62 vs 29.87. The
+  pre-registered Δ>0 test fails. The decision_log fields stay until the crossposting PR
+  that replaces shadow scoring removes them.
+
+Readout: [`docs/analyst/readouts/2026-10-30-experiment-closure.md`](../../docs/analyst/readouts/2026-10-30-experiment-closure.md).
