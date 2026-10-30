@@ -71,6 +71,9 @@ class Config(BaseSettings):
     # H10 cold_start_fresh_viral_v1: KILLED 2026-10-30 (first tap and 1h block
     # rate both worse in treatment). Off = no new assignment, everyone is control.
     COLD_START_FRESH_VIRAL_EXPERIMENT_ENABLED: bool = False
+    # explore_budget_v1: 50/50 non-cold-start users get the labeling budget,
+    # fresh-viral blend slot and idle-return first slot. Kill switch = all control.
+    EXPLORE_BUDGET_V1_ENABLED: bool = True
 
     # Recommendation batch diagnostics are realtime operational data, not
     # durable product facts. Keep compact logs/spans always on and sample full

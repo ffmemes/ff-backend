@@ -473,6 +473,104 @@ async def test_moderator_low_sent_candidates_are_prepended():
 
 
 @pytest.mark.asyncio
+async def test_explore_budget_moderator_gets_half_quota_and_proven_first_slot():
+    seen: dict[str, Any] = {}
+
+    async def low_sent_fetcher(request, limit, exclude_meme_ids):
+        seen["limit"] = limit
+        seen["explore_budget"] = request.explore_budget_enabled
+        return [_meme(900 + i, "low_sent_pool") for i in range(limit)]
+
+    retriever = FakeRetriever({"lr_smoothed": [_meme(101), _meme(102)]})
+    pipeline = _pipeline(retriever, low_sent_fetcher=low_sent_fetcher)
+
+    result = await pipeline.run(
+        _request(limit=4, user_type="moderator", nmemes_sent=200, explore_budget_enabled=True)
+    )
+    # 50% quota; empty queue => first meme comes from the blend, not labeling.
+    assert seen == {"limit": 2, "explore_budget": True}
+    assert _ids(result.selected) == [101, 900, 901, 102]
+
+    queued = await pipeline.run(
+        _request(
+            limit=4,
+            user_type="moderator",
+            nmemes_sent=200,
+            explore_budget_enabled=True,
+            meme_ids_in_queue=[1],
+        )
+    )
+    assert _ids(queued.selected) == [900, 901, 101, 102]
+
+
+@pytest.mark.asyncio
+async def test_explore_budget_adds_fresh_viral_and_drops_bad_fresh():
+    captured: dict[str, Any] = {}
+
+    def blend(candidates_by_engine, weights, fixed_pos=None, limit=0, random_seed=None):
+        captured["weights"] = dict(weights)
+        captured["fixed_pos"] = dict(fixed_pos or {})
+        return _fake_blend(candidates_by_engine, weights, fixed_pos, limit, random_seed)
+
+    async def fetch_all(query, params):
+        captured["bad_fresh_ids"] = params["meme_ids"]
+        return [{"id": 102}]
+
+    async def mature_weights(user_id):
+        return {"lr_smoothed": 0.6, "like_spread_and_recent_memes": 0.4}
+
+    retriever = FakeRetriever(
+        {
+            "lr_smoothed": [_meme(101), _meme(102)],
+            "fresh_viral": [_meme(301, "fresh_viral")],
+        }
+    )
+    pipeline = RecommendationBatchPipeline(
+        retriever=retriever,
+        blend_func=blend,
+        fetch_all_func=fetch_all,
+        low_sent_fetcher=_empty_low_sent_fetcher,
+        mature_weights_func=mature_weights,
+        text_light_weights_func=_identity_text_light_weights,
+    )
+
+    result = await pipeline.run(_request(limit=5, nmemes_sent=200, explore_budget_enabled=True))
+
+    assert captured["weights"] == pytest.approx(
+        {"lr_smoothed": 0.51, "like_spread_and_recent_memes": 0.34, "fresh_viral": 0.15}
+    )
+    assert captured["fixed_pos"] == {0: "like_spread_and_recent_memes"}
+    assert captured["bad_fresh_ids"] == [101, 102, 301]
+    assert _ids(result.selected) == [101, 301]
+
+
+async def _lr_only_mature_weights(user_id: int) -> dict[str, float]:
+    del user_id
+    return {"lr_smoothed": 1.0}
+
+
+@pytest.mark.asyncio
+async def test_explore_budget_control_keeps_current_feed():
+    async def fetch_all(query, params):
+        raise AssertionError("control must not run the bad-fresh filter")
+
+    retriever = FakeRetriever({"lr_smoothed": [_meme(101)], "fresh_viral": [_meme(301)]})
+    pipeline = RecommendationBatchPipeline(
+        retriever=retriever,
+        blend_func=_fake_blend,
+        fetch_all_func=fetch_all,
+        low_sent_fetcher=_empty_low_sent_fetcher,
+        mature_weights_func=_lr_only_mature_weights,
+        text_light_weights_func=_identity_text_light_weights,
+    )
+
+    result = await pipeline.run(_request(limit=5, nmemes_sent=200))
+
+    assert _ids(result.selected) == [101]
+    assert "fresh_viral" not in {call["engine"] for call in retriever.calls}
+
+
+@pytest.mark.asyncio
 async def test_source_diversity_is_disabled_by_default():
     retriever = FakeRetriever(
         {

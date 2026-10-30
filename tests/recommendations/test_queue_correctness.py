@@ -14,6 +14,7 @@ from tests.factories import (
 )
 
 from src import redis
+from src.config import settings
 from src.database import engine
 from src.recommendations.candidates import CandidatesRetriever
 from src.recommendations.meme_queue import generate_recommendations, get_next_meme_for_user
@@ -72,6 +73,13 @@ def _meme(id: int, recommended_by: str = "test") -> dict:
         "recommended_by": recommended_by,
         "nlikes": 10,
     }
+
+
+@pytest.fixture(autouse=True)
+def explore_budget_control(monkeypatch):
+    # These tests pin the control feed; explore_budget_v1 treatment is covered
+    # in test_pipeline.py / test_low_sent_pool.py.
+    monkeypatch.setattr(settings, "EXPLORE_BUDGET_V1_ENABLED", False)
 
 
 @pytest_asyncio.fixture()

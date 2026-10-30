@@ -3,6 +3,9 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from src.recommendations.blender_experiments import (
+    EXPLORE_BUDGET_V1_CONTROL,
+    EXPLORE_BUDGET_V1_EXPERIMENT_ID,
+    EXPLORE_BUDGET_V1_TREATMENT,
     MATURE_BLENDER_CONTROL_WEIGHTS,
     MATURE_BLENDER_TREATMENT_WEIGHTS,
     RECENTLY_LIKED_BLENDER_V2_CONTROL,
@@ -18,6 +21,7 @@ from src.recommendations.blender_experiments import (
     _lr_quartile_from_boundaries,
     build_recently_liked_blender_v2_assignment,
     build_text_light_blender_v1_assignment,
+    explore_budget_v1_variant_for_user,
     get_mature_blend_weights_with_experiments,
     get_or_assign_recently_liked_blender_v2_variant,
     get_or_assign_text_light_blender_v1_variant,
@@ -25,6 +29,7 @@ from src.recommendations.blender_experiments import (
     get_recent_7d_lr_quartile_boundaries,
     get_recently_liked_blender_v2_weights,
     get_text_light_blender_v1_weights,
+    is_explore_budget_v1_treatment,
 )
 
 
@@ -342,3 +347,41 @@ async def test_text_light_blender_v1_control_keeps_base_weights():
         weights = await get_text_light_blender_v1_weights(100, MATURE_BLENDER_TREATMENT_WEIGHTS)
 
     assert weights == MATURE_BLENDER_TREATMENT_WEIGHTS
+
+
+def test_explore_budget_v1_split_is_deterministic_and_balanced():
+    variants = [explore_budget_v1_variant_for_user(user_id) for user_id in range(2000)]
+
+    assert variants == [explore_budget_v1_variant_for_user(u) for u in range(2000)]
+    assert 900 < variants.count(EXPLORE_BUDGET_V1_TREATMENT) < 1100
+
+
+@pytest.mark.asyncio
+async def test_explore_budget_v1_assigns_hash_variant_once_and_skips_cold_start():
+    treated = EXPLORE_BUDGET_V1_TREATMENT
+    user_id = next(u for u in range(100) if explore_budget_v1_variant_for_user(u) == treated)
+    with (
+        patch(
+            "src.recommendations.blender_experiments.get_experiment_assignment",
+            new_callable=AsyncMock,
+            return_value=None,
+        ) as get_assignment,
+        patch(
+            "src.recommendations.blender_experiments.assign_experiment",
+            new_callable=AsyncMock,
+            return_value=True,
+        ) as assign,
+    ):
+        assert await is_explore_budget_v1_treatment(user_id, 29) is False
+        get_assignment.assert_not_awaited()
+
+        assert await is_explore_budget_v1_treatment(user_id, 30) is True
+        assert assign.await_args.args[:3] == (
+            user_id,
+            EXPLORE_BUDGET_V1_EXPERIMENT_ID,
+            EXPLORE_BUDGET_V1_TREATMENT,
+        )
+
+        get_assignment.return_value = {"variant": EXPLORE_BUDGET_V1_CONTROL}
+        assert await is_explore_budget_v1_treatment(user_id, 500) is False
+        assert assign.await_count == 1

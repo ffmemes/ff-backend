@@ -29,7 +29,11 @@ from src.recommendations.blender_experiments import (
     get_text_light_blender_v1_weights,
 )
 from src.recommendations.candidates import CandidatesRetriever
-from src.recommendations.utils import exclude_meme_ids_sql_filter
+from src.recommendations.utils import (
+    block_disliked_sources_sql_filter,
+    disliked_source_demote_sql,
+    exclude_meme_ids_sql_filter,
+)
 
 try:
     import sentry_sdk
@@ -41,6 +45,16 @@ logger = logging.getLogger(__name__)
 
 LOW_SENT_POOL_MIN_REACTIONS_FOR_QUALITY_GATE = 10
 LOW_SENT_POOL_MIN_LIKE_RATE = 0.15
+# explore_budget_v1 labeling budget: low_sent only serves fresh, still-unlabeled
+# memes and stops early on clear losers.
+EXPLORE_BUDGET_LOW_SENT_MAX_AGE_DAYS = 7
+EXPLORE_BUDGET_LOW_SENT_MAX_REACTIONS = 20
+EXPLORE_BUDGET_LOW_SENT_MIN_SMOOTHED_LR = 0.25
+# Fresh memes whose first >= 20 reactions are < 40% likes (prod: later LR 0.355).
+BAD_FRESH_MAX_AGE_DAYS = 7
+BAD_FRESH_MIN_REACTIONS = 20
+BAD_FRESH_MAX_LIKE_RATE = 0.40
+FRESH_VIRAL_BLEND_SHARE = 0.15
 
 Candidate = dict[str, Any]
 BlendFunc = Callable[
@@ -81,6 +95,7 @@ class RecommendationBatchRequest:
     cold_start_candidate_guardrails_enabled: bool = False
     cold_start_fresh_max_age_days: int | None = None
     text_light_blender_v1_enabled: bool = False
+    explore_budget_enabled: bool = False
     source_diversity_enabled: bool = False
     shadow_scoring_enabled: bool = True
     diagnostics_sample_rate: float = 0.01
@@ -356,7 +371,7 @@ class RecommendationBatchPipeline:
         if request.limit <= 0:
             return []
 
-        quota = low_sent_quota(request.limit, request.user_type)
+        quota = low_sent_quota(request.limit, request.user_type, request.explore_budget_enabled)
         if quota <= 0:
             return await self._select_by_plan(
                 request,
@@ -372,22 +387,26 @@ class RecommendationBatchPipeline:
             quota,
             list(request.meme_ids_in_queue),
             diagnostics,
+            explore_budget=request.explore_budget_enabled,
         )
         exclude_ids = list(request.meme_ids_in_queue)
         exclude_ids.extend(_candidate_ids(candidates))
 
         remaining_limit = max(0, request.limit - len(candidates))
         if remaining_limit > 0:
-            candidates.extend(
-                await self._select_by_plan(
-                    request,
-                    diagnostics,
-                    limit=remaining_limit,
-                    exclude_ids=exclude_ids,
-                    use_recently_liked_blender_v2=False,
-                    use_text_light_blender_v1=False,
-                )
+            planned = await self._select_by_plan(
+                request,
+                diagnostics,
+                limit=remaining_limit,
+                exclude_ids=exclude_ids,
+                use_recently_liked_blender_v2=False,
+                use_text_light_blender_v1=False,
             )
+            if _is_idle_return(request):
+                # The first meme after an idle gap is a proven one, not a label.
+                candidates = planned[:1] + candidates + planned[1:]
+            else:
+                candidates.extend(planned)
 
         if not candidates:
             candidates = await self._get_last_resort_candidates(
@@ -418,6 +437,7 @@ class RecommendationBatchPipeline:
             cold_start_nsessions_gate_enabled=request.cold_start_nsessions_gate_enabled,
             limit=limit,
             cold_start_account_too_old=request.cold_start_account_too_old,
+            idle_return=_is_idle_return(request),
         )
         diagnostics.maturity_stage = plan.maturity_stage
 
@@ -440,6 +460,8 @@ class RecommendationBatchPipeline:
             use_recently_liked_blender_v2,
             use_text_light_blender_v1,
         )
+        if request.explore_budget_enabled and plan.maturity_stage == MATURE:
+            weights = with_fresh_viral_weight(weights)
         candidates_dict = await self._fetch_candidates_dict(
             list(weights.keys()),
             request.user_id,
@@ -447,6 +469,8 @@ class RecommendationBatchPipeline:
             exclude_ids,
             diagnostics,
         )
+        if request.explore_budget_enabled:
+            candidates_dict = await self._drop_bad_fresh(candidates_dict)
         blended = self.blend_func(
             candidates_dict,
             weights,
@@ -734,12 +758,37 @@ class RecommendationBatchPipeline:
             _set_engine_span_data(span, source_name, duration_ms, len(candidates), None)
             return candidates
 
+    async def _drop_bad_fresh(
+        self,
+        candidates_dict: dict[str, list[Candidate]],
+    ) -> dict[str, list[Candidate]]:
+        meme_ids = sorted(
+            {c["id"] for cs in candidates_dict.values() for c in cs if isinstance(c.get("id"), int)}
+        )
+        if not meme_ids or self.fetch_all_func is None:
+            return candidates_dict
+
+        try:
+            bad_rows = await self.fetch_all_func(text(_BAD_FRESH_QUERY), {"meme_ids": meme_ids})
+        except Exception:
+            logger.warning("bad-fresh filter failed; serving unfiltered blend", exc_info=True)
+            return candidates_dict
+        bad_ids = {row["id"] for row in bad_rows}
+        if not bad_ids:
+            return candidates_dict
+        return {
+            engine: [c for c in candidates if c.get("id") not in bad_ids]
+            for engine, candidates in candidates_dict.items()
+        }
+
     async def _get_low_sent_candidates(
         self,
         user_id: int,
         limit: int,
         exclude_ids: list[int],
         diagnostics: RecommendationBatchDiagnostics,
+        *,
+        explore_budget: bool = False,
     ) -> list[Candidate]:
         if limit <= 0:
             return []
@@ -759,6 +808,7 @@ class RecommendationBatchPipeline:
                         cold_start_account_too_old=diagnostics.cold_start_account_too_old,
                         user_type=diagnostics.user_type,
                         meme_ids_in_queue=exclude_ids,
+                        explore_budget_enabled=explore_budget,
                     ),
                     limit,
                     exclude_ids,
@@ -770,7 +820,7 @@ class RecommendationBatchPipeline:
 
         candidates = await self._fetch_query_pool(
             "low_sent_pool",
-            _low_sent_query(exclude_ids),
+            _low_sent_query(exclude_ids, explore_budget=explore_budget),
             {"user_id": user_id, "limit": limit, **_exclude_params(exclude_ids)},
             diagnostics,
         )
@@ -843,6 +893,20 @@ def diversify_candidates_by_source(candidates: list[Candidate]) -> tuple[list[Ca
     return diversified, reordered_count
 
 
+def _is_idle_return(request: RecommendationBatchRequest) -> bool:
+    """Empty queue == the batch's first meme is the next one shown. The Redis
+    queue expires 1h after the last refill, so this is the post-push slot."""
+    return request.explore_budget_enabled and not request.meme_ids_in_queue
+
+
+def with_fresh_viral_weight(weights: Mapping[str, float]) -> dict[str, float]:
+    """Give fresh_viral FRESH_VIRAL_BLEND_SHARE of total mass, scaling others down."""
+    total = sum(weights.values())
+    scaled = {engine: weight * (1 - FRESH_VIRAL_BLEND_SHARE) for engine, weight in weights.items()}
+    scaled["fresh_viral"] = total * FRESH_VIRAL_BLEND_SHARE
+    return scaled
+
+
 def _fixed_pos_for_weights(
     plan: CandidateSelectionPlan,
     weights: Mapping[str, float],
@@ -875,7 +939,31 @@ def summarize_shadow_scores(candidates: Sequence[Candidate]) -> ShadowScoreSumma
     )
 
 
-def _low_sent_query(exclude_ids: list[int]) -> str:
+def _low_sent_query(exclude_ids: list[int], explore_budget: bool = False) -> str:
+    reactions = "(COALESCE(MS.nlikes, 0) + COALESCE(MS.ndislikes, 0))"
+    if explore_budget:
+        # Labeling budget: fresh + unlabeled only, early-stop clear losers,
+        # and the user's disliked sources go last (same demote as engines).
+        pool_filter = f"""
+            AND M.created_at >= NOW() - INTERVAL '{EXPLORE_BUDGET_LOW_SENT_MAX_AGE_DAYS} days'
+            AND {reactions} < {EXPLORE_BUDGET_LOW_SENT_MAX_REACTIONS}
+            AND (
+                {reactions} < {LOW_SENT_POOL_MIN_REACTIONS_FOR_QUALITY_GATE}
+                OR (COALESCE(MS.nlikes, 0) + 1.) / ({reactions} + 2.)
+                    >= {EXPLORE_BUDGET_LOW_SENT_MIN_SMOOTHED_LR}
+            )
+            {block_disliked_sources_sql_filter()}
+        """
+        source_order = f"{disliked_source_demote_sql()} DESC,"
+    else:
+        pool_filter = f"""
+            AND (
+                {reactions} < {LOW_SENT_POOL_MIN_REACTIONS_FOR_QUALITY_GATE}
+                OR COALESCE(MS.nlikes, 0)::float / NULLIF({reactions}, 0)
+                    >= {LOW_SENT_POOL_MIN_LIKE_RATE}
+            )
+        """
+        source_order = ""
     return f"""
         SELECT
             M.id,
@@ -893,24 +981,33 @@ def _low_sent_query(exclude_ids: list[int]) -> str:
         INNER JOIN user_language UL
             ON UL.user_id = :user_id
             AND UL.language_code = M.language_code
+        LEFT JOIN user_meme_source_stats UMSS
+            ON UMSS.meme_source_id = M.meme_source_id
+            AND UMSS.user_id = :user_id
         WHERE 1=1
             AND M.status = 'ok'
             AND R.meme_id IS NULL
-            AND (
-                COALESCE(MS.nlikes, 0) + COALESCE(MS.ndislikes, 0)
-                    < {LOW_SENT_POOL_MIN_REACTIONS_FOR_QUALITY_GATE}
-                OR (
-                    COALESCE(MS.nlikes, 0)::float
-                    / NULLIF(COALESCE(MS.nlikes, 0) + COALESCE(MS.ndislikes, 0), 0)
-                ) >= {LOW_SENT_POOL_MIN_LIKE_RATE}
-            )
+            {pool_filter}
             {exclude_meme_ids_sql_filter(exclude_ids)}
         ORDER BY
-            COALESCE(MS.nlikes, 0) + COALESCE(MS.ndislikes, 0),
+            {source_order}
+            {reactions},
             COALESCE(MS.nmemes_sent, 0),
             M.id
         LIMIT :limit
     """
+
+
+_BAD_FRESH_QUERY = f"""
+    SELECT M.id
+    FROM meme M
+    INNER JOIN meme_stats MS
+        ON MS.meme_id = M.id
+    WHERE M.id = ANY(:meme_ids)
+        AND M.created_at >= NOW() - INTERVAL '{BAD_FRESH_MAX_AGE_DAYS} days'
+        AND MS.nlikes + MS.ndislikes >= {BAD_FRESH_MIN_REACTIONS}
+        AND MS.nlikes < {BAD_FRESH_MAX_LIKE_RATE} * (MS.nlikes + MS.ndislikes)
+"""
 
 
 def _last_resort_query(exclude_ids: list[int]) -> str:

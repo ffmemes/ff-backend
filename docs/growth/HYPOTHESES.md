@@ -58,6 +58,7 @@ Readout: [`docs/analyst/readouts/2026-10-30-experiment-closure.md`](../analyst/r
 | **2026-08-23** | Feed exp finals if needed | H1 primarily |
 | **2026-08-24** | Taste shadow readout | **H7** |
 | Ad-hoc | Bot→channel ML re-run / walk-forward | **H8** |
+| **2026-11-20** | `explore_budget_v1` keep/kill — [`experiments/active/2026-10-30-explore-budget.md`](../../experiments/active/2026-10-30-explore-budget.md) | explore budget |
 | Ad-hoc | After any ranking/deploy incident | all active |
 
 Agent prompt on resume (copy-paste):

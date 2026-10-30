@@ -12,6 +12,7 @@ from src.recommendations.blender_experiments import (
     MATURE_BLENDER_CONTROL_WEIGHTS,
     get_mature_blend_weights_with_experiments,
     get_text_light_blender_v1_weights,
+    is_explore_budget_v1_treatment,
 )
 from src.recommendations.candidates import (
     CandidatesRetriever,
@@ -364,6 +365,10 @@ async def generate_recommendations(
             # FFM-1357: stop new exposure until this overlay has a CEO-owned
             # active experiment record. Existing assignment rows remain readable.
             text_light_blender_v1_enabled=False,
+            explore_budget_enabled=(
+                settings.EXPLORE_BUDGET_V1_ENABLED is True
+                and await is_explore_budget_v1_treatment(user_id, nmemes_sent)
+            ),
             source_diversity_enabled=settings.RECOMMENDATION_SOURCE_DIVERSITY_ENABLED,
             shadow_scoring_enabled=settings.RECOMMENDATION_SHADOW_SCORING_ENABLED,
             diagnostics_sample_rate=settings.RECOMMENDATION_DIAGNOSTICS_SAMPLE_RATE,
