@@ -10,7 +10,7 @@
 **See**: [testing.md](testing.md) Phase 1
 
 ### ~~C2: Kill 3 bad recommendation engines for users~~
-**DONE**: goat integer division fixed (commit `67d123f`), less_seen_meme_and_source removed, fast_dopamine removed. goat + es_ranked now at 0.1 weight each. Experiment measuring until 2026-03-21/23. See [experiment-2026-03-14.md](experiment-2026-03-14.md), [experiment-2026-03-16-es-ranked.md](experiment-2026-03-16-es-ranked.md).
+**DONE**: goat integer division fixed (commit `67d123f`), less_seen_meme_and_source removed, fast_dopamine removed. goat + es_ranked now at 0.1 weight each. Experiment measuring until 2026-03-21/23. See `experiment-2026-03-14` (archived), `experiment-2026-03-16-es-ranked` (archived).
 
 ### ~~C3: Re-enable Sentry~~
 **DONE**: Sentry re-enabled. Forbidden errors filtered from Sentry (commit `e918bec`).
@@ -26,16 +26,16 @@
 **Sentry**: FF-BACKEND-V3, FF-BACKEND-V9 — error rate dropped to near-zero after fixes.
 
 ### ~~H2: Fix blender random_seed=42~~
-**DONE**: Per-user seed with `random.Random(seed)` instance (commit from [experiment-2026-03-14.md](experiment-2026-03-14.md)).
+**DONE**: Per-user seed with `random.Random(seed)` instance (commit from `experiment-2026-03-14` (archived)).
 
 ### ~~H3: Switch Redis queue from SET to LIST~~
-**DONE**: `rpush/lpop` preserves blender ordering (commit from [experiment-2026-03-14.md](experiment-2026-03-14.md)).
+**DONE**: `rpush/lpop` preserves blender ordering (commit from `experiment-2026-03-14` (archived)).
 
 ### ~~H4: Increase queue refill threshold~~
 **DONE**: Threshold 2→8, batch 5→15 (`src/recommendations/meme_queue.py`). Part of adaptive cold start.
 
 ### ~~H5: Optimize cold start with proven retention sources~~
-**DONE**: 3-phase adaptive cold start. Phase 1: diverse sources via DISTINCT ON + data-driven source ranking. Phase 2: real-time adaptation from raw reactions. Phase 3: transition to blended engines. See [experiment-2026-03-20-adaptive-cold-start.md](experiment-2026-03-20-adaptive-cold-start.md).
+**DONE**: 3-phase adaptive cold start. Phase 1: diverse sources via DISTINCT ON + data-driven source ranking. Phase 2: real-time adaptation from raw reactions. Phase 3: transition to blended engines. See `experiment-2026-03-20-adaptive-cold-start` (archived).
 **Files**: `src/recommendations/candidates.py` (cold_start_explore, cold_start_adapt), `src/recommendations/meme_queue.py`
 
 ## Medium (Do When Ready)
@@ -101,4 +101,4 @@
 ### L5: Per-engine live metrics dashboard
 **Why**: No real-time visibility into engine performance.
 **Action**: Log per-engine impressions/likes/dislikes. Measurement SQL exists in experiment specs.
-**See**: [experiment-2026-03-14.md](experiment-2026-03-14.md), [experiment-2026-03-16-es-ranked.md](experiment-2026-03-16-es-ranked.md), [experiment-2026-03-20-adaptive-cold-start.md](experiment-2026-03-20-adaptive-cold-start.md)
+**See**: `experiment-2026-03-14` (archived), `experiment-2026-03-16-es-ranked` (archived), `experiment-2026-03-20-adaptive-cold-start` (archived)

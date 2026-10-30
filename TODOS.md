@@ -1,7 +1,7 @@
 # TODOS
 
 > Living backlog only. Completed items live in git history and dated experiment
-> write-ups under `experiments/completed/` / `specs/archive/`.
+> write-ups under `experiments/completed/`.
 > Last cleaned: 2026-06 (Wave A hygiene).
 
 **Product compass:** [docs/growth/virality-loop.md](docs/growth/virality-loop.md)
@@ -24,7 +24,7 @@
 ### Per-engine session continuation rate (dashboard)
 **What:** SQL/readout for % of times a user continues scrolling after a meme from each `recommended_by` engine.
 **Why:** Better engine evaluation than LR; aligns with session-length north star.
-**Context:** Measurement patterns exist in archived cold-start / es-ranked experiment notes under `specs/archive/`.
+**Context:** Measurement patterns exist in archived cold-start / es-ranked experiment notes (git history, `specs/archive/` at `89af5b71`).
 
 ### ~~Share CTA experiment harness~~ — seam landed
 **What:** `src/tgbot/senders/delivery.py` unifies prep for `next_message` + `send_meme_to_user`.

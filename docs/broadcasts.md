@@ -40,16 +40,6 @@ ssh "$PROD_SSH" "docker exec -e PYTHONPATH=/src <container> \
 
 Verify counts in dry run output. Then run without `--dry-run`.
 
-### Meme broadcast to idle users
-
-`scripts/broadcast_dormant.py` sends one meme per user (channel-viral last 7
-days, then HQ, then queue). Same Redis `broadcast_id` dedup. Default delay 0.3s.
-
-```bash
-python scripts/broadcast_dormant.py dormant-channel-viral-2026-09-07 --dry-run
-python scripts/broadcast_dormant.py dormant-channel-viral-2026-09-07 --min-days 7 --delay 0.3
-```
-
 Never reuse a `broadcast_id` for a different audience.
 
 ### Scheduled retention pushes

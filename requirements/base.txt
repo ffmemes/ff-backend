@@ -20,7 +20,6 @@ lxml==6.1.*
 python-telegram-bot[rate-limiter]==22.7.*
 
 Pillow==11.3.*
-matplotlib==3.10.*
 
 openai==2.32.*
 

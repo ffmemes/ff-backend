@@ -72,7 +72,6 @@ reactions arrive after 1h (slow reactions ≈ delayed session / broadcast open).
 
 Broadcasts should set `recommended_by=broadcast_reengagement` for analytics.
 
-Playground: `python scripts/reco_eval.py counterfactual-block-disliked --days 7`  
 Platform plan: [reco-experiment-platform.md](reco-experiment-platform.md)
 
 ## Shipped: recently_liked blender v2 closeout (2026-08-09)
