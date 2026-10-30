@@ -137,7 +137,7 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     #
     # If you add another universal onboarding side effect, hoist it
     # ABOVE the deep_link ladder. Do NOT bury it inside a per-branch
-    # block — branches that early-return (kitchen, wrapped, giveaway,
+    # block — branches that early-return (kitchen, giveaway,
     # _is_blocked_acquisition_channel) silently skip anything below them.
     # Drift here caused FFM-907 (kitchen ghosts: 9.4% of April 2026
     # cohort registered but never received a meme).
@@ -180,11 +180,6 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await set_user_languages_exclusive(user_id, [auto])
             await update_user_info_cache(user_id)
         return await handle_show_kitchen(update, context)
-
-    if deep_link == "wrapped":
-        from src.tgbot.handlers.stats.wrapped import handle_wrapped
-
-        return await handle_wrapped(update, context)
 
     if created:  # new user:
         shared_meme_sent = await _send_shared_meme_from_deep_link(

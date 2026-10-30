@@ -32,13 +32,8 @@ class Config(BaseSettings):
     TELEGRAM_BOT_TOKEN: str | None = None
     TELEGRAM_BOT_USERNAME: str | None = None
     TELEGRAM_BOT_WEBHOOK_SECRET: str | None = None
-    TELEGRAM_INLINE_SHARE_ENABLED: bool = True
-    TELEGRAM_INLINE_SHARE_CANARY_PERCENT: int = 0
     # Friend challenge (H12): 90% treatment / 10% holdout of eligible senders.
     FRIEND_CHALLENGE_ENABLED: bool = False
-    # Enable after membership backfill and fixed channel-hit cohort enrollment.
-    CHANNEL_HITS_ENABLED: bool = False
-    CHANNEL_MEMBERSHIP_SYNC_ENABLED: bool = False
     MEME_STORAGE_TELEGRAM_CHAT_ID: str | None = None
     UPLOADED_MEMES_REVIEW_CHAT_ID: str | None = None
     ADMIN_LOGS_CHAT_ID: str | None = None
@@ -47,19 +42,13 @@ class Config(BaseSettings):
     ADMIN_API_TOKEN: str | None = None
 
     VK_TOKEN: str | None = None
-    VK_USER_TOKEN: str | None = None
-    VK_GROUP_ID: int | None = None
 
     REDIS_MAX_CONNECTIONS: int = 128
 
-    OPENAI_API_KEY: str | None = None
+    OPENAI_API_KEY: str | None = None  # src/comms image generation only
     OPENROUTER_API_KEY: str | None = None
     # Optional independent account for free-only OCR redundancy.
     OPENROUTER_API_KEY_SECONDARY: str | None = None
-
-    DEEPSEEK_API_KEY: str | None = None
-    DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
-    CHAT_AGENT_ENABLED: bool = False
 
     # FFM-1161/FFM-1689: gate cold_start engines so they only serve genuinely-new
     # users (nsessions <= 1). Dormant returners with nmemes_sent < 30 but
@@ -94,7 +83,7 @@ class Config(BaseSettings):
     # blind Redis queue pop. Kill switch rolls back to queue path.
     BROADCAST_HIGH_QUALITY_PICK_ENABLED: bool = True
     # Prefer last-7-day channel posts ranked by forwards (community-verified).
-    # Falls back to HQ/queue. Skips channel-hit experiment users and members.
+    # Falls back to HQ/queue. Skips known channel members.
     # Off since 2026-10-30 (H3c disable rule): viral LR 5-20 pp below HQ with
     # equal/worse reactions; HQ is the default push pick.
     BROADCAST_CHANNEL_VIRAL_PICK_ENABLED: bool = False
@@ -111,7 +100,6 @@ class Config(BaseSettings):
     CROSSPOST_RU_MEME_LIKE_VOLUME_ENABLED: bool = True
 
     PREFECT_API_URL: str | None = None
-    PREFECT_AUTH_STRING: str | None = None
 
     TELEGRAM_API_ID: int | None = None
     TELEGRAM_API_HASH: str | None = None

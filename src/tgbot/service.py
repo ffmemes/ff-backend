@@ -11,11 +11,6 @@ from src.tgbot.repo.experiments import (
     get_experiment_assignment,
     get_experiment_variant,
 )
-from src.tgbot.repo.inline_search import (
-    create_inline_chosen_result_log,
-    create_inline_search_log,
-    search_memes_for_inline_query,
-)
 from src.tgbot.repo.languages import (
     add_user_language,
     add_user_languages,
@@ -67,8 +62,6 @@ __all__ = [
     "add_user_tg_chat_membership",
     "assign_experiment",
     "clear_user_languages",
-    "create_inline_chosen_result_log",
-    "create_inline_search_log",
     "create_or_update_user",
     "create_user_popup_log",
     "del_user_language",
@@ -95,7 +88,6 @@ __all__ = [
     "mark_user_unblocked",
     "promote_source_candidate",
     "save_tg_user",
-    "search_memes_for_inline_query",
     "set_user_languages_exclusive",
     "update_meme_source",
     "update_user",

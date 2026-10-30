@@ -1,5 +1,4 @@
 from src.tgbot.senders.keyboards import meme_reaction_keyboard
-from src.tgbot.sharing import MEME_SHARE_BUTTON_URL
 
 
 def _button_texts(markup) -> list[str]:
@@ -25,7 +24,7 @@ def test_keyboard_renders_share_button_above_reactions(monkeypatch):
         meme_id=1,
         user_id=2,
         referral_button_text="Send to a friend",
-        share_button_variant=MEME_SHARE_BUTTON_URL,
+        share_button=True,
         interface_lang="en",
     )
 
@@ -46,7 +45,7 @@ def test_keyboard_assigns_random_styles_to_buttons_under_meme(monkeypatch):
         meme_id=1,
         user_id=2,
         referral_button_text="Send to a friend",
-        share_button_variant=MEME_SHARE_BUTTON_URL,
+        share_button=True,
         interface_lang="en",
     )
 

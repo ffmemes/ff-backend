@@ -41,9 +41,6 @@ HIGH_ENTROPY_TOKEN_PATTERN = re.compile(
 
 def before_send(event: dict[str, Any], _hint: dict[str, Any]) -> dict[str, Any] | None:
     """Remove sensitive exception payloads before Sentry stores an event."""
-    if _is_expected_chat_agent_max_turns_event(event):
-        return None
-
     _drop_exception_frame_vars(event)
     return event
 
@@ -61,33 +58,6 @@ def before_send_log(log: dict[str, Any], _hint: dict[str, Any]) -> dict[str, Any
         log["body"] = _scrub_log_text(body)
 
     return log
-
-
-@contextmanager
-def chat_agent_scope(
-    *,
-    chat_id: int,
-    user_id: int,
-    reply_to_message_id: int | None = None,
-    trigger_type: str | None = None,
-) -> Iterator[None]:
-    """Attach chat-agent context to Sentry events produced while running the agent."""
-    with sentry_sdk.new_scope() as scope:
-        scope.set_tag("ff.module", "chat_agent")
-        if trigger_type:
-            scope.set_tag("chat_agent.trigger_type", trigger_type)
-        scope.set_context(
-            "chat_agent",
-            _clean_context(
-                {
-                    "chat_id": chat_id,
-                    "user_id": user_id,
-                    "reply_to_message_id": reply_to_message_id,
-                    "trigger_type": trigger_type,
-                }
-            ),
-        )
-        yield
 
 
 @contextmanager
@@ -374,95 +344,6 @@ def _drop_exception_frame_vars(event: dict[str, Any]) -> None:
         for frame in frames:
             if isinstance(frame, dict):
                 frame.pop("vars", None)
-
-
-def _is_expected_chat_agent_max_turns_event(event: dict[str, Any]) -> bool:
-    """Drop handled chat-agent fallbacks that Sentry may still receive."""
-    exception = event.get("exception")
-    if not isinstance(exception, dict):
-        return False
-
-    values = exception.get("values")
-    if not isinstance(values, list):
-        return False
-
-    for exception_value in values:
-        if not isinstance(exception_value, dict):
-            continue
-        if (
-            exception_value.get("type") != "MaxTurnsExceeded"
-            or exception_value.get("module") != "agents.exceptions"
-        ):
-            continue
-
-        if event.get("logger") == "src.tgbot.handlers.chat.agent.runner":
-            return True
-        if _exception_has_chat_agent_frame(exception_value):
-            return True
-        if _event_has_chat_agent_context(event):
-            return True
-        if _event_has_chat_agent_webhook_context(event, exception_value):
-            return True
-
-    return False
-
-
-def _event_has_chat_agent_context(event: dict[str, Any]) -> bool:
-    tags = event.get("tags")
-    if isinstance(tags, dict):
-        if tags.get("ff.module") == "chat_agent":
-            return True
-        if tags.get("chat_agent.trigger_type"):
-            return True
-
-    contexts = event.get("contexts")
-    if isinstance(contexts, dict) and isinstance(contexts.get("chat_agent"), dict):
-        return True
-
-    return False
-
-
-def _event_has_chat_agent_webhook_context(
-    event: dict[str, Any],
-    exception_value: dict[str, Any],
-) -> bool:
-    mechanism = exception_value.get("mechanism")
-    if not isinstance(mechanism, dict) or mechanism.get("type") != "openai_agents":
-        return False
-
-    if event.get("transaction") != "/tgbot/webhook":
-        return False
-
-    tags = event.get("tags")
-    if not isinstance(tags, dict):
-        return False
-
-    return (
-        tags.get("telegram.update_type") == "message"
-        and tags.get("telegram.chat_type") == "supergroup"
-    )
-
-
-def _exception_has_chat_agent_frame(exception_value: dict[str, Any]) -> bool:
-    stacktrace = exception_value.get("stacktrace")
-    if not isinstance(stacktrace, dict):
-        return False
-
-    frames = stacktrace.get("frames")
-    if not isinstance(frames, list):
-        return False
-
-    for frame in frames:
-        if not isinstance(frame, dict):
-            continue
-        filename = str(frame.get("filename") or "")
-        abs_path = str(frame.get("abs_path") or "")
-        if "tgbot/handlers/chat/agent/runner.py" in filename:
-            return True
-        if "tgbot/handlers/chat/agent/runner.py" in abs_path:
-            return True
-
-    return False
 
 
 def _scrub_log_attribute(key: str, value: Any) -> Any:

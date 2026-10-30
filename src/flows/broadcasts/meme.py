@@ -7,7 +7,6 @@ from src.broadcasts.service import (
     drop_holdout,
     get_monthly_reminder_user_ids,
     get_user_ids_active_minutes_ago,
-    get_users_active_more_than_days_ago,
     send_meme_broadcast,
 )
 from src.config import settings
@@ -204,13 +203,6 @@ async def broadcast_next_meme_to_active_2w_ago():
 @flow(**_BROADCAST_FLOW_OPTS)
 async def broadcast_next_meme_to_active_4w_ago():
     await _broadcast_cadence_step("4w", 4 * 7 * 24 * 60, 4 * 7 * 24 * 60 + 60)
-
-
-@flow(**_BROADCAST_FLOW_OPTS)
-async def broadcast_next_meme_to_active_more_than_days_ago(days: int = 3):
-    """To call manually sometimes"""
-    user_ids = await get_users_active_more_than_days_ago(days)
-    await broadcast_next_meme_to_users(user_ids)
 
 
 @flow(**{**_BROADCAST_FLOW_OPTS, "timeout_seconds": 3 * 60 * 60})

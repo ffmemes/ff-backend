@@ -14,10 +14,9 @@ silent drop is by design):
   - 60s ≤ age ≤ 300s        → WARN
   - 300s < age ≤ 1500s      → ERROR (something stayed broken for 5+ min)
 
-Runs every minute. The 25-minute trailing window is wide enough that
-a couple of minutes of Prefect downtime won't lose the signal, narrow
-enough that a single regression spike fires 5+ ERROR runs in a row
-(easy to spot in the admin chat).
+Runs every 10 minutes. The 25-minute trailing window overlaps consecutive
+runs, so a ghost older than 5 minutes is reported at least once and a
+short Prefect outage doesn't lose the signal.
 """
 
 import logging

@@ -117,24 +117,3 @@ async def get_user_info_by_key(key: str) -> dict | None:
 
 async def set_user_info_by_key(key: str, user_info: dict) -> None:
     await redis_client.set(key, orjson.dumps(user_info), ex=60 * 60 * 1)  # 1h cache
-
-
-#############################
-# wrapped
-
-
-def get_user_wrapped_key(user_id: int) -> str:
-    return f"wrapped:{user_id}"
-
-
-async def get_user_wrapped(user_id: str) -> dict | None:
-    data = await redis_client.get(get_user_wrapped_key(user_id))
-    return orjson.loads(data) if data else None
-
-
-async def set_user_wrapped(user_id: str, data: dict, ttl: int = None) -> None:
-    key = get_user_wrapped_key(user_id)
-    if ttl:
-        await redis_client.set(key, orjson.dumps(data), ex=ttl)
-    else:
-        await redis_client.set(key, orjson.dumps(data))
