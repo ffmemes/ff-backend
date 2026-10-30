@@ -4,15 +4,34 @@ from unittest.mock import AsyncMock, patch
 import pytest
 import pytest_asyncio
 from sqlalchemy import delete
-from tests.factories import create_user, create_user_language
+from tests.factories import (
+    create_meme,
+    create_meme_source,
+    create_reaction,
+    create_user,
+    create_user_language,
+)
 
 from src.broadcasts.service import (
+    drop_holdout,
     get_all_non_blocked_users,
+    get_monthly_reminder_user_ids,
+    get_user_ids_active_minutes_ago,
     get_users_inactive_since_days,
     get_users_with_language,
+    holdout_variant,
     send_meme_broadcast,
 )
-from src.database import engine, user, user_language, user_tg
+from src.database import (
+    engine,
+    meme,
+    meme_source,
+    user,
+    user_language,
+    user_meme_reaction,
+    user_stats,
+    user_tg,
+)
 from src.storage.constants import MemeType
 from src.storage.schemas import MemeData
 
@@ -37,8 +56,17 @@ async def cleanup_broadcast_users():
     await _cleanup()
 
 
+TEST_MEME_ID = 311101
+
+
 async def _cleanup() -> None:
     async with engine.connect() as conn:
+        await conn.execute(
+            delete(user_meme_reaction).where(user_meme_reaction.c.user_id.in_(TEST_USER_IDS))
+        )
+        await conn.execute(delete(user_stats).where(user_stats.c.user_id.in_(TEST_USER_IDS)))
+        await conn.execute(delete(meme).where(meme.c.id == TEST_MEME_ID))
+        await conn.execute(delete(meme_source).where(meme_source.c.id == TEST_MEME_ID))
         await conn.execute(delete(user_language).where(user_language.c.user_id.in_(TEST_USER_IDS)))
         await conn.execute(delete(user_tg).where(user_tg.c.id.in_(TEST_USER_IDS)))
         await conn.execute(delete(user).where(user.c.id.in_(TEST_USER_IDS)))
@@ -194,3 +222,68 @@ async def test_send_meme_broadcast_picks_per_user_and_dedups() -> None:
     assert send.await_args.kwargs["recommended_by"] == "broadcast_channel_viral"
     assert result_again["skipped"] == 2
     assert result_again["sent"] == 0
+
+
+@pytest.mark.asyncio
+async def test_cadence_targeting_requires_recent_reaction(cleanup_broadcast_users) -> None:
+    now = datetime.utcnow()
+    reacted_id, stale_id = ACTIVE_USER_ID, ACTIVE_ADMIN_ID
+    async with engine.connect() as conn:
+        await create_meme_source(conn, id=TEST_MEME_ID)
+        await create_meme(conn, id=TEST_MEME_ID, meme_source_id=TEST_MEME_ID)
+        for user_id, reacted_at in ((reacted_id, now), (stale_id, now - timedelta(days=40))):
+            await create_user(conn, id=user_id)
+            await conn.execute(
+                user.update()
+                .where(user.c.id == user_id)
+                .values(last_active_at=now - timedelta(minutes=20))
+            )
+            await create_reaction(
+                conn, user_id=user_id, meme_id=TEST_MEME_ID, reaction_id=1, reacted_at=reacted_at
+            )
+        await conn.commit()
+
+    ids = set(await get_user_ids_active_minutes_ago(15, 30)) & set(TEST_USER_IDS)
+    assert ids == {reacted_id}
+
+
+@pytest.mark.asyncio
+async def test_monthly_reminder_selects_29_to_365_day_reactors(cleanup_broadcast_users) -> None:
+    now = datetime.utcnow()
+    cases = {
+        ACTIVE_USER_ID: now - timedelta(days=60),  # in
+        ACTIVE_ADMIN_ID: now - timedelta(days=10),  # too recent
+        WAITLIST_USER_ID: now - timedelta(days=400),  # too old
+        BLOCKED_ADMIN_ID: now - timedelta(days=60),  # blocked
+    }
+    async with engine.connect() as conn:
+        for user_id, last_reaction_at in cases.items():
+            await create_user(conn, id=user_id)
+            await conn.execute(
+                user_stats.insert().values(user_id=user_id, last_reaction_at=last_reaction_at)
+            )
+        await create_user(conn, id=LEGACY_BLOCKED_USER_ID)  # never reacted: no user_stats
+        await conn.execute(
+            user.update().where(user.c.id == BLOCKED_ADMIN_ID).values(blocked_bot_at=now)
+        )
+        await conn.commit()
+
+    ids = set(await get_monthly_reminder_user_ids()) & set(TEST_USER_IDS)
+    assert ids == {ACTIVE_USER_ID}
+
+
+@pytest.mark.asyncio
+async def test_drop_holdout_is_deterministic_and_logged() -> None:
+    share = sum(holdout_variant("exp", uid, 15) == "holdout" for uid in range(10_000)) / 10_000
+    assert 0.13 < share < 0.17
+    assert all(holdout_variant("exp", uid, 0) == "treatment" for uid in range(1000))
+
+    user_ids = list(range(100))
+    assign = AsyncMock()
+    with patch("src.broadcasts.service.assign_experiment", assign):
+        treated = await drop_holdout("exp", user_ids, 20)
+
+    assert treated == [u for u in user_ids if holdout_variant("exp", u, 20) == "treatment"]
+    assert 0 < len(treated) < 100
+    assert assign.await_count == 100
+    assert {c.args[2] for c in assign.await_args_list} == {"treatment", "holdout"}

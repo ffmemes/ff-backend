@@ -215,7 +215,7 @@ most users (fallback rate &gt;80%) or LR collapses &gt;5 pp vs fallback.
 | Field | Value |
 |-------|--------|
 | **ID** | `broadcast_channel_viral_pick` |
-| **Status** | **shipping** |
+| **Status** | **disabled 2026-10-30** (default `false`; code path kept) |
 | **Code** | `src/recommendations/broadcast_pick.py`, kill switch `BROADCAST_CHANNEL_VIRAL_PICK_ENABLED` |
 | **Labels** | `broadcast_channel_viral` vs `broadcast_reengagement_hq` vs queue |
 | **SQL** | `docs/analyst/broadcast-reengagement.sql` |
@@ -241,6 +241,13 @@ without a like-rate drop >3 pp on reacted rows.
 broadcasts is <10% (always empty) or 1h reactivation is worse than HQ by >5 pp
 with ≥200 viral sends.
 
+### Decision 2026-10-30: disable, HQ is default
+
+Sep 10 → Oct 28 stratified readout: viral like rate 5–20 pp below HQ in every
+stratum, react-within-1h/24h equal or worse, session length and 7d activity
+equal (within-user too). Disable rule met → `BROADCAST_CHANNEL_VIRAL_PICK_ENABLED`
+defaults to `false`. Follow-up: `experiments/active/2026-10-30-broadcast-cadence-holdout.md`.
+
 ### One-shot idle blast (2026-09-07)
 
 `scripts/broadcast_dormant.py` id `dormant-channel-viral-2026-09-07`.
@@ -252,6 +259,11 @@ Readout: `docs/analyst/readouts/2026-09-07-onboarding-and-dormant-blast.md`.
 Keep **15m / 24h / 48h / 1w / 2w / 4w** while the user is still fresh.
 After that, **one monthly** reminder for people who already reacted.
 Lever inside the cadence is meme quality (H3c), not fewer early nudges.
+
+2026-10-30: cadence targeting now requires a real reaction near the step
+window; per-step no-push holdouts (`broadcast_cadence_holdout_v1_*`) and the
+monthly reminder (`monthly_reminder_v1`, flag-gated) are live — see
+`experiments/active/2026-10-30-broadcast-cadence-holdout.md`.
 
 ---
 
