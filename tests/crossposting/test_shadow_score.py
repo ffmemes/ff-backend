@@ -1,87 +1,63 @@
-"""Shadow hybrid score — log only, pure functions."""
+"""v5 shadow score — log only, pure functions."""
+
+import math
 
 from src.crossposting.service import _build_decision_log
-from src.crossposting.shadow_score import (
-    SHADOW_VERSION,
-    attach_shadow_ranks,
-    hybrid_shadow_fields,
-    maturity_band_mult,
-    volume_factor,
-)
+from src.crossposting.shadow_score import SHADOW_V5_VERSION, attach_v5_ranks, score_v5
 
 
-def test_volume_and_hybrid():
-    import math
-
-    assert abs(volume_factor(0) - math.log(1)) < 1e-9
-    assert abs(volume_factor(10) - math.log(11)) < 1e-9
-    f = hybrid_shadow_fields(nlikes=10, src_quality_mult=1.5)
-    assert f["shadow_version"] == SHADOW_VERSION
-    assert abs(f["shadow_score"] - math.log(11) * 1.5) < 1e-5
-    assert f["shadow_src_mult"] == 1.5
+def test_score_v5_ru_and_en():
+    assert math.isclose(score_v5("tgchannelru", 10, 1.5, 0.4), math.log(11) * 1.5 * math.exp(0.2))
+    # EN ignores like volume, full-strength taste
+    assert math.isclose(score_v5("tgchannelen", 10, 1.5, 0.4), 1.5 * math.exp(0.4))
+    assert math.isclose(score_v5("tgchannelen", 999, 2.0, None), 2.0)
 
 
-def test_maturity_band():
-    assert maturity_band_mult(50) == 1.15
-    assert maturity_band_mult(5) == 1.0
-    assert maturity_band_mult(250) == 0.85
-    f = hybrid_shadow_fields(nlikes=50, src_quality_mult=1.0)
-    assert f["shadow_maturity_mult"] == 1.15
-    assert f["shadow_score_maturity"] > f["shadow_score"]
-
-
-def test_attach_shadow_ranks_disagree():
+def test_attach_v5_ranks_keeps_order_and_picks_best():
     cands = [
-        {"rank": 1, "meme_id": 1, "shadow_score": 1.0},
-        {"rank": 2, "meme_id": 2, "shadow_score": 9.0},
-        {"rank": 3, "meme_id": 3, "shadow_score": 3.0},
+        {"rank": 1, "meme_id": 1, "score_v5": 1.0},
+        {"rank": 2, "meme_id": 2, "score_v5": 9.0},
+        {"rank": 3, "meme_id": 3, "score_v5": 3.0},
     ]
-    out = attach_shadow_ranks(cands)
-    assert out[1]["shadow_rank"] == 1  # highest score
-    assert out[0]["shadow_rank"] == 3
-    assert out[0]["shadow_vs_prod_disagree"] is True
-    assert out[0]["shadow_pick_meme_id"] == 2
+    out = attach_v5_ranks(cands)
+    assert [c["meme_id"] for c in out] == [1, 2, 3]
+    assert [c["shadow_v5_rank"] for c in out] == [3, 1, 2]
+    assert {c["shadow_v5_pick_meme_id"] for c in out} == {2}
 
 
-def test_build_decision_log_includes_shadow():
+def _cand(mid, nlikes, **kw):
+    return {
+        "id": mid,
+        "nlikes": nlikes,
+        "ndislikes": 10,
+        "nmemes_sent": 40,
+        "raw_impr_rank": 1,
+        "age_days": 3,
+        "invited_count": 0,
+        "src_signal": 10.0,
+        "median_signal": 10.0,
+        "caption": None,
+        "meme_source_id": 1,
+        "candidate_pool_size": 50,
+        **kw,
+    }
+
+
+def test_build_decision_log_v5_fields():
     cands = [
-        {
-            "id": 101,
-            "nlikes": 100,
-            "ndislikes": 80,
-            "nmemes_sent": 200,
-            "raw_impr_rank": 1,
-            "age_days": 3,
-            "invited_count": 0,
-            "src_signal": 20.0,
-            "median_signal": 10.0,
-            "caption": None,
-            "meme_source_id": 1,
-            "candidate_pool_size": 50,
-        },
-        {
-            "id": 102,
-            "nlikes": 20,
-            "ndislikes": 10,
-            "nmemes_sent": 40,
-            "raw_impr_rank": 1,
-            "age_days": 3,
-            "invited_count": 0,
-            "src_signal": 5.0,
-            "median_signal": 10.0,
-            "caption": None,
-            "meme_source_id": 2,
-            "candidate_pool_size": 50,
-        },
+        _cand(101, 100, theta_src=0.5, user_taste_z=-1.0),
+        _cand(102, 20, theta_src=2.0, user_taste_z=1.0),
     ]
-    log = _build_decision_log("tgchannelru", 4, cands, like_volume_enabled=True)
-    assert log is not None
-    # Top-level keys must stay compatible with log_ranker_decision() columns only
-    assert "shadow_version" not in log
+    log = _build_decision_log("tgchannelen", 2, cands)
     top = log["candidates"][0]
-    assert top["shadow_version"] == SHADOW_VERSION
-    assert "shadow_score" in top
-    assert "shadow_rank" in top
-    assert top["rank"] == 1  # production order preserved
-    ranks = {c["meme_id"]: c["shadow_rank"] for c in log["candidates"]}
-    assert set(ranks.values()) == {1, 2}
+    assert top["rank"] == 1 and top["meme_id"] == 101  # production order preserved
+    assert top["shadow_version"] == SHADOW_V5_VERSION
+    assert top["shadow_v5_pick_meme_id"] == 102
+    assert "taste_boost_shadow" not in top
+
+
+def test_build_decision_log_without_v5_inputs_logs_none():
+    log = _build_decision_log("tgchannelru", 4, [_cand(101, 100)], like_volume_enabled=True)
+    top = log["candidates"][0]
+    assert top["score_v5"] is None
+    assert "shadow_v5_rank" not in top

@@ -15,6 +15,7 @@ from src.comms.performance import write_channel_stats_report
 
 # Broadcasts
 from src.flows.broadcasts.meme import (
+    broadcast_monthly_reminder,
     broadcast_next_meme_to_active_1w_ago,
     broadcast_next_meme_to_active_2w_ago,
     broadcast_next_meme_to_active_4w_ago,
@@ -149,6 +150,11 @@ if __name__ == "__main__":
         broadcast_next_meme_to_active_4w_ago.to_deployment(
             name="Broadcast 4w",
             schedules=[CronSchedule(cron="9 * * * *", timezone=LON)],
+        ),
+        # No-op until MONTHLY_REMINDER_ENABLED=true.
+        broadcast_monthly_reminder.to_deployment(
+            name="Broadcast monthly reminder",
+            schedules=[CronSchedule(cron="0 13 1 * *", timezone=MSK)],
         ),
         # ── Crossposting (Moscow timezone) ──
         post_meme_to_tgchannelru.to_deployment(

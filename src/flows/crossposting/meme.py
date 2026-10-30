@@ -16,6 +16,7 @@ from src.crossposting.service import (
     get_next_share_max_meme_for_tgchannelru,
     log_meme_sent,
     log_ranker_decision,
+    posted_recently,
 )
 from src.crossposting.vk import post_photo_to_group
 from src.flows.crossposting.stats_collector import refresh_crosspost_message_stats
@@ -221,6 +222,11 @@ async def _safe_refresh_crosspost_stats(
 async def post_meme_to_tgchannelen():
     logger = get_run_logger()
 
+    # Late scheduled runs (worker downtime) fire back-to-back: post at most one.
+    if await posted_recently(Channel.TG_CHANNEL_EN):
+        logger.warning("TG Channel EN posted <1h ago, skipping catch-up slot")
+        return
+
     meme_data, decision = await get_next_meme_for_tgchannelen()
     if meme_data is None:
         logger.warning("No qualifying meme for TG Channel EN, skipping slot")
@@ -275,6 +281,11 @@ async def post_meme_to_tgchannelen():
 )
 async def post_meme_to_tgchannelru():
     logger = get_run_logger()
+
+    # Late scheduled runs (worker downtime) fire back-to-back: post at most one.
+    if await posted_recently(Channel.TG_CHANNEL_RU):
+        logger.warning("TG Channel RU posted <1h ago, skipping catch-up slot")
+        return
 
     meme_data, decision = await get_next_meme_for_tgchannelru()
     if meme_data is None:

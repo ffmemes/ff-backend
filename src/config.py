@@ -90,7 +90,16 @@ class Config(BaseSettings):
     BROADCAST_HIGH_QUALITY_PICK_ENABLED: bool = True
     # Prefer last-7-day channel posts ranked by forwards (community-verified).
     # Falls back to HQ/queue. Skips channel-hit experiment users and members.
-    BROADCAST_CHANNEL_VIRAL_PICK_ENABLED: bool = True
+    # Off since 2026-10-30 (H3c disable rule): viral LR 5-20 pp below HQ with
+    # equal/worse reactions; HQ is the default push pick.
+    BROADCAST_CHANNEL_VIRAL_PICK_ENABLED: bool = False
+    # broadcast_cadence_holdout_v1: no-push holdout per cadence step (15m/24h
+    # 15%, 1w/2w/4w 20%). See experiments/active/2026-10-30-*.
+    BROADCAST_CADENCE_HOLDOUT_ENABLED: bool = True
+    # Monthly reminder (users whose last reaction was 29-365 days ago).
+    # Owner flips on after deploy. Set HOLDOUT_PCT=0 after the v1 readout.
+    MONTHLY_REMINDER_ENABLED: bool = False
+    MONTHLY_REMINDER_HOLDOUT_PCT: int = 50
     # RU crosspost ranker: multiply score by ln(nlikes+1) (meme volume, not LR).
     # Offline 2026-08-09: src×log1p(likes) top-20% lift ~1.14 on time-split.
     # Kill switch reverts @fastfoodmemes to score_version=2 behavior.

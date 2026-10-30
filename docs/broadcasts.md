@@ -52,6 +52,17 @@ python scripts/broadcast_dormant.py dormant-channel-viral-2026-09-07 --min-days 
 
 Never reuse a `broadcast_id` for a different audience.
 
+### Scheduled retention pushes
+
+Cadence flows (15m/24h/48h/1w/2w/4w) and the monthly reminder live in
+`src/flows/broadcasts/meme.py`, scheduled by `scripts/serve_flows.py`.
+Cadence steps require a real reaction near the step window (not just
+`last_active_at`). The monthly reminder (`MONTHLY_REMINDER_ENABLED`, 1st of the
+month 13:00 MSK) uses `send_meme_broadcast()` with
+`broadcast_id = monthly-reminder-YYYY-MM`, so a retry or manual re-run in the
+same month is deduped. Both carry holdouts logged in `experiment_assignment`;
+see `experiments/active/2026-10-30-broadcast-cadence-holdout.md`.
+
 ### 3. Monitor
 
 ```bash
