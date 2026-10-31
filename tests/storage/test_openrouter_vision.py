@@ -72,7 +72,7 @@ class _VisionClient:
 
 
 @pytest.mark.asyncio
-async def test_check_openrouter_key_health_blocks_exhausted_key(monkeypatch):
+async def test_key_health_blocks_exhausted_key(monkeypatch):
     response = _response(
         200,
         {"data": {"limit": 1, "limit_remaining": 0, "limit_reset": "monthly"}},
@@ -83,15 +83,16 @@ async def test_check_openrouter_key_health_blocks_exhausted_key(monkeypatch):
         lambda **kwargs: _FakeAsyncClient(response=response, **kwargs),
     )
     monkeypatch.setattr(openrouter_vision.settings, "OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(openrouter_vision.settings, "OPENROUTER_API_KEY_SECONDARY", None)
 
     log = _Log()
 
-    assert await openrouter_vision.check_openrouter_key_health(log) is False
+    assert bool(await openrouter_vision.get_usable_openrouter_keys(log)) is False
     assert any("limit exhausted" in message for level, message in log.messages if level == "error")
 
 
 @pytest.mark.asyncio
-async def test_check_openrouter_key_health_allows_unlimited_key(monkeypatch):
+async def test_key_health_allows_unlimited_key(monkeypatch):
     response = _response(
         200,
         {"data": {"limit": None, "limit_remaining": None, "limit_reset": None}},
@@ -102,12 +103,13 @@ async def test_check_openrouter_key_health_allows_unlimited_key(monkeypatch):
         lambda **kwargs: _FakeAsyncClient(response=response, **kwargs),
     )
     monkeypatch.setattr(openrouter_vision.settings, "OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(openrouter_vision.settings, "OPENROUTER_API_KEY_SECONDARY", None)
 
-    assert await openrouter_vision.check_openrouter_key_health(_Log()) is True
+    assert bool(await openrouter_vision.get_usable_openrouter_keys(_Log())) is True
 
 
 @pytest.mark.asyncio
-async def test_check_openrouter_key_health_allows_zero_paid_limit_for_free_models(monkeypatch):
+async def test_key_health_allows_zero_paid_limit_for_free_models(monkeypatch):
     response = _response(
         200,
         {"data": {"limit": 0, "limit_remaining": 0, "limit_reset": None}},
@@ -118,12 +120,13 @@ async def test_check_openrouter_key_health_allows_zero_paid_limit_for_free_model
         lambda **kwargs: _FakeAsyncClient(response=response, **kwargs),
     )
     monkeypatch.setattr(openrouter_vision.settings, "OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(openrouter_vision.settings, "OPENROUTER_API_KEY_SECONDARY", None)
 
-    assert await openrouter_vision.check_openrouter_key_health(_Log()) is True
+    assert bool(await openrouter_vision.get_usable_openrouter_keys(_Log())) is True
 
 
 @pytest.mark.asyncio
-async def test_check_openrouter_key_health_fails_open_when_probe_unavailable(monkeypatch):
+async def test_key_health_fails_open_when_probe_unavailable(monkeypatch):
     error = httpx.ConnectError(
         "unavailable",
         request=httpx.Request("GET", "https://openrouter.ai/api/v1/key"),
@@ -134,8 +137,9 @@ async def test_check_openrouter_key_health_fails_open_when_probe_unavailable(mon
         lambda **kwargs: _FakeAsyncClient(error=error, **kwargs),
     )
     monkeypatch.setattr(openrouter_vision.settings, "OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(openrouter_vision.settings, "OPENROUTER_API_KEY_SECONDARY", None)
 
-    assert await openrouter_vision.check_openrouter_key_health(_Log()) is True
+    assert bool(await openrouter_vision.get_usable_openrouter_keys(_Log())) is True
 
 
 def test_is_exhausted_key_limit_ignores_unlimited_or_unknown_values():

@@ -42,7 +42,6 @@ from src.config import settings
 from src.database import (
     channel_daily_stats,
     crossposting_snapshots,
-    editorial_post_snapshots,
     execute,
     fetch_all,
 )
@@ -135,48 +134,6 @@ async def _persist_crosspost_metrics(
     await execute(
         text(
             "UPDATE crossposting SET views = :views, forwards = :fwd, "
-            "reactions = :react, comments = :comments, "
-            "reactions_detail = :rdetail, stats_updated_at = NOW() "
-            "WHERE channel = :ch AND telegram_message_id = :msg_id"
-        ),
-        {
-            "views": views,
-            "fwd": forwards,
-            "react": reactions,
-            "comments": comments,
-            "rdetail": json.dumps(reactions_detail) if reactions_detail else None,
-            "ch": channel_key,
-            "msg_id": telegram_message_id,
-        },
-    )
-
-
-async def _persist_editorial_metrics(
-    *,
-    channel_key: str,
-    editorial_post_id: int,
-    telegram_message_id: int,
-    views: int,
-    forwards: int,
-    reactions: int,
-    comments: int,
-    reactions_detail: dict[str, int],
-) -> None:
-    await execute(
-        insert(editorial_post_snapshots).values(
-            channel=channel_key,
-            editorial_post_id=editorial_post_id,
-            telegram_message_id=telegram_message_id,
-            views=views,
-            forwards=forwards,
-            reactions=reactions,
-            comments=comments,
-            reactions_detail=reactions_detail or None,
-        )
-    )
-    await execute(
-        text(
-            "UPDATE editorial_posts SET views = :views, forwards = :fwd, "
             "reactions = :react, comments = :comments, "
             "reactions_detail = :rdetail, stats_updated_at = NOW() "
             "WHERE channel = :ch AND telegram_message_id = :msg_id"
@@ -306,12 +263,7 @@ async def refresh_crosspost_message_stats(
 
 
 async def _collect_post_stats(client: TelegramClient, channel_key: str, channel_username: str):
-    """Full sweep: views/forwards/reactions for recent posts in a channel.
-
-    Posts may be tracked in two places: `crossposting` (meme cross-posts, high
-    volume) or `editorial_posts` (editorial updates, ~1/day). A single
-    Telegram message cannot be both, so we dispatch by source.
-    """
+    """Full sweep: views/forwards/reactions for recent crossposts in a channel."""
     log = get_run_logger()
 
     try:
@@ -320,7 +272,6 @@ async def _collect_post_stats(client: TelegramClient, channel_key: str, channel_
         log.error(f"Cannot access @{channel_username} — private or no access")
         return
 
-    # Editorial posts are low-volume (~1/day) so we keep refreshing ~30 days.
     # Meme crossposts get most views in the first 48h; re-updating is cheap.
     messages = await client.get_messages(entity, limit=FULL_SWEEP_MESSAGE_LIMIT)
 
@@ -343,24 +294,11 @@ async def _collect_post_stats(client: TelegramClient, channel_key: str, channel_
         {r["telegram_message_id"]: r["meme_id"] for r in crosspost_rows} if crosspost_rows else {}
     )
 
-    editorial_rows = await fetch_all(
-        text(
-            "SELECT id, telegram_message_id FROM editorial_posts "
-            "WHERE channel = :channel AND telegram_message_id IS NOT NULL"
-        ),
-        {"channel": channel_key},
-    )
-    known_editorial = (
-        {r["telegram_message_id"]: r["id"] for r in editorial_rows} if editorial_rows else {}
-    )
-
     crosspost_snapshots = 0
-    editorial_snapshots = 0
     for msg in recent_messages:
         views, forwards, reaction_count, reactions_detail, comments = _extract_metrics(msg)
 
         meme_id = known_crosspost.get(msg.id)
-        editorial_id = known_editorial.get(msg.id)
 
         if meme_id is not None:
             await _persist_crosspost_metrics(
@@ -376,23 +314,7 @@ async def _collect_post_stats(client: TelegramClient, channel_key: str, channel_
             )
             crosspost_snapshots += 1
 
-        if editorial_id is not None:
-            await _persist_editorial_metrics(
-                channel_key=channel_key,
-                editorial_post_id=editorial_id,
-                telegram_message_id=msg.id,
-                views=views,
-                forwards=forwards,
-                reactions=reaction_count,
-                comments=comments,
-                reactions_detail=reactions_detail,
-            )
-            editorial_snapshots += 1
-
-    log.info(
-        f"@{channel_username}: {crosspost_snapshots} crosspost snapshots, "
-        f"{editorial_snapshots} editorial snapshots"
-    )
+    log.info(f"@{channel_username}: {crosspost_snapshots} crosspost snapshots")
 
 
 async def _collect_young_crosspost_stats(

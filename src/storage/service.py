@@ -83,8 +83,6 @@ async def auto_snooze_stale_sources(
                 SELECT meme_source_id, created_at FROM meme_raw_telegram
                 UNION ALL
                 SELECT meme_source_id, created_at FROM meme_raw_vk
-                UNION ALL
-                SELECT meme_source_id, created_at FROM meme_raw_ig
             ) raw_posts
             GROUP BY meme_source_id
         ),

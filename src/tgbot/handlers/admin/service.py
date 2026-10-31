@@ -1,11 +1,9 @@
-from datetime import datetime
 from typing import Any
 
 from sqlalchemy import func, select
 
 from src.database import (
     execute,
-    fetch_all,
     fetch_one,
     user,
     user_deep_link_log,
@@ -23,7 +21,6 @@ from src.redis import (
     get_user_info_key,
     redis_client,
 )
-from src.tgbot.constants import UserType
 
 
 async def delete_user(user_id: int) -> None:
@@ -54,13 +51,3 @@ async def get_user_by_tg_username(
         .where(func.lower(user_tg.c.username) == username.lower())
     )
     return await fetch_one(select_statement)
-
-
-async def get_waitlist_users_registered_before(
-    date: datetime,
-) -> list[dict[str, Any]]:
-    """Select all users that have registered before or at a certain datetime"""
-    select_statement = select(user).where(
-        user.c.created_at <= date, user.c.type == UserType.WAITLIST
-    )
-    return await fetch_all(select_statement)

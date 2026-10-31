@@ -9,8 +9,8 @@ Core tokenomics code:
 
 - Ledger table: [`treasury_trx`](../src/database.py)
 - Payout constants and transaction types: [`treasury/constants.py`](../src/tgbot/handlers/treasury/constants.py)
-- Balance, leaderboard, supply, transfer helpers: [`treasury/service.py`](../src/tgbot/handlers/treasury/service.py)
-- Idempotent mint/charge wrappers: [`treasury/payments.py`](../src/tgbot/handlers/treasury/payments.py)
+- Balance, leaderboard, supply helpers: [`treasury/service.py`](../src/tgbot/handlers/treasury/service.py)
+- Idempotent payout wrappers: [`treasury/payments.py`](../src/tgbot/handlers/treasury/payments.py)
 - User-facing burger commands: [`treasury/commands.py`](../src/tgbot/handlers/treasury/commands.py)
 - Command registry: [`tgbot/app.py`](../src/tgbot/app.py)
 
@@ -21,9 +21,6 @@ Flows and handlers that create burger transactions:
 - Channel publication payout: [`crossposting/meme.py`](../src/flows/crossposting/meme.py)
 - Weekly uploaded-meme rewards: [`rewards/uploaded_memes.py`](../src/flows/rewards/uploaded_memes.py)
 - Daily activity reward: [`rewards/daily.py`](../src/flows/rewards/daily.py)
-- Chat transfers and chat reward drops: [`chat/send_tokens.py`](../src/tgbot/handlers/chat/send_tokens.py)
-- Channel boost reward: [`admin/boost.py`](../src/tgbot/handlers/admin/boost.py)
-- Giveaway claims: [`treasury/giveaway.py`](../src/tgbot/handlers/treasury/giveaway.py)
 - Weekly burger economy channel report: [`weekly_report.py`](../src/flows/crossposting/weekly_report.py)
 
 ## Ledger Model
@@ -61,29 +58,22 @@ Current values from `PAYOUTS`:
 | `uploader_top_weekly_4` | +100 | Weekly uploaded-meme top 4. | Current date |
 | `uploader_top_weekly_5` | +50 | Weekly uploaded-meme top 5. | Current date |
 | `daily_reward` | +1 | User reaches exactly 10 memes watched today. | Current date |
-| `booster_channel` | +500 | User boosts RU or EN public channel. | Current date |
-| `giveaway` | +77 | User claims a giveaway deep link. | Giveaway deep link |
-| `purchase_token` | variable | Successful Telegram Stars purchase. | Telegram payment charge id |
-| `receive` | variable | User receives a manual group-chat transfer. | Sender user id |
-| `send` | negative variable | User sends burgers in group chat. | Recipient user id |
+| `booster_channel`, `giveaway`, `purchase_token`, `send`, `receive`, `active_in_chat` | — | Legacy: chat boost, giveaway, Stars purchase and chat transfer/reward flows removed 2026-10-31. Enum members kept for historical rows. | — |
 | `bot_reply_payment` | -1 | Legacy: group chat-agent replies (agent removed 2026-10-30). | Chat id + message id |
 
 Important current behavior: leaderboard and weekly economy "minted" totals count
-every positive row. This includes purchases, receives, giveaways, boost rewards,
-daily rewards, and inviter rewards, not only "earned by contribution" payouts.
+every positive row. This includes daily rewards and inviter rewards, not only "earned by contribution" payouts.
 
 ## User Commands
 
 ### `/balance` and `/b`
 
-Private chat only. Shows the user's current ledger-summed balance and renders
-purchase buttons for 100, 1000, and 10000 burgers.
+Private chat only. Shows the user's current ledger-summed balance.
 
 Code:
 
 - Registered in [`tgbot/app.py`](../src/tgbot/app.py)
 - Rendered by [`handle_show_balance`](../src/tgbot/handlers/treasury/commands.py)
-- Purchase invoice flow in [`payments/purchase.py`](../src/tgbot/handlers/payments/purchase.py)
 
 ### `/kitchen`
 
@@ -145,49 +135,13 @@ Code:
 - Registered in [`tgbot/app.py`](../src/tgbot/app.py)
 - Rendered by [`upload/stats.py`](../src/tgbot/handlers/upload/stats.py)
 
-### `/refund`
-
-Private chat only, admin-only in the handler. Calls Telegram Stars refund by
-payment charge id. It currently does not reverse local `purchase_token` ledger
-rows.
-
-Code: [`refund_command`](../src/tgbot/handlers/payments/purchase.py).
-
-### Group chat `+<number>`
-
-Group chats only, reply-only. Transfers burgers from the sender to the author of
-the replied-to message.
-
-Rules:
-
-- Sender must have enough balance.
-- Recipient must be an existing non-blocked bot user.
-- Sending to self is ignored.
-- Creates one negative `send` row for the sender and one positive `receive` row
-  for the recipient.
-
-Code:
-
-- Registered in [`tgbot/app.py`](../src/tgbot/app.py)
-- Transfer logic in [`send_tokens_to_reply`](../src/tgbot/handlers/chat/send_tokens.py)
-- Ledger write in [`transfer_tokens`](../src/tgbot/handlers/treasury/service.py)
-
-### Group chat `+fire <n>`
-
-Group chats only. Rewards active chat users with `active_in_chat` burgers.
-
-Code:
-
-- Registered in [`tgbot/app.py`](../src/tgbot/app.py)
-- Logic in [`reward_active_chat_users`](../src/tgbot/handlers/chat/send_tokens.py)
-
 ## Non-Treasury Commands
 
 These are registered commands that are not themselves burger-economy commands:
 
 | Command | Scope | Notes |
 | --- | --- | --- |
-| `/start` | Private | Onboarding, deep links, giveaway links, shared meme links. |
+| `/start` | Private | Onboarding, deep links, shared meme links. |
 | `/lang` | Private | Bot meme-language settings in `user_language`. |
 | `/chat`, `/c`, `/с` | Private text prefix | Feedback/chat to admins. Implemented as a message regex, not `CommandHandler`. |
 | `/stats` | Private | User stats. |
@@ -222,15 +176,10 @@ Code: [`weekly_report.py`](../src/flows/crossposting/weekly_report.py).
 
 These are current design debts worth resolving before changing values:
 
-- Should purchases and user-to-user `receive` rows count in `/leaderboard`, or
-  should public leaderboards count only contribution rewards?
-- Should daily rewards and giveaways count in weekly top earners?
+- Should public leaderboards count only contribution rewards?
+- Should daily rewards count in weekly top earners?
 - Should `user.balance` be removed or made strictly transactional? Today it is
   a cache, while the ledger is source of truth.
-- Should `send` and `receive` become one atomic transaction with a shared
-  transfer id?
-- Should `/refund` reverse local burger ledger rows when Telegram Stars are
-  refunded?
 - Should all command copy move into YAML localization instead of being embedded
   in handlers?
 - Should `meme_shared` be per-link, per-clicking-user, or remain one reward per

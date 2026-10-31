@@ -4,7 +4,7 @@ psycopg2==2.9.*
 SQLAlchemy==2.0.49
 httpx==0.28.*
 
-pydantic[email]==2.13.*
+pydantic==2.13.*
 pydantic-settings==2.14.*
 asyncpg==0.31.*
 fastapi==0.136.*
@@ -20,7 +20,5 @@ lxml==6.1.*
 python-telegram-bot[rate-limiter]==22.7.*
 
 Pillow==11.3.*
-
-openai==2.32.*
 
 telethon==1.43.*
