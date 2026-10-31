@@ -9,6 +9,7 @@ class TgChannelPostParsingResult(CustomModel):
     content: str | None = None  # post text
     media: list[dict] | None = None
     views: int
+    reactions: int | None = None
     date: datetime
 
     mentions: list[str] | None = None  # mentioned usernames

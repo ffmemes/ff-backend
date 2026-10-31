@@ -104,3 +104,12 @@ range scan the new partial index provides.
 ## Conclusion
 
 _Filled on completion only._
+
+## Confound: dedup restore (2026-10-31 14:40 UTC)
+7,762 memes that had been false-merged were restored to `ok`
+(ids: `docs/analyst/data/2026-10-31-dedup-restored-meme-ids.txt`). About 7.1k of them were never sent, and they average ~100 days old.
+The control low_sent pool orders by fewest reactions, so these memes jump to the front for **control only**. Treatment only allows memes under 7 days old, so it never sees them.
+Readout on 2026-11-20:
+- **Primary:** exclude sends of these ids from both arms. Also report the share of control low_sent sends that went to them.
+- **Sensitivity:** all sends.
+Use user-level means, not pooled.
