@@ -61,13 +61,13 @@ Design, assignment, frozen decision rules, confounds.
 | --- | --- | --- | --- | --- |
 | 2026-11-14 | [crosspost_v5_shadow](2026-10-30-crosspost-v5-shadow.md) | running | corr(score_v5, zf) - corr(v4, zf) >= 0.05 on posted picks, per channel | v5 score (source Beta hit rate x user taste, x like volume on RU) tracks channel virality better than v4 |
 | 2026-11-14 | [onboarding_default_language_v1](2026-10-31-onboarding-default-language.md) | running | share of signups with >=1 meme sent, share with a first reaction | Defaulting unknown/bare-en users to en (instead of a blocking picker) gets every signup a first meme and more first reactions |
+| 2026-11-14 | [phash_shadow_v1](2026-10-31-phash-shadow-dedup.md) | running | precision on sampled exact-hash pairs, agreement with duplicate_of | An exact 64-bit dHash match finds duplicates OCR cannot (videos, animations, text-free images) with high precision |
 | 2026-11-20 | [broadcast_cadence_holdout_v1](2026-10-30-broadcast-cadence-holdout.md) | running | reactions/user/week (15m, 24h); active d7-14 (1w, 2w, 4w) | The 15m push mostly re-times sessions heavy users would start anyway; later steps (24h, 1w, 2w, 4w) bring back lapsing users |
 | 2026-11-20 | [crosspost_content_tags_v5c](2026-10-31-crosspost-content-tags.md) | running | Gate A kappa >=0.6; Gate B refit coefficient <= -0.05 with CI excluding 0 | Relatable jokes and tweet screenshots get ~8-10% fewer RU forwards at equal source and likes; down-weighting them raises forwards per post |
 | 2026-11-20 | [explore_budget_v1](2026-10-30-explore-budget.md) | running | likes per active user per week, memes per session | Spend exploration only on labeling fresh memes, show fresh winners to everyone, and fill the idle-return slot from like_spread |
 | 2026-11-21 | [raw_impr_rank_reaction_rate](2026-10-31-raw-impr-rank-reaction-rate.md) | running | like rate of memes with raw_impr_rank = 0, 3 weeks before vs after deploy | Within-source reaction rate (reactions/views) beats views for ranking cold memes |
 | 2026-11-28 | [crosspost_src_fwd_v5f](2026-11-01-crosspost-src-forward-rate.md) | running | RU Spearman gain rho_v5f - rho_v5 with 95% CI excluding 0 | Memes whose source post was forwarded more than usual for that source get more forwards in our channels |
-| 2026-12-11 | [monthly_reminder_v1](2026-10-30-monthly-reminder.md) | proposed | react_30d_pct treated - holdout | One monthly HQ meme raises 30d activity of idle users who reacted before by >=3 pp at <2% blocks |
-| - | [phash_shadow_v1](2026-10-31-phash-shadow-dedup.md) | running | precision on sampled exact-hash pairs, agreement with duplicate_of | An exact 64-bit dHash match finds duplicates OCR cannot (videos, animations, text-free images) with high precision |
+| 2026-12-11 | [monthly_reminder_v1](2026-10-30-monthly-reminder.md) | running | react_30d_pct treated - holdout | One monthly HQ meme raises 30d activity of idle users who reacted before by >=3 pp at <2% blocks |
 
 ## Decided (28, newest first)
 

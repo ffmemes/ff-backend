@@ -7,7 +7,7 @@ guardrails: no merges in shadow; degenerate (blank-frame) hash groups
 unit: meme
 variants: shadow (logged only)
 started: 2026-10-31
-check_on: 
+check_on: 2026-11-14
 decided: 
 result: unknown
 learning: 
@@ -28,3 +28,5 @@ bytes (exact match may miss a few pairs); hashes 0/-1 are not matched.
 No check date or ship rule was set. Next step: run `phash-shadow.sql` after the
 backfill, label sample pairs for precision, then decide on merges (Hamming distance is
 the upgrade path).
+
+- 2026-10-31: check_on set to 2026-11-14: run scripts/admin/backfill_image_hash.py for 30 days of images, then docs/analyst/phash-shadow.sql; turn merging on only if a 50-pair sample shows >=95% true duplicates.

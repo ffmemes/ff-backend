@@ -1,17 +1,17 @@
 ---
 id: monthly_reminder_v1
-status: proposed
+status: running
 hypothesis: One monthly HQ meme raises 30d activity of idle users who reacted before by >=3 pp at <2% blocks
 primary_metric: react_30d_pct treated - holdout
 guardrails: blocked_30d_pct treated <2%
 unit: user
 variants: treatment:50,holdout:50
-started: 
+started: 2026-10-31
 check_on: 2026-12-11
 decided: 
 result: unknown
 learning: 
-code: MONTHLY_REMINDER_ENABLED (default false), MONTHLY_REMINDER_HOLDOUT_PCT, broadcast_monthly_reminder flow
+code: MONTHLY_REMINDER_ENABLED (true in prod, verified 2026-10-31), MONTHLY_REMINDER_HOLDOUT_PCT, broadcast_monthly_reminder flow
 readout: docs/analyst/broadcast-holdout-v1.sql
 ---
 
@@ -39,3 +39,5 @@ Fewer than 150 users per arm: extend 2 weeks.
 
 ## Log
 - 2026-10-30: code merged, flag off.
+
+- 2026-10-31: verified MONTHLY_REMINDER_ENABLED=true in the prod Prefect runner; status set to running (started = date verified, first send follows the flow schedule).
