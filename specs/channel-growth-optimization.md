@@ -53,7 +53,7 @@ Train a model that predicts whether a meme will grow the channel (high fwd/1k) B
 
 ## Architecture
 - Stats collector: src/flows/crossposting/stats_collector.py (Prefect flow, every 6h)
-- Scoring: src/crossposting/service.py (get_next_meme_for_tgchannelru/en)
+- Scoring: src/crossposting/scoring.py (factors, scores, LIVE); pool + log in service.py
 - CTAs: src/flows/crossposting/meme.py (CTAS list, weighted by repetition)
 - Env vars: TELEGRAM_API_ID, TELEGRAM_API_HASH, TELEGRAM_SESSION_STRING (same as e2e smoke tests)
 - Schedule: scripts/serve_flows.py (RU: 8,10,11,12,14,16 MSK, EN: 8,10,14,18,20 MSK)

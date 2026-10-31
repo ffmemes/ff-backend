@@ -73,10 +73,6 @@ class Config(BaseSettings):
     # Owner flips on after deploy. Set HOLDOUT_PCT=0 after the v1 readout.
     MONTHLY_REMINDER_ENABLED: bool = False
     MONTHLY_REMINDER_HOLDOUT_PCT: int = 50
-    # RU crosspost ranker: multiply score by ln(nlikes+1) (meme volume, not LR).
-    # Offline 2026-08-09: src×log1p(likes) top-20% lift ~1.14 on time-split.
-    # Kill switch reverts @fastfoodmemes to score_version=2 behavior.
-    CROSSPOST_RU_MEME_LIKE_VOLUME_ENABLED: bool = True
 
     PREFECT_API_URL: str | None = None
 

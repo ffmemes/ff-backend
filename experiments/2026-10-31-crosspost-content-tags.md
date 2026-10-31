@@ -11,7 +11,7 @@ check_on: 2026-11-20
 decided: 
 result: unknown
 learning: 
-code: Describe Memes content tags, src/crossposting/shadow_score.py
+code: Describe Memes content tags, src/crossposting/scoring.py
 readout: docs/analyst/crossposting-content-tags-gates.py, docs/analyst/crossposting-content-tags-shadow.sql
 ---
 
@@ -80,3 +80,12 @@ Also report `crossposting-content-tags-shadow.sql`:
 _(fill on 2026-11-20)_
 
 - 2026-10-31 ~16:00 UTC: prompt example changed from `false` to `true or false` for both booleans (models echoed the example). Count Gate A only on tags with calculated_at after this deploy.
+
+## Log
+- 2026-11-01: scoring refactor: every crosspost score now lives in
+  `src/crossposting/scoring.py` (`FACTORS`, `SCORES`, `LIVE`). Promote this shadow =
+  set `LIVE[channel]` to `"v5c"` (score_version 6); readouts unchanged, new rows
+  also carry `factors`, `scores`, `ranks`, `picks`, `picked_by` dicts. Caveat (unchanged):
+  shadow scores rank only the production top-5 (`PRESELECT`), not the whole pool.
+  Replay before/after: same pick and top-5 on 120 local fixture runs, the last 40 prod
+  decisions and the current prod pool (both channels).

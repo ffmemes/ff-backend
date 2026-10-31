@@ -26,7 +26,8 @@ Validated finding from Phase 1 (do not relitigate):
 
 ## Implementation shape
 
-In `src/crossposting/service.py`, both `get_next_meme_for_tgchannelru` and `get_next_meme_for_tgchannelen`:
+Original shape (now `_POOL_QUERY` in `src/crossposting/service.py` + `src_quality_mult` in `src/crossposting/scoring.py`;
+note the shipped SQL gave sources with n<5 a 0.5 multiplier, not the neutral 1.0 planned here):
 
 ```sql
 WITH src_quality AS (

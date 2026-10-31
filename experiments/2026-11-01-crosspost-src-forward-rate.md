@@ -11,7 +11,7 @@ check_on: 2026-11-28
 decided: 
 result: unknown
 learning: 
-code: meme_raw_telegram.forwards, Collect Channel Stats flow, src/crossposting/shadow_score.py
+code: meme_raw_telegram.forwards, Collect Channel Stats flow, src/crossposting/scoring.py
 readout: docs/analyst/crossposting-src-fwd-shadow.sql
 ---
 
@@ -73,3 +73,12 @@ Run `crossposting-src-fwd-shadow.sql` on 2026-11-28 and bootstrap the Spearman g
 ## Metrics after
 
 _(fill on 2026-11-28)_
+
+## Log
+- 2026-11-01: scoring refactor: every crosspost score now lives in
+  `src/crossposting/scoring.py` (`FACTORS`, `SCORES`, `LIVE`). Promote this shadow =
+  set `LIVE[channel]` to `"v5f"` (score_version 7); readouts unchanged, new rows
+  also carry `factors`, `scores`, `ranks`, `picks`, `picked_by` dicts. Caveat (unchanged):
+  shadow scores rank only the production top-5 (`PRESELECT`), not the whole pool.
+  Replay before/after: same pick and top-5 on 120 local fixture runs, the last 40 prod
+  decisions and the current prod pool (both channels).

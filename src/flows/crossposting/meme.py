@@ -5,13 +5,9 @@ from html import escape
 from prefect import flow, get_run_logger
 from telegram.constants import ParseMode
 
-from src.config import settings
 from src.crossposting.constants import Channel
 from src.crossposting.service import (
-    SCORE_VERSION_MEME_LIKE_VOLUME,
-    SCORE_VERSION_V2,
-    get_next_meme_for_tgchannelen,
-    get_next_meme_for_tgchannelru,
+    get_next_meme_for_channel,
     log_meme_sent,
     log_ranker_decision,
     posted_recently,
@@ -217,7 +213,7 @@ async def post_meme_to_tgchannelen():
         logger.warning("TG Channel EN posted <1h ago, skipping catch-up slot")
         return
 
-    meme_data, decision = await get_next_meme_for_tgchannelen()
+    meme_data, decision = await get_next_meme_for_channel(Channel.TG_CHANNEL_EN.value)
     if meme_data is None:
         logger.warning("No qualifying meme for TG Channel EN, skipping slot")
         return
@@ -243,7 +239,7 @@ async def post_meme_to_tgchannelen():
         Channel.TG_CHANNEL_EN,
         telegram_message_id=msg.message_id,
         caption_text=caption_text,
-        score_version=SCORE_VERSION_V2,
+        score_version=decision["score_version"],
     )
     await update_meme(next_meme.id, status=MemeStatus.PUBLISHED)
     await _safe_refresh_crosspost_stats(Channel.TG_CHANNEL_EN, next_meme.id, msg.message_id, logger)
@@ -277,7 +273,7 @@ async def post_meme_to_tgchannelru():
         logger.warning("TG Channel RU posted <1h ago, skipping catch-up slot")
         return
 
-    meme_data, decision = await get_next_meme_for_tgchannelru()
+    meme_data, decision = await get_next_meme_for_channel(Channel.TG_CHANNEL_RU.value)
     if meme_data is None:
         logger.warning("No qualifying meme for TG Channel RU, skipping slot")
         return
@@ -299,17 +295,12 @@ async def post_meme_to_tgchannelru():
         bot, TELEGRAM_CHANNEL_RU_CHAT_ID, next_meme, reply_markup=None
     )
 
-    ru_score_version = (
-        SCORE_VERSION_MEME_LIKE_VOLUME
-        if settings.CROSSPOST_RU_MEME_LIKE_VOLUME_ENABLED
-        else SCORE_VERSION_V2
-    )
     await log_meme_sent(
         next_meme.id,
         Channel.TG_CHANNEL_RU,
         telegram_message_id=msg.message_id,
         caption_text=caption_text,
-        score_version=ru_score_version,
+        score_version=decision["score_version"],
     )
     await update_meme(next_meme.id, status=MemeStatus.PUBLISHED)
     await _safe_refresh_crosspost_stats(Channel.TG_CHANNEL_RU, next_meme.id, msg.message_id, logger)

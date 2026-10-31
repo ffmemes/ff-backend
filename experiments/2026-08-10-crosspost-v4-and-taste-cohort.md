@@ -11,7 +11,7 @@ check_on: 2026-08-17
 decided: 2026-10-30
 result: hit rate 32.1% to 41.0% (+8.9 pp, z~2.4, n 299/373), f1k 26.2 to 28.9; manual posts also +3.4 f1k (channel drift)
 learning: Bot like volume, not like rate, predicts channel forwards; part of the lift is channel drift
-code: CROSSPOST_RU_MEME_LIKE_VOLUME_ENABLED, src/crossposting/service.py (score_version=4)
+code: src/crossposting/scoring.py LIVE (score_version=4)
 readout: docs/analyst/crossposting-v4-like-volume.sql
 ---
 
@@ -48,7 +48,7 @@ fill **Metrics after** only.
 
 | Field | Value |
 |-------|--------|
-| Code | `CROSSPOST_RU_MEME_LIKE_VOLUME_ENABLED` (default ON) |
+| Code | `LIVE["tgchannelru"] = "v4"` in `src/crossposting/scoring.py` (was `CROSSPOST_RU_MEME_LIKE_VOLUME_ENABLED` until 2026-11-01) |
 | Started | 2026-08-10 ~05:20 UTC first post |
 | Kill | env `false` |
 
@@ -176,7 +176,7 @@ Readout: [`docs/analyst/readouts/2026-10-30-experiment-closure.md`](../docs/anal
 |-------|--------|
 | **ID** | `crosspost_meme_level_v1` / **score_version=4** |
 | **Status** | **KEEP at 100% 2026-10-30**: hit rate 32.1 → 41.0% (+8.9 pp, z≈2.4), f1k 26.2 → 28.9 |
-| **Kill switch** | `CROSSPOST_RU_MEME_LIKE_VOLUME_ENABLED=false` → v2 |
+| **Kill switch** | set `LIVE["tgchannelru"] = "v2"` in `src/crossposting/scoring.py` |
 | **Readout offline** | `docs/analyst/readouts/2026-08-09-crosspost-meme-level-offline.md` |
 | **Readout online** | `docs/analyst/crossposting-v4-like-volume.sql` |
 | **n offline** | 611 RU image posts / 120d |

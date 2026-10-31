@@ -11,7 +11,7 @@ check_on: 2026-11-14
 decided: 
 result: unknown
 learning: 
-code: src/crossposting/shadow_score.py
+code: src/crossposting/scoring.py
 readout: docs/analyst/crossposting-v5-shadow.sql
 ---
 
@@ -50,8 +50,8 @@ EN score_v5  = theta_src · exp(user_taste_z)
 ```
 
 Logged per candidate in `crossposting_decision_log.candidates[]`: `theta_src`,
-`user_taste_z`, `score_v5`, `shadow_v5_rank`, `shadow_v5_pick_meme_id`,
-`shadow_version = v5_src_beta_taste_v1`.
+`user_taste_z`, `score_v5`, `shadow_v5_rank`, `shadow_v5_pick_meme_id`
+(`shadow_version = v5_src_beta_taste_v1` until the 2026-11-01 scoring refactor).
 
 ## Online vs offline differences (known limits)
 
@@ -78,3 +78,12 @@ Counterfactual zf exists only for v5 picks that got posted later.
 ## Metrics after
 
 _(fill on 2026-11-14)_
+
+## Log
+- 2026-11-01: scoring refactor: every crosspost score now lives in
+  `src/crossposting/scoring.py` (`FACTORS`, `SCORES`, `LIVE`). Promote this shadow =
+  set `LIVE[channel]` to `"v5"` (score_version 5); readouts unchanged, new rows
+  also carry `factors`, `scores`, `ranks`, `picks`, `picked_by` dicts. Caveat (unchanged):
+  shadow scores rank only the production top-5 (`PRESELECT`), not the whole pool.
+  Replay before/after: same pick and top-5 on 120 local fixture runs, the last 40 prod
+  decisions and the current prod pool (both channels).
