@@ -1,9 +1,16 @@
+import re
 from typing import Any
 
 from sqlalchemy import text
 
 from src.database import fetch_one
-from src.storage.deduplication.models import MIN_OCR_DUPLICATE_TEXT_LENGTH
+from src.storage.deduplication.models import (
+    MIN_OCR_DUPLICATE_SIMILARITY,
+    MIN_OCR_DUPLICATE_TEXT_LENGTH,
+    OCR_WATERMARK_PATTERN,
+)
+
+_WATERMARK_RE = re.compile(OCR_WATERMARK_PATTERN, re.IGNORECASE)
 
 
 def ocr_text_from_meme(meme_row: dict[str, Any]) -> str:
@@ -35,25 +42,47 @@ async def find_duplicate_by_ocr_text(meme_id: int, image_text: Any) -> int | Non
     if not isinstance(image_text, str):
         return None
 
+    # Our watermark (and OCR misreads of it) is on most images; matching on it
+    # merged unrelated short captions into a few "hub" memes.
+    image_text = _WATERMARK_RE.sub("", image_text).strip()
     if len(image_text) < MIN_OCR_DUPLICATE_TEXT_LENGTH:
         return None
 
+    # `%` (default 0.3 threshold) only prefilters via the trigram index;
+    # the real match is similarity >= MIN_OCR_DUPLICATE_SIMILARITY on stripped text.
     select_query = text(
         """
-        SELECT
-            M.id
-        FROM meme M
-        WHERE M.id != :meme_id
-            AND M.status IN ('ok', 'published')
-            AND M.type = 'image'
-            AND M.ocr_result IS NOT NULL
-            AND (M.ocr_result ->> 'text') % :image_text
+        SELECT id FROM (
+            SELECT
+                M.id,
+                M.status,
+                similarity(
+                    regexp_replace(M.ocr_result ->> 'text', :watermark, '', 'gi'),
+                    :image_text
+                ) AS sim
+            FROM meme M
+            WHERE M.id != :meme_id
+                AND M.status IN ('ok', 'published')
+                AND M.type = 'image'
+                AND M.ocr_result IS NOT NULL
+                AND (M.ocr_result ->> 'text') % :image_text
+        ) C
+        WHERE C.sim >= :min_similarity
         ORDER BY
-            CASE WHEN M.status = 'published' THEN 0 ELSE 1 END,
-            M.id ASC
+            C.sim DESC,
+            CASE WHEN C.status = 'published' THEN 0 ELSE 1 END,
+            C.id ASC
         LIMIT 1
     """
     )
 
-    res = await fetch_one(select_query, {"meme_id": meme_id, "image_text": image_text})
+    res = await fetch_one(
+        select_query,
+        {
+            "meme_id": meme_id,
+            "image_text": image_text,
+            "watermark": OCR_WATERMARK_PATTERN,
+            "min_similarity": MIN_OCR_DUPLICATE_SIMILARITY,
+        },
+    )
     return res["id"] if res else None
