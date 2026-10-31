@@ -395,15 +395,16 @@ async def calculate_meme_raw_impressions_stats() -> None:
     from 97 sources (2026-10-31) the views quartile predicted our like rate at
     Spearman +0.02, the reaction-rate percentile at +0.22 [0.18, 0.27]
     (top vs bottom quintile like rate 0.44 vs 0.35). Rows without reactions
-    (VK, old TG rows, reactions disabled) rank after rated rows, by views.
+    (VK, old TG rows, reactions disabled) get their own quartiles by views, so
+    old memes are not pushed below every newly rated one.
     """
     insert_query = """
         WITH MEME_RAW_IMPRESSIONS AS (
             SELECT
                 M.id AS meme_id,
-                COUNT(*) OVER (PARTITION BY M.meme_source_id, M.type),
+                COUNT(*) OVER (PARTITION BY M.meme_source_id, M.type, MRT.reactions IS NULL),
                 ROW_NUMBER() OVER (
-                    PARTITION BY M.meme_source_id, M.type
+                    PARTITION BY M.meme_source_id, M.type, MRT.reactions IS NULL
                     ORDER BY
                         MRT.reactions::float / NULLIF(MRT.views, 0) DESC NULLS LAST,
                         COALESCE(MRT.views, MRV.views) DESC

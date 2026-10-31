@@ -241,7 +241,8 @@ async def test_raw_impr_rank_by_reaction_rate_within_source_and_type(conn: Async
 
     rows = await fetch_all(select(meme_stats.c.meme_id, meme_stats.c.raw_impr_rank))
     ranks = {r["meme_id"]: r["raw_impr_rank"] for r in rows}
-    # Images: 20% rate > 1% rate > NULL reactions by views (5000 > 50).
-    assert [ranks[i] for i in (2, 1, 3, 4)] == [0, 1, 2, 3]
+    # Images: 20% rate beats 1%; unrated rows get their own quartiles by views.
+    assert [ranks[i] for i in (2, 1)] == [0, 2]
+    assert [ranks[i] for i in (3, 4)] == [0, 2]
     # Videos: 50% rate beats 10% despite 100x fewer views.
     assert (ranks[5], ranks[6]) == (0, 2)
