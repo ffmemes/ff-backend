@@ -8,6 +8,8 @@ User presses /start → meme with Like/Dislike → reaction triggers next meme.
 **Session north star**: session length (memes per session), not like rate alone.  
 **Growth north star**: organic users via share deep links — see
 [docs/growth/virality-loop.md](docs/growth/virality-loop.md).
+**Measured by**: [docs/analyst/north_star.sql](docs/analyst/north_star.sql) on the
+shared `v_*` metric views (definitions: [docs/analyst/README.md](docs/analyst/README.md)).
 
 **Supply**: ETL of TG channels + VK publics → quality filters → recommendation pool.
 

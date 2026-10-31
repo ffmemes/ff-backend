@@ -8,6 +8,19 @@ These queries and reports support product-health monitoring and experiment analy
 - **Statement timeout**: 30 seconds (kills runaway queries)
 - **Future tables**: Automatically accessible (DEFAULT PRIVILEGES granted)
 
+## Metric definitions (use these, not ad-hoc SQL)
+Sessions, actives, shares and funnel steps are defined ONCE, as DB views
+(`alembic/versions/2026-11-02_metrics_views.py`). Older SQL in this folder
+uses other session rules (reaction gaps, >= 2 memes); do not copy it.
+- `v_metric_user` — segment (`excluded` / `moderator` / `admin` / `user`), signup, acquisition channel (first `/start` deep link), languages.
+- `v_feed_session` — feed sends only (`recommended_by NOT LIKE 'broadcast%'`), new session after a 30-min gap; memes_sent, reactions, likes, started_by_push.
+- `v_user_day` — per user per day: memes_sent / reactions / likes (feed + push), feed sessions, non-self share clicks on the user's links.
+- `v_new_user` — per signup: got_first_meme, first_tap, first_like, reached_5_reactions (7d), d1/d7 return, blocked_within_24h.
+- `v_experiment_user` — per `experiment_assignment`: outcomes since assignment, for user-level-mean readouts.
+- `docs/analyst/north_star.sql` — THE north-star queries built on the views.
+- Always drop `segment = 'excluded'` (automated accounts in `analytics_excluded_user`; candidates from `excluded-users-detector.sql`, inserted by an operator). Drop moderators/admins too when volume metrics matter (they work `low_sent_pool`).
+- Filter views on their date columns with plain bounds (`day >= CURRENT_DATE - 28`), not `DATE_TRUNC(now())`.
+
 ## Key Files
 - `docs/analyst/metrics.sql` — SQL queries organized by section (health, north star, engines, retention, etc.)
 - `docs/analyst/command-surface-proxies.sql` — private slash commands from `message_tg` (`chat_id > 0`) + secondary feature proxies. Notes: [`docs/product/surface-and-commands.md`](../product/surface-and-commands.md).
@@ -85,4 +98,4 @@ Operational health signals:
 
 Healthy product snapshot (rough, not ship gates): new_memes_24h > 100, ok_pct ~90–96%, active reactors 24h not collapsing vs prior week, multi-engine mix still present.
 
-Queries: `docs/analyst/metrics.sql`.
+Queries: `docs/analyst/north_star.sql` (north star), `docs/analyst/metrics.sql` (operational health).
