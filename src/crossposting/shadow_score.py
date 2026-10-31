@@ -31,14 +31,24 @@ def score_v5(
     return theta * math.exp(taste)
 
 
-def attach_v5_ranks(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Add shadow_v5_rank (1=best) + shadow_v5_pick_meme_id without reordering."""
-    if not candidates or any(c.get("score_v5") is None for c in candidates):
+def content_mult_v1(content_format: str | None, relatable: bool | None) -> float:
+    """RU blind-label study 2026-10-30: relatable and tweet screenshots ≈ −0.1 zf each.
+
+    Tags come from Describe Memes (meme.ocr_result); missing tags → 1.0.
+    See experiments/active/2026-10-31-crosspost-content-tags.md.
+    """
+    return 0.85 ** (int(relatable is True) + int(content_format == "tweet_screenshot"))
+
+
+def attach_v5_ranks(candidates: list[dict[str, Any]], version: str = "v5") -> list[dict[str, Any]]:
+    """Add shadow_{version}_rank (1=best) + shadow_{version}_pick_meme_id without reordering."""
+    key = f"score_{version}"
+    if not candidates or any(c.get(key) is None for c in candidates):
         return candidates
-    order = sorted(range(len(candidates)), key=lambda i: -candidates[i]["score_v5"])
+    order = sorted(range(len(candidates)), key=lambda i: -candidates[i][key])
     for rank, i in enumerate(order, start=1):
-        candidates[i]["shadow_v5_rank"] = rank
+        candidates[i][f"shadow_{version}_rank"] = rank
     pick = candidates[order[0]]["meme_id"]
     for c in candidates:
-        c["shadow_v5_pick_meme_id"] = pick
+        c[f"shadow_{version}_pick_meme_id"] = pick
     return candidates

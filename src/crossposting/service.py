@@ -6,7 +6,12 @@ from sqlalchemy.dialects.postgresql import insert
 
 from src.config import settings
 from src.crossposting.constants import Channel
-from src.crossposting.shadow_score import SHADOW_V5_VERSION, attach_v5_ranks, score_v5
+from src.crossposting.shadow_score import (
+    SHADOW_V5_VERSION,
+    attach_v5_ranks,
+    content_mult_v1,
+    score_v5,
+)
 from src.database import (
     crossposting,
     crossposting_decision_log,
@@ -184,12 +189,23 @@ def _build_decision_log(
                 if row.get("theta_src") is not None
                 else None
             ),
+            # v5c shadow (log only): content tags from Describe Memes.
+            "content_format": row.get("content_format"),
+            "relatable": row.get("relatable"),
+            "politics_news": row.get("politics_news"),
+            "content_mult_v1": content_mult_v1(row.get("content_format"), row.get("relatable")),
         }
+        log_candidate["score_v5c"] = (
+            round(log_candidate["score_v5"] * log_candidate["content_mult_v1"], 6)
+            if log_candidate["score_v5"] is not None
+            else None
+        )
         log_candidates.append(log_candidate)
 
     # Shadow ranks among this top-N only (production order unchanged).
     # Keep shadow_* only inside candidates[] — log_ranker_decision kwargs are fixed columns.
     log_candidates = attach_v5_ranks(log_candidates)
+    log_candidates = attach_v5_ranks(log_candidates, version="v5c")
 
     return {
         "channel": channel,
@@ -266,7 +282,13 @@ _V5_SHADOW_QUERY = """
            LEAST(2.0, GREATEST(0.5,
                (COALESCE(s.h, 0) + 4 * pbar.p) / (COALESCE(s.n, 0) + 4) / pbar.p
            ))::float AS theta_src,
-           COALESCE(t.wsum / GREATEST(t.n_likes, 1) / wsd.sd, 0)::float AS user_taste_z
+           COALESCE(t.wsum / GREATEST(t.n_likes, 1) / wsd.sd, 0)::float AS user_taste_z,
+           -- Describe Memes content tags (null for memes described before 2026-10-31)
+           m.ocr_result->>'format' AS content_format,
+           CASE WHEN jsonb_typeof(m.ocr_result->'relatable') = 'boolean'
+                THEN (m.ocr_result->>'relatable')::boolean END AS relatable,
+           CASE WHEN jsonb_typeof(m.ocr_result->'politics_news') = 'boolean'
+                THEN (m.ocr_result->>'politics_news')::boolean END AS politics_news
     FROM meme m
     CROSS JOIN pbar CROSS JOIN wsd
     LEFT JOIN src s ON s.src = m.meme_source_id
@@ -291,6 +313,9 @@ async def _enrich_candidates_with_v5_shadow(
         if r is not None:
             c["theta_src"] = round(float(r["theta_src"]), 4)
             c["user_taste_z"] = round(float(r["user_taste_z"]), 4)
+            c["content_format"] = r["content_format"]
+            c["relatable"] = r["relatable"]
+            c["politics_news"] = r["politics_news"]
     return candidates
 
 

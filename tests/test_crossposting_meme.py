@@ -422,6 +422,38 @@ async def test_decision_log_shadow_counts_pre_posting_share_clicks(clean_xpost):
 
 
 @pytest.mark.asyncio
+async def test_v5_shadow_logs_content_tags_from_ocr_result(clean_xpost):
+    tags = {"format": "tweet_screenshot", "relatable": True, "politics_news": False}
+    async with engine.connect() as conn:
+        await create_meme_source(conn, id=10700, language_code="ru")
+        # A mature posted meme so the v5 enrichment has a forwards baseline.
+        await create_meme(conn, id=10701, meme_source_id=10700)
+        await _insert_crossposting(
+            conn,
+            "tgchannelru",
+            10701,
+            hours_ago=100,
+            views=100,
+            forwards=5,
+            telegram_message_id=999701,
+        )
+        await create_meme(conn, id=10702, meme_source_id=10700, ocr_result=tags)
+        await create_meme_stats(conn, meme_id=10702, nlikes=10, ndislikes=2)
+        await conn.commit()
+
+    picked, decision = await get_next_meme_for_tgchannelru()
+    assert picked["id"] == 10702
+    cand = decision["candidates"][0]
+    assert (cand["content_format"], cand["relatable"], cand["politics_news"]) == (
+        "tweet_screenshot",
+        True,
+        False,
+    )
+    assert cand["score_v5c"] == round(cand["score_v5"] * 0.85**2, 6)
+    assert cand["shadow_v5c_pick_meme_id"] == 10702
+
+
+@pytest.mark.asyncio
 async def test_en_ranker_decision_log_has_shadow_share_fields(clean_xpost):
     async with engine.connect() as conn:
         await create_meme_source(conn, id=10360, language_code="en")

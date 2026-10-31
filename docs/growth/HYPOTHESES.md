@@ -59,6 +59,7 @@ Readout: [`docs/analyst/readouts/2026-10-30-experiment-closure.md`](../analyst/r
 | **2026-08-24** | Taste shadow readout | **H7** |
 | Ad-hoc | Bot→channel ML re-run / walk-forward | **H8** |
 | **2026-11-20** | `explore_budget_v1` keep/kill — [`experiments/active/2026-10-30-explore-budget.md`](../../experiments/active/2026-10-30-explore-budget.md) | explore budget |
+| **2026-11-20** | Crosspost content tags Gate A/B (`crossposting-content-tags-gates.py`) + `crossposting-content-tags-shadow.sql`. Both pass → `score_v5c` live on RU — [`experiments/active/2026-10-31-crosspost-content-tags.md`](../../experiments/active/2026-10-31-crosspost-content-tags.md) | content tags (relatable / tweet −0.1 zf) |
 | Ad-hoc | After any ranking/deploy incident | all active |
 
 Agent prompt on resume (copy-paste):

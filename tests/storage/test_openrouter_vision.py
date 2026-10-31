@@ -390,3 +390,22 @@ async def test_removed_model_404_gets_long_model_cooldown(monkeypatch):
 
 async def _return_keys(keys):
     return keys
+
+
+def test_parse_vision_response_reads_content_tags():
+    out = openrouter_vision._parse_vision_response(
+        '```json\n{"ocr_text": "x", "description": "d", "language": "ru", '
+        '"format": "tweet_screenshot", "relatable": true, "politics_news": false}\n```'
+    )
+    assert out["format"] == "tweet_screenshot"
+    assert out["relatable"] is True and out["politics_news"] is False
+
+
+def test_parse_vision_response_regex_fallback_keeps_content_tags():
+    # Truncated JSON breaks json.loads; the regex fallback must still find the tags.
+    out = openrouter_vision._parse_vision_response(
+        '{"ocr_text": "x", "description": "d", "format": "multi_panel", '
+        '"relatable": false, "politics_news": true'
+    )
+    assert out["format"] == "multi_panel"
+    assert out["relatable"] is False and out["politics_news"] is True

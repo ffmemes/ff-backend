@@ -7,6 +7,15 @@ the image has no text. Rows described before 2026-10-30 lack the key; read
 `raw_result.language` as a fallback. `meme.language_code` is only updated for
 known languages, never from a text-free image.
 
+Since 2026-10-31, `ocr_result` also stores three content tags for the crosspost
+experiment (`experiments/active/2026-10-31-crosspost-content-tags.md`):
+- `format`: one of single_caption, multi_panel, tweet_screenshot, chat_screenshot,
+  photo_no_text, drawing_comic, other;
+- `relatable`: bool;
+- `politics_news`: bool.
+
+Missing or invalid values are stored as null. Older rows do not have these keys.
+
 ## Business Goal
 
 Use OpenRouter's free vision tier to process memes every day with **zero paid spend**. Throughput is useful, but consistency is the main goal: accept 429s/timeouts/invalid model output as normal free-tier backpressure, try another free model when possible, then retry later.
