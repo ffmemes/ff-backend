@@ -76,7 +76,7 @@ def test_like_volume_factor_raises_score_for_more_likes():
         "invited_count": 0,
         "src_signal": 10.0,
         "median_signal": 10.0,
-        "caption": None,
+        "has_caption": False,
     }
     v4 = score({**base, "nlikes": 80}, "tgchannelru", "v4")
     assert v4 > score(base, "tgchannelru", "v4")
@@ -310,7 +310,7 @@ async def test_source_quality_applied_when_n_above_threshold(clean_xpost):
 
 
 @pytest.mark.asyncio
-async def test_source_quality_neutral_when_no_snapshots(clean_xpost):
+async def test_source_quality_half_when_no_snapshots(clean_xpost):
     async with engine.connect() as conn:
         await create_meme_source(conn, id=10300, language_code="ru")
         await create_meme(

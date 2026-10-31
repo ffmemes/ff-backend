@@ -75,7 +75,7 @@ Run `crossposting-src-fwd-shadow.sql` on 2026-11-28 and bootstrap the Spearman g
 _(fill on 2026-11-28)_
 
 ## Log
-- 2026-11-01: scoring refactor: every crosspost score now lives in
+- 2026-10-31: scoring refactor: every crosspost score now lives in
   `src/crossposting/scoring.py` (`FACTORS`, `SCORES`, `LIVE`). Promote this shadow =
   set `LIVE[channel]` to `"v5f"` (score_version 7); readouts unchanged, new rows
   also carry `factors`, `scores`, `ranks`, `picks`, `picked_by` dicts. Caveat (unchanged):

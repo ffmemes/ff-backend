@@ -18,7 +18,7 @@ def _cand(mid, nlikes, **kw):
         "invited_count": 0,
         "src_signal": 10.0,
         "median_signal": 10.0,
-        "caption": None,
+        "has_caption": False,
         "meme_source_id": 1,
         **kw,
     }

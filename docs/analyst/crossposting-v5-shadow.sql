@@ -14,7 +14,7 @@ WITH dec AS (
     SELECT d.channel, d.decided_at, d.picked_meme_id,
            (d.candidates->0->>'shadow_v5_pick_meme_id')::int AS v5_pick,
            (d.candidates->0->>'score_v5')::float AS score_v5,
-           (d.candidates->0->>'final_score')::float AS score_v4
+           COALESCE(d.candidates->0->'scores'->>'v4', d.candidates->0->>'final_score')::float AS score_v4
     FROM crossposting_decision_log d
     WHERE d.channel IN ('tgchannelru', 'tgchannelen')
       AND d.candidates->0->>'shadow_v5_pick_meme_id' IS NOT NULL

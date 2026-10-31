@@ -234,8 +234,11 @@ async def log_ranker_decision(
 _PICKED_FIELDS = ("id", "type", "telegram_file_id", "caption")
 
 
-def _picked_meme_dict(candidate: dict[str, Any]) -> dict[str, Any]:
-    return {k: candidate[k] for k in _PICKED_FIELDS}
+async def _picked_meme_dict(meme_id: int) -> dict[str, Any]:
+    row = await fetch_one(
+        text(f"SELECT {', '.join(_PICKED_FIELDS)} FROM meme WHERE id = :id"), {"id": meme_id}
+    )
+    return dict(row)
 
 
 # Eligible pool, unordered: ranking lives in scoring.py.
@@ -268,7 +271,8 @@ _POOL_QUERY = """
           AND cp2.telegram_message_id IS NOT NULL
     )
     SELECT
-        M.id, M.type, M.telegram_file_id, M.caption, M.meme_source_id,
+        -- Scoring columns only: the pool is ~130k rows; picked fields load by id.
+        M.id, M.meme_source_id, (M.caption IS NOT NULL) AS has_caption,
         MS.nlikes, MS.ndislikes, MS.raw_impr_rank,
         MS.age_days, MS.nmemes_sent, MS.invited_count,
         SQ.signal AS src_signal,
@@ -326,7 +330,7 @@ def _build_decision_log(channel: str, top: list[dict[str, Any]], pool_size: int)
                 "invited_count": row.get("invited_count"),
                 "pre_inbot_share_clicks": row.get("pre_inbot_share_clicks") or 0,
                 "pre_inbot_share_click_users": row.get("pre_inbot_share_click_users") or 0,
-                "caption_present": row.get("caption") is not None,
+                "caption_present": bool(row.get("has_caption")),
                 "src_signal": _round(row.get("src_signal"), 4),
                 "theta_src": row.get("theta_src"),
                 "user_taste_z": row.get("user_taste_z"),
@@ -381,5 +385,4 @@ async def get_next_meme_for_channel(
     except Exception:
         logger.warning("crosspost shadow inputs failed", exc_info=True)
     decision = _build_decision_log(channel, top, pool_size=len(rows))
-    picked = next(r for r in top if r["id"] == decision["picked_meme_id"])
-    return _picked_meme_dict(picked), decision
+    return await _picked_meme_dict(decision["picked_meme_id"]), decision

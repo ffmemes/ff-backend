@@ -51,7 +51,7 @@ EN score_v5  = theta_src · exp(user_taste_z)
 
 Logged per candidate in `crossposting_decision_log.candidates[]`: `theta_src`,
 `user_taste_z`, `score_v5`, `shadow_v5_rank`, `shadow_v5_pick_meme_id`
-(`shadow_version = v5_src_beta_taste_v1` until the 2026-11-01 scoring refactor).
+(`shadow_version = v5_src_beta_taste_v1` until the 2026-10-31 scoring refactor).
 
 ## Online vs offline differences (known limits)
 
@@ -80,7 +80,7 @@ Counterfactual zf exists only for v5 picks that got posted later.
 _(fill on 2026-11-14)_
 
 ## Log
-- 2026-11-01: scoring refactor: every crosspost score now lives in
+- 2026-10-31: scoring refactor: every crosspost score now lives in
   `src/crossposting/scoring.py` (`FACTORS`, `SCORES`, `LIVE`). Promote this shadow =
   set `LIVE[channel]` to `"v5"` (score_version 5); readouts unchanged, new rows
   also carry `factors`, `scores`, `ranks`, `picks`, `picked_by` dicts. Caveat (unchanged):

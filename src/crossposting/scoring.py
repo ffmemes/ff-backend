@@ -56,7 +56,7 @@ FACTORS: dict[str, Callable[[Row, str], float | None]] = {
         1.0 if r["raw_impr_rank"] <= 1 else CHANNEL_PARAMS[c]["impr_penalty"]
     ),
     "age_factor": lambda r, c: 1.0 if r["age_days"] < CHANNEL_PARAMS[c]["age_threshold"] else 0.8,
-    "caption_factor": lambda r, c: 1.0 if r["caption"] is None else 0.8,
+    "caption_factor": lambda r, c: 0.8 if r["has_caption"] else 1.0,
     "sent_factor": lambda r, c: (
         1.0 if r["nmemes_sent"] <= 1 else (r["nlikes"] + r["ndislikes"]) / r["nmemes_sent"]
     ),

@@ -48,7 +48,7 @@ fill **Metrics after** only.
 
 | Field | Value |
 |-------|--------|
-| Code | `LIVE["tgchannelru"] = "v4"` in `src/crossposting/scoring.py` (was `CROSSPOST_RU_MEME_LIKE_VOLUME_ENABLED` until 2026-11-01) |
+| Code | `LIVE["tgchannelru"] = "v4"` in `src/crossposting/scoring.py` (was `CROSSPOST_RU_MEME_LIKE_VOLUME_ENABLED` until 2026-10-31) |
 | Started | 2026-08-10 ~05:20 UTC first post |
 | Kill | env `false` |
 
