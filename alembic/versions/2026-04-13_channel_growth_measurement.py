@@ -53,9 +53,7 @@ def upgrade() -> None:
         sa.Column("comments", sa.Integer()),
         sa.Column("reactions_detail", JSONB),
         sa.Column("message_text", sa.String()),
-        sa.Column(
-            "snapshot_at", sa.DateTime(), server_default=sa.func.now(), nullable=False
-        ),
+        sa.Column("snapshot_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
     )
     op.create_index(
         "ix_crossposting_snapshots_channel_msg",
@@ -73,9 +71,7 @@ def upgrade() -> None:
         sa.Column("posts_count", sa.Integer()),
         sa.Column("total_forwards", sa.Integer()),
         sa.Column("total_views", sa.Integer()),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False
-        ),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
         sa.UniqueConstraint("channel", "date"),
     )
 

@@ -23,15 +23,11 @@ def upgrade() -> None:
     # Without an index the planner does a full sequential sort on every 15-min stats run,
     # causing the 300s timeout.  CONCURRENTLY avoids table lock on the large meme table.
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS "
-        "ix_meme_meme_source_id "
-        "ON meme (meme_source_id)"
+        "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_meme_meme_source_id ON meme (meme_source_id)"
     )
 
 
 def downgrade() -> None:
     op.execute("COMMIT")
 
-    op.execute(
-        "DROP INDEX CONCURRENTLY IF EXISTS ix_meme_meme_source_id"
-    )
+    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_meme_meme_source_id")

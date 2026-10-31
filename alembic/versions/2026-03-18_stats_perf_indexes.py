@@ -33,10 +33,7 @@ def upgrade() -> None:
     # for an index. All queries that filter on reaction_id either:
     # - Filter within a per-user subset (uses PK)
     # - Filter globally (WHERE reaction_id = 1 matches 50%, seq scan is faster)
-    op.execute(
-        "DROP INDEX CONCURRENTLY IF EXISTS "
-        "user_meme_reaction_reaction_id_idx"
-    )
+    op.execute("DROP INDEX CONCURRENTLY IF EXISTS user_meme_reaction_reaction_id_idx")
 
     # Tune autovacuum for user_meme_reaction (22M rows).
     # Default scale_factor=0.2 means vacuum triggers at 4.4M dead tuples.
@@ -66,7 +63,4 @@ def downgrade() -> None:
         "ON user_meme_reaction (reaction_id)"
     )
 
-    op.execute(
-        "DROP INDEX CONCURRENTLY IF EXISTS "
-        "ix_user_meme_reaction_reacted_at"
-    )
+    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_user_meme_reaction_reacted_at")

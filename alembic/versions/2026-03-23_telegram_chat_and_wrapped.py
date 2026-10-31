@@ -28,12 +28,8 @@ def upgrade() -> None:
         sa.Column("bot_status", sa.String(20)),
         sa.Column("bot_joined_at", sa.DateTime()),
         sa.Column("bot_left_at", sa.DateTime()),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.func.now()
-        ),
-        sa.Column(
-            "updated_at", sa.DateTime(), server_default=sa.func.now()
-        ),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now()),
+        sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now()),
     )
 
     op.add_column(
@@ -52,9 +48,7 @@ def upgrade() -> None:
         ),
         sa.Column("data", JSONB, nullable=False),
         sa.Column("card_telegram_file_id", sa.String()),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.func.now()
-        ),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now()),
     )
 
 

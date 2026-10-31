@@ -46,7 +46,8 @@ async def fixture():
             (10500, "lr_smoothed", T0, 1),
             (10501, "lr_smoothed", T0 + timedelta(minutes=1), 1),
             (10502, "lr_smoothed", T0 + timedelta(minutes=2), 2),
-            (10503, "broadcast_reengagement_hq", T0 + timedelta(minutes=50), 1),
+            # push opened 10 min after delivery -> started_by_push
+            (10503, "broadcast_reengagement_hq", T0 + timedelta(hours=2, minutes=50), 1),
             (10504, "recently_liked", T0 + timedelta(hours=3), None),
             (10505, "recently_liked", T0 + timedelta(hours=3, minutes=1), 1),
             (10506, "lr_smoothed", T0 + timedelta(days=1, hours=1), 1),

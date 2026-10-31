@@ -38,6 +38,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute("COMMIT")
 
-    op.execute(
-        "DROP INDEX CONCURRENTLY IF EXISTS ix_user_deep_link_log_deep_link"
-    )
+    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_user_deep_link_log_deep_link")

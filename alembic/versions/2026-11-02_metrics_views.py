@@ -35,7 +35,7 @@ SELECT
     U.id AS user_id,
     CASE
         WHEN X.user_id IS NOT NULL THEN 'excluded'
-        WHEN U.type IN ('moderator', 'admin') THEN U.type
+        WHEN U.type IN ('moderator', 'admin', 'super_user') THEN U.type
         ELSE 'user'
     END AS segment,
     U.created_at AS signup_at,
@@ -85,6 +85,9 @@ SELECT
             AND P.recommended_by LIKE 'broadcast%'
             AND P.reacted_at >= S.sent_at - INTERVAL '30 minutes'
             AND P.reacted_at <= S.sent_at
+            -- Opened soon after delivery. Idle users always have a push as the
+            -- last chat message, so without this every return looks push-driven.
+            AND P.reacted_at - P.sent_at <= INTERVAL '15 minutes'
     ) AS started_by_push
 FROM user_meme_reaction S
 -- LATERAL ... LIMIT 1, not NOT EXISTS: keeps the planner on per-row index
@@ -135,6 +138,7 @@ WHERE S.recommended_by NOT LIKE 'broadcast%'
     ),
     (
         "v_user_day",
+        # Reactions are attributed to the day the meme was SENT (sent_at), not reacted_at.
         # memes_sent / reactions / likes: all sends (feed + push) by sent_at day.
         # sessions: feed sessions started that day.
         # shares: distinct non-self clicks (clicker x meme) on this user's
@@ -192,7 +196,8 @@ SELECT
     F.sent_at IS NOT NULL AS got_first_meme,
     COALESCE(F.reaction_id IS NOT NULL, FALSE) AS first_tap,
     COALESCE(F.reaction_id = 1, FALSE) AS first_like,
-    A.reactions_7d >= 5 AS reached_5_reactions,
+    CASE WHEN now() >= MU.signup_at + INTERVAL '8 days' THEN A.reactions_7d >= 5 END
+        AS reached_5_reactions,
     CASE WHEN now() >= MU.signup_at + INTERVAL '2 days' THEN A.d1 END AS d1_return,
     CASE WHEN now() >= MU.signup_at + INTERVAL '8 days' THEN A.d7 END AS d7_return,
     COALESCE(U.blocked_bot_at < U.created_at + INTERVAL '24 hours', FALSE)
@@ -224,7 +229,8 @@ CROSS JOIN LATERAL (
     ),
     (
         "v_experiment_user",
-        # One row per experiment assignment; outcomes from assigned_at to now.
+        # One row per experiment assignment; outcomes from assigned_at to now (open-ended:
+        # bound by the experiment end date in the readout, e.g. AND day < decided).
         # reactions / likes count feed + push; sessions are feed sessions that
         # started after assignment. Average these per variant (user-level means).
         """
