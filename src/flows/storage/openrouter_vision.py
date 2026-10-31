@@ -67,7 +67,7 @@ DESCRIBE_PROMPT = (
     "or a news event, else false.\n\n"
     "Respond with ONLY valid JSON, no markdown fences:\n"
     '{"ocr_text": "...", "description": "...", "language": "...", '
-    '"format": "...", "relatable": false, "politics_news": false}'
+    '"format": "...", "relatable": true or false, "politics_news": true or false}'
 )
 
 RATE_LIMITED = "__rate_limited"
@@ -534,9 +534,9 @@ def _parse_vision_response(raw_content: str) -> dict:
             except json.JSONDecodeError:
                 result[key] = match.group(1)
     for key in ("relatable", "politics_news"):
-        match = re.search(rf'"{key}"\s*:\s*(true|false)', content)
+        match = re.search(rf'"{key}"\s*:\s*"?(true|false)"?', content, re.IGNORECASE)
         if match:
-            result[key] = match.group(1) == "true"
+            result[key] = match.group(1).lower() == "true"
     if result:
         return result
 

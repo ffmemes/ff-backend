@@ -61,3 +61,5 @@ Also report `crossposting-content-tags-shadow.sql`:
 ## Metrics after
 
 _(fill on 2026-11-20)_
+
+- 2026-10-31 ~16:00 UTC: prompt example changed from `false` to `true or false` for both booleans (models echoed the example). Count Gate A only on tags with calculated_at after this deploy.
