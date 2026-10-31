@@ -216,10 +216,14 @@ class TelegramChannelScraper(Scraper):
         # Telegram omits the block when a post has no reactions (or they are disabled).
         reactions = None
         if reactions_div := post.find("div", class_="tgme_widget_message_reactions"):
-            reactions = sum(
-                _parse_num(_TRAILING_NUM_PATTERN.search(span.text.strip()).group())
-                for span in reactions_div.find_all("span", class_="tgme_reaction")
-            )
+            try:
+                reactions = sum(
+                    _parse_num(_TRAILING_NUM_PATTERN.search(span.text.strip()).group())
+                    for span in reactions_div.find_all("span", class_="tgme_reaction")
+                )
+            except (AttributeError, ValueError):
+                # Unknown markup must never drop the post itself.
+                logger.warning("Unparsed reactions block in %s", url)
 
         return TgChannelPostParsingResult(
             post_id=int(url.split("/")[-1]),
