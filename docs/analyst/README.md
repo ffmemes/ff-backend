@@ -13,6 +13,7 @@ These queries and reports support product-health monitoring and experiment analy
 - `docs/analyst/command-surface-proxies.sql` — private slash commands from `message_tg` (`chat_id > 0`) + secondary feature proxies. Notes: [`docs/product/surface-and-commands.md`](../product/surface-and-commands.md).
 - `docs/analyst/cold-start-first10-post-limit5.sql` + [readout 2026-08-13](readouts/2026-08-13-cold-start-first10-post-limit5.md) — first-10 quality pre/post queue limit=5; guarded explore skip problem.
 - `docs/analyst/describe-memes-health.sql` + [readout 2026-08-13](readouts/2026-08-13-describe-memes-health.md) — OCR / OpenRouter describe throughput vs 864/day target; backlog ~222k.
+- `docs/analyst/phash-shadow.sql` — dHash (`meme.image_hash`) shadow dedup: coverage, exact-hash collision groups by type, agreement with `duplicate_of`, sample pairs for precision checks. Backfill: `scripts/admin/backfill_image_hash.py`.
 - Meme inspect API (JSON + media download via bot token): [`docs/admin-meme-inspect.md`](../admin-meme-inspect.md).
 - `docs/analyst/viral-shares-blender-v1.sql` — readout for `viral_shares_blender_v1` (share clickers + invites vs control + session guardrail).
 - `docs/analyst/dwell-feed-vs-broadcast.sql` — `sec_to_react` percentiles: like vs skip × feed vs broadcast; dwell buckets; demote inventory risk.
