@@ -15,6 +15,7 @@ from src.observability.sentry import (
 )
 from src.storage.constants import MemeStatus, MemeType
 from src.storage.deduplication import find_duplicate_by_file_id
+from src.storage.deduplication.image_hash import dhash, log_phash_shadow_match
 from src.storage.parsers.constants import USER_AGENT
 from src.storage.service import (
     update_meme,
@@ -58,12 +59,29 @@ async def download_meme_content_from_tg(
     return bytes(file_bytearray)
 
 
+async def _image_hash(meme_id: int, meme_type: MemeType, content: bytes, media: Any) -> int | None:
+    """dHash of the uploaded image, or of Telegram's thumbnail for video/animation.
+
+    Never raises: a hash failure must not break the upload.
+    """
+    try:
+        if meme_type == MemeType.IMAGE:
+            return dhash(content)
+        thumbnail = getattr(media, "thumbnail", None)
+        if thumbnail:
+            return dhash(await download_meme_content_from_tg(thumbnail.file_id))
+    except Exception:
+        logger.warning("image_hash failed for meme %s", meme_id, exc_info=True)
+    return None
+
+
 async def _upload_meme_content_to_tg(
     meme_id: int,
     meme_type: MemeType,
     content: bytes,  # ??
 ) -> dict[str, Any] | None:
     file_id = None
+    media = None
 
     if meme_type == MemeType.IMAGE:
         try:
@@ -72,7 +90,8 @@ async def _upload_meme_content_to_tg(
             )
         except telegram.error.TimedOut:
             return None
-        file_id = msg.photo[-1].file_id
+        media = msg.photo[-1]
+        file_id = media.file_id
 
     if meme_type == MemeType.VIDEO:
         try:
@@ -81,7 +100,8 @@ async def _upload_meme_content_to_tg(
             )
         except telegram.error.TimedOut:
             return None
-        file_id = msg.video.file_id
+        media = msg.video
+        file_id = media.file_id
 
     if meme_type == MemeType.ANIMATION:
         try:
@@ -95,17 +115,19 @@ async def _upload_meme_content_to_tg(
         except telegram.error.TimedOut:
             return None
 
-        animation = msg.animation or msg.video or msg.document
-        if not animation:
+        media = msg.animation or msg.video or msg.document
+        if not media:
             logging.warning(
                 "Telegram did not return animation/video/document for meme %s upload.",
                 meme_id,
             )
             return None
-        file_id = animation.file_id
+        file_id = media.file_id
 
     if not file_id:
         return None
+
+    image_hash = await _image_hash(meme_id, meme_type, content, media)
 
     # Check if this file_id already exists before the meme reaches recommendations.
     duplicate_of = await find_duplicate_by_file_id(meme_id, file_id)
@@ -120,13 +142,20 @@ async def _upload_meme_content_to_tg(
             telegram_file_id=file_id,
             status=MemeStatus.DUPLICATE,
             duplicate_of=duplicate_of,
+            image_hash=image_hash,
         )
     else:
         meme = await update_meme(
             meme_id=meme_id,
             telegram_file_id=file_id,
             status=MemeStatus.CREATED,
+            image_hash=image_hash,
         )
+        if meme and image_hash is not None:
+            try:
+                await log_phash_shadow_match(meme)
+            except Exception:
+                logger.warning("phash shadow lookup failed for meme %s", meme_id, exc_info=True)
 
     return meme
 

@@ -377,6 +377,7 @@ meme = Table(
     Column("language_code", String, index=True),
     Column("ocr_result", JSONB),
     Column("duplicate_of", ForeignKey("meme.id", ondelete="SET NULL"), index=True),
+    Column("image_hash", BigInteger),
     Column("published_at", DateTime, nullable=False),
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
     Column("updated_at", DateTime, onupdate=func.now()),
