@@ -214,8 +214,8 @@ async def test_source_post_stats_skips_failures_and_writes_rest(monkeypatch):
     assert await stats_collector._collect_source_post_stats(Client()) == 2
     updates = [c.args[1] for c in execute.await_args_list if "fwds" in c.args[1]]
     assert updates == [
-        {"ids": [2], "views": [None], "fwds": [None]},
-        {"ids": [3], "views": [500], "fwds": [7]},
+        {"ids": [2], "fwds": [None]},
+        {"ids": [3], "fwds": [7]},
     ]
     # source c was resolved by username → peer cached
     assert any(c.args[1].get("id") == 7 and "peer" in c.args[1] for c in execute.await_args_list)
@@ -245,7 +245,7 @@ async def test_source_post_stats_stops_on_long_flood_wait(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_source_post_stats_sql_roundtrip(monkeypatch):
-    """Real DB: picks 20–48h posts, writes views/forwards, caches the peer, then idles."""
+    """Real DB: picks 20–48h posts, writes forwards (not views), caches the peer, then idles."""
     from datetime import UTC, datetime, timedelta
 
     from sqlalchemy import text
@@ -290,7 +290,7 @@ async def test_source_post_stats_sql_roundtrip(monkeypatch):
         )
         assert [tuple(r.values()) for r in rows] == [
             (5, None, True),  # message gone: views kept, forwards NULL
-            (900, 9, True),
+            (5, 9, True),  # views stay the parser value
             (5, None, False),
         ]
         src = await fetch_all(text("SELECT data FROM meme_source WHERE id = 19900"))

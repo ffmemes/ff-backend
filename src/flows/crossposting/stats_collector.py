@@ -560,19 +560,17 @@ async def _collect_source_post_stats(client: TelegramClient) -> int:
                 msgs = await client.get_messages(entity, ids=[p["post_id"] for p in chunk])
                 if not isinstance(msgs, list):
                     msgs = [msgs]
-                views, fwds = [], []
-                for m in msgs:
-                    v, f = (None, None) if m is None else _extract_metrics(m)[:2]
-                    views.append(v)
-                    fwds.append(f)
+                # views stays the parser's value: raw_impr_rank ranks reactions/views
+                # within source, and a later denominator would sink fresh memes.
+                fwds = [None if m is None else _extract_metrics(m)[1] for m in msgs]
                 await execute(
                     text(
-                        "UPDATE meme_raw_telegram r SET views = COALESCE(v.views, r.views), "
+                        "UPDATE meme_raw_telegram r SET "
                         "forwards = v.fwd, stats_fetched_at = NOW() "
-                        "FROM unnest(CAST(:ids AS int[]), CAST(:views AS int[]), "
-                        "CAST(:fwds AS int[])) AS v(id, views, fwd) WHERE r.id = v.id"
+                        "FROM unnest(CAST(:ids AS int[]), CAST(:fwds AS int[])) AS v(id, fwd) "
+                        "WHERE r.id = v.id"
                     ),
-                    {"ids": [p["id"] for p in chunk], "views": views, "fwds": fwds},
+                    {"ids": [p["id"] for p in chunk], "fwds": fwds},
                 )
                 fetched += len(chunk)
         except FloodWaitError as e:
@@ -596,7 +594,7 @@ async def _collect_source_post_stats(client: TelegramClient) -> int:
 
 
 @flow(
-    retries=2,
+    retries=1,
     retry_delay_seconds=60,
     timeout_seconds=600,
     on_failure=[notify_telegram_on_failure],
