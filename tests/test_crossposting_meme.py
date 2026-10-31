@@ -1,3 +1,4 @@
+import math
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -5,14 +6,9 @@ import pytest_asyncio
 from sqlalchemy import delete, text
 from sqlalchemy.dialects.postgresql import insert
 
-from src.crossposting.service import (
-    SCORE_VERSION_MEME_LIKE_VOLUME,
-    SCORE_VERSION_V2,
-    _compute_score_breakdown,
-    get_next_meme_for_tgchannelen,
-    get_next_meme_for_tgchannelru,
-    log_ranker_decision,
-)
+from src.crossposting import scoring
+from src.crossposting.scoring import score
+from src.crossposting.service import get_next_meme_for_channel, log_ranker_decision
 from src.database import (
     crossposting,
     crossposting_decision_log,
@@ -80,14 +76,11 @@ def test_like_volume_factor_raises_score_for_more_likes():
         "invited_count": 0,
         "src_signal": 10.0,
         "median_signal": 10.0,
-        "caption": None,
+        "has_caption": False,
     }
-    low = _compute_score_breakdown({**base, "nlikes": 10}, "tgchannelru", like_volume_enabled=True)
-    high = _compute_score_breakdown({**base, "nlikes": 80}, "tgchannelru", like_volume_enabled=True)
-    off = _compute_score_breakdown({**base, "nlikes": 80}, "tgchannelru", like_volume_enabled=False)
-    assert high["like_volume_factor"] > low["like_volume_factor"]
-    assert high["final_score"] > low["final_score"]
-    assert off["like_volume_factor"] == 1.0
+    v4 = score({**base, "nlikes": 80}, "tgchannelru", "v4")
+    assert v4 > score(base, "tgchannelru", "v4")
+    assert v4 / score({**base, "nlikes": 80}, "tgchannelru", "v2") == pytest.approx(math.log(81))
 
 
 # ── Integration tests for get_next_meme_for_tgchannelru ranker ───────────
@@ -171,7 +164,7 @@ async def test_select_excludes_source_posted_within_24h(clean_xpost):
         await create_meme_stats(conn, meme_id=10004, nlikes=10, ndislikes=2)
         await conn.commit()
 
-    picked, decision = await get_next_meme_for_tgchannelru()
+    picked, decision = await get_next_meme_for_channel("tgchannelru")
     assert picked is not None, "Source B candidate should remain selectable"
     assert picked["id"] == 10004, (
         "diversity cap must exclude source 10001 and prefer source 10003 candidate"
@@ -179,16 +172,12 @@ async def test_select_excludes_source_posted_within_24h(clean_xpost):
     assert decision is not None
     assert decision["picked_meme_id"] == 10004
     assert decision["candidates"][0]["meme_id"] == 10004
-    assert decision["score_version"] == SCORE_VERSION_MEME_LIKE_VOLUME
+    assert decision["score_version"] == 4
 
 
 @pytest.mark.asyncio
-async def test_like_volume_prefers_higher_nlikes_same_source(clean_xpost, monkeypatch):
+async def test_like_volume_prefers_higher_nlikes_same_source(clean_xpost):
     """score_version=4: ln(nlikes+1) re-ranks within equal quality."""
-    monkeypatch.setattr(
-        "src.crossposting.service.settings.CROSSPOST_RU_MEME_LIKE_VOLUME_ENABLED",
-        True,
-    )
     async with engine.connect() as conn:
         await create_meme_source(conn, id=10500, language_code="ru")
         await create_meme(
@@ -202,10 +191,10 @@ async def test_like_volume_prefers_higher_nlikes_same_source(clean_xpost, monkey
         await create_meme_stats(conn, meme_id=10502, nlikes=80, ndislikes=20, nmemes_sent=200)
         await conn.commit()
 
-    picked, decision = await get_next_meme_for_tgchannelru()
+    picked, decision = await get_next_meme_for_channel("tgchannelru")
     assert picked is not None
     assert picked["id"] == 10502
-    assert decision["score_version"] == SCORE_VERSION_MEME_LIKE_VOLUME
+    assert decision["score_version"] == 4
     assert (
         decision["candidates"][0]["like_volume_factor"]
         > decision["candidates"][1]["like_volume_factor"]
@@ -213,11 +202,8 @@ async def test_like_volume_prefers_higher_nlikes_same_source(clean_xpost, monkey
 
 
 @pytest.mark.asyncio
-async def test_ru_kill_switch_falls_back_to_v2(clean_xpost, monkeypatch):
-    monkeypatch.setattr(
-        "src.crossposting.service.settings.CROSSPOST_RU_MEME_LIKE_VOLUME_ENABLED",
-        False,
-    )
+async def test_live_edit_switches_picking_score(clean_xpost, monkeypatch):
+    monkeypatch.setitem(scoring.LIVE, "tgchannelru", "v2")
     async with engine.connect() as conn:
         await create_meme_source(conn, id=10510, language_code="ru")
         await create_meme(
@@ -226,11 +212,11 @@ async def test_ru_kill_switch_falls_back_to_v2(clean_xpost, monkeypatch):
         await create_meme_stats(conn, meme_id=10511, nlikes=20, ndislikes=5)
         await conn.commit()
 
-    picked, decision = await get_next_meme_for_tgchannelru()
+    picked, decision = await get_next_meme_for_channel("tgchannelru")
     assert picked is not None
-    assert decision["score_version"] == SCORE_VERSION_V2
+    assert decision["score_version"] == 2
+    assert decision["candidates"][0]["picked_by"] == "v2"
     assert decision["candidates"][0]["like_volume_enabled"] is False
-    assert decision["candidates"][0]["like_volume_factor"] == 1.0
 
 
 @pytest.mark.asyncio
@@ -255,7 +241,7 @@ async def test_select_returns_none_when_all_filtered(clean_xpost):
         await _insert_crossposting(conn, "tgchannelru", 10013, hours_ago=72, views=100, forwards=5)
         await conn.commit()
 
-    picked, decision = await get_next_meme_for_tgchannelru()
+    picked, decision = await get_next_meme_for_channel("tgchannelru")
     assert picked is None
     assert decision is None
 
@@ -307,7 +293,7 @@ async def test_source_quality_applied_when_n_above_threshold(clean_xpost):
         await create_meme_stats(conn, meme_id=10250, nlikes=10, ndislikes=2)
         await conn.commit()
 
-    picked, decision = await get_next_meme_for_tgchannelru()
+    picked, decision = await get_next_meme_for_channel("tgchannelru")
     assert picked is not None
     assert picked["id"] == 10150, (
         "good_source candidate should outrank bad_source via SQ multiplier"
@@ -324,7 +310,7 @@ async def test_source_quality_applied_when_n_above_threshold(clean_xpost):
 
 
 @pytest.mark.asyncio
-async def test_source_quality_neutral_when_no_snapshots(clean_xpost):
+async def test_source_quality_half_when_no_snapshots(clean_xpost):
     async with engine.connect() as conn:
         await create_meme_source(conn, id=10300, language_code="ru")
         await create_meme(
@@ -333,14 +319,15 @@ async def test_source_quality_neutral_when_no_snapshots(clean_xpost):
         await create_meme_stats(conn, meme_id=10301, nlikes=10, ndislikes=2)
         await conn.commit()
 
-    picked, decision = await get_next_meme_for_tgchannelru()
+    picked, decision = await get_next_meme_for_channel("tgchannelru")
     assert picked is not None
     assert picked["id"] == 10301
     assert decision is not None
-    # Cold-start: src_signal None and src_quality_mult falls through to neutral 1.0
+    # Cold-start: src_signal None → 0.5 (what the pre-refactor SQL ORDER BY applied:
+    # GREATEST(0.5, NULL) = 0.5; the old logged breakdown wrongly said 1.0)
     only_candidate = decision["candidates"][0]
     assert only_candidate["src_signal"] is None
-    assert only_candidate["src_quality_mult"] == 1.0
+    assert only_candidate["src_quality_mult"] == 0.5
 
 
 @pytest.mark.asyncio
@@ -418,7 +405,7 @@ async def test_decision_log_shadow_counts_pre_posting_share_clicks(clean_xpost):
         )
         await conn.commit()
 
-    picked, decision = await get_next_meme_for_tgchannelru()
+    picked, decision = await get_next_meme_for_channel("tgchannelru")
     assert picked is not None
     assert picked["id"] == 10351
     assert decision is not None
@@ -447,7 +434,7 @@ async def test_v5_shadow_logs_content_tags_from_ocr_result(clean_xpost):
         await create_meme_stats(conn, meme_id=10702, nlikes=10, ndislikes=2)
         await conn.commit()
 
-    picked, decision = await get_next_meme_for_tgchannelru()
+    picked, decision = await get_next_meme_for_channel("tgchannelru")
     assert picked["id"] == 10702
     cand = decision["candidates"][0]
     assert (cand["content_format"], cand["relatable"], cand["politics_news"]) == (
@@ -495,7 +482,7 @@ async def test_v5f_shadow_logs_src_fwd_pct(clean_xpost):
         await create_meme_stats(conn, meme_id=10802, nlikes=10, ndislikes=2)
         await conn.commit()
 
-    picked, decision = await get_next_meme_for_tgchannelru()
+    picked, decision = await get_next_meme_for_channel("tgchannelru")
     assert picked["id"] == 10802
     cand = decision["candidates"][0]
     assert cand["src_fwd_pct"] == 1.0
@@ -513,7 +500,7 @@ async def test_en_ranker_decision_log_has_shadow_share_fields(clean_xpost):
         await create_meme_stats(conn, meme_id=10361, nlikes=10, ndislikes=2)
         await conn.commit()
 
-    picked, decision = await get_next_meme_for_tgchannelen()
+    picked, decision = await get_next_meme_for_channel("tgchannelen")
     assert picked is not None
     assert picked["id"] == 10361
     assert decision is not None
@@ -528,7 +515,7 @@ async def test_ranker_decision_log_records_top5(clean_xpost):
     async with engine.connect() as conn:
         await create_meme_source(conn, id=10400, language_code="ru")
         # Create 7 eligible candidates from the same source (so all pass filters
-        # and rank by score). LIMIT in get_next_meme_for_tgchannelru is 5 → top-5 logged.
+        # and rank by score). log_top_n defaults to 5 → top-5 logged.
         for i in range(7):
             mid = 10401 + i
             await create_meme(
@@ -543,7 +530,7 @@ async def test_ranker_decision_log_records_top5(clean_xpost):
             await create_meme_stats(conn, meme_id=mid, nlikes=20 - i, ndislikes=2)
         await conn.commit()
 
-    picked, decision = await get_next_meme_for_tgchannelru()
+    picked, decision = await get_next_meme_for_channel("tgchannelru")
     assert picked is not None
     assert decision is not None
     # Persist via the actual logger (exercising the SQL path)
@@ -568,7 +555,7 @@ async def test_ranker_decision_log_records_top5(clean_xpost):
     row = rows[0]
     assert row["channel"] == "tgchannelru"
     assert row["picked_meme_id"] == picked["id"]
-    assert row["score_version"] == SCORE_VERSION_MEME_LIKE_VOLUME
+    assert row["score_version"] == 4
     assert row["candidate_pool_size"] == 7  # 7 eligible memes
     assert len(row["candidates"]) == 5  # top-5 logged (LIMIT 5)
     # Each entry has the documented score breakdown keys
