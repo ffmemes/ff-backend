@@ -352,6 +352,28 @@ async def test_new_user_share_link_branch_inits_languages(cleanup):
 
 
 @pytest.mark.asyncio
+async def test_new_user_share_link_keeps_only_shared_meme_language(cleanup):
+    from src.tgbot.handlers.start import handle_start
+    from src.tgbot.repo.languages import add_user_language, get_user_languages
+
+    async def send_ru_meme(bot, user_id, deep_link, reaction_context=None):
+        await add_user_language(user_id, "ru")  # what the real share-click path does
+        return True
+
+    patches = _patch_handlers()
+    for p in patches:
+        p.start()
+    try:
+        with patch(f"{HANDLER_MODULE}._send_shared_meme_from_deep_link", side_effect=send_ru_meme):
+            await handle_start(_make_update("m_12345_678"), _make_context("m_12345_678"))
+    finally:
+        for p in patches:
+            p.stop()
+
+    assert await get_user_languages(NEW_USER_ID) == {"ru"}
+
+
+@pytest.mark.asyncio
 async def test_blocked_acquisition_channel_silently_drops_new_user(cleanup):
     """Blocked acquisition channels: no user row created at all (by design)."""
     mocks = await _run_handle_start(deep_link="likefollowbot")

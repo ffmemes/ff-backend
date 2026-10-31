@@ -204,6 +204,14 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
 
         if shared_meme_sent:
+            # The shared meme's language is the only real signal; drop the "en" placeholder.
+            if offer_language_picker:
+                languages = await get_user_languages(user_id)
+                if len(languages) > 1 and "en" in languages:
+                    await set_user_languages_exclusive(
+                        user_id, [lang for lang in languages if lang != "en"]
+                    )
+                    await update_user_info_cache(user_id)
             return
 
         # handle giveaway after languages exist
