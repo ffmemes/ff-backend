@@ -8,6 +8,7 @@ from src.crossposting.shadow_score import (
     attach_v5_ranks,
     content_mult_v1,
     score_v5,
+    src_fwd_mult,
 )
 
 
@@ -97,3 +98,25 @@ def test_build_decision_log_v5c_none_without_v5():
     top = _build_decision_log("tgchannelru", 4, [_cand(101, 100)])["candidates"][0]
     assert top["content_mult_v1"] == 1.0 and top["score_v5c"] is None
     assert "shadow_v5c_rank" not in top
+
+
+def test_src_fwd_mult():
+    assert src_fwd_mult(None) == 1.0
+    assert src_fwd_mult(0.0) == 0.5
+    assert src_fwd_mult(1.0) == 1.5
+
+
+def test_build_decision_log_v5f_shadow():
+    cands = [
+        _cand(101, 100, theta_src=1.0, user_taste_z=0.0, src_fwd_pct=0.1),
+        _cand(102, 100, theta_src=0.9, user_taste_z=0.0, src_fwd_pct=0.9),
+        _cand(103, 100, theta_src=0.8, user_taste_z=0.0),
+    ]
+    log = _build_decision_log("tgchannelru", 4, cands, like_volume_enabled=True)
+    a, b, c = log["candidates"]
+    assert log["picked_meme_id"] == 101  # production pick unchanged
+    assert math.isclose(a["score_v5f"], a["score_v5"] * 0.6, rel_tol=1e-5)
+    assert c["src_fwd_pct"] is None and c["score_v5f"] == c["score_v5"]
+    assert a["shadow_v5_pick_meme_id"] == 101
+    assert a["shadow_v5f_pick_meme_id"] == 102
+    assert (a["shadow_v5f_rank"], b["shadow_v5f_rank"], c["shadow_v5f_rank"]) == (3, 1, 2)

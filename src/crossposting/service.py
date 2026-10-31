@@ -11,6 +11,7 @@ from src.crossposting.shadow_score import (
     attach_v5_ranks,
     content_mult_v1,
     score_v5,
+    src_fwd_mult,
 )
 from src.database import (
     crossposting,
@@ -194,11 +195,15 @@ def _build_decision_log(
             "relatable": row.get("relatable"),
             "politics_news": row.get("politics_news"),
             "content_mult_v1": content_mult_v1(row.get("content_format"), row.get("relatable")),
+            # v5f shadow (log only): source post's within-source forward-rate percentile.
+            "src_fwd_pct": row.get("src_fwd_pct"),
         }
+        v5 = log_candidate["score_v5"]
         log_candidate["score_v5c"] = (
-            round(log_candidate["score_v5"] * log_candidate["content_mult_v1"], 6)
-            if log_candidate["score_v5"] is not None
-            else None
+            round(v5 * log_candidate["content_mult_v1"], 6) if v5 is not None else None
+        )
+        log_candidate["score_v5f"] = (
+            round(v5 * src_fwd_mult(row.get("src_fwd_pct")), 6) if v5 is not None else None
         )
         log_candidates.append(log_candidate)
 
@@ -206,6 +211,7 @@ def _build_decision_log(
     # Keep shadow_* only inside candidates[] — log_ranker_decision kwargs are fixed columns.
     log_candidates = attach_v5_ranks(log_candidates)
     log_candidates = attach_v5_ranks(log_candidates, version="v5c")
+    log_candidates = attach_v5_ranks(log_candidates, version="v5f")
 
     return {
         "channel": channel,
@@ -229,6 +235,9 @@ def _build_decision_log(
 #   hit = top quartile of ln(1+forwards) within its week.
 # user_taste_z: user weight w = Σ zf of liked posts (liked before the post) / (n + 20);
 #   meme taste = Σ w of its likers / n_likes / stddev(w).
+# src_fwd_pct: PERCENT_RANK of forwards/views among the source's posts with a
+#   Telethon read in the last 30d (meme_raw_telegram.stats_fetched_at); NULL when
+#   the post has no read or the source has < 10 reference posts.
 # ponytail: likes limited to sent_at > now()-90d — user_meme_reaction has no valid
 #   meme_id-leading index on prod, so this window keeps the scan bounded. Widen it
 #   (or precompute weights) if user coverage proves too thin.
@@ -272,6 +281,17 @@ _V5_SHADOW_QUERY = """
         GROUP BY lk.user_id
     ),
     wsd AS (SELECT NULLIF(STDDEV_POP(w), 0) AS sd FROM users),
+    src_fwd AS (
+        SELECT r.id, r.meme_source_id,
+               PERCENT_RANK() OVER w AS pct, COUNT(*) OVER w AS n_ref
+        FROM meme_raw_telegram r
+        WHERE r.meme_source_id IN (SELECT meme_source_id FROM meme WHERE id = ANY(:meme_ids))
+          AND r.stats_fetched_at > NOW() - INTERVAL '30 days'
+          AND r.forwards IS NOT NULL
+          AND r.views > 0
+        WINDOW w AS (PARTITION BY r.meme_source_id ORDER BY r.forwards::float / r.views
+                     ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING)
+    ),
     taste AS (
         SELECT lk.meme_id, COUNT(*) AS n_likes, SUM(COALESCE(u.w, 0)) AS wsum
         FROM likes lk LEFT JOIN users u USING (user_id)
@@ -288,11 +308,13 @@ _V5_SHADOW_QUERY = """
            CASE WHEN jsonb_typeof(m.ocr_result->'relatable') = 'boolean'
                 THEN (m.ocr_result->>'relatable')::boolean END AS relatable,
            CASE WHEN jsonb_typeof(m.ocr_result->'politics_news') = 'boolean'
-                THEN (m.ocr_result->>'politics_news')::boolean END AS politics_news
+                THEN (m.ocr_result->>'politics_news')::boolean END AS politics_news,
+           CASE WHEN sf.n_ref >= 10 THEN sf.pct END::float AS src_fwd_pct
     FROM meme m
     CROSS JOIN pbar CROSS JOIN wsd
     LEFT JOIN src s ON s.src = m.meme_source_id
     LEFT JOIN taste t ON t.meme_id = m.id
+    LEFT JOIN src_fwd sf ON sf.id = m.raw_meme_id AND sf.meme_source_id = m.meme_source_id
     WHERE m.id = ANY(:meme_ids)
 """
 
@@ -316,6 +338,8 @@ async def _enrich_candidates_with_v5_shadow(
             c["content_format"] = r["content_format"]
             c["relatable"] = r["relatable"]
             c["politics_news"] = r["politics_news"]
+            pct = r["src_fwd_pct"]
+            c["src_fwd_pct"] = round(float(pct), 4) if pct is not None else None
     return candidates
 
 

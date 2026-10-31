@@ -166,7 +166,7 @@ if __name__ == "__main__":
             schedules=[CronSchedule(cron="40 8,10,14,18,20 * * *", timezone=MSK)],
         ),
         # ── Channel Stats ──
-        # Full sweep: mature 24h labels + subscribers.
+        # Full sweep: mature 24h labels + subscribers + source posts aged 20-48h.
         collect_channel_stats.to_deployment(
             name="Collect Channel Stats",
             schedules=[CronSchedule(cron="0 */6 * * *", timezone=LON)],
