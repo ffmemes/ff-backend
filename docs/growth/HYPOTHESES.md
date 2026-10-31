@@ -60,6 +60,7 @@ Readout: [`docs/analyst/readouts/2026-10-30-experiment-closure.md`](../analyst/r
 | Ad-hoc | Bot→channel ML re-run / walk-forward | **H8** |
 | **2026-11-20** | `explore_budget_v1` keep/kill — [`experiments/active/2026-10-30-explore-budget.md`](../../experiments/active/2026-10-30-explore-budget.md) | explore budget |
 | **2026-11-20** | Crosspost content tags Gate A/B (`crossposting-content-tags-gates.py`) + `crossposting-content-tags-shadow.sql`. Both pass → `score_v5c` live on RU — [`experiments/active/2026-10-31-crosspost-content-tags.md`](../../experiments/active/2026-10-31-crosspost-content-tags.md) | content tags (relatable / tweet −0.1 zf) |
+| **2026-11-14** | Signups with ≥1 meme sent / first reaction (H13 query below) | **H13** |
 | **2026-11-21** | Within-source **reaction rate** beats views for cold-meme ranking (`raw_impr_rank` now = quartile of `reactions / views` within source × meme type; offline Spearman vs our like rate +0.22 vs +0.02 for views). Metric: like rate of memes with `raw_impr_rank = 0`, and of engines that use it (`candidates.py` rank-0 pool, crosspost impr penalty), 3 weeks before vs after deploy. Kill if rank-0 LR does not rise | reaction-rate rank |
 | Ad-hoc | After any ranking/deploy incident | all active |
 
@@ -598,6 +599,44 @@ Not an A/B — UX debt. Score with H9. Rollback = restore the countdown block.
 
 **2026-09-14** empty-start p50 seconds to first meme should drop toward ~1s;
 first-tap of empty start vs 61% baseline.
+
+---
+
+## H13 — Default language instead of blocking picker
+
+| Field | Value |
+|-------|--------|
+| **ID** | `onboarding_default_language_v1` |
+| **Status** | **live** (not an A/B; bug fix) |
+| **Code** | `src/tgbot/handlers/start.py` (language seeded above the deep-link ladder), `language.py` picker callback |
+
+### Hypothesis
+
+Bare-`en` / unknown Telegram users got only the language picker on /start, no
+`user_language` row, and so no meme (feed joins on `user_language`). 6 weeks to
+2026-10-31: 21/150 signups (14%) had no language row, 0 of them got a meme, 0
+clicked the picker. Now they default to `en`, get welcome + first meme
+immediately, and the picker follows the meme (`/lang` still works).
+
+### Growth bar
+
+Share of signups with ≥1 meme sent → ~100% (minus blocked); share with a first
+reaction should rise. Baseline 6w: got meme 128/150 (85%), reacted 79/150
+(53%); last 2 weeks 42/56 (75%) and 27/56 (48%). Guardrail: no-language
+signups = 0.
+
+```sql
+SELECT date_trunc('week', u.created_at)::date wk, count(*) signups,
+  count(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM user_language l WHERE l.user_id=u.id)) no_lang,
+  count(*) FILTER (WHERE EXISTS (SELECT 1 FROM user_meme_reaction r WHERE r.user_id=u.id)) got_meme,
+  count(*) FILTER (WHERE EXISTS (SELECT 1 FROM user_meme_reaction r
+    WHERE r.user_id=u.id AND r.reacted_at IS NOT NULL)) reacted
+FROM "user" u WHERE u.created_at >= now() - interval '42 days' GROUP BY 1 ORDER BY 1;
+```
+
+### Next check
+
+**2026-11-14**.
 
 ---
 

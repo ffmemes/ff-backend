@@ -17,6 +17,7 @@ from src.tgbot.constants import (
     ONBOARDING_LANG_CALLBACK_DATA_PATTERN,
 )
 from src.tgbot.handlers.onboarding import onboarding_flow
+from src.tgbot.senders.next_message import next_message
 from src.tgbot.service import (
     add_user_language,
     add_user_languages,
@@ -137,7 +138,7 @@ async def handle_onboarding_language_selected(
     update: telegram.Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
-    """Single-language onboarding choice → set language → welcome + first meme."""
+    """Single-language onboarding choice → set language → next meme in that language."""
     query = update.callback_query
     if query is None or not query.data:
         return
@@ -164,7 +165,8 @@ async def handle_onboarding_language_selected(
     except BadRequest:
         pass
 
-    return await onboarding_flow(update, context.bot)
+    # Welcome + first meme were already sent on /start; just serve the next meme.
+    return await next_message(context.bot, user_id, prev_update=update, prev_reaction_id=None)
 
 
 def create_language_button(lang: str, lang_text: str, is_selected: bool) -> InlineKeyboardButton:

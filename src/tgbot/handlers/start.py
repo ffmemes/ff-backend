@@ -174,11 +174,18 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         return await handle_challenge_start(update, context, deep_link, created=created)
 
+    # Every other branch needs user_language before serving memes (feed queries
+    # join on it). Bare-EN / unknown Telegram language defaults to "en"; the
+    # picker is offered after the first meme instead of blocking it.
+    # (Friend challenge above seeds from its pack languages instead.)
+    offer_language_picker = False
+    if not has_languages:
+        auto_language = resolve_onboarding_auto_language(update.effective_user)
+        offer_language_picker = auto_language is None
+        await set_user_languages_exclusive(user_id, [auto_language or "en"])
+        await update_user_info_cache(user_id)
+
     if deep_link == "kitchen":
-        if not has_languages:
-            auto = resolve_onboarding_auto_language(update.effective_user) or "en"
-            await set_user_languages_exclusive(user_id, [auto])
-            await update_user_info_cache(user_id)
         return await handle_show_kitchen(update, context)
 
     if created:  # new user:
@@ -197,28 +204,26 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
 
         if shared_meme_sent:
+            # The shared meme's language is the only real signal; drop the "en" placeholder.
+            if offer_language_picker:
+                languages = await get_user_languages(user_id)
+                if len(languages) > 1 and "en" in languages:
+                    await set_user_languages_exclusive(
+                        user_id, [lang for lang in languages if lang != "en"]
+                    )
+                    await update_user_info_cache(user_id)
             return
 
         # handle giveaway after languages exist
         if deep_link and deep_link.startswith("giveaway_"):
-            if not await get_user_languages(user_id):
-                auto = resolve_onboarding_auto_language(update.effective_user) or "en"
-                await set_user_languages_exclusive(user_id, [auto])
-                await update_user_info_cache(user_id)
             from src.tgbot.handlers.treasury.giveaway import handle_giveaway
 
             return await handle_giveaway(update, context, deep_link)
 
-        # Primary language first; welcome + first meme only after language is set.
-        if not await get_user_languages(user_id):
-            auto = resolve_onboarding_auto_language(update.effective_user)
-            if auto:
-                await set_user_languages_exclusive(user_id, [auto])
-                await update_user_info_cache(user_id)
-            else:
-                return await send_onboarding_language_picker(update, context)
-
-        return await onboarding_flow(update, context.bot)
+        await onboarding_flow(update, context.bot)
+        if offer_language_picker:
+            await send_onboarding_language_picker(update, context)
+        return
     else:  # existing user:
         if deep_link and deep_link.startswith("giveaway_"):
             from src.tgbot.handlers.treasury.giveaway import handle_giveaway
