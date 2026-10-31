@@ -8,19 +8,8 @@ from src import redis
 from src.config import settings
 from src.database import fetch_all, fetch_one
 from src.recommendations.blender import blend
-from src.recommendations.blender_experiments import (
-    MATURE_BLENDER_CONTROL_WEIGHTS,
-    get_mature_blend_weights_with_experiments,
-    get_text_light_blender_v1_weights,
-    is_explore_budget_v1_treatment,
-)
-from src.recommendations.candidates import (
-    CandidatesRetriever,
-)
-from src.recommendations.cold_start_experiments import (
-    fresh_max_age_days_for_variant,
-    get_or_assign_cold_start_fresh_variant,
-)
+from src.recommendations.blender_experiments import is_explore_budget_v1_treatment
+from src.recommendations.candidates import CandidatesRetriever
 from src.recommendations.pipeline import (
     RecommendationBatchPipeline,
     RecommendationBatchRequest,
@@ -36,15 +25,12 @@ COLD_START_RECOMMENDED_BY = frozenset(
         "cold_start_adapt",
         "cold_start_explore_guarded",
         "cold_start_adapt_guarded",
-        "cold_start_explore_fresh",
-        "cold_start_explore_fresh_guarded",
     }
 )
 COLD_START_GUARDED_RECOMMENDED_BY = frozenset(
     {
         "cold_start_explore_guarded",
         "cold_start_adapt_guarded",
-        "cold_start_explore_fresh_guarded",
     }
 )
 
@@ -217,12 +203,6 @@ async def clear_meme_queue_for_user(user_id: int) -> None:
     await redis.delete_by_key(queue_key)
 
 
-def _trim_error_message(value: str, limit: int = 300) -> str:
-    if len(value) <= limit:
-        return value
-    return value[: limit - 3] + "..."
-
-
 async def check_queue(user_id: int) -> bool:
     """Refill queue if low. Returns True if lock was acquired (work done or skipped).
 
@@ -261,29 +241,6 @@ async def check_queue(user_id: int) -> bool:
             await redis.redis_client.delete(lock_key)
 
     return True
-
-
-async def _cold_start_fresh_max_age_days(
-    user_id: int,
-    *,
-    nmemes_sent: int,
-    nsessions: int,
-    cold_start_account_too_old: bool,
-) -> int | None:
-    if settings.COLD_START_FRESH_VIRAL_EXPERIMENT_ENABLED is not True:
-        return None
-    variant = await get_or_assign_cold_start_fresh_variant(
-        user_id,
-        nmemes_sent=nmemes_sent,
-        nsessions=nsessions,
-        cold_start_account_too_old=cold_start_account_too_old,
-    )
-    return fresh_max_age_days_for_variant(
-        variant,
-        nmemes_sent=nmemes_sent,
-        nsessions=nsessions,
-        cold_start_account_too_old=cold_start_account_too_old,
-    )
 
 
 async def generate_recommendations(
@@ -337,9 +294,6 @@ async def generate_recommendations(
         retriever=retriever,
         blend_func=blend,
         fetch_all_func=fetch_all,
-        mature_weights_func=get_mature_blend_weights_with_experiments,
-        text_light_weights_func=get_text_light_blender_v1_weights,
-        mature_control_weights=MATURE_BLENDER_CONTROL_WEIGHTS,
     )
     result = await pipeline.run(
         RecommendationBatchRequest(
@@ -356,22 +310,10 @@ async def generate_recommendations(
             cold_start_candidate_guardrails_enabled=(
                 settings.COLD_START_CANDIDATE_GUARDRAILS_ENABLED
             ),
-            cold_start_fresh_max_age_days=await _cold_start_fresh_max_age_days(
-                user_id,
-                nmemes_sent=nmemes_sent,
-                nsessions=nsessions,
-                cold_start_account_too_old=cold_start_account_too_old,
-            ),
-            # FFM-1357: stop new exposure until this overlay has a CEO-owned
-            # active experiment record. Existing assignment rows remain readable.
-            text_light_blender_v1_enabled=False,
             explore_budget_enabled=(
                 settings.EXPLORE_BUDGET_V1_ENABLED is True
                 and await is_explore_budget_v1_treatment(user_id, nmemes_sent)
             ),
-            source_diversity_enabled=settings.RECOMMENDATION_SOURCE_DIVERSITY_ENABLED,
-            shadow_scoring_enabled=settings.RECOMMENDATION_SHADOW_SCORING_ENABLED,
-            diagnostics_sample_rate=settings.RECOMMENDATION_DIAGNOSTICS_SAMPLE_RATE,
         )
     )
     candidates = result.selected
@@ -383,8 +325,7 @@ async def generate_recommendations(
     except Exception as error:
         result.diagnostics.outcome = "enqueue_failure"
         result.diagnostics.error_type = type(error).__name__
-        result.diagnostics.error_message = _trim_error_message(str(error))
-        record_recommendation_batch_diagnostics(result.diagnostics, force_full=True)
+        record_recommendation_batch_diagnostics(result.diagnostics)
         raise
 
     record_recommendation_batch_diagnostics(result.diagnostics)

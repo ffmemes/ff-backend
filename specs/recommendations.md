@@ -42,7 +42,7 @@ Removed engines: `fast_dopamine`, `classic`, `multiply_all_scores`, `selected_so
 | Mature | 100+ | Recently-liked blender v2; the text-light overlay is disabled unless explicitly enabled by a registered experiment | [`pipeline.py`](../src/recommendations/pipeline.py) |
 | Moderator/Admin | user_type check | 75% low_sent_pool + 25% regular (by maturity) | [`pipeline.py`](../src/recommendations/pipeline.py) |
 
-`fixed_pos={0: "lr_smoothed"}` forces first position to `lr_smoothed` in blended mode. If the `text_light_blender_v1` overlay is explicitly enabled, its treatment slot becomes `text_light_lr_smoothed`.
+`fixed_pos={0: "lr_smoothed"}` forces first position to `lr_smoothed` in blended mode.
 
 ## Diagnostics Refactor
 
