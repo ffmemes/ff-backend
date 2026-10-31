@@ -27,7 +27,7 @@ Total v4 posts live at readout: **17** (not all mature yet).
 - ~8 decisions with `shadow_score` by 2026-08-13 morning; ~half disagree with prod top-1
 - Too early for f1k compare of shadow-counterfactual (shadow pick usually not posted)
 
-SQL: `docs/analyst/crossposting-shadow-hybrid.sql`
+SQL: `docs/analyst/crossposting-shadow-hybrid.sql` (removed 2026-10-31 after the H8 kill; in git history)
 
 ## Next experiments shipped after this readout
 

@@ -52,7 +52,7 @@ See **H1 Decision rules** in `experiments/HYPOTHESES.md`.
 
 ## Interim (2026-08-09 15:44 UTC)
 
-Full numbers: `docs/analyst/readouts/2026-08-09-viral-shares-interim.md`
+Full numbers: interim readout removed 2026-10-31 (in git history); final numbers in [`docs/analyst/readouts/2026-10-30-experiment-closure.md`](../../docs/analyst/readouts/2026-10-30-experiment-closure.md)
 
 - 10 control / 12 treatment users; 0 share clickers; 0 invites
 - 13 `viral_shares` sends on treatment (wiring OK)
@@ -85,4 +85,4 @@ The canned SQL §4 invite multiplier bug was fixed in the same PR.
 
 ## Readout SQL
 
-`docs/analyst/viral-shares-blender-v1.sql`
+`docs/analyst/viral-shares-blender-v1.sql` (removed 2026-10-31; in git history)
