@@ -182,9 +182,6 @@ async def _deduplicate_upload_via_ocr(
         return meme, None
 
     ocr_text = (refreshed.get("ocr_result") or {}).get("text") or ""
-    if len(ocr_text) < 12:
-        return refreshed, None
-
     dup_id = await find_duplicate_by_ocr_text(refreshed["id"], ocr_text)
     if dup_id is None:
         return refreshed, None

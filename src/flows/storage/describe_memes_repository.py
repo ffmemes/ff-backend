@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -5,6 +6,7 @@ from sqlalchemy import text
 
 from src.database import execute, fetch_all, fetch_one, meme
 from src.flows.storage.openrouter_vision import VISION_MODELS
+from src.storage.deduplication.models import OCR_WATERMARK_PATTERN
 
 KNOWN_LANGUAGES = {
     "ru",
@@ -350,7 +352,7 @@ async def save_meme_description(
     model_used = result.get("__model", VISION_MODELS[0])
     # Models often answer "en" for text-free images; no text means no language.
     # The stored image carries our watermark, which is not meme text.
-    has_text = ocr_text.replace("@ffmemesbot", "").strip()
+    has_text = re.sub(OCR_WATERMARK_PATTERN, "", ocr_text, flags=re.IGNORECASE).strip()
     language_code = language.strip().lower() if has_text else "none"
 
     merged = {
