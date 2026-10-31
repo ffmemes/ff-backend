@@ -38,11 +38,11 @@ Removed engines: `fast_dopamine`, `classic`, `multiply_all_scores`, `selected_so
 | Stage | Trigger | Engines | Source |
 |-------|---------|---------|--------|
 | Cold start | nmemes_sent < 30 | 3-phase adaptive with text-light guards: explore/adapt/fallback avoid OCR text above 30 words | [`pipeline.py`](../src/recommendations/pipeline.py) |
-| Growing | 30-100 | Control uses `lr_smoothed`; the text-light overlay is disabled unless explicitly enabled by a registered experiment | [`pipeline.py`](../src/recommendations/pipeline.py) |
-| Mature | 100+ | Recently-liked blender v2; the text-light overlay is disabled unless explicitly enabled by a registered experiment | [`pipeline.py`](../src/recommendations/pipeline.py) |
+| Growing | 30-100 | `lr_smoothed`-led blend (see `src/feed_turn/planner.py`) | [`pipeline.py`](../src/recommendations/pipeline.py) |
+| Mature | 100+ | `MATURE_BLEND_WEIGHTS` blend (`src/feed_turn/planner.py`); `explore_budget_v1` adds `fresh_viral` for treatment | [`pipeline.py`](../src/recommendations/pipeline.py) |
 | Moderator/Admin | user_type check | 75% low_sent_pool + 25% regular (by maturity) | [`pipeline.py`](../src/recommendations/pipeline.py) |
 
-`fixed_pos={0: "lr_smoothed"}` forces first position to `lr_smoothed` in blended mode. If the `text_light_blender_v1` overlay is explicitly enabled, its treatment slot becomes `text_light_lr_smoothed`.
+`fixed_pos={0: "lr_smoothed"}` forces first position to `lr_smoothed` in blended mode.
 
 ## Diagnostics Refactor
 

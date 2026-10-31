@@ -1,6 +1,8 @@
+> **Closed 2026-10-31:** the meme #5 trigger shipped as the default (`STATIC_POPUP_RULES` in `src/tgbot/senders/popups.py`); no A/B and no readout was ever run. Not a live experiment.
+
 # Experiment: Early Channel Popup (Meme #5)
 
-**Status:** active
+**Status:** shipped without readout (see note above)
 **Created:** 2026-04-20
 **Deployed:** pending
 **Measure after:** 14 days post-deploy

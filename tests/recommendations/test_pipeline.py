@@ -1,8 +1,8 @@
-import json
 from typing import Any
 
 import pytest
 
+from src.feed_turn.planner import MATURE_BLEND_WEIGHTS
 from src.recommendations.candidates import CandidatesRetriever
 from src.recommendations.pipeline import (
     RecommendationBatchPipeline,
@@ -117,26 +117,15 @@ async def _empty_low_sent_fetcher(
     return []
 
 
-async def _identity_text_light_weights(
-    user_id: int,
-    weights: dict[str, float],
-) -> dict[str, float]:
-    del user_id
-    return weights
-
-
 def _pipeline(
     retriever: FakeRetriever,
     *,
     low_sent_fetcher=_empty_low_sent_fetcher,
-    shadow_scorer=None,
 ) -> RecommendationBatchPipeline:
     return RecommendationBatchPipeline(
         retriever=retriever,
         blend_func=_fake_blend,
         low_sent_fetcher=low_sent_fetcher,
-        shadow_scorer=shadow_scorer,
-        text_light_weights_func=_identity_text_light_weights,
     )
 
 
@@ -441,8 +430,9 @@ async def test_blend_engine_failure_is_recorded_but_other_engines_continue():
     result = await _pipeline(retriever).run(_request(nmemes_sent=50))
 
     assert _ids(result.selected) == [101, 102]
+    assert result.diagnostics.engine_error_count == 1
     assert "goat" in repr(result.diagnostics)
-    assert "temporarily unavailable" in repr(result.diagnostics)
+    assert "RuntimeError" in repr(result.diagnostics)
 
 
 @pytest.mark.asyncio
@@ -516,9 +506,6 @@ async def test_explore_budget_adds_fresh_viral_and_drops_bad_fresh():
         captured["bad_fresh_ids"] = params["meme_ids"]
         return [{"id": 102}]
 
-    async def mature_weights(user_id):
-        return {"lr_smoothed": 0.6, "like_spread_and_recent_memes": 0.4}
-
     retriever = FakeRetriever(
         {
             "lr_smoothed": [_meme(101), _meme(102)],
@@ -530,23 +517,17 @@ async def test_explore_budget_adds_fresh_viral_and_drops_bad_fresh():
         blend_func=blend,
         fetch_all_func=fetch_all,
         low_sent_fetcher=_empty_low_sent_fetcher,
-        mature_weights_func=mature_weights,
-        text_light_weights_func=_identity_text_light_weights,
     )
 
     result = await pipeline.run(_request(limit=5, nmemes_sent=200, explore_budget_enabled=True))
 
-    assert captured["weights"] == pytest.approx(
-        {"lr_smoothed": 0.51, "like_spread_and_recent_memes": 0.34, "fresh_viral": 0.15}
-    )
+    total = sum(MATURE_BLEND_WEIGHTS.values())
+    expected = {engine: weight * 0.85 for engine, weight in MATURE_BLEND_WEIGHTS.items()}
+    expected["fresh_viral"] = total * 0.15
+    assert captured["weights"] == pytest.approx(expected)
     assert captured["fixed_pos"] == {0: "like_spread_and_recent_memes"}
     assert captured["bad_fresh_ids"] == [101, 102, 301]
     assert _ids(result.selected) == [101, 301]
-
-
-async def _lr_only_mature_weights(user_id: int) -> dict[str, float]:
-    del user_id
-    return {"lr_smoothed": 1.0}
 
 
 @pytest.mark.asyncio
@@ -560,130 +541,9 @@ async def test_explore_budget_control_keeps_current_feed():
         blend_func=_fake_blend,
         fetch_all_func=fetch_all,
         low_sent_fetcher=_empty_low_sent_fetcher,
-        mature_weights_func=_lr_only_mature_weights,
-        text_light_weights_func=_identity_text_light_weights,
     )
 
     result = await pipeline.run(_request(limit=5, nmemes_sent=200))
 
     assert _ids(result.selected) == [101]
     assert "fresh_viral" not in {call["engine"] for call in retriever.calls}
-
-
-@pytest.mark.asyncio
-async def test_source_diversity_is_disabled_by_default():
-    retriever = FakeRetriever(
-        {
-            "lr_smoothed": [
-                _meme(101, "lr_smoothed", meme_source_id=1),
-                _meme(102, "lr_smoothed", meme_source_id=1),
-                _meme(103, "lr_smoothed", meme_source_id=2),
-            ]
-        }
-    )
-
-    result = await _pipeline(retriever).run(_request(nmemes_sent=50))
-
-    assert _ids(result.selected) == [101, 102, 103]
-
-
-@pytest.mark.asyncio
-async def test_source_diversity_enabled_reorders_only_when_source_metadata_exists():
-    retriever = FakeRetriever(
-        {
-            "lr_smoothed": [
-                _meme(101, "lr_smoothed", meme_source_id=1),
-                _meme(102, "lr_smoothed", meme_source_id=1),
-                _meme(103, "lr_smoothed", meme_source_id=2),
-                _meme(104, "lr_smoothed", meme_source_id=1),
-            ]
-        }
-    )
-
-    with_source_metadata = await _pipeline(retriever).run(
-        _request(nmemes_sent=50, source_diversity_enabled=True)
-    )
-
-    assert _ids(with_source_metadata.selected) == [101, 103, 102, 104]
-
-    retriever_without_metadata = FakeRetriever(
-        {
-            "lr_smoothed": [
-                _meme(201, "lr_smoothed"),
-                _meme(202, "lr_smoothed"),
-                _meme(203, "lr_smoothed"),
-            ]
-        }
-    )
-
-    without_source_metadata = await _pipeline(retriever_without_metadata).run(
-        _request(nmemes_sent=50, source_diversity_enabled=True)
-    )
-
-    assert _ids(without_source_metadata.selected) == [201, 202, 203]
-
-
-@pytest.mark.asyncio
-async def test_shadow_scoring_records_summary_without_changing_selected_order():
-    async def shadow_scorer(
-        candidates: list[dict[str, Any]],
-        request: RecommendationBatchRequest,
-    ) -> dict[str, Any]:
-        del request
-        return {
-            "summary": {
-                "candidate_count": len(candidates),
-                "top_shadow_id": 103,
-            },
-            "scores": {
-                101: 0.1,
-                102: 0.5,
-                103: 0.9,
-            },
-        }
-
-    retriever = FakeRetriever(
-        {
-            "lr_smoothed": [
-                _meme(101, "lr_smoothed"),
-                _meme(102, "lr_smoothed"),
-                _meme(103, "lr_smoothed"),
-            ]
-        }
-    )
-
-    result = await _pipeline(retriever, shadow_scorer=shadow_scorer).run(
-        _request(nmemes_sent=50, shadow_scoring_enabled=True)
-    )
-
-    assert _ids(result.selected) == [101, 102, 103]
-    assert result.diagnostics.shadow_scoring_payload == {
-        "summary": {
-            "candidate_count": 3,
-            "top_shadow_id": 103,
-        },
-        "scores": {
-            101: 0.1,
-            102: 0.5,
-            103: 0.9,
-        },
-    }
-
-
-@pytest.mark.asyncio
-async def test_compact_diagnostics_exclude_candidate_ids():
-    retriever = FakeRetriever(
-        {
-            "lr_smoothed": [
-                _meme(101, "lr_smoothed"),
-                _meme(102, "lr_smoothed"),
-            ]
-        }
-    )
-
-    result = await _pipeline(retriever).run(_request(nmemes_sent=50))
-
-    compact_json = json.dumps(result.diagnostics.compact(), sort_keys=True)
-    assert "selected_ids" not in compact_json
-    assert "candidate_ids" not in compact_json
-    assert result.diagnostics.full()["selected_ids"] == [101, 102]

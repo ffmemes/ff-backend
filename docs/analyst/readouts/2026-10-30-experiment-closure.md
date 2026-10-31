@@ -33,7 +33,7 @@ n = 344 control / 350 treatment, 426k / 395k sends.
 
 The primary metric fails. The pooled session drop trips the frozen kill trigger, but it
 comes from heavy-user composition, since the user-level median is flat.
-**SQL bug fixed:** `viral-shares-blender-v1.sql` §4 joined invites on `variant`, which
+**SQL bug fixed:** `viral-shares-blender-v1.sql` (since removed; in git history) §4 joined invites on `variant`, which
 multiplied invites by cohort size (it reported 1720/2450 instead of 5/7). §3 `share_clicks`
 counted LEFT-joined send rows. Both are fixed, and §4 now returns 5/7.
 
