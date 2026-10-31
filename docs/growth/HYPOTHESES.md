@@ -60,7 +60,7 @@ Readout: [`docs/analyst/readouts/2026-10-30-experiment-closure.md`](../analyst/r
 | Ad-hoc | Bot→channel ML re-run / walk-forward | **H8** |
 | **2026-11-20** | `explore_budget_v1` keep/kill — [`experiments/active/2026-10-30-explore-budget.md`](../../experiments/active/2026-10-30-explore-budget.md) | explore budget |
 | **2026-11-20** | Crosspost content tags Gate A/B (`crossposting-content-tags-gates.py`) + `crossposting-content-tags-shadow.sql`. Both pass → `score_v5c` live on RU — [`experiments/active/2026-10-31-crosspost-content-tags.md`](../../experiments/active/2026-10-31-crosspost-content-tags.md) | content tags (relatable / tweet −0.1 zf) |
-| **2026-11-14** | Signups with ≥1 meme sent / first reaction (H12 query below) | **H12** |
+| **2026-11-14** | Signups with ≥1 meme sent / first reaction (H13 query below) | **H13** |
 | Ad-hoc | After any ranking/deploy incident | all active |
 
 Agent prompt on resume (copy-paste):
@@ -601,7 +601,7 @@ first-tap of empty start vs 61% baseline.
 
 ---
 
-## H12 — Default language instead of blocking picker
+## H13 — Default language instead of blocking picker
 
 | Field | Value |
 |-------|--------|
