@@ -6,7 +6,6 @@ from sqlalchemy import text
 
 from src.database import fetch_all, fetch_one
 from src.recommendations.utils import (
-    block_disliked_sources_sql_filter,
     disliked_source_demote_sql,
     exclude_meme_ids_sql_filter,
 )
@@ -36,8 +35,6 @@ COLD_START_EXPLORE_RECOMMENDED_BY = "cold_start_explore"
 COLD_START_ADAPT_RECOMMENDED_BY = "cold_start_adapt"
 COLD_START_EXPLORE_GUARDED_RECOMMENDED_BY = "cold_start_explore_guarded"
 COLD_START_ADAPT_GUARDED_RECOMMENDED_BY = "cold_start_adapt_guarded"
-COLD_START_EXPLORE_FRESH_RECOMMENDED_BY = "cold_start_explore_fresh"
-COLD_START_EXPLORE_FRESH_GUARDED_RECOMMENDED_BY = "cold_start_explore_fresh_guarded"
 
 _OCR_TEXT_SQL = "trim(coalesce(M.ocr_result->>'text', M.ocr_result->'raw_result'->>'ocr_text', ''))"
 TEXT_LIGHT_OCR_FILTER_SQL = f"""
@@ -76,19 +73,9 @@ def _build_params(
     return params
 
 
-def _cold_start_recommended_by(
-    engine: str,
-    candidate_guardrails_enabled: bool,
-    *,
-    max_age_days: int | None = None,
-) -> str:
-    if engine == COLD_START_EXPLORE_RECOMMENDED_BY:
-        if max_age_days:
-            if candidate_guardrails_enabled:
-                return COLD_START_EXPLORE_FRESH_GUARDED_RECOMMENDED_BY
-            return COLD_START_EXPLORE_FRESH_RECOMMENDED_BY
-        if candidate_guardrails_enabled:
-            return COLD_START_EXPLORE_GUARDED_RECOMMENDED_BY
+def _cold_start_recommended_by(engine: str, candidate_guardrails_enabled: bool) -> str:
+    if engine == COLD_START_EXPLORE_RECOMMENDED_BY and candidate_guardrails_enabled:
+        return COLD_START_EXPLORE_GUARDED_RECOMMENDED_BY
     if engine == COLD_START_ADAPT_RECOMMENDED_BY and candidate_guardrails_enabled:
         return COLD_START_ADAPT_GUARDED_RECOMMENDED_BY
     return engine
@@ -105,23 +92,16 @@ def _cold_start_params(
     *,
     engine: str,
     candidate_guardrails_enabled: bool,
-    max_age_days: int | None = None,
 ) -> dict[str, Any]:
     params = _build_params(
         user_id,
         limit,
         exclude_meme_ids,
-        recommended_by=_cold_start_recommended_by(
-            engine,
-            candidate_guardrails_enabled,
-            max_age_days=max_age_days,
-        ),
+        recommended_by=_cold_start_recommended_by(engine, candidate_guardrails_enabled),
         text_light_max_ocr_words=TEXT_LIGHT_MAX_OCR_WORDS,
     )
     if candidate_guardrails_enabled:
         params["cold_start_guardrail_source_urls"] = list(COLD_START_GUARDRAIL_SOURCE_URLS)
-    if max_age_days:
-        params["cold_start_max_age_days"] = max_age_days
     return params
 
 
@@ -161,7 +141,6 @@ async def best_uploaded_memes(
             AND R.meme_id IS NULL
             AND S.type = 'user upload'
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
-            {block_disliked_sources_sql_filter()}
 
         ORDER BY -1
             * COALESCE((UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.), 0.5)
@@ -212,7 +191,6 @@ async def like_spread_and_recent_memes(
             AND MS.nlikes > MS.ndislikes
             {pool_filter}
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
-            {block_disliked_sources_sql_filter()}
         ORDER BY -1
             * (MS.nlikes - MS.ndislikes) / (MS.nmemes_sent + 1.)
             * {disliked_source_demote_sql()}
@@ -284,7 +262,6 @@ async def _get_lr_smoothed_candidates(
             {min_sends_filter}
             {text_light_filter}
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
-            {block_disliked_sources_sql_filter()}
 
         ORDER BY -1
             * COALESCE((UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.), 0.5)
@@ -372,7 +349,6 @@ async def get_es_ranked(
             AND R.meme_id IS NULL
             AND MS.engagement_score > 0
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
-            {block_disliked_sources_sql_filter()}
 
         ORDER BY -1
             * COALESCE((UMSS.nlikes + 1.) / (UMSS.nlikes + UMSS.ndislikes + 1.), 0.5)
@@ -458,7 +434,6 @@ async def goat(
 
         WHERE 1=1
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
-            {block_disliked_sources_sql_filter()}
         ORDER BY SCORES.score DESC NULLS LAST
         LIMIT :limit
     """
@@ -522,7 +497,6 @@ async def get_recently_liked(
             AND M.status = 'ok'
             AND R.meme_id IS NULL
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
-            {block_disliked_sources_sql_filter()}
         -- Prefer non-disliked sources first (demote mult 1.0 before 0.15)
         ORDER BY {disliked_source_demote_sql()} DESC, M.id DESC
         LIMIT :limit
@@ -535,7 +509,6 @@ async def cold_start_explore(
     limit: int = 5,
     exclude_meme_ids: list[int] = [],
     candidate_guardrails_enabled: bool = False,
-    max_age_days: int | None = None,
 ):
     """Phase 1 cold start: quality-first selection for new user first impression.
 
@@ -553,25 +526,7 @@ async def cold_start_explore(
     correction.
 
     Used for memes 1-5 (first impression).
-
-    ``max_age_days`` (H10 treatment) keeps the same quality floors but only
-    among memes created in that window, ranked newest first. Empty pool is
-    filled by the pipeline from unfiltered cold_start_explore.
     """
-
-    age_filter_sql = ""
-    if max_age_days:
-        age_filter_sql = "AND M.created_at >= NOW() - (:cold_start_max_age_days * INTERVAL '1 day')"
-    order_sql = (
-        """M.created_at DESC,
-                 MS.lr_smoothed DESC NULLS LAST,
-                 (MS.nlikes::float / NULLIF(MS.nlikes + MS.ndislikes, 0)) DESC,
-                 (MS.nlikes + MS.ndislikes) DESC"""
-        if max_age_days
-        else """MS.lr_smoothed DESC NULLS LAST,
-                 (MS.nlikes::float / NULLIF(MS.nlikes + MS.ndislikes, 0)) DESC,
-                 (MS.nlikes + MS.ndislikes) DESC"""
-    )
 
     query = f"""
         SELECT
@@ -599,13 +554,13 @@ async def cold_start_explore(
             AND MS.lr_smoothed >= :cold_start_explore_min_lr_smoothed
             AND (MS.nlikes::float / NULLIF(MS.nlikes + MS.ndislikes, 0))
                 >= :cold_start_explore_min_raw_like_rate
-            {age_filter_sql}
             {TEXT_LIGHT_OCR_FILTER_SQL}
             {_cold_start_guardrail_source_filter(candidate_guardrails_enabled)}
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
-            {block_disliked_sources_sql_filter()}
 
-        ORDER BY {order_sql}
+        ORDER BY MS.lr_smoothed DESC NULLS LAST,
+                 (MS.nlikes::float / NULLIF(MS.nlikes + MS.ndislikes, 0)) DESC,
+                 (MS.nlikes + MS.ndislikes) DESC
         LIMIT :limit
     """
     params = _cold_start_params(
@@ -614,7 +569,6 @@ async def cold_start_explore(
         exclude_meme_ids,
         engine=COLD_START_EXPLORE_RECOMMENDED_BY,
         candidate_guardrails_enabled=candidate_guardrails_enabled,
-        max_age_days=max_age_days,
     )
     params.update(
         {
@@ -689,7 +643,6 @@ async def cold_start_adapt(
             {TEXT_LIGHT_OCR_FILTER_SQL}
             {_cold_start_guardrail_source_filter(candidate_guardrails_enabled)}
             {exclude_meme_ids_sql_filter(exclude_meme_ids)}
-            {block_disliked_sources_sql_filter()}
 
         ORDER BY -1
             * GREATEST(COALESCE(RR.raw_weight, 0) + 0.5, 0.1)
@@ -708,68 +661,6 @@ async def cold_start_adapt(
     )
 
 
-async def viral_shares(
-    user_id: int,
-    limit: int = 10,
-    exclude_meme_ids: list[int] = [],
-):
-    """Memes with proven share-click conversion (unique non-self deep-link clickers).
-
-    Ranks by invited_count / ln(nmemes_sent + e) so high-volume memes do not
-    dominate purely by raw share-click counts. Quality floor keeps junk out of
-    the growth-oriented blend slot.
-    """
-    query = f"""
-        SELECT
-            M.id
-            , M.type, M.telegram_file_id, M.caption
-            , 'viral_shares' AS recommended_by
-            , COALESCE(MS.nlikes, 0) AS nlikes
-            , COALESCE(MS.invited_count, 0) AS invited_count
-            , COALESCE(MS.nmemes_sent, 0) AS nmemes_sent
-            , COALESCE(MS.lr_smoothed, 0) AS lr_smoothed
-            , (
-                COALESCE(MS.invited_count, 0)::float
-                / LN(COALESCE(MS.nmemes_sent, 0) + 2.718281828)
-              ) AS virality_score
-
-        FROM meme M
-        INNER JOIN meme_stats MS
-            ON MS.meme_id = M.id
-
-        INNER JOIN user_language L
-            ON L.language_code = M.language_code
-            AND L.user_id = :user_id
-
-        LEFT JOIN user_meme_reaction R
-            ON R.meme_id = M.id
-            AND R.user_id = :user_id
-
-        LEFT JOIN user_meme_source_stats UMSS
-            ON UMSS.meme_source_id = M.meme_source_id
-            AND UMSS.user_id = :user_id
-
-        WHERE 1=1
-            AND M.status = 'ok'
-            AND R.meme_id IS NULL
-            AND COALESCE(MS.invited_count, 0) > 0
-            AND COALESCE(MS.nmemes_sent, 0) >= 20
-            AND COALESCE(MS.lr_smoothed, 0) >= 0.05
-            {exclude_meme_ids_sql_filter(exclude_meme_ids)}
-            {block_disliked_sources_sql_filter()}
-
-        ORDER BY
-            (
-                COALESCE(MS.invited_count, 0)::float
-                / LN(COALESCE(MS.nmemes_sent, 0) + 2.718281828)
-            ) * {disliked_source_demote_sql()} DESC
-            , MS.lr_smoothed DESC NULLS LAST
-            , MS.nlikes DESC NULLS LAST
-        LIMIT :limit
-    """
-    return await fetch_all(text(query), _build_params(user_id, limit, exclude_meme_ids))
-
-
 class CandidatesRetriever:
     """CandidatesRetriever class is used for unit testing"""
 
@@ -784,7 +675,6 @@ class CandidatesRetriever:
         "es_ranked": get_es_ranked,
         "cold_start_explore": cold_start_explore,
         "cold_start_adapt": cold_start_adapt,
-        "viral_shares": viral_shares,
     }
 
     async def get_candidates(
