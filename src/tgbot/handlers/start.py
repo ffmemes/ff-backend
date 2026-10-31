@@ -3,7 +3,6 @@ import asyncio
 from telegram import Bot, Update
 from telegram.ext import ContextTypes
 
-from src.config import settings
 from src.recommendations.meme_queue import clear_meme_queue_for_user
 from src.storage.schemas import MemeData
 from src.tgbot.handlers.deep_link import handle_invited_user, handle_shared_meme_reward
@@ -137,7 +136,7 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     #
     # If you add another universal onboarding side effect, hoist it
     # ABOVE the deep_link ladder. Do NOT bury it inside a per-branch
-    # block — branches that early-return (kitchen, giveaway,
+    # block — branches that early-return (kitchen,
     # _is_blocked_acquisition_channel) silently skip anything below them.
     # Drift here caused FFM-907 (kitchen ghosts: 9.4% of April 2026
     # cohort registered but never received a meme).
@@ -169,15 +168,9 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await init_user_languages_from_tg_user(update.effective_user)
         has_languages = bool(await get_user_languages(user_id))
 
-    if settings.FRIEND_CHALLENGE_ENABLED and deep_link and deep_link.startswith("fc_"):
-        from src.tgbot.handlers.friend_challenge import handle_challenge_start
-
-        return await handle_challenge_start(update, context, deep_link, created=created)
-
-    # Every other branch needs user_language before serving memes (feed queries
+    # Every branch needs user_language before serving memes (feed queries
     # join on it). Bare-EN / unknown Telegram language defaults to "en"; the
     # picker is offered after the first meme instead of blocking it.
-    # (Friend challenge above seeds from its pack languages instead.)
     offer_language_picker = False
     if not has_languages:
         auto_language = resolve_onboarding_auto_language(update.effective_user)
@@ -214,22 +207,11 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                     await update_user_info_cache(user_id)
             return
 
-        # handle giveaway after languages exist
-        if deep_link and deep_link.startswith("giveaway_"):
-            from src.tgbot.handlers.treasury.giveaway import handle_giveaway
-
-            return await handle_giveaway(update, context, deep_link)
-
         await onboarding_flow(update, context.bot)
         if offer_language_picker:
             await send_onboarding_language_picker(update, context)
         return
     else:  # existing user:
-        if deep_link and deep_link.startswith("giveaway_"):
-            from src.tgbot.handlers.treasury.giveaway import handle_giveaway
-
-            return await handle_giveaway(update, context, deep_link)
-
         shared_meme_sent = await _send_shared_meme_from_deep_link(
             context.bot,
             user_id,

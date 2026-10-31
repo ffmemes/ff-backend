@@ -33,9 +33,6 @@ class TrxType(str, Enum):
     CHANNEL_AUDIENCE_GIVEAWAY = "channel_audience_giveaway"
 
 
-TREASURY_USER_ID = 1123681771
-
-
 PAYOUTS = {
     TrxType.MEME_UPLOADER: 5,
     TrxType.USER_INVITER: 100,

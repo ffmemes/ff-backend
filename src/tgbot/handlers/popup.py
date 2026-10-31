@@ -3,7 +3,6 @@ Handle reactions on sent memes
 """
 
 import asyncio
-import logging
 
 from telegram import Update
 from telegram.ext import (
@@ -14,8 +13,6 @@ from src.recommendations.service import update_user_last_active_at
 from src.tgbot.senders.next_message import next_message
 from src.tgbot.service import update_user_popup_log
 from src.tgbot.utils import safe_answer_callback_query
-
-logger = logging.getLogger(__name__)
 
 
 async def handle_popup_button(

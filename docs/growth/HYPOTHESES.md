@@ -659,6 +659,7 @@ FROM "user" u WHERE u.created_at >= now() - interval '42 days' GROUP BY 1 ORDER 
 | `ocr_length_preference_v1` | **Invalid** 2026-10-05. Late OCR 23% vs the 5% limit |
 | `first_meme_nudge` | **Killed** 2026-10-30. Orphan split, flat first tap (15.8 vs 16.0%). Code removed |
 | `meme_like_count` | **Killed** 2026-10-30. Orphan split, flat LR (45.6 vs 46.2%). Code removed |
+| H12 `friend_challenge_h12` | **KILLED** 2026-10-31. 106 assignments, 0 participations ever. Code removed, tables kept |
 
 ---
 

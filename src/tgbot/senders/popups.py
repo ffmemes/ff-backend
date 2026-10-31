@@ -1,4 +1,3 @@
-import logging
 from collections.abc import Callable
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -13,10 +12,6 @@ from src.tgbot.service import (
     create_user_popup_log,
     user_popup_already_sent,
 )
-from src.tgbot.utils import get_related_channel_link
-
-logger = logging.getLogger(__name__)
-
 
 PopupFactory = Callable[[str, dict], Popup]
 PopupPredicate = Callable[[int], bool]
@@ -25,10 +20,6 @@ StaticPopupRule = tuple[PopupPredicate, str, PopupFactory]
 
 def _sent_count_is(expected: int) -> PopupPredicate:
     return lambda nmemes_sent: nmemes_sent == expected
-
-
-def _sent_count_mod_1000_is(expected: int) -> PopupPredicate:
-    return lambda nmemes_sent: nmemes_sent % 1000 == expected
 
 
 def _get_popup(popup_id: str, user_info: dict) -> Popup:
@@ -49,36 +40,8 @@ def _get_popup(popup_id: str, user_info: dict) -> Popup:
     )
 
 
-def _get_channel_popup(popup_id: str, user_info: dict) -> Popup:
-    channel_link = get_related_channel_link(user_info["interface_lang"])
-    return Popup(
-        id=popup_id,
-        text=localizer.t(popup_id, user_info["interface_lang"]),
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton(
-                        "📢 Subscribe",
-                        url=channel_link,
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        "✅ I subscribed",
-                        callback_data=POPUP_BUTTON_CALLBACK_DATA_PATTERN.format(popup_id=popup_id),
-                    )
-                ],
-            ]
-        ),
-    )
-
-
 STATIC_POPUP_RULES: tuple[StaticPopupRule, ...] = (
     (_sent_count_is(10), "achievement.nmemes_sent_10", _get_popup),
-    (_sent_count_mod_1000_is(20), "popup.upload_meme", _get_popup),
-    (_sent_count_mod_1000_is(5), "popup.telegram_channel", _get_channel_popup),
-    (_sent_count_mod_1000_is(70), "popup.github_repo", _get_popup),
-    (_sent_count_mod_1000_is(90), "popup.feedback", _get_popup),
     (_sent_count_is(100), "achievement.nmemes_sent_100", _get_popup),
     (_sent_count_is(1000), "achievement.nmemes_sent_1000", _get_popup),
 )

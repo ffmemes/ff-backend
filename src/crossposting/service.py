@@ -20,7 +20,6 @@ from src.database import (
     fetch_all,
     fetch_one,
 )
-from src.tgbot.constants import TELEGRAM_CHANNEL_EN_CHAT_ID, TELEGRAM_CHANNEL_RU_CHAT_ID
 
 # score_version in crossposting + decision_log
 SCORE_VERSION_V2 = 2
@@ -175,7 +174,6 @@ def _build_decision_log(
             "invited_count": row.get("invited_count"),
             "pre_inbot_share_clicks": row.get("pre_inbot_share_clicks") or 0,
             "pre_inbot_share_click_users": row.get("pre_inbot_share_click_users") or 0,
-            "n_sub_likes": int(row.get("n_sub_likes") or 0),
             "caption_present": row.get("caption") is not None,
             "src_signal": (
                 round(float(row["src_signal"]), 4) if row.get("src_signal") is not None else None
@@ -340,58 +338,6 @@ async def _enrich_candidates_with_v5_shadow(
             c["politics_news"] = r["politics_news"]
             pct = r["src_fwd_pct"]
             c["src_fwd_pct"] = round(float(pct), 4) if pct is not None else None
-    return candidates
-
-
-async def _enrich_candidates_with_sub_likes(
-    candidates: list[dict[str, Any]],
-    *,
-    channel: str,
-) -> list[dict[str, Any]]:
-    """Attach n_sub_likes: pre-existing likes from known channel members (shadow).
-
-    Membership comes from ``user_tg_chat_membership`` (bot-observed). Does not re-rank.
-    """
-    if not candidates:
-        return candidates
-    chat_id = (
-        TELEGRAM_CHANNEL_RU_CHAT_ID
-        if channel == "tgchannelru"
-        else TELEGRAM_CHANNEL_EN_CHAT_ID
-        if channel == "tgchannelen"
-        else None
-    )
-    if chat_id is None:
-        for c in candidates:
-            c["n_sub_likes"] = 0
-        return candidates
-
-    meme_ids = [int(c["id"]) for c in candidates if c.get("id") is not None]
-    counts: dict[int, int] = {}
-    if meme_ids:
-        rows = await fetch_all(
-            text(
-                """
-                SELECT umr.meme_id, COUNT(DISTINCT umr.user_id)::int AS n_sub
-                FROM user_meme_reaction umr
-                WHERE umr.reaction_id = 1
-                  AND umr.meme_id = ANY(:meme_ids)
-                  AND EXISTS (
-                    SELECT 1
-                    FROM user_tg_chat_membership m
-                    WHERE m.user_tg_id = umr.user_id
-                      AND m.chat_id = :chat_id
-                  )
-                GROUP BY umr.meme_id
-                """
-            ),
-            {"meme_ids": meme_ids, "chat_id": int(chat_id)},
-        )
-        counts = {int(r["meme_id"]): int(r["n_sub"]) for r in rows}
-
-    for c in candidates:
-        mid = int(c["id"]) if c.get("id") is not None else None
-        c["n_sub_likes"] = counts.get(mid, 0) if mid is not None else 0
     return candidates
 
 
@@ -576,12 +522,6 @@ async def _get_next_meme_for_channel(
         import logging
 
         logging.getLogger(__name__).warning("v5 shadow enrichment failed", exc_info=True)
-    try:
-        rows = await _enrich_candidates_with_sub_likes(rows, channel=channel)
-    except Exception:
-        import logging
-
-        logging.getLogger(__name__).warning("sub-likes shadow enrichment failed", exc_info=True)
     return (
         _picked_meme_dict(rows[0]),
         _build_decision_log(

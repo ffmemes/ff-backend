@@ -5,14 +5,12 @@ from typing import Any, Awaitable, Callable, TypeVar
 from sqlalchemy import (
     BigInteger,
     Boolean,
-    CheckConstraint,
     Column,
     CursorResult,
     Date,
     DateTime,
     Float,
     ForeignKey,
-    ForeignKeyConstraint,
     Identity,
     Index,
     Insert,
@@ -36,7 +34,6 @@ from src.config import settings
 from src.constants import DB_NAMING_CONVENTION, Environment
 from src.storage.constants import (
     MEME_MEME_SOURCE_RAW_MEME_UNIQUE_CONSTRAINT,
-    MEME_RAW_IG_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
     MEME_RAW_TELEGRAM_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
     MEME_RAW_VK_MEME_SOURCE_POST_UNIQUE_CONSTRAINT,
 )
@@ -319,34 +316,6 @@ meme_raw_vk = Table(
     ),
 )
 
-meme_raw_ig = Table(
-    "meme_raw_ig",
-    metadata,
-    Column("id", Integer, Identity(), primary_key=True),
-    Column(
-        "meme_source_id",
-        ForeignKey("meme_source.id", ondelete="CASCADE"),
-        nullable=False,
-    ),
-    Column("post_id", String, nullable=False),
-    Column("url", String, nullable=False),
-    Column("published_at", DateTime, nullable=False),
-    Column("caption", String),  # caption
-    Column("media", JSONB),
-    Column("likes", Integer),
-    Column("views", Integer),
-    Column("comments", Integer),
-    Column("shares", Integer),
-    Column("media_type", Integer),
-    Column("video_duration", Float),
-    Column("product_type", String),
-    Column("created_at", DateTime, server_default=func.now(), nullable=False),
-    Column("updated_at", DateTime, onupdate=func.now()),
-    UniqueConstraint(
-        "meme_source_id", "post_id", name=MEME_RAW_IG_MEME_SOURCE_POST_UNIQUE_CONSTRAINT
-    ),
-)
-
 
 meme_raw_upload = Table(
     "meme_raw_upload",
@@ -424,32 +393,6 @@ user_tg_chat_membership = Table(
         onupdate=func.now(),
         nullable=False,
     ),
-)
-
-
-user_channel_membership = Table(
-    "user_channel_membership",
-    metadata,
-    Column("user_id", BigInteger, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True),
-    Column("chat_id", BigInteger, primary_key=True),
-    Column("status", String(16), nullable=False, server_default="unknown"),
-    Column("observed_at", DateTime),
-    Column("source", String(16), nullable=False, server_default="queued"),
-    Column("last_event_update_id", BigInteger),
-    Column("last_event_received_at", DateTime),
-    Column("ever_member", Boolean, nullable=False, server_default=text("false")),
-    Column("last_member_at", DateTime),
-    Column("checked_at", DateTime),
-    Column("next_check_at", DateTime, nullable=False, server_default=func.now()),
-    Column("last_error", String(40)),
-    CheckConstraint(
-        "status IN ('unknown', 'member', 'nonmember')", name="user_channel_membership_status"
-    ),
-    CheckConstraint(
-        "source IN ('queued', 'event', 'snapshot', 'access_lost')",
-        name="user_channel_membership_source",
-    ),
-    Index("ix_user_channel_membership_next_check", "next_check_at", "user_id"),
 )
 
 
@@ -650,64 +593,6 @@ channel_daily_stats = Table(
     UniqueConstraint("channel", "date"),
 )
 
-channel_lifecycle_event = Table(
-    "channel_lifecycle_event",
-    metadata,
-    Column("id", Integer, Identity(), primary_key=True),
-    Column("channel", String, nullable=False),
-    Column("telegram_event_id", BigInteger, nullable=False),
-    Column("telegram_user_id", BigInteger),
-    Column("event_type", String, nullable=False),
-    Column("event_at", DateTime, nullable=False),
-    Column("data", JSONB),
-    Column("created_at", DateTime, server_default=func.now(), nullable=False),
-    UniqueConstraint("channel", "telegram_event_id"),
-    Index("ix_channel_lifecycle_event_channel_time", "channel", "event_at"),
-    Index("ix_channel_lifecycle_event_user_time", "telegram_user_id", "event_at"),
-)
-
-editorial_posts = Table(
-    "editorial_posts",
-    metadata,
-    Column("id", Integer, Identity(), primary_key=True),
-    Column("channel", String, nullable=False),
-    Column("telegram_message_id", BigInteger, nullable=True),
-    Column("draft_hash", String, nullable=False),
-    Column("category", String),
-    Column("entity_id", String),
-    Column("topic_slug", String),
-    Column("text", String, nullable=False),
-    Column("has_media", Boolean, nullable=False, server_default="false"),
-    Column("validation_version", Integer, nullable=False, server_default="1"),
-    Column("created_at", DateTime, server_default=func.now(), nullable=False),
-    Column("views", Integer),
-    Column("forwards", Integer),
-    Column("reactions", Integer),
-    Column("comments", Integer),
-    Column("reactions_detail", JSONB),  # {"😁": 6, "❤": 4, ...}
-    Column("stats_updated_at", DateTime),
-    UniqueConstraint("draft_hash", name="uq_editorial_posts_draft_hash"),
-    UniqueConstraint("channel", "telegram_message_id", name="uq_editorial_posts_channel_msg"),
-)
-
-editorial_post_snapshots = Table(
-    "editorial_post_snapshots",
-    metadata,
-    Column("id", Integer, Identity(), primary_key=True),
-    Column("channel", String, nullable=False),
-    Column(
-        "editorial_post_id",
-        ForeignKey("editorial_posts.id", ondelete="CASCADE"),
-        nullable=False,
-    ),
-    Column("telegram_message_id", BigInteger, nullable=False),
-    Column("views", Integer),
-    Column("forwards", Integer),
-    Column("reactions", Integer),
-    Column("comments", Integer),
-    Column("reactions_detail", JSONB),
-    Column("snapshot_at", DateTime, server_default=func.now(), nullable=False),
-)
 
 user_popup_logs = Table(
     "user_popup_logs",
@@ -718,25 +603,6 @@ user_popup_logs = Table(
     Column("reacted_at", DateTime),
 )
 
-inline_search_logs = Table(
-    "inline_search_logs",
-    metadata,
-    Column("id", Integer, Identity(), primary_key=True),
-    Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
-    Column("query", String, nullable=False),
-    Column("chat_type", String),
-    Column("searched_at", DateTime, server_default=func.now(), nullable=False),
-)
-
-inline_search_chosen_result_logs = Table(
-    "inline_search_chosen_result_logs",
-    metadata,
-    Column("id", Integer, Identity(), primary_key=True),
-    Column("result_id", String, nullable=False),
-    Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
-    Column("query", String, nullable=False),
-    Column("chosen_at", DateTime, server_default=func.now(), nullable=False),
-)
 
 treasury_trx = Table(
     "treasury_trx",
@@ -793,15 +659,6 @@ message_tg = Table(
     UniqueConstraint("chat_id", "message_id", name="uq_message_tg"),
 )
 
-user_wrapped = Table(
-    "user_wrapped",
-    metadata,
-    Column("id", Integer, Identity(), primary_key=True),
-    Column("user_id", BigInteger, ForeignKey("user.id"), nullable=False),
-    Column("data", JSONB, nullable=False),
-    Column("card_telegram_file_id", String),
-    Column("created_at", DateTime, server_default=func.now()),
-)
 
 chat_meme_reaction = Table(
     "chat_meme_reaction",
@@ -815,19 +672,6 @@ chat_meme_reaction = Table(
     UniqueConstraint("chat_id", "meme_id", "user_id", name="uq_chat_meme_reaction"),
 )
 
-chat_agent_usage = Table(
-    "chat_agent_usage",
-    metadata,
-    Column("id", Integer, Identity(), primary_key=True),
-    Column("chat_id", BigInteger, nullable=False),
-    Column("user_id", BigInteger, nullable=False),
-    Column("prompt_tokens", Integer, nullable=False, server_default="0"),
-    Column("completion_tokens", Integer, nullable=False, server_default="0"),
-    Column("tool_calls", Integer, nullable=False, server_default="0"),
-    Column("response_time_ms", Integer),
-    Column("trigger_type", String),  # mention, reply, activity
-    Column("created_at", DateTime, server_default=func.now(), nullable=False),
-)
 
 # === Experiment Analytics ===
 
@@ -846,62 +690,6 @@ experiment_assignment = Table(
     ),
     Column("assigned_at", DateTime, server_default=func.now(), nullable=False),
     UniqueConstraint("experiment_id", "user_id", name="uq_experiment_assignment"),
-)
-
-# === Friend challenge ("Пять мемов для друга") ===
-
-friend_challenge_pack = Table(
-    "friend_challenge_pack",
-    metadata,
-    Column("id", Integer, Identity(), primary_key=True),
-    Column("owner_id", BigInteger, ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
-    Column("token", String(32), nullable=False),
-    Column("created_at", DateTime, server_default=func.now(), nullable=False),
-    Column("confirmed_at", DateTime),
-    UniqueConstraint("owner_id"),
-    UniqueConstraint("token"),
-)
-
-friend_challenge_item = Table(
-    "friend_challenge_item",
-    metadata,
-    Column("pack_id", ForeignKey("friend_challenge_pack.id", ondelete="CASCADE"), primary_key=True),
-    Column("position", SmallInteger, primary_key=True),
-    # Preserve a fixed slot when content is removed; never silently replace its meme.
-    Column("meme_id", ForeignKey("meme.id", ondelete="SET NULL")),
-    CheckConstraint("position BETWEEN 1 AND 5", name="position"),
-    UniqueConstraint("pack_id", "meme_id", name="friend_challenge_item_pack_meme_key"),
-)
-
-friend_challenge_participation = Table(
-    "friend_challenge_participation",
-    metadata,
-    Column("pack_id", ForeignKey("friend_challenge_pack.id", ondelete="CASCADE"), primary_key=True),
-    Column("user_id", BigInteger, ForeignKey("user.id", ondelete="CASCADE"), primary_key=True),
-    Column("started_at", DateTime, server_default=func.now(), nullable=False),
-    Column("completed_at", DateTime),
-)
-
-friend_challenge_answer = Table(
-    "friend_challenge_answer",
-    metadata,
-    Column("pack_id", Integer, primary_key=True),
-    Column("user_id", BigInteger, primary_key=True),
-    Column("position", SmallInteger, primary_key=True),
-    Column("liked", Boolean, nullable=False),
-    Column("answered_at", DateTime, server_default=func.now(), nullable=False),
-    ForeignKeyConstraint(
-        ["pack_id", "user_id"],
-        ["friend_challenge_participation.pack_id", "friend_challenge_participation.user_id"],
-        name="friend_challenge_answer_participation_fkey",
-        ondelete="CASCADE",
-    ),
-    ForeignKeyConstraint(
-        ["pack_id", "position"],
-        ["friend_challenge_item.pack_id", "friend_challenge_item.position"],
-        name="friend_challenge_answer_item_fkey",
-        ondelete="CASCADE",
-    ),
 )
 
 

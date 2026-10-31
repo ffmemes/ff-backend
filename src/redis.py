@@ -1,6 +1,4 @@
 import logging
-from datetime import timedelta
-from typing import Optional
 
 import orjson
 from redis.exceptions import ResponseError
@@ -8,7 +6,6 @@ from redis.exceptions import ResponseError
 from redis import asyncio as aioredis
 from src.config import settings
 from src.constants import Environment
-from src.models import CustomModel
 
 logger = logging.getLogger(__name__)
 
@@ -24,25 +21,6 @@ if settings.ENVIRONMENT != Environment.TESTING:
 
 pool = aioredis.ConnectionPool.from_url(str(settings.REDIS_URL), **_pool_kwargs)
 redis_client = aioredis.Redis(connection_pool=pool)
-
-
-class RedisData(CustomModel):
-    key: bytes | str
-    value: bytes | str
-    ttl: Optional[int | timedelta] = None
-
-
-async def set_redis_key(redis_data: RedisData, *, is_transaction: bool = False) -> None:
-    async with redis_client.pipeline(transaction=is_transaction) as pipe:
-        await pipe.set(redis_data.key, redis_data.value)
-        if redis_data.ttl:
-            await pipe.expire(redis_data.key, redis_data.ttl)
-
-        await pipe.execute()
-
-
-async def get_by_key(key: str) -> Optional[str]:
-    return await redis_client.get(key)
 
 
 async def delete_by_key(key: str) -> None:

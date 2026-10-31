@@ -32,8 +32,6 @@ class Config(BaseSettings):
     TELEGRAM_BOT_TOKEN: str | None = None
     TELEGRAM_BOT_USERNAME: str | None = None
     TELEGRAM_BOT_WEBHOOK_SECRET: str | None = None
-    # Friend challenge (H12): 90% treatment / 10% holdout of eligible senders.
-    FRIEND_CHALLENGE_ENABLED: bool = False
     MEME_STORAGE_TELEGRAM_CHAT_ID: str | None = None
     UPLOADED_MEMES_REVIEW_CHAT_ID: str | None = None
     ADMIN_LOGS_CHAT_ID: str | None = None
@@ -45,7 +43,6 @@ class Config(BaseSettings):
 
     REDIS_MAX_CONNECTIONS: int = 128
 
-    OPENAI_API_KEY: str | None = None  # src/comms image generation only
     OPENROUTER_API_KEY: str | None = None
     # Optional independent account for free-only OCR redundancy.
     OPENROUTER_API_KEY_SECONDARY: str | None = None

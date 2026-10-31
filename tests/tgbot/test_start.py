@@ -113,10 +113,6 @@ def _patch_handlers(shared_meme_sent: bool = False):
         patch(f"{HANDLER_MODULE}.onboarding_flow", new_callable=AsyncMock),
         patch(f"{HANDLER_MODULE}.next_message", new_callable=AsyncMock),
         patch(f"{HANDLER_MODULE}.log_start_event", new_callable=AsyncMock),
-        patch(
-            "src.tgbot.handlers.treasury.giveaway.handle_giveaway",
-            new_callable=AsyncMock,
-        ),
     ]
 
 
@@ -172,7 +168,6 @@ async def _run_handle_start(
                 "onboarding",
                 "next_message",
                 "log_start",
-                "giveaway",
             ],
             started,
         )
@@ -317,7 +312,6 @@ async def test_new_user_no_deep_link_runs_universal_side_effects(cleanup):
     mocks["onboarding"].assert_called_once()
     mocks["next_message"].assert_not_called()
     mocks["kitchen"].assert_not_called()
-    mocks["giveaway"].assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -329,15 +323,6 @@ async def test_new_user_kitchen_branch_still_inits_languages(cleanup):
     mocks["lang_picker"].assert_not_called()
     mocks["onboarding"].assert_not_called()
     mocks["next_message"].assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_new_user_giveaway_branch_inits_languages(cleanup):
-    mocks = await _run_handle_start(deep_link="giveaway_77")
-    await _assert_universal_side_effects(NEW_USER_ID, expected_deep_link="giveaway_77")
-    mocks["lang_picker"].assert_not_called()
-    mocks["giveaway"].assert_called_once()
-    mocks["onboarding"].assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -465,10 +450,6 @@ async def test_existing_user_share_link_with_prior_reaction_serves_shared_meme(c
         patch(f"{HANDLER_MODULE}.send_meme_to_user", new_callable=AsyncMock),
         patch(f"{HANDLER_MODULE}.next_message", new_callable=AsyncMock),
         patch(f"{HANDLER_MODULE}.log_start_event", new_callable=AsyncMock),
-        patch(
-            "src.tgbot.handlers.treasury.giveaway.handle_giveaway",
-            new_callable=AsyncMock,
-        ),
     ]
     started = [p.start() for p in patches]
     try:
@@ -487,7 +468,6 @@ async def test_existing_user_share_link_with_prior_reaction_serves_shared_meme(c
                 "send_meme",
                 "next_message",
                 "log_start",
-                "giveaway",
             ],
             started,
         )
@@ -535,10 +515,6 @@ async def test_existing_user_legacy_share_link_serves_shared_meme(cleanup):
         patch(f"{HANDLER_MODULE}.send_meme_to_user", new_callable=AsyncMock),
         patch(f"{HANDLER_MODULE}.next_message", new_callable=AsyncMock),
         patch(f"{HANDLER_MODULE}.log_start_event", new_callable=AsyncMock),
-        patch(
-            "src.tgbot.handlers.treasury.giveaway.handle_giveaway",
-            new_callable=AsyncMock,
-        ),
     ]
     started = [p.start() for p in patches]
     try:
@@ -557,7 +533,6 @@ async def test_existing_user_legacy_share_link_serves_shared_meme(cleanup):
                 "send_meme",
                 "next_message",
                 "log_start",
-                "giveaway",
             ],
             started,
         )
