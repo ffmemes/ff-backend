@@ -5,7 +5,6 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
 from src import localizer
-from src.flows.events import safe_emit
 from src.tgbot.bot import bot
 from src.tgbot.constants import POPUP_BUTTON_CALLBACK_DATA_PATTERN
 from src.tgbot.schemas import Popup
@@ -93,13 +92,6 @@ async def send_popup(user_id: int, popup: Popup) -> None:
         reply_markup=popup.reply_markup,
     )
     await create_user_popup_log(user_id, popup.id)
-
-    if popup.id == "popup.telegram_channel":
-        safe_emit(
-            "ff.popup.telegram_channel.shown",
-            f"user.{user_id}",
-            {"user_id": user_id},
-        )
 
 
 async def _unsent_popup(

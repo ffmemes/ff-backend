@@ -4,7 +4,6 @@ from datetime import datetime
 
 from prefect import flow, get_run_logger
 
-from src.flows.events import safe_emit
 from src.flows.hooks import notify_telegram_on_failure
 from src.storage.etl import insert_parsed_posts_from_vk
 from src.storage.parsers.vk import VkGroupScraper
@@ -82,10 +81,4 @@ async def parse_vk_sources(
     logger.info(
         f"Parsing done: {ok_count} ok, {fail_count} failed "
         f"out of {len(vk_sources)} sources in {elapsed:.0f}s"
-    )
-
-    safe_emit(
-        "ff.parser.vk.completed",
-        "ff.parser.vk",
-        {"sources_ok": ok_count, "sources_failed": fail_count},
     )

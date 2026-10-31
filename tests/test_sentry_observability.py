@@ -125,3 +125,25 @@ def test_before_send_drops_exception_frame_vars():
     assert scrubbed is event
     frame = scrubbed["exception"]["values"][0]["stacktrace"]["frames"][0]
     assert "vars" not in frame
+
+
+def test_before_send_scrubs_telegram_update_text_and_bot_token_url():
+    bot_url = "https://api.telegram.org/bot123456789:AAHsecretsecretsecretsecret12/sendMessage"
+    event = {
+        "request": {
+            "url": "https://example.test/tgbot/webhook",
+            "headers": {"X-Telegram-Bot-Api-Secret-Token": "hook-secret", "Accept": "*/*"},
+            "data": {"update_id": 1, "message": {"text": "my phone is +10000000000"}},
+        },
+        "exception": {"values": [{"value": f"Client error for url {bot_url}"}]},
+        "logentry": {"message": "sent %s", "params": ["private text"], "formatted": bot_url},
+        "breadcrumbs": {
+            "values": [{"message": f"HTTP Request: POST {bot_url}", "data": {"url": bot_url}}]
+        },
+    }
+
+    scrubbed = repr(before_send(event, {}))
+
+    for leaked in ("AAHsecret", "123456789", "phone", "private text", "hook-secret"):
+        assert leaked not in scrubbed
+    assert event["request"]["headers"]["Accept"] == "*/*"
