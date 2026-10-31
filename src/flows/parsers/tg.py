@@ -4,7 +4,6 @@ from datetime import datetime
 
 from prefect import flow, get_run_logger
 
-from src.flows.events import safe_emit
 from src.flows.hooks import notify_telegram_on_failure
 from src.storage.etl import insert_parsed_posts_from_telegram
 from src.storage.parsers.tg import TelegramChannelScraper
@@ -76,10 +75,4 @@ async def parse_telegram_sources(
     logger.info(
         f"Parsing done: {ok_count} ok, {fail_count} failed "
         f"out of {len(tg_sources)} sources in {elapsed:.0f}s"
-    )
-
-    safe_emit(
-        "ff.parser.telegram.completed",
-        "ff.parser.telegram",
-        {"sources_ok": ok_count, "sources_failed": fail_count},
     )

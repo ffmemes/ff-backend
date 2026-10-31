@@ -30,7 +30,6 @@ async def send_meme_to_user(
     user_id: int,
     meme: MemeData,
     reaction_context: str | None = None,
-    first_meme_nudge_tasks: list[asyncio.Task[None]] | None = None,
     recommended_by: str | None = None,
 ):
     """Send a meme to a user.
@@ -54,8 +53,6 @@ async def send_meme_to_user(
         return
 
     delivery_task = asyncio.create_task(_record_delivered_meme_reaction(user_id, meme))
-    if first_meme_nudge_tasks is not None:
-        first_meme_nudge_tasks.append(delivery_task)
     try:
         await asyncio.shield(delivery_task)
     except asyncio.CancelledError:

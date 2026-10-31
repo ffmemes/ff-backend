@@ -35,7 +35,6 @@ from datetime import datetime, timezone
 from prefect import flow, get_run_logger
 from prefect.states import Completed
 
-from src.flows.events import safe_emit
 from src.flows.hooks import notify_telegram_on_failure
 from src.flows.storage.describe_memes_repository import (
     get_memes_to_describe,
@@ -143,20 +142,17 @@ async def describe_memes_flow(batch_size: int = 20) -> None:
 
     if not get_configured_openrouter_keys():
         log.warning("No OpenRouter OCR key is configured. No work performed.")
-        safe_emit("ff.describe_memes.no_work", "ff.describe_memes", {"reason": "no_configured_key"})
         return Completed(name="OCR unavailable", message="no OpenRouter OCR key is configured")
 
     usable_keys = await get_usable_openrouter_keys(log)
     if not usable_keys:
         log.warning("No usable OpenRouter OCR key. No work performed; inspect key-health logs.")
-        safe_emit("ff.describe_memes.no_work", "ff.describe_memes", {"reason": "no_usable_key"})
         return Completed(name="OCR unavailable", message="no usable OpenRouter OCR key")
 
     memes = await get_memes_to_describe(limit=batch_size)
     log.info("Found %d memes to describe.", len(memes))
 
     if not memes:
-        safe_emit("ff.describe_memes.no_work", "ff.describe_memes", {"reason": "no_pending_memes"})
         return
 
     ok = 0
@@ -285,9 +281,3 @@ async def describe_memes_flow(batch_size: int = 20) -> None:
                 await asyncio.sleep(sleep_needed)
 
     log.info("Batch: %d described, %d failed out of %d.", ok, failed, len(memes))
-
-    safe_emit(
-        "ff.describe_memes.completed",
-        "ff.describe_memes",
-        {"described": ok, "failed": failed},
-    )

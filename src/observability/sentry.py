@@ -1,3 +1,11 @@
+"""Sentry scrubbing and safe-context helpers.
+
+Sentry's default EventScrubber (send_default_pii=False) only filters a fixed key
+denylist in request/extra/user/breadcrumb data. It does not touch free-form
+strings, scope contexts, Sentry Logs, the webhook request body (Telegram message
+text) or the Telegram secret-token header, so those are handled here.
+"""
+
 import logging
 import re
 from contextlib import contextmanager
@@ -23,25 +31,64 @@ SENSITIVE_KEY_PARTS = (
     "session",
     "token",
 )
-
+UPDATE_TYPES = (
+    "message edited_message callback_query inline_query chosen_inline_result "
+    "pre_checkout_query chat_member my_chat_member chat_boost"
+).split()
+RAW_FILE_ID_KEYS = {"file_id", "telegram_file_id", "raw_file_id"}
 MAX_CONTEXT_STRING_LENGTH = 500
 MAX_LOG_BODY_LENGTH = 2000
-SENTRY_LOG_PARAMETER_PREFIX = "sentry.message.parameter."
-URL_PATTERN = re.compile(r"https?://[^\s)>\]]+")
-BEARER_TOKEN_PATTERN = re.compile(r"\bBearer\s+[A-Za-z0-9._~+/=-]+", re.IGNORECASE)
-SECRET_ASSIGNMENT_PATTERN = re.compile(
-    r"(?i)\b(api[_-]?key|authorization|bot[_-]?token|dsn|password|secret|token)"
-    r"\s*[:=]\s*([^\s,;]+)"
-)
-TELEGRAM_BOT_TOKEN_PATTERN = re.compile(r"\b\d{6,}:[A-Za-z0-9_-]{20,}\b")
-HIGH_ENTROPY_TOKEN_PATTERN = re.compile(
-    r"\b(?=[A-Za-z0-9_-]{32,}\b)(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9_-]+\b"
+TEXT_SCRUBBERS = (
+    # URLs carry bot tokens (api.telegram.org/bot<token>/...) and signed params.
+    (re.compile(r"https?://[^\s)>\]]+"), "[Filtered]"),
+    (re.compile(r"\bBearer\s+[A-Za-z0-9._~+/=-]+", re.IGNORECASE), "Bearer [Filtered]"),
+    (
+        re.compile(
+            r"(?i)\b(api[_-]?key|authorization|bot[_-]?token|dsn|password|secret|token)"
+            r"\s*[:=]\s*([^\s,;]+)"
+        ),
+        r"\1=[Filtered]",
+    ),
+    (re.compile(r"\b\d{6,}:[A-Za-z0-9_-]{20,}\b"), "[Filtered]"),  # bare bot token
+    # Telegram file IDs and other opaque tokens.
+    (
+        re.compile(r"\b(?=[A-Za-z0-9_-]{32,}\b)(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9_-]+\b"),
+        "[Filtered]",
+    ),
 )
 
 
 def before_send(event: dict[str, Any], _hint: dict[str, Any]) -> dict[str, Any] | None:
-    """Remove sensitive exception payloads before Sentry stores an event."""
-    _drop_exception_frame_vars(event)
+    """Strip payloads Sentry's default scrubber keeps: webhook body, frame vars, URLs."""
+    request = event.get("request")
+    if isinstance(request, dict):
+        request.pop("data", None)  # raw Telegram update: message text, contacts, names
+        if isinstance(request.get("url"), str):
+            request["url"] = _scrub_text(request["url"])
+        headers = request.get("headers")
+        if isinstance(headers, dict):
+            request["headers"] = {
+                k: "[Filtered]" if _is_sensitive_key(k) else v for k, v in headers.items()
+            }
+
+    for exc in (event.get("exception") or {}).get("values") or []:
+        if isinstance(exc.get("value"), str):
+            exc["value"] = _scrub_text(exc["value"])
+        for frame in (exc.get("stacktrace") or {}).get("frames") or []:
+            frame.pop("vars", None)
+
+    logentry = event.get("logentry")
+    if isinstance(logentry, dict):
+        logentry.pop("params", None)
+        for key in ("message", "formatted"):
+            if isinstance(logentry.get(key), str):
+                logentry[key] = _scrub_text(logentry[key])
+
+    for crumb in (event.get("breadcrumbs") or {}).get("values") or []:
+        if isinstance(crumb.get("message"), str):
+            crumb["message"] = _scrub_text(crumb["message"])
+        crumb.pop("data", None)
+
     return event
 
 
@@ -50,13 +97,15 @@ def before_send_log(log: dict[str, Any], _hint: dict[str, Any]) -> dict[str, Any
     attributes = log.get("attributes")
     if isinstance(attributes, dict):
         log["attributes"] = {
-            key: _scrub_log_attribute(key, value) for key, value in attributes.items()
+            key: "[Filtered]"
+            if _is_sensitive_key(key) or key.lower().startswith("sentry.message.parameter.")
+            else _scrub_text(value)
+            if isinstance(value, str)
+            else value
+            for key, value in attributes.items()
         }
-
-    body = log.get("body")
-    if isinstance(body, str):
-        log["body"] = _scrub_log_text(body)
-
+    if isinstance(log.get("body"), str):
+        log["body"] = _scrub_text(log["body"])
     return log
 
 
@@ -64,15 +113,15 @@ def before_send_log(log: dict[str, Any], _hint: dict[str, Any]) -> dict[str, Any
 def telegram_update_scope(update: Any) -> Iterator[None]:
     """Attach Telegram update context to Sentry events produced by one webhook."""
     with sentry_sdk.new_scope() as scope:
-        user_id = _get_attr(getattr(update, "effective_user", None), "id")
+        user_id = getattr(getattr(update, "effective_user", None), "id", None)
         if user_id is not None:
             scope.set_user({"id": str(user_id)})
 
-        update_type = _telegram_update_type(update)
         chat = getattr(update, "effective_chat", None)
-        message = getattr(update, "effective_message", None)
-        callback_query = getattr(update, "callback_query", None)
-        callback_route = _callback_route(getattr(callback_query, "data", None))
+        update_type = _telegram_update_type(update)
+        callback_route = _callback_route(
+            getattr(getattr(update, "callback_query", None), "data", None)
+        )
 
         scope.set_tag("ff.module", "telegram_update")
         scope.set_tag("telegram.update_type", update_type)
@@ -85,13 +134,11 @@ def telegram_update_scope(update: Any) -> Iterator[None]:
             "telegram_update",
             _clean_context(
                 {
-                    "update_id": _get_attr(update, "update_id"),
-                    "update_type": update_type,
-                    "user_id": user_id,
-                    "chat_id": _get_attr(chat, "id"),
-                    "chat_type": _get_attr(chat, "type"),
-                    "message_id": _get_attr(message, "message_id"),
-                    "callback_route": callback_route,
+                    "update_id": getattr(update, "update_id", None),
+                    "chat_id": getattr(chat, "id", None),
+                    "message_id": getattr(
+                        getattr(update, "effective_message", None), "message_id", None
+                    ),
                 }
             ),
         )
@@ -105,13 +152,12 @@ def user_upload_observability_context(
     """Build safe user-upload context without raw Telegram payloads or file IDs."""
     media = meme_upload.get("media") or {}
     forward_origin = meme_upload.get("forward_origin") or {}
-
     return {
         "meme": _clean_context(
             {
                 "id": meme.get("id"),
-                "type": _enum_value(meme.get("type")),
-                "status": _enum_value(meme.get("status")),
+                "type": meme.get("type"),
+                "status": meme.get("status"),
                 "language_code": meme.get("language_code"),
                 "has_telegram_file_id": bool(meme.get("telegram_file_id")),
             }
@@ -127,11 +173,8 @@ def user_upload_observability_context(
         ),
         "telegram_media": _clean_context(
             {
-                "file_size": media.get("file_size"),
-                "mime_type": media.get("mime_type"),
-                "duration": media.get("duration"),
-                "width": media.get("width"),
-                "height": media.get("height"),
+                key: media.get(key)
+                for key in ("file_size", "mime_type", "duration", "width", "height")
             }
         ),
     }
@@ -147,34 +190,14 @@ def capture_handled_issue(
     error: BaseException | None = None,
 ) -> str | None:
     """Capture a handled backend failure as a Sentry event with safe context."""
-    try:
-        with sentry_sdk.new_scope() as scope:
-            scope.set_level(level)
-            if user_id is not None:
-                scope.set_user({"id": str(user_id)})
-
-            for key, value in (tags or {}).items():
-                if value is not None:
-                    scope.set_tag(key, _tag_value(value))
-
-            for key, value in (contexts or {}).items():
-                scope.set_context(key, _clean_context(value))
-
-            if error is not None:
-                scope.set_context(
-                    "error",
-                    _clean_context(
-                        {
-                            "type": type(error).__name__,
-                            "message": str(error),
-                        }
-                    ),
-                )
-
-            return scope.capture_message(message, level=level)
-    except Exception:  # noqa: BLE001
-        logger.exception("Failed to capture handled Sentry issue")
-        return None
+    if error is not None:
+        contexts = {
+            **(contexts or {}),
+            "error": {"type": type(error).__name__, "message": _scrub_text(str(error))},
+        }
+    return _capture(
+        level, user_id, tags, contexts, lambda scope: scope.capture_message(message, level=level)
+    )
 
 
 def capture_handled_exception(
@@ -187,32 +210,13 @@ def capture_handled_exception(
     contexts: dict[str, Any] | None = None,
 ) -> str | None:
     """Capture a handled exception with stack trace and safe context."""
-    try:
-        with sentry_sdk.new_scope() as scope:
-            scope.set_level(level)
-            if user_id is not None:
-                scope.set_user({"id": str(user_id)})
-
-            for key, value in (tags or {}).items():
-                if value is not None:
-                    scope.set_tag(key, _tag_value(value))
-
-            for key, value in (contexts or {}).items():
-                scope.set_context(key, _clean_context(value))
-
-            scope.set_context(
-                "handled_failure",
-                _clean_context(
-                    {
-                        "message": message,
-                        "type": type(error).__name__,
-                    }
-                ),
-            )
-            return sentry_sdk.capture_exception(error)
-    except Exception:  # noqa: BLE001
-        logger.exception("Failed to capture handled Sentry exception")
-        return None
+    contexts = {
+        **(contexts or {}),
+        "handled_failure": {"message": message, "type": type(error).__name__},
+    }
+    return _capture(
+        level, user_id, tags, contexts, lambda _scope: sentry_sdk.capture_exception(error)
+    )
 
 
 def capture_telegram_storage_upload_failure(
@@ -226,26 +230,22 @@ def capture_telegram_storage_upload_failure(
     observability_context: dict[str, Any] | None = None,
 ) -> str | None:
     contexts = dict(observability_context or {})
-    contexts["telegram_storage_upload"] = _clean_context(
-        {
-            "reason": reason,
-            "attempt": attempt,
-            "max_attempts": max_attempts,
-            "content_size": content_size,
-            "meme_id": meme.get("id"),
-            "meme_type": _enum_value(meme.get("type")),
-        }
-    )
-    user_id = _context_user_id(observability_context)
-
+    contexts["telegram_storage_upload"] = {
+        "reason": reason,
+        "attempt": attempt,
+        "max_attempts": max_attempts,
+        "content_size": content_size,
+        "meme_id": meme.get("id"),
+        "meme_type": meme.get("type"),
+    }
     return capture_handled_issue(
         "telegram_storage_upload.failed",
         level="warning",
-        user_id=user_id,
+        user_id=(contexts.get("user_upload") or {}).get("user_id"),
         tags={
             "ff.module": "telegram_storage_upload",
             "ff.failure_kind": reason,
-            "meme.type": _enum_value(meme.get("type")),
+            "meme.type": meme.get("type"),
             "error.type": type(error).__name__ if error else None,
         },
         contexts=contexts,
@@ -255,50 +255,44 @@ def capture_telegram_storage_upload_failure(
 
 def sentry_log_extra(context: dict[str, Any] | None = None, **values: Any) -> dict[str, Any]:
     """Flatten safe context into LogRecord extras for Sentry Logs and JSON logs."""
-    extra: dict[str, Any] = {}
-    for namespace, namespace_values in (context or {}).items():
-        if not isinstance(namespace_values, dict):
-            continue
-        for key, value in namespace_values.items():
-            if _is_scalar(value) and not _is_sensitive_key(key):
-                extra[f"ff_{namespace}_{key}"] = _clean_scalar(value)
+    items = [
+        (f"{namespace}_{key}", value)
+        for namespace, namespace_values in (context or {}).items()
+        if isinstance(namespace_values, dict)
+        for key, value in namespace_values.items()
+    ] + list(values.items())
+    return {
+        f"ff_{key}": _clean_scalar(value)
+        for key, value in items
+        if _is_scalar(value) and not _is_sensitive_key(key)
+    }
 
-    for key, value in values.items():
-        if _is_scalar(value) and not _is_sensitive_key(key):
-            extra[f"ff_{key}"] = _clean_scalar(value)
 
-    return extra
+def _capture(level, user_id, tags, contexts, send) -> str | None:
+    try:
+        with sentry_sdk.new_scope() as scope:
+            scope.set_level(level)
+            if user_id is not None:
+                scope.set_user({"id": str(user_id)})
+            for key, value in (tags or {}).items():
+                if value is not None:
+                    scope.set_tag(key, str(_clean_scalar(value))[:200].replace("\n", " "))
+            for key, value in (contexts or {}).items():
+                scope.set_context(key, _clean_context(value))
+            return send(scope)
+    except Exception:  # noqa: BLE001
+        logger.exception("Failed to capture handled Sentry event")
+        return None
 
 
 def _telegram_update_type(update: Any) -> str:
-    for field in (
-        "message",
-        "edited_message",
-        "callback_query",
-        "inline_query",
-        "chosen_inline_result",
-        "pre_checkout_query",
-        "chat_member",
-        "my_chat_member",
-        "chat_boost",
-    ):
-        if getattr(update, field, None) is not None:
-            return field
-    return "unknown"
+    return next((f for f in UPDATE_TYPES if getattr(update, f, None) is not None), "unknown")
 
 
 def _callback_route(callback_data: Any) -> str | None:
     if not isinstance(callback_data, str) or not callback_data:
         return None
-    route = re.sub(r"\d+", "{id}", callback_data)
-    return route[:120]
-
-
-def _context_user_id(context: dict[str, Any] | None) -> int | str | None:
-    user_upload = (context or {}).get("user_upload")
-    if isinstance(user_upload, dict):
-        return user_upload.get("user_id")
-    return None
+    return re.sub(r"\d+", "{id}", callback_data)[:120]
 
 
 def _clean_context(value: Any) -> Any:
@@ -306,7 +300,7 @@ def _clean_context(value: Any) -> Any:
         return {
             str(key): "[Filtered]" if _is_sensitive_key(str(key)) else _clean_context(item)
             for key, item in value.items()
-            if not _is_raw_telegram_file_id_key(str(key))
+            if str(key) not in RAW_FILE_ID_KEYS
         }
     if isinstance(value, (list, tuple)):
         return [_clean_context(item) for item in value[:10]]
@@ -314,7 +308,8 @@ def _clean_context(value: Any) -> Any:
 
 
 def _clean_scalar(value: Any) -> Any:
-    value = _enum_value(value)
+    if isinstance(value, Enum):
+        value = value.value
     if value is None or isinstance(value, (bool, int, float)):
         return value
     text = str(value)
@@ -323,75 +318,17 @@ def _clean_scalar(value: Any) -> Any:
     return text
 
 
-def _drop_exception_frame_vars(event: dict[str, Any]) -> None:
-    exception = event.get("exception")
-    if not isinstance(exception, dict):
-        return
-
-    values = exception.get("values")
-    if not isinstance(values, list):
-        return
-
-    for exception_value in values:
-        if not isinstance(exception_value, dict):
-            continue
-        stacktrace = exception_value.get("stacktrace")
-        if not isinstance(stacktrace, dict):
-            continue
-        frames = stacktrace.get("frames")
-        if not isinstance(frames, list):
-            continue
-        for frame in frames:
-            if isinstance(frame, dict):
-                frame.pop("vars", None)
-
-
-def _scrub_log_attribute(key: str, value: Any) -> Any:
-    if _is_sensitive_key(key) or _is_sentry_log_parameter_key(key):
-        return "[Filtered]"
-    if isinstance(value, str):
-        return _scrub_log_text(value)
-    return value
-
-
-def _scrub_log_text(text: str) -> str:
-    scrubbed = URL_PATTERN.sub("[Filtered]", text)
-    scrubbed = BEARER_TOKEN_PATTERN.sub("Bearer [Filtered]", scrubbed)
-    scrubbed = SECRET_ASSIGNMENT_PATTERN.sub(r"\1=[Filtered]", scrubbed)
-    scrubbed = TELEGRAM_BOT_TOKEN_PATTERN.sub("[Filtered]", scrubbed)
-    scrubbed = HIGH_ENTROPY_TOKEN_PATTERN.sub("[Filtered]", scrubbed)
-    if len(scrubbed) > MAX_LOG_BODY_LENGTH:
-        return scrubbed[:MAX_LOG_BODY_LENGTH] + "...[truncated]"
-    return scrubbed
-
-
-def _tag_value(value: Any) -> str:
-    return str(_clean_scalar(value))[:200].replace("\n", " ")
-
-
-def _enum_value(value: Any) -> Any:
-    if isinstance(value, Enum):
-        return value.value
-    return value
+def _scrub_text(text: str) -> str:
+    for pattern, replacement in TEXT_SCRUBBERS:
+        text = pattern.sub(replacement, text)
+    if len(text) > MAX_LOG_BODY_LENGTH:
+        return text[:MAX_LOG_BODY_LENGTH] + "...[truncated]"
+    return text
 
 
 def _is_sensitive_key(key: str) -> bool:
-    normalized = key.lower()
-    return any(part in normalized for part in SENSITIVE_KEY_PARTS)
-
-
-def _is_sentry_log_parameter_key(key: str) -> bool:
-    return key.lower().startswith(SENTRY_LOG_PARAMETER_PREFIX)
-
-
-def _is_raw_telegram_file_id_key(key: str) -> bool:
-    return key in {"file_id", "telegram_file_id", "raw_file_id"}
+    return any(part in key.lower() for part in SENSITIVE_KEY_PARTS)
 
 
 def _is_scalar(value: Any) -> bool:
-    value = _enum_value(value)
-    return value is None or isinstance(value, (str, int, float, bool))
-
-
-def _get_attr(value: Any, attr: str) -> Any:
-    return getattr(value, attr, None) if value is not None else None
+    return value is None or isinstance(value, (Enum, str, int, float, bool))

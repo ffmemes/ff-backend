@@ -40,7 +40,6 @@ async def test_final_meme_pipeline_deduplicates_batch_before_ok_promotion(monkey
     monkeypatch.setattr(memes, "deduplicate_pending_meme", fake_deduplicate)
     monkeypatch.setattr(memes, "update_meme_status_of_ready_memes", fake_update_ready)
     monkeypatch.setattr(memes, "sweep_file_id_duplicates", fake_sweep)
-    monkeypatch.setattr(memes, "safe_emit", lambda *args, **kwargs: calls.append(("emit", args)))
 
     await memes.final_meme_pipeline.fn()
 
