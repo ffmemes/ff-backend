@@ -32,8 +32,6 @@ class Config(BaseSettings):
     TELEGRAM_BOT_TOKEN: str | None = None
     TELEGRAM_BOT_USERNAME: str | None = None
     TELEGRAM_BOT_WEBHOOK_SECRET: str | None = None
-    # Friend challenge (H12): 90% treatment / 10% holdout of eligible senders.
-    FRIEND_CHALLENGE_ENABLED: bool = False
     MEME_STORAGE_TELEGRAM_CHAT_ID: str | None = None
     UPLOADED_MEMES_REVIEW_CHAT_ID: str | None = None
     ADMIN_LOGS_CHAT_ID: str | None = None
@@ -45,7 +43,6 @@ class Config(BaseSettings):
 
     REDIS_MAX_CONNECTIONS: int = 128
 
-    OPENAI_API_KEY: str | None = None  # src/comms image generation only
     OPENROUTER_API_KEY: str | None = None
     # Optional independent account for free-only OCR redundancy.
     OPENROUTER_API_KEY_SECONDARY: str | None = None
@@ -57,36 +54,18 @@ class Config(BaseSettings):
     # FFM-1882: narrow true-new cold-start positions 2-10 experiment.
     # Roll back by setting this to false in production env.
     COLD_START_CANDIDATE_GUARDRAILS_ENABLED: bool = True
-    # H10 cold_start_fresh_viral_v1: KILLED 2026-10-30 (first tap and 1h block
-    # rate both worse in treatment). Off = no new assignment, everyone is control.
-    COLD_START_FRESH_VIRAL_EXPERIMENT_ENABLED: bool = False
     # explore_budget_v1: 50/50 non-cold-start users get the labeling budget,
     # fresh-viral blend slot and idle-return first slot. Kill switch = all control.
     EXPLORE_BUDGET_V1_ENABLED: bool = True
 
-    # Recommendation batch diagnostics are realtime operational data, not
-    # durable product facts. Keep compact logs/spans always on and sample full
-    # payloads so future Prometheus/Grafana adapters can reuse the same seam.
-    RECOMMENDATION_DIAGNOSTICS_SAMPLE_RATE: float = 0.01
-    RECOMMENDATION_SOURCE_DIVERSITY_ENABLED: bool = False
-    RECOMMENDATION_SHADOW_SCORING_ENABLED: bool = True
     # Source affinity policies (skip/dislike ≈ "next", not "ban channel").
     # Soft demote majority-dislike sources in ranking (default ON).
     RECOMMENDATION_DEMOTE_DISLIKED_SOURCES: bool = True
     RECOMMENDATION_DEMOTE_DISLIKED_MIN_REACTIONS: int = 5
     RECOMMENDATION_DEMOTE_DISLIKED_MULTIPLIER: float = 0.15
-    # Hard exclude only strong hate (default OFF — empty-queue risk).
-    RECOMMENDATION_BLOCK_DISLIKED_SOURCES: bool = False
-    RECOMMENDATION_BLOCK_DISLIKED_MIN_REACTIONS: int = 15
-    RECOMMENDATION_BLOCK_DISLIKED_RATIO: float = 3.0  # ndislikes >= 3 * nlikes
     # Retention broadcasts: pick high-confidence meme (affinity + LR) instead of
     # blind Redis queue pop. Kill switch rolls back to queue path.
     BROADCAST_HIGH_QUALITY_PICK_ENABLED: bool = True
-    # Prefer last-7-day channel posts ranked by forwards (community-verified).
-    # Falls back to HQ/queue. Skips known channel members.
-    # Off since 2026-10-30 (H3c disable rule): viral LR 5-20 pp below HQ with
-    # equal/worse reactions; HQ is the default push pick.
-    BROADCAST_CHANNEL_VIRAL_PICK_ENABLED: bool = False
     # broadcast_cadence_holdout_v1: no-push holdout per cadence step (15m/24h
     # 15%, 1w/2w/4w 20%). See experiments/2026-10-30-broadcast-cadence-holdout.md.
     BROADCAST_CADENCE_HOLDOUT_ENABLED: bool = True

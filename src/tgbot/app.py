@@ -5,11 +5,9 @@ from telegram.ext import (
     AIORateLimiter,
     Application,
     CallbackQueryHandler,
-    ChatBoostHandler,
     ChatMemberHandler,
     CommandHandler,
     MessageHandler,
-    PreCheckoutQueryHandler,
     filters,
 )
 
@@ -36,7 +34,6 @@ from src.tgbot.handlers import (
     reaction,
     start,
 )
-from src.tgbot.handlers.admin.boost import handle_chat_boost
 from src.tgbot.handlers.admin.broadcast_text import (
     handle_broadcast_text_ru,
     handle_broadcast_text_ru_trigger,
@@ -59,26 +56,8 @@ from src.tgbot.handlers.chat.group_meme_reaction import (
     CHAT_MEME_REACTION_CALLBACK_PATTERN,
     handle_chat_meme_reaction,
 )
-from src.tgbot.handlers.chat.send_tokens import (
-    reward_active_chat_users,
-    send_tokens_to_reply,
-)
-from src.tgbot.handlers.friend_challenge import (
-    CALLBACK_PATTERN as FRIEND_CHALLENGE_CALLBACK_PATTERN,
-)
-from src.tgbot.handlers.friend_challenge import (
-    handle_friend_callback,
-    handle_friend_command,
-)
 from src.tgbot.handlers.help import handle_help, handle_last
 from src.tgbot.handlers.moderator.registry import add_moderator_handlers
-from src.tgbot.handlers.payments.purchase import (
-    PURCHASE_TOKEN_CALLBACK_DATA_REGEXP,
-    handle_new_token_purchase_request_callback,
-    precheckout_callback,
-    refund_command,
-    successful_payment_callback,
-)
 from src.tgbot.handlers.private_message_log import log_private_inbound_message
 from src.tgbot.handlers.stats.stats import handle_stats
 from src.tgbot.handlers.treasury.commands import (
@@ -224,26 +203,6 @@ def add_handlers(application: Application) -> None:
     )
 
     ####################
-    # purchase
-    application.add_handler(
-        CallbackQueryHandler(
-            handle_new_token_purchase_request_callback,
-            pattern=PURCHASE_TOKEN_CALLBACK_DATA_REGEXP,
-        )
-    )
-
-    application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
-    application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
-
-    application.add_handler(
-        CommandHandler(
-            "refund",
-            refund_command,
-            filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
-        )
-    )
-
-    ####################
     # user stats
     application.add_handler(
         CommandHandler(
@@ -303,23 +262,6 @@ def add_handlers(application: Application) -> None:
                 filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
             ),
         ]
-    )
-
-    ######################
-    # chat activity
-
-    application.add_handler(
-        MessageHandler(
-            filters=filters.ChatType.GROUPS & filters.Regex(r"^\+fire\ \d+$"),
-            callback=reward_active_chat_users,
-        )
-    )
-
-    application.add_handler(
-        MessageHandler(
-            filters=filters.REPLY & filters.ChatType.GROUPS & filters.Regex(r"^\+\d+$"),
-            callback=send_tokens_to_reply,
-        )
     )
 
     ######################
@@ -417,27 +359,6 @@ def add_handlers(application: Application) -> None:
                 pattern=DELETE_USER_DATA_CONFIRMATION_CALLBACK,
             ),
         ]
-    )
-
-    # handle boosts of a chat
-    application.add_handler(
-        ChatBoostHandler(
-            handle_chat_boost,
-            block=False,
-        )
-    )
-
-    ############## friend challenge (H12)
-    if settings.FRIEND_CHALLENGE_ENABLED:
-        application.add_handler(
-            CommandHandler(
-                "friend",
-                handle_friend_command,
-                filters=filters.ChatType.PRIVATE & filters.UpdateType.MESSAGE,
-            )
-        )
-    application.add_handler(
-        CallbackQueryHandler(handle_friend_callback, pattern=FRIEND_CHALLENGE_CALLBACK_PATTERN)
     )
 
     # handle all old & broken callback queries

@@ -3,7 +3,6 @@ import logging
 
 from prefect import flow
 
-from src.flows.events import safe_emit
 from src.flows.hooks import notify_telegram_on_failure
 from src.stats import meme
 from src.tgbot.logs import log
@@ -30,8 +29,6 @@ async def calculate_meme_stats() -> None:
     # Heavy operations (raw_impr_rank, invited_count) run separately every hour
     # via calculate_meme_stats_heavy to avoid blocking this 15-min flow.
     await meme.calculate_meme_reactions_and_engagement(lookback_hours=3)
-
-    safe_emit("ff.stats.meme.completed", "ff.stats.meme")
 
 
 def _pct(value: float | None) -> str:
@@ -183,9 +180,4 @@ async def alert_low_sent_pool_skip_rate(
             )
         )
 
-    safe_emit(
-        "ff.stats.low_sent_pool_skip_rate_alert.completed",
-        "ff.stats.low_sent_pool_skip_rate_alert",
-        summary,
-    )
     return summary

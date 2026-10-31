@@ -10,7 +10,6 @@ from telegram.error import TelegramError
 
 from src.database import (
     engine,
-    fetch_all,
     fetch_one,
     meme_source,
     meme_source_candidate,
@@ -318,21 +317,6 @@ async def prepare_source_candidate(
             expected_status=CANDIDATE_STATUS_DISCOVERED,
         )
     return await _prepare_candidate_with_posts(candidate, source, posts)
-
-
-async def get_source_candidate_vote_counts(poll_id: int) -> dict[str, int]:
-    rows = await fetch_all(
-        text(
-            """
-            SELECT vote, COUNT(*) AS voters
-            FROM meme_source_candidate_vote
-            WHERE poll_id = :poll_id
-            GROUP BY vote
-            """
-        ),
-        {"poll_id": poll_id},
-    )
-    return _source_candidate_vote_counts_from_rows(rows)
 
 
 def _source_candidate_vote_counts_from_rows(rows: list[dict[str, Any]]) -> dict[str, int]:

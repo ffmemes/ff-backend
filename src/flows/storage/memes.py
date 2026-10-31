@@ -2,7 +2,6 @@ from typing import Any
 
 from prefect import flow, get_run_logger
 
-from src.flows.events import safe_emit
 from src.flows.hooks import notify_telegram_on_failure
 from src.storage import ads
 from src.storage.constants import MemeStatus, MemeType
@@ -151,8 +150,6 @@ async def tg_meme_pipeline() -> None:
     unloaded_memes = await get_unloaded_tg_memes(limit=100)
     await _process_unloaded_memes(unloaded_memes, "Telegram")
 
-    safe_emit("ff.pipeline.telegram.completed", "ff.pipeline.telegram")
-
 
 async def process_cached_telegram_source(meme_source_id: int, limit: int = 100) -> None:
     """Process cached raw Telegram posts for one just-enabled source."""
@@ -185,8 +182,6 @@ async def vk_meme_pipeline() -> None:
     unloaded_memes = await get_unloaded_vk_memes(limit=100)
     await _process_unloaded_memes(unloaded_memes, "VK")
 
-    safe_emit("ff.pipeline.vk.completed", "ff.pipeline.vk")
-
 
 @flow(
     name="Final Memes Pipeline",
@@ -215,17 +210,7 @@ async def final_meme_pipeline() -> None:
                 result.duplicate_of,
             )
 
-    promoted_memes = await update_meme_status_of_ready_memes(processed_meme_ids)
+    await update_meme_status_of_ready_memes(processed_meme_ids)
     file_id_duplicates = await sweep_file_id_duplicates()
     if file_id_duplicates["resolved"]:
         logger.info("Resolved file_id duplicates: %s", file_id_duplicates)
-
-    safe_emit(
-        "ff.pipeline.final.completed",
-        "ff.pipeline.final",
-        {
-            "memes_processed": len(memes),
-            "memes_promoted": len(promoted_memes),
-            "file_id_duplicates_resolved": file_id_duplicates["resolved"],
-        },
-    )

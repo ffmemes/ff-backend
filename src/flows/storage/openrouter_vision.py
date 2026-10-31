@@ -479,13 +479,6 @@ async def _check_openrouter_key_health(key: OpenRouterKey, log) -> OpenRouterKey
     return checked_key
 
 
-async def check_openrouter_key_health(log) -> bool:
-    """Backward-compatible health check for the configured primary key."""
-    keys = get_configured_openrouter_keys()
-    primary = next((key for key in keys if key.label == "primary"), None)
-    return primary is not None and await _check_openrouter_key_health(primary, log) is not None
-
-
 async def get_usable_openrouter_keys(log) -> tuple[OpenRouterKey, ...]:
     """Probe every distinct configured key and retain only usable accounts."""
     usable: list[OpenRouterKey] = []

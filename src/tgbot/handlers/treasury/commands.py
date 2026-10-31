@@ -1,8 +1,6 @@
 from html import escape
 
 from telegram import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
     Update,
 )
 from telegram.constants import ParseMode
@@ -10,7 +8,6 @@ from telegram.ext import (
     ContextTypes,
 )
 
-from src.tgbot.handlers.payments.purchase import PURCHASE_TOKEN_CALLBACK_DATA_PATTERN
 from src.tgbot.handlers.treasury.constants import PAYOUTS, TrxType
 from src.tgbot.handlers.treasury.service import (
     LEADERBOARD_WINDOW_DAYS,
@@ -44,29 +41,6 @@ async def _user_has_russian_enabled(user_id: int) -> bool:
 async def handle_show_balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     balance = await get_user_balance(update.effective_user.id)
 
-    reply_markup = InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton(
-                    "buy 100 🍔",
-                    callback_data=PURCHASE_TOKEN_CALLBACK_DATA_PATTERN.format(tokens_to_buy=100),
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    "buy 1000 🍔",
-                    callback_data=PURCHASE_TOKEN_CALLBACK_DATA_PATTERN.format(tokens_to_buy=1000),
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    "buy 10000 🍔",
-                    callback_data=PURCHASE_TOKEN_CALLBACK_DATA_PATTERN.format(tokens_to_buy=10000),
-                ),
-            ],
-        ]
-    )
-
     return await update.message.reply_text(
         f"""
 <b>Your balance</b>: {balance} 🍔
@@ -75,7 +49,6 @@ Your rank: /leaderboard
 Get more 🍔: /kitchen
         """,
         parse_mode=ParseMode.HTML,
-        reply_markup=reply_markup,
     )
 
 

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from src.database import (
     engine,
+    fetch_all,
     fetch_one,
     meme_raw_telegram,
     meme_source,
@@ -29,7 +30,6 @@ from src.storage.source_voting import (
     advance_daily_source_cycle,
     close_source_candidate_poll,
     create_source_candidate_poll,
-    get_source_candidate_vote_counts,
     mark_source_candidate_poll_open,
     post_new_source_candidate_poll,
     post_source_candidate_poll_message,
@@ -257,11 +257,13 @@ async def test_source_candidate_vote_does_not_early_reject_on_sixth_skip_racing_
     assert sixth_skip["status"] == "recorded"
     assert first_add["status"] == "recorded"
     assert close_attempt["status"] == "not_due"
-    assert await get_source_candidate_vote_counts(poll["id"]) == {
-        "yes": 1,
-        "no": 6,
-        "total": 7,
-    }
+    votes = await fetch_all(
+        select(meme_source_candidate_vote.c.vote).where(
+            meme_source_candidate_vote.c.poll_id == poll["id"]
+        )
+    )
+    expected = [VOTE_ADD_SOURCE] + [VOTE_SKIP_SOURCE] * 6
+    assert sorted(row["vote"] for row in votes) == sorted(expected)
 
     stored_poll = await fetch_one(
         select(meme_source_candidate_poll).where(meme_source_candidate_poll.c.id == poll["id"])

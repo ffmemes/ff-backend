@@ -106,25 +106,6 @@ async def create_treasury_trx(
     )
 
 
-async def transfer_tokens(from_user_id: int, to_user_id: int, amount: int):
-    # TODO: atomic
-    # Create negative transaction for sender
-    await create_treasury_trx(
-        user_id=from_user_id,
-        type=TrxType.SEND,
-        amount=-amount,
-        external_id=str(to_user_id),
-    )
-
-    # Create positive transaction for recipient
-    await create_treasury_trx(
-        user_id=to_user_id,
-        type=TrxType.RECEIVE,
-        amount=amount,
-        external_id=str(from_user_id),
-    )
-
-
 async def check_if_treasury_trx_exists(
     user_id: int,
     type: TrxType,

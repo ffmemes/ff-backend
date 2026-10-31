@@ -339,8 +339,6 @@ async def get_low_sent_pool_skip_rate_alerts(
                     THEN MS.url || '/' || MRT.post_id
                 WHEN MS.type = 'vk' AND MRV.url IS NOT NULL
                     THEN MRV.url
-                WHEN MS.type = 'instagram' AND MRI.url IS NOT NULL
-                    THEN MRI.url
                 ELSE MS.url
             END AS source_url,
             LSR.sends,
@@ -365,8 +363,6 @@ async def get_low_sent_pool_skip_rate_alerts(
             ON MS.type = 'telegram' AND MRT.id = M.raw_meme_id
         LEFT JOIN meme_raw_vk MRV
             ON MS.type = 'vk' AND MRV.id = M.raw_meme_id
-        LEFT JOIN meme_raw_ig MRI
-            ON MS.type = 'instagram' AND MRI.id = M.raw_meme_id
         WHERE LSR.sends >= :min_sends
             AND LSR.explicit_reactions > 0
             AND (LSR.skips::float / NULLIF(LSR.explicit_reactions, 0)) > :skip_rate_threshold

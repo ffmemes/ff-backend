@@ -12,7 +12,7 @@ decided: 2026-10-31
 result: 0 participations ever
 learning: Nobody played, so the friend-invite idea is untested, not disproven
 code: FRIEND_CHALLENGE_ENABLED (default false), removed in a follow-up PR
-readout: docs/analyst/friend-challenge-h12.sql
+readout: deleted in PR #390 (see git history)
 ---
 
 # Experiment: Friend challenge "Пять мемов для друга" (H12)

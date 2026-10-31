@@ -18,26 +18,20 @@ class _Log:
 
 
 @pytest.mark.asyncio
-async def test_flow_emits_observable_no_work_when_no_ocr_key_is_configured(monkeypatch):
-    events = []
+async def test_flow_completes_without_work_when_no_ocr_key_is_configured(monkeypatch):
     log = _Log()
     monkeypatch.setattr(describe_memes, "get_run_logger", lambda: log)
     monkeypatch.setattr(describe_memes, "get_configured_openrouter_keys", lambda: ())
-    monkeypatch.setattr(describe_memes, "safe_emit", lambda *args: events.append(args))
 
     state = await describe_memes.describe_memes_flow.fn()
 
-    assert events == [
-        ("ff.describe_memes.no_work", "ff.describe_memes", {"reason": "no_configured_key"})
-    ]
     assert "No work performed" in log.messages[0]
     assert state.name == "OCR unavailable"
     assert state.message == "no OpenRouter OCR key is configured"
 
 
 @pytest.mark.asyncio
-async def test_flow_emits_observable_no_work_when_all_keys_are_unusable(monkeypatch):
-    events = []
+async def test_flow_completes_without_work_when_all_keys_are_unusable(monkeypatch):
     log = _Log()
     monkeypatch.setattr(describe_memes, "get_run_logger", lambda: log)
     monkeypatch.setattr(describe_memes, "get_configured_openrouter_keys", lambda: (object(),))
@@ -46,13 +40,9 @@ async def test_flow_emits_observable_no_work_when_all_keys_are_unusable(monkeypa
         return ()
 
     monkeypatch.setattr(describe_memes, "get_usable_openrouter_keys", no_usable_keys)
-    monkeypatch.setattr(describe_memes, "safe_emit", lambda *args: events.append(args))
 
     state = await describe_memes.describe_memes_flow.fn()
 
-    assert events == [
-        ("ff.describe_memes.no_work", "ff.describe_memes", {"reason": "no_usable_key"})
-    ]
     assert "No work performed" in log.messages[0]
     assert state.name == "OCR unavailable"
     assert state.message == "no usable OpenRouter OCR key"
@@ -101,7 +91,6 @@ async def test_flow_stops_when_run_attempt_cap_is_used(monkeypatch):
     monkeypatch.setattr(describe_memes, "run_attempt_cap", lambda *_a: 5)
     monkeypatch.setattr(describe_memes, "describe_single_meme", fake_describe)
     monkeypatch.setattr(describe_memes.asyncio, "sleep", no_sleep)
-    monkeypatch.setattr(describe_memes, "safe_emit", lambda *args: None)
 
     await describe_memes.describe_memes_flow.fn(batch_size=18)
 
