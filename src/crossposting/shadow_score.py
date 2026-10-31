@@ -1,7 +1,7 @@
 """Crosspost v5 shadow scorer — log only, never changes the production pick.
 
 From the 2026-10-30 walk-forward study (target zf = log1p(forwards) minus
-channel×week mean; see experiments/active/2026-10-30-crosspost-v5-shadow.md):
+channel×week mean; see experiments/2026-10-30-crosspost-v5-shadow.md):
 
   RU: score_v5 = ln(nlikes+1) * theta_src * exp(0.5 * user_taste_z)
   EN: score_v5 = theta_src * exp(user_taste_z)        (like volume hurts on EN)
@@ -35,7 +35,7 @@ def content_mult_v1(content_format: str | None, relatable: bool | None) -> float
     """RU blind-label study 2026-10-30: relatable and tweet screenshots ≈ −0.1 zf each.
 
     Tags come from Describe Memes (meme.ocr_result); missing tags → 1.0.
-    See experiments/active/2026-10-31-crosspost-content-tags.md.
+    See experiments/2026-10-31-crosspost-content-tags.md.
     """
     return 0.85 ** (int(relatable is True) + int(content_format == "tweet_screenshot"))
 
@@ -46,7 +46,7 @@ def src_fwd_mult(src_fwd_pct: float | None) -> float:
     src_fwd_pct: within-source percentile of the source post's forwards/views
     (Telethon read at ~20–48h). Study 2026-10-31: Spearman with our crosspost
     forwards +0.52 RU / +0.28 EN. See
-    experiments/active/2026-11-01-crosspost-src-forward-rate.md.
+    experiments/2026-11-01-crosspost-src-forward-rate.md.
     """
     return 1.0 if src_fwd_pct is None else 0.5 + float(src_fwd_pct)
 

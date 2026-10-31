@@ -1,4 +1,4 @@
--- Crosspost content-tags shadow readout (experiments/active/2026-10-31-crosspost-content-tags.md).
+-- Crosspost content-tags shadow readout (experiments/2026-10-31-crosspost-content-tags.md).
 -- One SELECT, one row per channel. Production pick is unchanged; v5c is log-only.
 --
 -- score_v5c = score_v5 * content_mult_v1, content_mult_v1 = 0.85 ^ (relatable + tweet_screenshot)

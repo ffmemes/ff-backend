@@ -1,3 +1,20 @@
+---
+id: goat_engine_investigation
+status: shipped
+hypothesis: goat LR decline (44% to 16% in 6 days) is per-user pool exhaustion, not content quality
+primary_metric: goat engine LR and session continuation
+guardrails: 
+unit: user
+variants: none (observational)
+started: 2026-03-20
+check_on: 
+decided: 2026-03-20
+result: goat continuation 98.0% (best engine) while LR fell 44.6% to 16%, halving about every 3 days
+learning: A fixed top-N engine exhausts its pool per user; continuation can stay high while LR decays, so add a per-user recency filter
+code: src/recommendations/candidates.py goat
+readout: 
+---
+
 # Experiment: Goat Engine Investigation
 
 **Status:** completed

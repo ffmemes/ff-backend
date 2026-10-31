@@ -1,3 +1,20 @@
+---
+id: upload_promo_day1
+status: killed
+hypothesis: A day-1 message explaining meme upload raises upload adoption and D7 retention
+primary_metric: upload rate by day 7
+guardrails: D7 retention not lower, session length, spam uploads
+unit: user
+variants: control:50,treatment:50
+started: 2026-03-29
+check_on: 2026-04-12
+decided: 2026-04-08
+result: uploads 3.2% treatment vs 8.8% control; D1 retention 28.1% vs 28.6%; D7 never measured
+learning: A passive 'did you know' message does not create an upload habit and may reduce uploads; needs a CTA after a positive moment
+code: upload_promo_day1 assignment
+readout: 
+---
+
 # Experiment: Upload Promotion Day 1
 
 **Status:** archived

@@ -1,3 +1,20 @@
+---
+id: cold_start_3phase
+status: killed
+hypothesis: Diversity-first cold start (best meme per top source, then adapt to reactions) beats single-engine lr_smoothed for new users
+primary_metric: new-user D1 retention, 10-meme reach, first-meme LR
+guardrails: median session >=17, WAU >=500, no new Sentry errors
+unit: user
+variants: none (pre/post)
+started: 2026-03-20
+check_on: 2026-04-02
+decided: 2026-03-26
+result: first-meme LR 0% (28 new users), 10-meme reach 24.2%, cold_start_explore LR 18.8%; session 19 and WAU flat
+learning: New users with no taste signal need the globally best memes first, not the most varied ones
+code: src/recommendations/candidates.py cold_start_explore/cold_start_adapt, meme_queue.py
+readout: 
+---
+
 # Experiment: Cold Start 3-Phase Adaptive System
 
 **Status:** active — EXTENDED

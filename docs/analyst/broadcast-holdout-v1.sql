@@ -1,6 +1,6 @@
 -- Readout: broadcast_cadence_holdout_v1_<step> (15m/24h/1w/2w/4w) and
 -- monthly_reminder_v1, treated vs holdout. Read-only, one SELECT.
--- Experiment note: experiments/active/2026-10-30-broadcast-cadence-holdout.md
+-- Experiment note: experiments/2026-10-30-broadcast-cadence-holdout.md
 --
 -- Assignment = first time the user was selected by that step (intent-to-treat;
 -- holdout users were selected but not pushed). Steps are randomized

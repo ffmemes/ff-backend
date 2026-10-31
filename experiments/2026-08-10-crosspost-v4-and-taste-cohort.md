@@ -1,16 +1,33 @@
+---
+id: crosspost_meme_level_v1
+status: shipped
+hypothesis: RU channel pick by bot like volume ln(nlikes+1) x source prior gets more forwards than v2; bot like rate does not
+primary_metric: hit rate (f1k >=31 or forwards_24h >=12)
+guardrails: views not < v2 - 15%, no empty slots
+unit: channel_post
+variants: none (v2 then v4 at 100%)
+started: 2026-08-10
+check_on: 2026-08-17
+decided: 2026-10-30
+result: hit rate 32.1% to 41.0% (+8.9 pp, z~2.4, n 299/373), f1k 26.2 to 28.9; manual posts also +3.4 f1k (channel drift)
+learning: Bot like volume, not like rate, predicts channel forwards; part of the lift is channel drift
+code: CROSSPOST_RU_MEME_LIKE_VOLUME_ENABLED, src/crossposting/service.py (score_version=4)
+readout: docs/analyst/crossposting-v4-like-volume.sql
+---
+
 # Experiments: Crosspost RU v4 like-volume + taste-cohort shadow (H6 / H7)
 
 Created: 2026-08-10  
 Owner: engineer / analyst  
 Status: **completed (2026-10-30)**: H6 kept at 100%, H7 killed as a signal  
 Channel: `tgchannelru` (@fastfoodmemes)  
-**Predictions frozen:** 2026-08-10 (this file + `experiments/HYPOTHESES.md` H6/H7)
+**Predictions frozen:** 2026-08-10 (this file; H6 registry entry at the end, H7 in 2026-08-10-crosspost-taste-cohort-shadow.md)
 
 > **Amendment 2026-10-30:** H7 taste cohort and the H8 `v4_x_src_v1` shadow are killed
 > (corr ≈ 0 / −0.09 with zf). Their code was removed. They are replaced by the v5 shadow:
-> [`2026-10-30-crosspost-v5-shadow.md`](../active/2026-10-30-crosspost-v5-shadow.md).
+> [`2026-10-30-crosspost-v5-shadow.md`](2026-10-30-crosspost-v5-shadow.md).
 
-Authoritative calendar also in `experiments/HYPOTHESES.md` (H6, H7).  
+Check dates are in the front matter of this file and the H7 file.  
 Do **not** edit pass/fail thresholds after freeze without a dated amendment;
 fill **Metrics after** only.
 
@@ -104,7 +121,7 @@ python scripts/crosspost_taste_cohort.py --days 120 --top 50 --min-n 8
 
 ## How future-me / agents check who was right
 
-1. Open this file + `experiments/HYPOTHESES.md` H6/H7.
+1. Open this file and 2026-08-10-crosspost-taste-cohort-shadow.md.
 2. Run:
    - `docs/analyst/crossposting-v4-like-volume.sql`
    - taste shadow SQL in `docs/analyst/crossposting-taste-shadow.sql` (removed 2026-10-31 after the H7 kill; in git history)
@@ -148,4 +165,62 @@ Full interim writeup: `docs/analyst/crossposting-v4-interim-readout.md`
   pre-registered Δ>0 test fails. The decision_log fields stay until the crossposting PR
   that replaces shadow scoring removes them.
 
-Readout: [`docs/analyst/readouts/2026-10-30-experiment-closure.md`](../../docs/analyst/readouts/2026-10-30-experiment-closure.md).
+Readout: [`docs/analyst/readouts/2026-10-30-experiment-closure.md`](../docs/analyst/readouts/2026-10-30-experiment-closure.md).
+
+
+## Registry entry (moved from docs/growth/HYPOTHESES.md, 2026-10-31)
+
+## H6 — Crosspost RU: meme-level bot volume (not LR) × source prior
+
+| Field | Value |
+|-------|--------|
+| **ID** | `crosspost_meme_level_v1` / **score_version=4** |
+| **Status** | **KEEP at 100% 2026-10-30**: hit rate 32.1 → 41.0% (+8.9 pp, z≈2.4), f1k 26.2 → 28.9 |
+| **Kill switch** | `CROSSPOST_RU_MEME_LIKE_VOLUME_ENABLED=false` → v2 |
+| **Readout offline** | `docs/analyst/readouts/2026-08-09-crosspost-meme-level-offline.md` |
+| **Readout online** | `docs/analyst/crossposting-v4-like-volume.sql` |
+| **n offline** | 611 RU image posts / 120d |
+
+### Hypothesis
+
+Among channel candidates, **like volume** (`ln(nlikes+1)` via `meme_stats`) improves
+24h channel forwards beyond source prior. Bot **like rate** does not.
+
+### Offline result (2026-08-09)
+
+- pre_lr vs channel: ~0 (reject LR feature)
+- pre_likes residual Spearman ~**0.16–0.20**
+- top-20% **src × log1p(pre_likes)** lift **1.14×** forwards (time-split test too)
+- HIT: f1k ≥ **~31** OR forwards ≥ **12**
+
+### Production formula (score_version=4)
+
+```text
+v2_score * LN(COALESCE(nlikes,0) + 1)
+```
+
+Logged in decision candidates: `like_volume_factor`, `like_volume_enabled`.
+
+### Online success (7–14d after deploy)
+
+Compare v4 mature posts vs last 30d v2 baseline:
+
+- hit_rate_pct not down; preferably **+3pp**
+- avg forwards_24h ≥ v2 baseline
+- avg views_24h not &lt; v2 − 15%
+- Kill if hit_rate collapses or empty slots spike
+
+### Online early (2026-08-10 ~17 UTC)
+
+- 4 v4 posts live; **0 mature** yet — WATCH
+- age-matched ~6h: v4 f1k **30.0** vs v2 **32.6** (n=4, not RED)
+- Frequency: **keep 5/day** (do not post more/less until mature readout)
+
+### Next check
+
+- **2026-08-12**: mature n≥8 if possible  
+- **2026-08-17** (~7d): `crossposting-v4-like-volume.sql` keep/kill  
+- Full plan: `2026-08-10-crosspost-v4-and-taste-cohort.md`
+
+Rejected offline: ranking crossposts by bot like rate (no correlation with forwards).
+H7 (taste cohort) has its own record: [2026-08-10-crosspost-taste-cohort-shadow.md](2026-08-10-crosspost-taste-cohort-shadow.md).

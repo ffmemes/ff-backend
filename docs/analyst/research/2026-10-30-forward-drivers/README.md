@@ -7,7 +7,7 @@ Result: two traits predict **fewer** forwards: a relatable everyday joke and a t
 Threads screenshot. Each one costs about −0.1 zf. Political or news memes get **more**
 forwards (+0.19 zf), but only 57 posts have that label, so we log it and do not use it.
 
-Experiment: [`experiments/active/2026-10-31-crosspost-content-tags.md`](../../../../experiments/active/2026-10-31-crosspost-content-tags.md).
+Experiment: [`experiments/2026-10-31-crosspost-content-tags.md`](../../../../experiments/2026-10-31-crosspost-content-tags.md).
 
 ## Data and method
 

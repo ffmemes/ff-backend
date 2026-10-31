@@ -1,3 +1,20 @@
+---
+id: explore_budget_v1
+status: running
+hypothesis: Spend exploration only on labeling fresh memes, show fresh winners to everyone, and fill the idle-return slot from like_spread
+primary_metric: likes per active user per week, memes per session
+guardrails: fresh_ru_labeled_share >=0.90, empty-queue errors, pos2_abandon <= control
+unit: user
+variants: control:50,treatment:50
+started: 2026-10-30
+check_on: 2026-11-20
+decided: 
+result: unknown
+learning: 
+code: EXPLORE_BUDGET_V1_ENABLED, src/recommendations/pipeline.py, candidates.py, blender_experiments.py, src/feed_turn/planner.py
+readout: docs/analyst/explore-budget-v1.sql
+---
+
 # Experiment: Explore budget v1 (labeling budget + fresh-viral + idle-return slot)
 
 Created: 2026-10-30

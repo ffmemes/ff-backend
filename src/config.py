@@ -67,7 +67,7 @@ class Config(BaseSettings):
     # blind Redis queue pop. Kill switch rolls back to queue path.
     BROADCAST_HIGH_QUALITY_PICK_ENABLED: bool = True
     # broadcast_cadence_holdout_v1: no-push holdout per cadence step (15m/24h
-    # 15%, 1w/2w/4w 20%). See experiments/active/2026-10-30-*.
+    # 15%, 1w/2w/4w 20%). See experiments/2026-10-30-broadcast-cadence-holdout.md.
     BROADCAST_CADENCE_HOLDOUT_ENABLED: bool = True
     # Monthly reminder (users whose last reaction was 29-365 days ago).
     # Owner flips on after deploy. Set HOLDOUT_PCT=0 after the v1 readout.

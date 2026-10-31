@@ -51,7 +51,7 @@ Cadence steps require a real reaction near the step window (not just
 month 13:00 MSK) uses `send_meme_broadcast()` with
 `broadcast_id = monthly-reminder-YYYY-MM`, so a retry or manual re-run in the
 same month is deduped. Both carry holdouts logged in `experiment_assignment`;
-see `experiments/active/2026-10-30-broadcast-cadence-holdout.md`.
+see `experiments/2026-10-30-broadcast-cadence-holdout.md`.
 
 ### 3. Monitor
 

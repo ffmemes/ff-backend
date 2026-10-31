@@ -56,7 +56,7 @@ Living entries (short list):
 | [specs/moderator-community-loop.md](specs/moderator-community-loop.md) | Source voting |
 | [docs/growth/virality-loop.md](docs/growth/virality-loop.md) | Growth thesis |
 
-Finished experiment write-ups: [experiments/completed/](experiments/completed/).
+Experiments (running and decided, one file each): [experiments/README.md](experiments/README.md).
 
 ## Invariants
 

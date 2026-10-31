@@ -1,6 +1,6 @@
 """Gates for the crosspost content-tags hypothesis (read-only).
 
-Experiment: experiments/active/2026-10-31-crosspost-content-tags.md
+Experiment: experiments/2026-10-31-crosspost-content-tags.md
 Research:   docs/analyst/research/2026-10-30-forward-drivers/
 
 Usage (analyst machine, needs pandas + statsmodels + scikit-learn):

@@ -1,3 +1,20 @@
+---
+id: broadcast_cadence_holdout_v1
+status: running
+hypothesis: The 15m push mostly re-times sessions heavy users would start anyway; later steps (24h, 1w, 2w, 4w) bring back lapsing users
+primary_metric: reactions/user/week (15m, 24h); active d7-14 (1w, 2w, 4w)
+guardrails: blocks <1%, weekly-reactor % not lower in holdout, >=150 users/arm
+unit: user
+variants: push:85,holdout:15 (15m, 24h); push:80,holdout:20 (1w, 2w, 4w)
+started: 2026-10-30
+check_on: 2026-11-20
+decided: 
+result: unknown
+learning: 
+code: BROADCAST_CADENCE_HOLDOUT_ENABLED, broadcast_cadence_holdout_v1_<step>
+readout: docs/analyst/broadcast-holdout-v1.sql
+---
+
 # Experiment: Broadcast cadence holdout + monthly reminder
 
 Created: 2026-10-30  
@@ -6,8 +23,8 @@ Owner: engineer / analyst
 Deployed: pending (holdout starts on deploy; monthly reminder waits for `MONTHLY_REMINDER_ENABLED=true`)  
 **Check 1: 2026-11-20** (15m / 24h)  
 **Check 2: 2026-12-11** (1w / 2w / 4w, monthly reminder)  
-SQL: [`docs/analyst/broadcast-holdout-v1.sql`](../../docs/analyst/broadcast-holdout-v1.sql)  
-Registry: [`docs/growth/HYPOTHESES.md`](../../docs/growth/HYPOTHESES.md) H3c (cadence doctrine)
+SQL: [`docs/analyst/broadcast-holdout-v1.sql`](../docs/analyst/broadcast-holdout-v1.sql)  
+Background: [broadcast_channel_viral_pick](2026-09-07-broadcast-channel-viral-pick.md) (H3c, cadence doctrine). Monthly reminder has its own record: [monthly_reminder_v1](2026-10-30-monthly-reminder.md)
 
 ## Why
 

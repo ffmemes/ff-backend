@@ -1,4 +1,4 @@
--- Crosspost v5 shadow readout (experiments/active/2026-10-30-crosspost-v5-shadow.md).
+-- Crosspost v5 shadow readout (experiments/2026-10-30-crosspost-v5-shadow.md).
 -- One SELECT, one row per channel. Production pick is unchanged; v5 is log-only.
 --
 -- zf = ln(1+forwards) - channel x MSK-week mean over posted image memes >= 48h old

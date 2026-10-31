@@ -1,10 +1,27 @@
+---
+id: crosspost_src_fwd_v5f
+status: running
+hypothesis: Memes whose source post was forwarded more than usual for that source get more forwards in our channels
+primary_metric: RU Spearman gain rho_v5f - rho_v5 with 95% CI excluding 0
+guardrails: coverage_pct >=50%
+unit: channel_post
+variants: shadow (logged only, score_v5f)
+started: 2026-10-31
+check_on: 2026-11-28
+decided: 
+result: unknown
+learning: 
+code: meme_raw_telegram.forwards, Collect Channel Stats flow, src/crossposting/shadow_score.py
+readout: docs/analyst/crossposting-src-fwd-shadow.sql
+---
+
 # Experiment: Crosspost source forward rate (v5f shadow)
 
 - **Created:** 2026-11-01
 - **Status:** active, shadow only. Source-post forwards are collected and a shadow score is logged; the production pick is unchanged.
 - **Channels:** `tgchannelru` decides. `tgchannelen` is logged for reference.
 - **Check date:** **2026-11-28**
-- **Shadow readout:** [`docs/analyst/crossposting-src-fwd-shadow.sql`](../../docs/analyst/crossposting-src-fwd-shadow.sql)
+- **Shadow readout:** [`docs/analyst/crossposting-src-fwd-shadow.sql`](../docs/analyst/crossposting-src-fwd-shadow.sql)
 
 ## Evidence (2026-10-31, offline)
 

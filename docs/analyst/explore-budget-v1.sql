@@ -1,5 +1,5 @@
 -- explore_budget_v1 readout (one SELECT; read-only)
--- Experiment doc: experiments/active/2026-10-30-explore-budget.md
+-- Experiment doc: experiments/2026-10-30-explore-budget.md
 -- Rows: variant x segment (mod = moderator/admin, user = everyone else).
 -- Per-user means, feed sends only (recommended_by NOT LIKE 'broadcast%'),
 -- counted from each user's assigned_at.

@@ -1,3 +1,20 @@
+---
+id: cold_start_v2
+status: shipped
+hypothesis: Quality-first cold start phase 1 (>=20 reactions, raw LR >=0.40) beats diversity-first for first impressions
+primary_metric: first-meme LR, 10-meme reach (new users)
+guardrails: median session >=18, WAU >=500
+unit: user
+variants: none (pre/post)
+started: 2026-03-26
+check_on: 2026-04-09
+decided: 2026-04-09
+result: first-meme LR 0% to 33.3%, organic 10-meme reach 24.2% to 52.4% (n=84; 44.5% incl. Apr 1 spike), WAU 897
+learning: Cold start should rank proven memes by raw like rate; lr_smoothed's user-bias correction empties the pool for new users
+code: src/recommendations/candidates.py cold_start_explore
+readout: 
+---
+
 # Experiment: Cold Start v2 — Quality-First Phase 1
 
 **Status:** success

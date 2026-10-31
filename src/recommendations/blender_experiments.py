@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 # --- explore_budget_v1: labeling budget + fresh-viral + idle-return first slot ---
-# See experiments/active/2026-10-30-explore-budget.md.
+# See experiments/2026-10-30-explore-budget.md.
 
 EXPLORE_BUDGET_V1_EXPERIMENT_ID = "explore_budget_v1"
 EXPLORE_BUDGET_V1_CONTROL = "control"
