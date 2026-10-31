@@ -116,6 +116,44 @@ async def test_find_duplicate_by_ocr_text_skips_non_string_text(image_text):
     assert await find_duplicate_by_ocr_text(10001, image_text) is None
 
 
+@pytest.mark.asyncio
+async def test_find_duplicate_by_ocr_text_ignores_watermark_and_loose_matches(dedup_setup):
+    contract = "когда устроился на работу и подписал трудовой договор"
+    async with engine.begin() as conn:
+        await create_meme(
+            conn,
+            id=10002,
+            meme_source_id=10001,
+            status=MemeStatus.PUBLISHED.value,
+            ocr_result={"text": "ИНТЕРСЕТЕЛЯР @ffmemesbot"},
+        )
+        await create_meme(
+            conn,
+            id=10003,
+            meme_source_id=10001,
+            ocr_result={"text": f"{contract} @ffmemesbot"},
+        )
+        await create_meme(
+            conn,
+            id=10004,
+            meme_source_id=10001,
+            ocr_result={"text": "кот смотрит в окно и думает о вечном"},
+        )
+
+    # Shares only the watermark with a published meme: not a duplicate.
+    assert await find_duplicate_by_ocr_text(10001, "ПРИВЕТ ПОДПИСЧИКИ @ffmemesbot") is None
+    # Same template, different punchline: below the similarity threshold.
+    assert (
+        await find_duplicate_by_ocr_text(
+            10001, "когда устроился на работу и узнал про темку мыться @ffmemesbot"
+        )
+        is None
+    )
+    # Same text with a misread watermark is still the same meme.
+    assert await find_duplicate_by_ocr_text(10001, f"{contract} @ffemesbot") == 10003
+    assert await find_duplicate_by_ocr_text(10001, "кот смотрит в окно и думает о вечном!") == 10004
+
+
 def test_ocr_text_from_meme_skips_non_string_values():
     assert ocr_text_from_meme({"ocr_result": {"text": None, "raw_result": {"ocr_text": 123}}}) == ""
 
