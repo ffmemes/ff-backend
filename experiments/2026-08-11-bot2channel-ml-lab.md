@@ -1,3 +1,20 @@
+---
+id: bot2channel_ml_lab_v1
+status: killed
+hypothesis: Simple models on pre-post bot features + source prior beat ln(pre_likes+1) for RU channel picks (then shadow v4_x_src_v1)
+primary_metric: walk-forward top-20% f1k lift; live corr(shadow_score, f1k)
+guardrails: no production pick change
+unit: channel_post
+variants: shadow (logged only)
+started: 2026-08-11
+check_on: 2026-08-25
+decided: 2026-10-30
+result: lifetime walk-forward HOLD (n=3889); live shadow corr -0.092 (n=363 posted), agreed vs disagreed f1k 29.01 vs 29.10
+learning: A one-split offline win (lift 1.19) did not survive lifetime walk-forward or live shadow; require both before trusting a ranker
+code: removed: experiments/ml-crosspost-bot2channel/ (commit 177cad0e), v4_x_src_v1 shadow fields
+readout: docs/analyst/readouts/2026-10-30-experiment-closure.md
+---
+
 # Experiment: Bot→channel ML lab (offline)
 
 Created: 2026-08-11  
@@ -112,3 +129,67 @@ are range-restricted and near zero. Agreed vs disagreed picks: f1k 29.01 vs 29.1
 The "clearly better than v4" bar was not met. Offline lab code stays under
 `experiments/ml-crosspost-bot2channel/` for reference. The decision_log shadow fields
 stay until the crossposting PR that replaces shadow scoring removes them.
+
+
+## Registry entry (moved from docs/growth/HYPOTHESES.md, 2026-10-31)
+
+## H8 — Bot→channel ML lab (OFFLINE)
+
+| Field | Value |
+|-------|--------|
+| **ID** | `bot2channel_ml_lab_v1` |
+| **Status** | **KILLED as signal 2026-10-30**: offline HOLD vs v4, and the live shadow corr is −0.09 (see below) |
+| **Code** | `experiments/ml-crosspost-bot2channel/` — removed 2026-10-30; recover from commit `177cad0e` |
+| **Note** | `2026-08-11-bot2channel-ml-lab.md` |
+| **Report** | `experiments/ml-crosspost-bot2channel/reports/2026-08-11-models.md` |
+
+### Hypothesis
+
+Simple linear/logistic models on pre-post bot features + source prior beat
+`ln(pre_likes+1)` on time-holdout top-20% f1k lift without tree overfit.
+
+### First result (2026-08-11)
+
+- n=624 labeled; single 70/30: logreg lift 1.187 vs v4 1.114 (looked good once)
+- HGB depth3 **overfits** — discard for ship
+
+### Walk-forward (authoritative, 2026-08-11)
+
+- 3 expanding folds (~93 test each); bar: lift ≥ v4+0.05 on ≥2/3 + spearman gap &lt;0.25
+- **logreg PASS** (2/3, mean lift 1.190 vs v4 1.080)
+- **ridge PASS** (2/3, mean lift 1.171)
+- HGB FAIL (overfit gap ~0.5)
+- Report: `experiments/ml-crosspost-bot2channel/reports/2026-08-11-walkforward.md`
+- RU summary: `.../reports/2026-08-11-otchet-ru.md`
+- **No production pick change** — next is shadow score only
+
+
+### Deep lifetime re-run (2026-08-11 evening)
+
+- Telethon full crawl: 11928 msgs, 4897 sc_ joinable → dataset **n=3889** (2023-11..2026-08)
+- Label = lifetime f1k (TG now); HIT = f1k≥train p75
+- Walk-forward: **HOLD** — logreg/ridge/HGB do **not** beat v4 on ≥2/3 folds
+- Source prior often ≥ volume on long history; bot volume ~flat on lifetime
+- HTML: `experiments/ml-crosspost-bot2channel/reports/2026-08-11-results.html`
+- Hypothesis battery: hybrids volume×source lead mean lift; **no bar PASS**
+  (`reports/2026-08-11-hypothesis-battery.html`)
+
+### Shadow hybrid in decision_log (shipping)
+
+| Field | Value |
+|-------|--------|
+| **Status** | **KILLED 2026-10-30**: corr(shadow, f1k) −0.092 on 363 posted picks, agreed vs disagreed f1k 29.01 vs 29.10. Fields stay until the crossposting PR replaces shadow scoring |
+| **Formula** | `shadow_score = ln(nlikes+1) * src_quality_mult` |
+| **Version** | `v4_x_src_v1` (+ `shadow_score_maturity` band) |
+| **Code** | `src/crossposting/shadow_score.py`, `_build_decision_log` |
+| **SQL** | removed 2026-10-31 (killed; in git history) |
+
+Also logs `shadow_rank`, `shadow_pick_meme_id`, `shadow_vs_prod_disagree`.
+
+### Next check
+
+- After deploy: decision_log has `shadow_score` on candidates
+- **2026-08-25**: shadow-hybrid SQL (now removed) — disagree rate + corr(shadow, f1k_24h)
+- Canary soft boost only if live corr/lift clearly > v4 alone
+- After H7 merge: re-export + optional taste feature
+- Do not schedule as feed experiment

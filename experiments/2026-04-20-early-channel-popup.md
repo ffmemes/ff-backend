@@ -1,3 +1,20 @@
+---
+id: early_channel_popup
+status: shipped
+hypothesis: Moving the channel popup from meme #50 to #5 raises channel subscriptions and D7 retention
+primary_metric: popup subscribe rate (shown to subscribed)
+guardrails: median session >=10 (all) and >=5 (new users), LR >=35%
+unit: user
+variants: none (pre/post, never read)
+started: 
+check_on: 
+decided: 2026-10-31
+result: unknown (shipped as default without a readout)
+learning: none: unmeasured, do not cite as evidence
+code: STATIC_POPUP_RULES in src/tgbot/senders/popups.py
+readout: 
+---
+
 > **Closed 2026-10-31:** the meme #5 trigger shipped as the default (`STATIC_POPUP_RULES` in `src/tgbot/senders/popups.py`); no A/B and no readout was ever run. Not a live experiment.
 
 # Experiment: Early Channel Popup (Meme #5)

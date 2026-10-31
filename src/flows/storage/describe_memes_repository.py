@@ -25,7 +25,7 @@ KNOWN_LANGUAGES = {
 }
 
 # Content tags for the crosspost shadow multiplier
-# (experiments/active/2026-10-31-crosspost-content-tags.md).
+# (experiments/2026-10-31-crosspost-content-tags.md).
 MEME_FORMATS = {
     "single_caption",
     "multi_panel",

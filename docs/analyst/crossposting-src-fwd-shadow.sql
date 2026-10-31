@@ -1,5 +1,5 @@
 -- Crosspost source-forward-rate shadow readout
--- (experiments/active/2026-11-01-crosspost-src-forward-rate.md).
+-- (experiments/2026-11-01-crosspost-src-forward-rate.md).
 -- One SELECT, one row per channel. Production pick is unchanged; v5f is log-only.
 --
 -- score_v5f = score_v5 * (0.5 + src_fwd_pct), 1.0 multiplier when src_fwd_pct is NULL

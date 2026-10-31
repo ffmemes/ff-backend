@@ -8,7 +8,7 @@
 -- Compare to in-session feed engines (recommended_by NOT LIKE 'broadcast%').
 -- Primary: reactivation (react within 1h), LR, sec_to_react p50.
 --
--- See experiments/HYPOTHESES.md H3 / H5.
+-- See experiments/2026-08-09-broadcast-hq-pick.md (H3b) and experiments/README.md.
 
 \set ON_ERROR_STOP on
 

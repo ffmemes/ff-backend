@@ -1,7 +1,7 @@
 -- Onboarding funnel + first-meme quality
 --
 -- Companion: docs/analyst/readouts/2026-09-07-onboarding-and-dormant-blast.md
--- Hypotheses: docs/growth/HYPOTHESES.md H9 / H10 / H11
+-- Experiments: experiments/2026-09-07-onboarding-first-tap.md (H9), -cold-start-fresh-viral.md (H10), -onboarding-skip-countdown.md (H11)
 --
 -- Growth bar for any onboarding change:
 --   1) less leaky: first-tap %, first-like %, reached-5

@@ -1,10 +1,27 @@
+---
+id: crosspost_v5_shadow
+status: running
+hypothesis: v5 score (source Beta hit rate x user taste, x like volume on RU) tracks channel virality better than v4
+primary_metric: corr(score_v5, zf) - corr(v4, zf) >= 0.05 on posted picks, per channel
+guardrails: n_posted >= 60 per channel
+unit: channel_post
+variants: shadow (logged only, v5_src_beta_taste_v1)
+started: 2026-10-30
+check_on: 2026-11-14
+decided: 
+result: unknown
+learning: 
+code: src/crossposting/shadow_score.py
+readout: docs/analyst/crossposting-v5-shadow.sql
+---
+
 # Experiment: Crosspost v5 shadow score (RU + EN)
 
 Created: 2026-10-30
 Status: **active (shadow only, production pick unchanged)**
 Channels: `tgchannelru`, `tgchannelen`
 Check date: **2026-11-14**
-Readout: [`docs/analyst/crossposting-v5-shadow.sql`](../../docs/analyst/crossposting-v5-shadow.sql)
+Readout: [`docs/analyst/crossposting-v5-shadow.sql`](../docs/analyst/crossposting-v5-shadow.sql)
 
 ## Evidence (DS study 2026-10-30)
 

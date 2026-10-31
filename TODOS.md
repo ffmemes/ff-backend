@@ -1,7 +1,7 @@
 # TODOS
 
 > Living backlog only. Completed items live in git history and dated experiment
-> write-ups under `experiments/completed/`.
+> write-ups in [`experiments/`](experiments/README.md).
 > Last cleaned: 2026-06 (Wave A hygiene).
 
 **Product compass:** [docs/growth/virality-loop.md](docs/growth/virality-loop.md)
@@ -9,13 +9,13 @@
 ## P1 — Growth & feed measurement
 
 ### ~~Virality score for ranking~~ — viral_shares_blender_v1 KILLED 2026-10-30
-**What:** Engine `viral_shares` + mature blend A/B (`viral_shares_blender_v1`). See `experiments/completed/2026-08-09-viral-shares-blender-v1.md`.
+**What:** Engine `viral_shares` + mature blend A/B (`viral_shares_blender_v1`). See `experiments/2026-08-09-viral-shares-blender-v1.md`.
 **Closed:** clickers/1k 0.031 control vs 0.025 treatment. Enrollment stopped, all users on control.
-**Rules + all open hypotheses:** [`docs/growth/HYPOTHESES.md`](docs/growth/HYPOTHESES.md).
+**All experiments and learnings:** [`experiments/README.md`](experiments/README.md).
 
 ### Cold-start first-session quality floors — SHIPPING
 **What:** explore raw-LR ≥0.50 / n≥25; CS3 blend uses best_uploaded + text_light (no like_spread).
-**Check:** H5 in `experiments/HYPOTHESES.md` — smoke 2026-08-12, primary 2026-08-16.
+**Check:** `experiments/2026-08-09-cold-start-floors.md` (H5).
 
 ### Broadcast HQ meme pick — SHIPPING
 **What:** retention pushes pick affinity×LR meme (`broadcast_reengagement_hq`) vs queue fallback.

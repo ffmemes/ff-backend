@@ -26,6 +26,12 @@
 - User reactions are persisted through `create_user_meme_reaction` / `update_user_meme_reaction` (see [`src/recommendations/service.py`](src/recommendations/service.py)). These records drive stats aggregation and recommendation eligibility.
 - Share attribution: deep links `s_{user_id}_{meme_id}` in `user_deep_link_log` — see `CONTEXT.md` **Share Attribution**. Growth thesis and measurement plan: [`docs/growth/virality-loop.md`](docs/growth/virality-loop.md).
 
+## Experiments
+- Experiments live in [`experiments/`](experiments/), one file each with flat front matter (id, status, check_on, result, learning, readout, ...).
+- Before designing an experiment, read [`experiments/README.md`](experiments/README.md): open checks plus every decided result and learning.
+- When starting or closing one, edit its file, then run `python scripts/experiments.py index` and commit the README (CI fails if it is stale).
+- `python scripts/experiments.py due` lists checks that are due; `readout <id>` prints the read-only SQL command for `$ANALYST_DATABASE_URL`.
+
 ## Operational notes
 - Manual upload review happens entirely inside the designated Telegram upload review chat. Keep communications and escalations there for traceability.
 - Weekly maintenance (Prefect flow health checks, data hygiene jobs, etc.) runs through Prefect deployment definitions. Use Prefect CLI to trigger flows during scheduled operations.

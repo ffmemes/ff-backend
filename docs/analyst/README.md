@@ -17,11 +17,9 @@ These queries and reports support product-health monitoring and experiment analy
 - `docs/analyst/dwell-feed-vs-broadcast.sql` — `sec_to_react` percentiles: like vs skip × feed vs broadcast; dwell buckets; demote inventory risk.
 - `docs/analyst/source-affinity-demote-guardrails.sql` — post-deploy volume / LR checks for soft-demote (#340).
 - `docs/analyst/broadcast-reengagement.sql` — retention push HQ vs queue fallback vs feed.
-- Living decision calendar (which experiments are live and which SQL each uses): [`docs/growth/HYPOTHESES.md`](../growth/HYPOTHESES.md). SQL for killed experiments is deleted; recover it from version control history if needed.
+- Experiment ledger (open experiments with check dates, decided ones with result + learning): [`experiments/README.md`](../../experiments/README.md). `python scripts/experiments.py due` lists checks that are due; `readout <id>` prints the SQL command. SQL for killed experiments is deleted; recover it from version control history if needed.
 - `docs/analyst/crossposting.sql` — reusable read-only queries for Telegram channel views/forwards, 24h labels, and pre-posting share signals.
 - `specs/crossposting-share-optimization-2026-05-18.md` — current compact crossposting readout and next experiment gate.
-- `experiments/active/` — Currently running experiments to monitor
-- `experiments/completed/` — Historical experiments for context
 
 ## Database Schema Reference
 Full table definitions: `src/database.py`
@@ -77,7 +75,7 @@ No hardcoded engine list or expected LRs here; they drift. Sources of truth:
 - **Prefect**: Pipeline health (parser → ETL → final_pipeline)
 
 ## North Star Metric
-Defined once in [`SPEC.md`](../../SPEC.md) (session length + organic growth via shares). The experiment ship bar (funnel + k-factor, with session length and block rate as guardrails) is in [`docs/growth/HYPOTHESES.md`](../growth/HYPOTHESES.md). Do not restate either here.
+Defined once in [`SPEC.md`](../../SPEC.md) (session length + organic growth via shares). The experiment ship bar (funnel + k-factor, with session length and block rate as guardrails) is in [`experiments/README.md`](../../experiments/README.md). Do not restate either here.
 
 Operational health signals:
 
@@ -85,4 +83,6 @@ Operational health signals:
 
 **Chat Agent metrics**: agent_calls_24h, active_chats_24h, avg_response_ms, token_cost_usd, chat meme like rate. See "CHAT AGENT" section in metrics.sql.
 
-See `experiments/README.md` for report format and `docs/analyst/metrics.sql` for the actual queries.
+Healthy product snapshot (rough, not ship gates): new_memes_24h > 100, ok_pct ~90–96%, active reactors 24h not collapsing vs prior week, multi-engine mix still present.
+
+Queries: `docs/analyst/metrics.sql`.

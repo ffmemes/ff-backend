@@ -1,3 +1,20 @@
+---
+id: recently_liked_blender_v2
+status: shipped
+hypothesis: With LR-stratified assignment, more recently_liked weight for mature users lifts session depth without an LR loss
+primary_metric: median session depth (14d)
+guardrails: LR >= control - 2 pp, high-volume skipper balance <=1.3x
+unit: user
+variants: control:50,treatment:50 (stratified by 7d user LR)
+started: 2026-05-09
+check_on: 
+decided: 2026-08-09
+result: median session 18 vs 19 (+5.6%), global LR 63.33% vs 63.67%, median user LR 62.65% vs 71.08% (n ~371/409; 1000/arm gate never reached)
+learning: v1's -14 pp LR was an assignment failure (skipper imbalance 2.3x); stratify by user LR; recently_liked deserves more weight
+code: src/recommendations/blender_experiments.py, MATURE_BLEND_WEIGHTS in src/feed_turn/planner.py
+readout: docs/analyst/recently-liked-blender-v2-closeout.md
+---
+
 # Experiment: recently_liked Blender V2
 Created: 2026-05-09
 Status: frozen - passive watch only
@@ -58,7 +75,7 @@ The v1 failure is therefore treated as an experiment-design failure, not proof t
 
 ## Metrics After
 
-See [docs/analyst/recently-liked-blender-v2-closeout.md](../../docs/analyst/recently-liked-blender-v2-closeout.md).
+See [docs/analyst/recently-liked-blender-v2-closeout.md](../docs/analyst/recently-liked-blender-v2-closeout.md).
 
 | Metric | Control | Treatment |
 |--------|---------|-----------|

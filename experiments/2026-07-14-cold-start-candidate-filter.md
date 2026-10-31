@@ -1,3 +1,20 @@
+---
+id: cold_start_candidate_guardrails
+status: shipped
+hypothesis: Excluding 4 weak sources from cold-start positions 2-10 improves depth for true-new users
+primary_metric: reached-10 sends (true-new users)
+guardrails: first-meme continuation >=84%, first-10 LR not -3 pp, no fallback spike, no routing leakage
+unit: user
+variants: control,treatment (guarded cold start)
+started: 2026-07-16
+check_on: 
+decided: 2026-07-29
+result: reached-10 32.4% treatment (n=37) vs 11.1% concurrent control vs 26.8% baseline; reached-5 70.3% vs 44.4%; all guardrails pass
+learning: Dropping a few weak sources from early positions lifts new-user depth (directional, n=37); mostly validates guarded phase 1
+code: COLD_START_CANDIDATE_GUARDRAILS_ENABLED, src/recommendations/candidates.py
+readout: docs/analyst/readouts/2026-07-29-cold-start-candidate-filter-readout.md
+---
+
 # Experiment: Cold Start Candidate Filter
 
 Created: 2026-07-14
@@ -107,9 +124,9 @@ routes, not leakage from `cold_start_explore_guarded` or
 `cold_start_adapt_guarded`.
 
 The early six-user spot check was intentionally non-decisive; see
-[`2026-07-18-cold-start-candidate-filter-spotcheck.md`](../../docs/analyst/readouts/2026-07-18-cold-start-candidate-filter-spotcheck.md).
+[`2026-07-18-cold-start-candidate-filter-spotcheck.md`](../docs/analyst/readouts/2026-07-18-cold-start-candidate-filter-spotcheck.md).
 The final evidence is in
-[`2026-07-29-cold-start-candidate-filter-readout.md`](../../docs/analyst/readouts/2026-07-29-cold-start-candidate-filter-readout.md).
+[`2026-07-29-cold-start-candidate-filter-readout.md`](../docs/analyst/readouts/2026-07-29-cold-start-candidate-filter-readout.md).
 
 ## Conclusion
 

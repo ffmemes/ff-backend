@@ -1,3 +1,20 @@
+---
+id: unstarve_like_spread
+status: shipped
+hypothesis: Dropping age_days<30 from like_spread_and_recent_memes multiplies its volume without hurting quality
+primary_metric: engine sends/7d, median session length
+guardrails: engine LR >=35% (revised from 40%), median session >=16
+unit: user
+variants: none (pre/post)
+started: 2026-03-20
+check_on: 2026-03-27
+decided: 2026-03-26
+result: engine sends 3,112 to 18,233 per 7d (5.9x), engine LR 51.1% to 42.5%, median session 18 to 19, continuation 97.7%
+learning: Meme age is not a quality signal; widening a high-LR engine trades some LR for volume and longer sessions
+code: src/recommendations/candidates.py like_spread_and_recent_memes
+readout: 
+---
+
 # Experiment: Unstarve like_spread_and_recent engine
 
 **Status:** completed — SUCCESS

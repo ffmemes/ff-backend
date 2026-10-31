@@ -8,7 +8,7 @@ the image has no text. Rows described before 2026-10-30 lack the key; read
 known languages, never from a text-free image.
 
 Since 2026-10-31, `ocr_result` also stores three content tags for the crosspost
-experiment (`experiments/active/2026-10-31-crosspost-content-tags.md`):
+experiment (`experiments/2026-10-31-crosspost-content-tags.md`):
 - `format`: one of single_caption, multi_panel, tweet_screenshot, chat_screenshot,
   photo_no_text, drawing_comic, other;
 - `relatable`: bool;

@@ -1,4 +1,21 @@
-> **Closed 2026-10-31, never built:** superseded by crosspost v4/v5/v5f scoring (see `docs/growth/HYPOTHESES.md`). Not a live experiment.
+---
+id: crossposting_forward_intent_ranker
+status: killed
+hypothesis: A forward-intent score from exact-meme share clicks and good share users predicts channel forwards better than source prior
+primary_metric: forwards per 1k views at 24h
+guardrails: no empty posting slots, views not -20%
+unit: channel_post
+variants: none (never built)
+started: 
+check_on: 
+decided: 2026-10-31
+result: unknown (never built); 2 manual source-prior posts: RU 27.5 fwd/1k, EN 0
+learning: Source prior alone found acceptable RU memes but no breakouts; superseded by v4/v5/v5f scoring
+code: score_version=3 decision-log fields
+readout: 
+---
+
+> **Closed 2026-10-31, never built:** superseded by crosspost v4/v5/v5f scoring (see [crosspost_src_fwd_v5f](2026-11-01-crosspost-src-forward-rate.md) and the README). Not a live experiment.
 
 # Experiment: Crossposting Forward-Intent Ranker
 Created: 2026-05-19

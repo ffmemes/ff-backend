@@ -146,7 +146,7 @@ Rules:
 
 Before merge, required files:
 
-1. `experiments/active/YYYY-MM-DD-name.md` — hypothesis, gates, kill rules  
+1. `experiments/YYYY-MM-DD-name.md` (front matter, see `experiments/README.md`) — hypothesis, gates, kill rules  
 2. `docs/analyst/<name>.sql` — primary + guardrails  
 3. `recommended_by` or assignment variant for slice  
 

@@ -52,7 +52,7 @@ A shippable ranking/growth experiment should have:
 3. **Primary metric** + **guardrails**:
    - Primary growth: unique share clickers, new-user invites, invites per 1k memes sent
    - Guardrails: session continuation, LR, block rate
-4. **Readout SQL** committed under `docs/analyst/` or `experiments/active/…`
+4. **Readout SQL** committed under `docs/analyst/` (linked from the `experiments/` file)
 5. **Control weights** imported from `src/feed_turn/planner.py` (`MATURE_BLEND_WEIGHTS` / `GROWING_BLEND_WEIGHTS`), never copy-pasted.
 
 ## Source affinity policy (v2, 2026-08-09)
@@ -90,7 +90,7 @@ Full readout: [docs/analyst/recently-liked-blender-v2-closeout.md](../analyst/re
 | Mature wiring | `get_mature_blend_weights_with_experiments` |
 | Delivery prep | `src/tgbot/senders/delivery.py` |
 | Readout | killed 2026-10-30; SQL removed (in git history) |
-| Experiment note | `experiments/completed/2026-08-09-viral-shares-blender-v1.md` |
+| Experiment note | `experiments/2026-08-09-viral-shares-blender-v1.md` |
 
 ## Architecture still wanted
 
@@ -106,7 +106,7 @@ Full readout: [docs/analyst/recently-liked-blender-v2-closeout.md](../analyst/re
 - [`specs/channel-growth-optimization.md`](../../specs/channel-growth-optimization.md) — channel side
 - [`specs/crossposting-share-optimization-2026-05-18.md`](../../specs/crossposting-share-optimization-2026-05-18.md) — channel share experiments
 - [`specs/data-hypotheses.md`](../../specs/data-hypotheses.md) — data findings
-- [`experiments/README.md`](../../experiments/README.md) — how to run A/B write-ups
+- [`experiments/README.md`](../../experiments/README.md) — experiment ledger: how to add/close one, everything tried and learned
 
 ## Anti-patterns
 

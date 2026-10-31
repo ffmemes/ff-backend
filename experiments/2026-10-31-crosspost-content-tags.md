@@ -1,12 +1,29 @@
+---
+id: crosspost_content_tags_v5c
+status: running
+hypothesis: Relatable jokes and tweet screenshots get ~8-10% fewer RU forwards at equal source and likes; down-weighting them raises forwards per post
+primary_metric: Gate A kappa >=0.6; Gate B refit coefficient <= -0.05 with CI excluding 0
+guardrails: tagged_pct, corr_v5c - corr_v5
+unit: channel_post
+variants: shadow (logged only, score_v5c)
+started: 2026-10-31
+check_on: 2026-11-20
+decided: 
+result: unknown
+learning: 
+code: Describe Memes content tags, src/crossposting/shadow_score.py
+readout: docs/analyst/crossposting-content-tags-gates.py, docs/analyst/crossposting-content-tags-shadow.sql
+---
+
 # Experiment: Crosspost content tags (relatable / tweet screenshot)
 
 - **Created:** 2026-10-31
 - **Status:** active. Tags are collected and a shadow score is logged; the production pick is unchanged.
 - **Channels:** `tgchannelru` decides. `tgchannelen` is logged for reference only.
 - **Check date:** **2026-11-20**
-- **Research:** [`docs/analyst/research/2026-10-30-forward-drivers/`](../../docs/analyst/research/2026-10-30-forward-drivers/README.md)
-- **Gates:** [`docs/analyst/crossposting-content-tags-gates.py`](../../docs/analyst/crossposting-content-tags-gates.py)
-- **Shadow readout:** [`docs/analyst/crossposting-content-tags-shadow.sql`](../../docs/analyst/crossposting-content-tags-shadow.sql)
+- **Research:** [`docs/analyst/research/2026-10-30-forward-drivers/`](../docs/analyst/research/2026-10-30-forward-drivers/README.md)
+- **Gates:** [`docs/analyst/crossposting-content-tags-gates.py`](../docs/analyst/crossposting-content-tags-gates.py)
+- **Shadow readout:** [`docs/analyst/crossposting-content-tags-shadow.sql`](../docs/analyst/crossposting-content-tags-shadow.sql)
 
 ## Evidence
 
