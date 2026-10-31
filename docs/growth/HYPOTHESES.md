@@ -60,6 +60,7 @@ Readout: [`docs/analyst/readouts/2026-10-30-experiment-closure.md`](../analyst/r
 | Ad-hoc | Bot→channel ML re-run / walk-forward | **H8** |
 | **2026-11-20** | `explore_budget_v1` keep/kill — [`experiments/active/2026-10-30-explore-budget.md`](../../experiments/active/2026-10-30-explore-budget.md) | explore budget |
 | **2026-11-20** | Crosspost content tags Gate A/B (`crossposting-content-tags-gates.py`) + `crossposting-content-tags-shadow.sql`. Both pass → `score_v5c` live on RU — [`experiments/active/2026-10-31-crosspost-content-tags.md`](../../experiments/active/2026-10-31-crosspost-content-tags.md) | content tags (relatable / tweet −0.1 zf) |
+| **2026-11-21** | Within-source **reaction rate** beats views for cold-meme ranking (`raw_impr_rank` now = quartile of `reactions / views` within source × meme type; offline Spearman vs our like rate +0.22 vs +0.02 for views). Metric: like rate of memes with `raw_impr_rank = 0`, and of engines that use it (`candidates.py` rank-0 pool, crosspost impr penalty), 3 weeks before vs after deploy. Kill if rank-0 LR does not rise | reaction-rate rank |
 | Ad-hoc | After any ranking/deploy incident | all active |
 
 Agent prompt on resume (copy-paste):
