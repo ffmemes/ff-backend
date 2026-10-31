@@ -123,8 +123,6 @@ def _patch_handlers(shared_meme_sent: bool = False):
 async def _assert_universal_side_effects(
     user_id: int,
     expected_deep_link: str | None,
-    *,
-    require_languages: bool = True,
 ) -> None:
     """Side effects every /start MUST run for created=True, all branches."""
     async with engine.connect() as conn:
@@ -141,8 +139,7 @@ async def _assert_universal_side_effects(
 
     assert tg_row is not None, "user_tg row missing"
     assert u_row is not None, "user row missing"
-    if require_languages:
-        assert len(lang_rows) >= 1, "user_language rows missing — onboarding leak!"
+    assert len(lang_rows) >= 1, "user_language rows missing — onboarding leak!"
     assert len(dl_rows) == 1, "user_deep_link_log row missing"
     assert dl_rows[0]._asdict()["deep_link"] == expected_deep_link
 
@@ -183,7 +180,7 @@ async def _run_handle_start(
 
 
 @pytest.mark.asyncio
-async def test_new_user_en_shows_language_picker_not_welcome():
+async def test_new_user_en_gets_first_meme_then_picker():
     from src.tgbot.handlers.start import handle_start
 
     update = _make_update(deep_link=None)
@@ -210,6 +207,10 @@ async def test_new_user_en_shows_language_picker_not_welcome():
             f"{HANDLER_MODULE}.resolve_onboarding_auto_language",
             return_value=None,
         ),
+        patch(
+            f"{HANDLER_MODULE}.set_user_languages_exclusive",
+            new_callable=AsyncMock,
+        ) as set_langs,
     ):
         save_user.return_value = ({"id": NEW_USER_ID}, True)
         user_info.return_value = {"type": "user", "interface_lang": "en"}
@@ -217,8 +218,10 @@ async def test_new_user_en_shows_language_picker_not_welcome():
 
         await handle_start(update, context)
 
+    # Bare EN / unknown must not block the first meme on the picker.
+    set_langs.assert_awaited_once_with(NEW_USER_ID, ["en"])
+    onboarding.assert_awaited_once_with(update, context.bot)
     picker.assert_awaited_once_with(update, context)
-    onboarding.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -296,8 +299,8 @@ async def test_language_settings_done_does_not_replay_onboarding_after_meme_sent
 @pytest.mark.asyncio
 async def test_new_user_no_deep_link_runs_universal_side_effects(cleanup):
     mocks = await _run_handle_start(deep_link=None)
-    # EN Test User has no auto language → picker before welcome.
-    # user_language rows are created when auto-lang or picker fires, not on bare EN start.
+    # Bare-EN Test User: defaulted to "en", first meme sent, picker offered after.
+    await _assert_universal_side_effects(NEW_USER_ID, expected_deep_link=None)
     async with engine.connect() as conn:
         tg_row = (await conn.execute(select(user_tg).where(user_tg.c.id == NEW_USER_ID))).first()
         u_row = (await conn.execute(select(user).where(user.c.id == NEW_USER_ID))).first()
@@ -311,7 +314,7 @@ async def test_new_user_no_deep_link_runs_universal_side_effects(cleanup):
     assert len(dl_rows) == 1, "user_deep_link_log row missing"
     mocks["lang_picker"].assert_called_once()
     mocks["invited"].assert_called_once()
-    mocks["onboarding"].assert_not_called()
+    mocks["onboarding"].assert_called_once()
     mocks["next_message"].assert_not_called()
     mocks["kitchen"].assert_not_called()
     mocks["giveaway"].assert_not_called()
@@ -340,11 +343,7 @@ async def test_new_user_giveaway_branch_inits_languages(cleanup):
 @pytest.mark.asyncio
 async def test_new_user_share_link_branch_inits_languages(cleanup):
     mocks = await _run_handle_start(deep_link="m_12345_678", shared_meme_sent=True)
-    # Shared meme path may only add meme language when a real meme is sent;
-    # with the handler mocked, languages can remain empty.
-    await _assert_universal_side_effects(
-        NEW_USER_ID, expected_deep_link="m_12345_678", require_languages=False
-    )
+    await _assert_universal_side_effects(NEW_USER_ID, expected_deep_link="m_12345_678")
     mocks["shared_meme"].assert_called_once()
     assert mocks["shared_meme"].call_args.kwargs["reaction_context"] == "onboard"
     mocks["lang_picker"].assert_not_called()
@@ -372,7 +371,6 @@ async def test_blocked_acquisition_channel_silently_drops_new_user(cleanup):
 @pytest.mark.asyncio
 async def test_existing_user_no_deep_link_serves_meme(cleanup):
     """Existing-user branch: must call next_message (the meme)."""
-    # First /start: EN user → language picker only (no languages yet).
     await _run_handle_start(deep_link=None, user_id=EXISTING_USER_ID)
     # Seed a language so the second /start is a true existing-user feed path.
     async with engine.begin() as conn:
