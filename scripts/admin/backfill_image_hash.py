@@ -13,6 +13,7 @@ import json
 import logging
 
 from sqlalchemy import text
+from telegram.error import RetryAfter
 
 from src.database import fetch_all
 from src.storage.deduplication.image_hash import dhash, log_phash_shadow_match
@@ -42,6 +43,10 @@ async def _run(days: int, limit: int, rate: float) -> dict[str, int]:
         try:
             content = await download_meme_content_from_tg(row["telegram_file_id"])
             meme = await update_meme(row["id"], image_hash=dhash(content))
+        except RetryAfter as e:
+            await asyncio.sleep(e.retry_after)
+            counts["failed"] += 1
+            continue
         except Exception as e:
             logging.warning("meme %s: hash failed: %s", row["id"], e)
             counts["failed"] += 1
@@ -56,7 +61,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m scripts.admin.backfill_image_hash")
     parser.add_argument("--days", type=int, default=30)
     parser.add_argument("--limit", type=int, default=1000)
-    parser.add_argument("--rate", type=float, default=20.0, help="max files per second")
+    parser.add_argument("--rate", type=float, default=5.0, help="max files per second")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
     print(json.dumps(asyncio.run(_run(args.days, args.limit, args.rate))))

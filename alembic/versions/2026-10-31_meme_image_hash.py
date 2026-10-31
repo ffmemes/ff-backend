@@ -17,6 +17,8 @@ depends_on = None
 
 def upgrade() -> None:
     # IF NOT EXISTS: a failed index build below commits the column without stamping.
+    # Don't queue every meme read behind ACCESS EXCLUSIVE if a long scan holds meme.
+    op.execute("SET lock_timeout = '5s'")
     op.execute("ALTER TABLE meme ADD COLUMN IF NOT EXISTS image_hash BIGINT")
     # Build without blocking meme writes on the large production table.
     with op.get_context().autocommit_block():

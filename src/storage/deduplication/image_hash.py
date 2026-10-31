@@ -25,7 +25,8 @@ def dhash(content: bytes) -> int:
 
 async def log_phash_shadow_match(meme_row: dict[str, Any]) -> dict[str, Any] | None:
     """Shadow mode: log a live meme with the same image_hash; never merges."""
-    if meme_row.get("image_hash") is None:
+    # Solid/blank frames (e.g. black first video frame) all hash to 0 or -1.
+    if meme_row.get("image_hash") in (None, 0, -1):
         return None
     # ponytail: exact hash only; Hamming distance <= N (bit_count(a # b)) is the upgrade path.
     candidate = await fetch_one(
