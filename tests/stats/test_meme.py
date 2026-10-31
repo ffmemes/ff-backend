@@ -9,6 +9,7 @@ from src.database import (
     engine,
     fetch_all,
     meme,
+    meme_raw_telegram,
     meme_source,
     meme_stats,
     user,
@@ -16,7 +17,11 @@ from src.database import (
     user_language,
     user_meme_reaction,
 )
-from src.stats.meme import calculate_meme_invited_count, calculate_meme_reactions_and_engagement
+from src.stats.meme import (
+    calculate_meme_invited_count,
+    calculate_meme_raw_impressions_stats,
+    calculate_meme_reactions_and_engagement,
+)
 
 
 @pytest_asyncio.fixture()
@@ -96,6 +101,7 @@ async def conn():
         await conn.execute(delete(user_meme_reaction))
         await conn.execute(delete(user_language))
         await conn.execute(delete(meme))
+        await conn.execute(delete(meme_raw_telegram))
         await conn.execute(delete(meme_source))
         await conn.execute(delete(user))
         await conn.commit()
@@ -207,3 +213,35 @@ async def test_calculate_meme_invited_count_excludes_self_clicks(conn: AsyncConn
 
     assert invited_count_by_meme_id[1] == 2
     assert invited_count_by_meme_id[2] == 0
+
+
+@pytest.mark.asyncio
+async def test_raw_impr_rank_by_reaction_rate_within_source_and_type(conn: AsyncConnection):
+    # (meme_id, views, reactions): images 1-4, videos 5-6 ranked separately.
+    raws = [(1, 1000, 10), (2, 100, 20), (3, 5000, None), (4, 50, None), (5, 10, 5), (6, 1000, 100)]
+    await conn.execute(
+        insert(meme_raw_telegram),
+        [
+            {
+                "id": i,
+                "meme_source_id": 1,
+                "post_id": i,
+                "url": f"https://t.me/s/x/{i}",
+                "date": datetime(2024, 1, 1),
+                "views": views,
+                "reactions": reactions,
+            }
+            for i, views, reactions in raws
+        ],
+    )
+    await conn.execute(text("UPDATE meme SET type = 'video' WHERE id IN (5, 6)"))
+    await conn.commit()
+
+    await calculate_meme_raw_impressions_stats()
+
+    rows = await fetch_all(select(meme_stats.c.meme_id, meme_stats.c.raw_impr_rank))
+    ranks = {r["meme_id"]: r["raw_impr_rank"] for r in rows}
+    # Images: 20% rate > 1% rate > NULL reactions by views (5000 > 50).
+    assert [ranks[i] for i in (2, 1, 3, 4)] == [0, 1, 2, 3]
+    # Videos: 50% rate beats 10% despite 100x fewer views.
+    assert (ranks[5], ranks[6]) == (0, 2)

@@ -389,16 +389,24 @@ async def get_low_sent_pool_skip_rate_alerts(
 
 
 async def calculate_meme_raw_impressions_stats() -> None:
+    """raw_impr_rank: within-(source, meme type) quartile, 0 = best.
+
+    Ranked by source reaction rate (reactions / views), not views: on 3,622 memes
+    from 97 sources (2026-10-31) the views quartile predicted our like rate at
+    Spearman +0.02, the reaction-rate percentile at +0.22 [0.18, 0.27]
+    (top vs bottom quintile like rate 0.44 vs 0.35). Rows without reactions
+    (VK, old TG rows, reactions disabled) rank after rated rows, by views.
+    """
     insert_query = """
         WITH MEME_RAW_IMPRESSIONS AS (
             SELECT
                 M.id AS meme_id,
-                M.meme_source_id,
-                COUNT(*) OVER (PARTITION BY M.meme_source_id),
-                COALESCE(MRT.views, MRV.views) impressions,
+                COUNT(*) OVER (PARTITION BY M.meme_source_id, M.type),
                 ROW_NUMBER() OVER (
-                    PARTITION BY M.meme_source_id
-                    ORDER BY COALESCE(MRT.views, MRV.views) DESC
+                    PARTITION BY M.meme_source_id, M.type
+                    ORDER BY
+                        MRT.reactions::float / NULLIF(MRT.views, 0) DESC NULLS LAST,
+                        COALESCE(MRT.views, MRV.views) DESC
                 ) impr_rank
             FROM meme M
             LEFT JOIN meme_source MS
@@ -416,7 +424,7 @@ async def calculate_meme_raw_impressions_stats() -> None:
         )
         SELECT
             meme_id,
-            FLOOR(4.0 * impr_rank / count) AS raw_impr_rank
+            FLOOR(4.0 * (impr_rank - 1) / count) AS raw_impr_rank
         FROM MEME_RAW_IMPRESSIONS
         ON CONFLICT (meme_id) DO
         UPDATE SET

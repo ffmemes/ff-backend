@@ -13,6 +13,7 @@ from src.storage.parsers.schemas import TgChannelPostParsingResult
 logger = logging.getLogger(__name__)
 _SINGLE_MEDIA_LINK_PATTERN = re.compile(r"^https://t\.me/[^/]+/\d+\?single$")
 _STYLE_MEDIA_URL_PATTERN = re.compile(r"url\(\'(.*?)\'\)")
+_TRAILING_NUM_PATTERN = re.compile(r"[\d.]+[KM]?$")
 
 
 class TelegramChannelScraper(Scraper):
@@ -212,6 +213,14 @@ class TelegramChannelScraper(Scraper):
         views_span = post.find("span", class_="tgme_widget_message_views")
         views = 0 if views_span is None else _parse_num(views_span.text)
 
+        # Telegram omits the block when a post has no reactions (or they are disabled).
+        reactions = None
+        if reactions_div := post.find("div", class_="tgme_widget_message_reactions"):
+            reactions = sum(
+                _parse_num(_TRAILING_NUM_PATTERN.search(span.text.strip()).group())
+                for span in reactions_div.find_all("span", class_="tgme_reaction")
+            )
+
         return TgChannelPostParsingResult(
             post_id=int(url.split("/")[-1]),
             url=url,
@@ -225,6 +234,7 @@ class TelegramChannelScraper(Scraper):
             link_preview=link_preview,
             out_links=outlinks,
             views=views,
+            reactions=reactions,
         )
 
 

@@ -278,6 +278,7 @@ meme_raw_telegram = Table(
     Column("forwarded", JSONB),
     Column("media", JSONB),
     Column("views", Integer, nullable=False),
+    Column("reactions", Integer),
     Column("forwarded_url", String),
     Column("link_preview", JSONB),
     Column("created_at", DateTime, server_default=func.now(), nullable=False),
