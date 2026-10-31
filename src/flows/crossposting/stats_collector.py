@@ -8,6 +8,8 @@ Schedules (serve_flows.py):
 - Full sweep every 6h (all recent messages + subscribers)
 - Young-posts hourly (<48h) for early canary / score_version reads
 - Single-message refresh after each crosspost (post-hook)
+- Source-channel posts aged 20–48h (views/forwards on meme_raw_telegram), inside
+  the 6h sweep's client session — feeds the crosspost src_fwd_pct shadow signal
 
 Uses the Telethon session string (TELEGRAM_API_ID,
 TELEGRAM_API_HASH, TELEGRAM_SESSION_STRING env vars).
@@ -15,8 +17,11 @@ TELEGRAM_API_HASH, TELEGRAM_SESSION_STRING env vars).
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import time
+from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -31,6 +36,7 @@ from telethon.errors import (
 )
 from telethon.sessions import StringSession
 from telethon.tl.functions.channels import GetFullChannelRequest
+from telethon.tl.types import InputPeerChannel
 
 from src.config import settings
 from src.database import (
@@ -59,6 +65,12 @@ YOUNG_POST_MAX_AGE = timedelta(hours=48)
 # Full sweep still refreshes a wider window for mature 24h labels.
 FULL_SWEEP_MESSAGE_LIMIT = 200
 FULL_SWEEP_MAX_AGE = timedelta(days=30)
+
+# Source-channel post stats (meme_raw_telegram.forwards). Forward rate at ~24h
+# tracks the final one (Spearman ~0.9), so one read per post is enough.
+SOURCE_STATS_MAX_CHANNELS = 120
+SOURCE_STATS_BUDGET_SECONDS = 240
+SOURCE_STATS_MAX_FLOOD_WAIT = 30
 
 
 def _get_telethon_client() -> TelegramClient | None:
@@ -490,10 +502,101 @@ async def _collect_subscriber_count(
     log.info(f"@{channel_username}: {count} subscribers")
 
 
+async def _collect_source_post_stats(client: TelegramClient) -> int:
+    """One Telethon read of views/forwards for source posts aged 20–48h.
+
+    Shares the caller's client (the StringSession must never run twice at once).
+    Resolved channel peers are cached in ``meme_source.data.tg_peer`` so
+    usernames are resolved once, not every run. Posts Telegram no longer returns
+    get ``stats_fetched_at`` with NULL forwards so they are not retried.
+
+    ponytail: the date filter has no index (seq scan 4x/day); add a partial index
+    on (date) WHERE stats_fetched_at IS NULL if this query shows up as slow.
+    """
+    log = get_run_logger()
+    rows = await fetch_all(
+        text(
+            """
+            SELECT r.id, r.post_id, s.id AS source_id, s.url,
+                   (s.data->'tg_peer'->>'id')::bigint AS peer_id,
+                   (s.data->'tg_peer'->>'hash')::bigint AS peer_hash
+            FROM meme_raw_telegram r
+            JOIN meme_source s ON s.id = r.meme_source_id
+            WHERE s.type = 'telegram'
+              AND r.stats_fetched_at IS NULL
+              AND r.date BETWEEN NOW() - INTERVAL '48 hours' AND NOW() - INTERVAL '20 hours'
+            ORDER BY s.id, r.post_id
+            """
+        )
+    )
+    by_source: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    for r in rows:
+        by_source[r["source_id"]].append(r)
+
+    deadline = time.monotonic() + SOURCE_STATS_BUDGET_SECONDS
+    fetched = 0
+    for source_id, posts in list(by_source.items())[:SOURCE_STATS_MAX_CHANNELS]:
+        if time.monotonic() > deadline:
+            log.info("Source stats: time budget spent, rest next run")
+            break
+        src = posts[0]
+        username = src["url"].rstrip("/").split("/")[-1]
+        try:
+            if src["peer_id"]:
+                entity = InputPeerChannel(src["peer_id"], src["peer_hash"])
+            else:
+                entity = await client.get_input_entity(username)
+                if isinstance(entity, InputPeerChannel):
+                    peer = {"id": entity.channel_id, "hash": entity.access_hash}
+                    await execute(
+                        text(
+                            "UPDATE meme_source SET data = COALESCE(data, '{}'::jsonb) "
+                            "|| jsonb_build_object('tg_peer', CAST(:peer AS jsonb)) WHERE id = :id"
+                        ),
+                        {"peer": json.dumps(peer), "id": source_id},
+                    )
+            for i in range(0, len(posts), 100):
+                chunk = posts[i : i + 100]
+                msgs = await client.get_messages(entity, ids=[p["post_id"] for p in chunk])
+                if not isinstance(msgs, list):
+                    msgs = [msgs]
+                # views stays the parser's value: raw_impr_rank ranks reactions/views
+                # within source, and a later denominator would sink fresh memes.
+                fwds = [None if m is None else _extract_metrics(m)[1] for m in msgs]
+                await execute(
+                    text(
+                        "UPDATE meme_raw_telegram r SET "
+                        "forwards = v.fwd, stats_fetched_at = NOW() "
+                        "FROM unnest(CAST(:ids AS int[]), CAST(:fwds AS int[])) AS v(id, fwd) "
+                        "WHERE r.id = v.id"
+                    ),
+                    {"ids": [p["id"] for p in chunk], "fwds": fwds},
+                )
+                fetched += len(chunk)
+        except FloodWaitError as e:
+            log.warning("Source stats flood wait %ss at @%s", e.seconds, username)
+            if e.seconds > SOURCE_STATS_MAX_FLOOD_WAIT:
+                break
+            await asyncio.sleep(e.seconds + 1)
+        except SessionExpiredError:
+            raise
+        except Exception as e:
+            log.warning("Source stats failed @%s: %s", username, e)
+            if src["peer_id"]:  # stale cached peer → re-resolve next run
+                await execute(
+                    text("UPDATE meme_source SET data = data - 'tg_peer' WHERE id = :id"),
+                    {"id": source_id},
+                )
+        await asyncio.sleep(1)
+
+    log.info("Source stats: %s posts from %s channels", fetched, len(by_source))
+    return fetched
+
+
 @flow(
-    retries=2,
+    retries=1,
     retry_delay_seconds=60,
-    timeout_seconds=300,
+    timeout_seconds=600,
     on_failure=[notify_telegram_on_failure],
 )
 async def collect_channel_stats():
@@ -517,6 +620,11 @@ async def collect_channel_stats():
             except Exception as e:
                 log.error(f"Error collecting stats for @{channel_username}: {e}")
 
+        # Same client/session as above: never open a second concurrent session.
+        try:
+            await _collect_source_post_stats(client)
+        except Exception as e:
+            log.error(f"Source post stats failed: {e}")
     finally:
         await client.disconnect()
 

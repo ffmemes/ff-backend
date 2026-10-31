@@ -279,6 +279,9 @@ meme_raw_telegram = Table(
     Column("media", JSONB),
     Column("views", Integer, nullable=False),
     Column("reactions", Integer),
+    # Telethon read at ~20-48h (crossposting stats flow); views is overwritten then too.
+    Column("forwards", Integer),
+    Column("stats_fetched_at", DateTime),
     Column("forwarded_url", String),
     Column("link_preview", JSONB),
     Column("created_at", DateTime, server_default=func.now(), nullable=False),

@@ -40,6 +40,17 @@ def content_mult_v1(content_format: str | None, relatable: bool | None) -> float
     return 0.85 ** (int(relatable is True) + int(content_format == "tweet_screenshot"))
 
 
+def src_fwd_mult(src_fwd_pct: float | None) -> float:
+    """score_v5f = score_v5 * (0.5 + src_fwd_pct); missing pct → 1.0.
+
+    src_fwd_pct: within-source percentile of the source post's forwards/views
+    (Telethon read at ~20–48h). Study 2026-10-31: Spearman with our crosspost
+    forwards +0.52 RU / +0.28 EN. See
+    experiments/active/2026-11-01-crosspost-src-forward-rate.md.
+    """
+    return 1.0 if src_fwd_pct is None else 0.5 + float(src_fwd_pct)
+
+
 def attach_v5_ranks(candidates: list[dict[str, Any]], version: str = "v5") -> list[dict[str, Any]]:
     """Add shadow_{version}_rank (1=best) + shadow_{version}_pick_meme_id without reordering."""
     key = f"score_{version}"

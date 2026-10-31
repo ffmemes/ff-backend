@@ -13,7 +13,13 @@ from src.crossposting.service import (
     get_next_meme_for_tgchannelru,
     log_ranker_decision,
 )
-from src.database import crossposting, crossposting_decision_log, engine, user_deep_link_log
+from src.database import (
+    crossposting,
+    crossposting_decision_log,
+    engine,
+    meme_raw_telegram,
+    user_deep_link_log,
+)
 from src.flows.crossposting.meme import _clean_caption
 from tests.factories import (
     TEST_ID_START,
@@ -451,6 +457,50 @@ async def test_v5_shadow_logs_content_tags_from_ocr_result(clean_xpost):
     )
     assert cand["score_v5c"] == round(cand["score_v5"] * 0.85**2, 6)
     assert cand["shadow_v5c_pick_meme_id"] == 10702
+
+
+@pytest.mark.asyncio
+async def test_v5f_shadow_logs_src_fwd_pct(clean_xpost):
+    now = datetime.now(UTC).replace(tzinfo=None)
+    async with engine.connect() as conn:
+        await create_meme_source(conn, id=10800, language_code="ru")
+        await create_meme(conn, id=10801, meme_source_id=10800)
+        await _insert_crossposting(
+            conn,
+            "tgchannelru",
+            10801,
+            hours_ago=100,
+            views=100,
+            forwards=5,
+            telegram_message_id=999801,
+        )
+        # 11 source posts with a Telethon read; the candidate's own post has the top rate.
+        await conn.execute(
+            insert(meme_raw_telegram),
+            [
+                {
+                    "id": 10810 + i,
+                    "meme_source_id": 10800,
+                    "post_id": i,
+                    "url": f"https://t.me/x/{i}",
+                    "date": now,
+                    "views": 1000,
+                    "forwards": i,
+                    "stats_fetched_at": now,
+                }
+                for i in range(11)
+            ],
+        )
+        await create_meme(conn, id=10802, meme_source_id=10800, raw_meme_id=10820)
+        await create_meme_stats(conn, meme_id=10802, nlikes=10, ndislikes=2)
+        await conn.commit()
+
+    picked, decision = await get_next_meme_for_tgchannelru()
+    assert picked["id"] == 10802
+    cand = decision["candidates"][0]
+    assert cand["src_fwd_pct"] == 1.0
+    assert cand["score_v5f"] == round(cand["score_v5"] * 1.5, 6)
+    assert cand["shadow_v5f_pick_meme_id"] == 10802
 
 
 @pytest.mark.asyncio
