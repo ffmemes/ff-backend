@@ -43,9 +43,7 @@ def upgrade() -> None:
             server_default=sa.func.now(),
             nullable=False,
         ),
-        sa.UniqueConstraint(
-            "chat_id", "meme_id", "user_id", name="uq_chat_meme_reaction"
-        ),
+        sa.UniqueConstraint("chat_id", "meme_id", "user_id", name="uq_chat_meme_reaction"),
     )
 
     op.create_table(
@@ -53,15 +51,9 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), sa.Identity(), primary_key=True),
         sa.Column("chat_id", sa.BigInteger(), nullable=False),
         sa.Column("user_id", sa.BigInteger(), nullable=False),
-        sa.Column(
-            "prompt_tokens", sa.Integer(), nullable=False, server_default="0"
-        ),
-        sa.Column(
-            "completion_tokens", sa.Integer(), nullable=False, server_default="0"
-        ),
-        sa.Column(
-            "tool_calls", sa.Integer(), nullable=False, server_default="0"
-        ),
+        sa.Column("prompt_tokens", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("completion_tokens", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("tool_calls", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("response_time_ms", sa.Integer()),
         sa.Column("trigger_type", sa.String()),
         sa.Column(

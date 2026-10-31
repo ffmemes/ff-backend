@@ -31,6 +31,8 @@
 - Before designing an experiment, read [`experiments/README.md`](experiments/README.md): open checks plus every decided result and learning.
 - When starting or closing one, edit its file, then run `python scripts/experiments.py index` and commit the README (CI fails if it is stale).
 - `python scripts/experiments.py due` lists checks that are due; `readout <id>` prints the read-only SQL command for `$ANALYST_DATABASE_URL`.
+- Metrics: use the `v_*` views and [`docs/analyst/north_star.sql`](docs/analyst/north_star.sql) (sessions, actives, shares, funnel); never redefine them ad hoc.
+- Always exclude `segment = 'excluded'` (automated accounts, `v_metric_user`) from metrics and readouts.
 
 ## Operational notes
 - Manual upload review happens entirely inside the designated Telegram upload review chat. Keep communications and escalations there for traceability.

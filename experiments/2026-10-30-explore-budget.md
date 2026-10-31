@@ -130,3 +130,10 @@ Readout on 2026-11-20:
 - **Primary:** exclude sends of these ids from both arms. Also report the share of control low_sent sends that went to them.
 - **Sensitivity:** all sends.
 Use user-level means, not pooled.
+
+## Note: shared metric views (2026-11-02)
+The readout SQL keeps its own session logic (frozen with the decision rule;
+it also needs dedup-id exclusion and pos2/fresh_ru guardrails the views do not
+have). On 2026-11-20 also report `v_experiment_user` user-level means
+(`reactions_per_week`, `likes_per_week`, `memes_per_session`, segment
+`<> 'excluded'`) as a cross-check; definitions in `docs/analyst/north_star.sql`.
