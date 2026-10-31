@@ -107,7 +107,7 @@ python scripts/crosspost_taste_cohort.py --days 120 --top 50 --min-n 8
 1. Open this file + `experiments/HYPOTHESES.md` H6/H7.
 2. Run:
    - `docs/analyst/crossposting-v4-like-volume.sql`
-   - taste shadow SQL in `docs/analyst/crossposting-taste-shadow.sql`
+   - taste shadow SQL in `docs/analyst/crossposting-taste-shadow.sql` (removed 2026-10-31 after the H7 kill; in git history)
 3. Fill **Metrics after** tables below with dates.
 4. Mark H6/H7 pass/fail; if H6 fail → kill switch; if H7 pass → canary PR.
 

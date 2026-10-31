@@ -11,22 +11,17 @@ These queries and reports support product-health monitoring and experiment analy
 ## Key Files
 - `docs/analyst/metrics.sql` — SQL queries organized by section (health, north star, engines, retention, etc.)
 - `docs/analyst/command-surface-proxies.sql` — private slash commands from `message_tg` (`chat_id > 0`) + secondary feature proxies. Notes: [`docs/product/surface-and-commands.md`](../product/surface-and-commands.md).
-- `docs/analyst/cold-start-first10-post-limit5.sql` + [readout 2026-08-13](readouts/2026-08-13-cold-start-first10-post-limit5.md) — first-10 quality pre/post queue limit=5; guarded explore skip problem.
 - `docs/analyst/describe-memes-health.sql` + [readout 2026-08-13](readouts/2026-08-13-describe-memes-health.md) — OCR / OpenRouter describe throughput vs 864/day target; backlog ~222k.
 - `docs/analyst/phash-shadow.sql` — dHash (`meme.image_hash`) shadow dedup: coverage, exact-hash collision groups by type, agreement with `duplicate_of`, sample pairs for precision checks. Backfill: `scripts/admin/backfill_image_hash.py`.
 - Meme inspect API (JSON + media download via bot token): [`docs/admin-meme-inspect.md`](../admin-meme-inspect.md).
-- `docs/analyst/viral-shares-blender-v1.sql` — readout for `viral_shares_blender_v1` (share clickers + invites vs control + session guardrail).
 - `docs/analyst/dwell-feed-vs-broadcast.sql` — `sec_to_react` percentiles: like vs skip × feed vs broadcast; dwell buckets; demote inventory risk.
 - `docs/analyst/source-affinity-demote-guardrails.sql` — post-deploy volume / LR checks for soft-demote (#340).
 - `docs/analyst/broadcast-reengagement.sql` — retention push HQ vs queue fallback vs feed.
-- Living decision calendar: [`experiments/HYPOTHESES.md`](../../experiments/HYPOTHESES.md).
-- `docs/growth/2026-08-09-viral-shares-blender-v1.md` — experiment design note (also under `experiments/active/` when tracked).
+- Living decision calendar (which experiments are live and which SQL each uses): [`docs/growth/HYPOTHESES.md`](../growth/HYPOTHESES.md). SQL for killed experiments is deleted; recover it from version control history if needed.
 - `docs/analyst/crossposting.sql` — reusable read-only queries for Telegram channel views/forwards, 24h labels, and pre-posting share signals.
 - `specs/crossposting-share-optimization-2026-05-18.md` — current compact crossposting readout and next experiment gate.
 - `experiments/active/` — Currently running experiments to monitor
 - `experiments/completed/` — Historical experiments for context
-- `experiments/reports/` — Daily report output
-- `experiments/log.jsonl` — Machine-readable audit trail
 
 ## Database Schema Reference
 Full table definitions: `src/database.py`
@@ -69,16 +64,11 @@ For in-bot share-button work, when interpreting `user_deep_link_log`: raw `m_`/`
 treated as shares; count non-self clicks only.
 
 ## Engine Names (recommended_by column)
-| Engine | Description | Expected LR |
-|--------|-------------|-------------|
-| `multiply_all_scores` | Combined scoring | ~47% |
-| `like_spread_and_recent_memes` | High-spread viral memes | ~50% |
-| `best_memes_from_each_source` | Top meme per source | ~44% |
-| `best_memes_from_liked_sources` | User's preferred sources | ~45% |
-| `uploaded_memes` | User-uploaded content | ~42% |
-| `goat` | Greatest Of All Time | ~43% (after fix) |
-| `es_ranked` | Engagement score ranked | TBD |
-| `low_sent_pool` | New content (moderators only) | varies |
+No hardcoded engine list or expected LRs here; they drift. Sources of truth:
+- Feed engines: `CandidatesRetriever.engine_map` in `src/recommendations/candidates.py`.
+- Blend weights per maturity stage: `GROWING_BLEND_WEIGHTS` / `MATURE_BLEND_WEIGHTS` in `src/feed_turn/planner.py`.
+- Other labels: `low_sent_pool` (moderators), `cold_start_*`, `broadcast_*` (retention pushes; keep them out of feed dwell/LR analysis, see `broadcast-reengagement.sql`).
+- Old rows still carry removed engines (e.g. `multiply_all_scores`, `best_memes_from_each_source`); they are no longer served.
 
 ## Other Data Sources
 - **Sentry**: `sentry issue list` — production errors
@@ -87,9 +77,9 @@ treated as shares; count non-self clicks only.
 - **Prefect**: Pipeline health (parser → ETL → final_pipeline)
 
 ## North Star Metric
-**Session length** (median memes per session). A session starts when a user opens the bot and ends after 30 minutes of inactivity. Higher = better.
+Defined once in [`SPEC.md`](../../SPEC.md) (session length + organic growth via shares). The experiment ship bar (funnel + k-factor, with session length and block rate as guardrails) is in [`docs/growth/HYPOTHESES.md`](../growth/HYPOTHESES.md). Do not restate either here.
 
-Secondary signals: WAU growth, share click rate, D1/D7 retention, cold start like rate.
+Operational health signals:
 
 **Describe Memes throughput**: `described_24h` — memes described by the OpenRouter Vision flow in the last 24h. Expected >0. Zero means the circuit breaker has paused the flow. See "DESCRIBE MEMES THROUGHPUT" section in metrics.sql.
 

@@ -84,8 +84,8 @@ and the linked readout markdown, then recommend ship/hold/kill with numbers.
 | **Shipped** | 2026-08-09 ~14:20 UTC (first assignment) |
 | **Code** | `candidates.viral_shares`, `blender_experiments.get_viral_shares_blender_v1_weights` |
 | **Note** | `experiments/completed/2026-08-09-viral-shares-blender-v1.md` |
-| **SQL** | `docs/analyst/viral-shares-blender-v1.sql` |
-| **Readout log** | `docs/analyst/readouts/2026-08-09-viral-shares-interim.md` |
+| **SQL** | removed 2026-10-31 (killed; in git history) |
+| **Readout log** | removed 2026-10-31 (killed; in git history); final numbers in the 2026-10-30 closure readout |
 
 ### Hypothesis (precise)
 
@@ -420,7 +420,7 @@ Compare v4 mature posts vs last 30d v2 baseline:
 | **Status** | **KILLED as signal 2026-10-30**: top vs bottom n_taste f1k 28.52 vs 28.72 (n=287). No canary |
 | **Cohort** | `src/crossposting/data/ru_taste_cohort_v1.json` (top 50) |
 | **Code** | `taste_cohort.py`, `_enrich_candidates_with_taste_shadow` |
-| **SQL** | `docs/analyst/crossposting-taste-shadow.sql` |
+| **SQL** | removed 2026-10-31 (killed; in git history) |
 | **Experiment note** | `experiments/completed/2026-08-10-crosspost-v4-and-taste-cohort.md` |
 
 ### Hypothesis
@@ -508,14 +508,14 @@ Simple linear/logistic models on pre-post bot features + source prior beat
 | **Formula** | `shadow_score = ln(nlikes+1) * src_quality_mult` |
 | **Version** | `v4_x_src_v1` (+ `shadow_score_maturity` band) |
 | **Code** | `src/crossposting/shadow_score.py`, `_build_decision_log` |
-| **SQL** | `docs/analyst/crossposting-shadow-hybrid.sql` |
+| **SQL** | removed 2026-10-31 (killed; in git history) |
 
 Also logs `shadow_rank`, `shadow_pick_meme_id`, `shadow_vs_prod_disagree`.
 
 ### Next check
 
 - After deploy: decision_log has `shadow_score` on candidates
-- **2026-08-25**: `crossposting-shadow-hybrid.sql` — disagree rate + corr(shadow, f1k_24h)
+- **2026-08-25**: shadow-hybrid SQL (now removed) — disagree rate + corr(shadow, f1k_24h)
 - Canary soft boost only if live corr/lift clearly > v4 alone
 - After H7 merge: re-export + optional taste feature
 - Do not schedule as feed experiment
@@ -667,13 +667,11 @@ FROM "user" u WHERE u.created_at >= now() - interval '42 days' GROUP BY 1 ORDER 
 ```bash
 # 1) Hypotheses file
 # 2) Run:
-psql "$ANALYST_DATABASE_URL" -f docs/analyst/viral-shares-blender-v1.sql
 psql "$ANALYST_DATABASE_URL" -f docs/analyst/source-affinity-demote-guardrails.sql
 psql "$ANALYST_DATABASE_URL" -f docs/analyst/dwell-feed-vs-broadcast.sql
 psql "$ANALYST_DATABASE_URL" -f docs/analyst/broadcast-reengagement.sql
 psql "$ANALYST_DATABASE_URL" -f docs/analyst/onboarding-funnel.sql            # H9–H11
 psql "$ANALYST_DATABASE_URL" -f docs/analyst/crossposting-v4-like-volume.sql   # H6
-psql "$ANALYST_DATABASE_URL" -f docs/analyst/crossposting-taste-shadow.sql    # H7
 # 3) Update this file Status/Decision + write
 #    docs/analyst/readouts/YYYY-MM-DD-weekly-hypotheses.md
 # 4) Crosspost plan tables:

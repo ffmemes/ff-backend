@@ -89,7 +89,7 @@ Full readout: [docs/analyst/recently-liked-blender-v2-closeout.md](../analyst/re
 | Experiment | `viral_shares_blender_v1` — 0.2 weight from `lr_smoothed` for treatment |
 | Mature wiring | `get_mature_blend_weights_with_experiments` |
 | Delivery prep | `src/tgbot/senders/delivery.py` |
-| Readout | `docs/analyst/viral-shares-blender-v1.sql` |
+| Readout | killed 2026-10-30; SQL removed (in git history) |
 | Experiment note | `experiments/completed/2026-08-09-viral-shares-blender-v1.md` |
 
 ## Architecture still wanted

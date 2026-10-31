@@ -1,6 +1,8 @@
+> **Closed 2026-10-31, never built:** superseded by crosspost v4/v5/v5f scoring (see `docs/growth/HYPOTHESES.md`). Not a live experiment.
+
 # Experiment: Crossposting Forward-Intent Ranker
 Created: 2026-05-19
-Status: proposed - offline evaluator, then RU-only canary
+Status: proposed, never built (see note above)
 Owner: analyst + engineer
 Deployed: pending
 Measure after: pending
