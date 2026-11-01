@@ -1,5 +1,6 @@
 import heapq
 import logging
+import random
 from typing import Any
 
 from sqlalchemy import text
@@ -7,6 +8,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from src.crossposting.constants import Channel
 from src.crossposting.scoring import (
+    AB_ARMS,
     CHANNEL_PARAMS,
     LIVE,
     PRESELECT,
@@ -297,7 +299,9 @@ def _round(x: float | None, nd: int) -> float | None:
     return None if x is None else round(float(x), nd)
 
 
-def _build_decision_log(channel: str, top: list[dict[str, Any]], pool_size: int) -> dict[str, Any]:
+def _build_decision_log(
+    channel: str, top: list[dict[str, Any]], pool_size: int, live: str, pre: str
+) -> dict[str, Any]:
     """Score the preselected top-N with every score; return log_ranker_decision kwargs."""
     scored = [score_all(r, channel) for r in top]
     picks: dict[str, int] = {}
@@ -311,7 +315,7 @@ def _build_decision_log(channel: str, top: list[dict[str, Any]], pool_size: int)
             ranks[i][name] = rank
         picks[name] = top[order[0]]["id"]
     # LIVE may need shadow inputs; if they failed to load, fall back to PRESELECT.
-    picked_by = LIVE[channel] if LIVE[channel] in picks else PRESELECT[channel]
+    picked_by = live if live in picks else pre
 
     log_candidates = []
     for i, (row, (factors, scores)) in enumerate(zip(top, scored, strict=True)):
@@ -377,12 +381,14 @@ async def get_next_meme_for_channel(
     rows = await fetch_all(text(_POOL_QUERY), params)
     if not rows:
         return None, None
-    pre = PRESELECT[channel]
+    pre, live = PRESELECT[channel], LIVE[channel]
+    if channel in AB_ARMS:
+        pre = live = random.choice(AB_ARMS[channel])
     top = heapq.nsmallest(log_top_n, rows, key=lambda r: (-score(r, channel, pre), r["id"]))
     # Shadow inputs must never block posting.
     try:
         await _attach_shadow_inputs(top, channel)
     except Exception:
         logger.warning("crosspost shadow inputs failed", exc_info=True)
-    decision = _build_decision_log(channel, top, pool_size=len(rows))
+    decision = _build_decision_log(channel, top, pool_size=len(rows), live=live, pre=pre)
     return await _picked_meme_dict(decision["picked_meme_id"]), decision
