@@ -1,24 +1,24 @@
 redis==5.0.*
-alembic==1.18.*
+alembic==1.20.*
 psycopg2==2.9.*
-SQLAlchemy==2.0.49
+SQLAlchemy==2.0.55
 httpx==0.28.*
 
-pydantic==2.13.*
-pydantic-settings==2.14.*
+pydantic==2.14.*
+pydantic-settings==2.16.*
 asyncpg==0.31.*
 fastapi==0.136.*
 uvicorn[standard]==0.46.*
 
-sentry-sdk==2.60.*
+sentry-sdk==2.73.*
 
 # prefect + worker
 prefect==3.6.*
-beautifulsoup4==4.14.*
+beautifulsoup4==4.15.*
 lxml==6.1.*
 
-python-telegram-bot[rate-limiter]==22.7.*
+python-telegram-bot[rate-limiter]==22.8.*
 
-Pillow==11.3.*
+Pillow==13.0.*
 
-telethon==1.43.*
+telethon==1.45.*
