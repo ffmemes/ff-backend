@@ -125,7 +125,8 @@ async def _insert_crossposting(
 
 
 @pytest_asyncio.fixture()
-async def clean_xpost():
+async def clean_xpost(monkeypatch):
+    monkeypatch.setattr("src.crossposting.service.AB_ARMS", {})
     async with engine.connect() as conn:
         await _wipe(conn)
     yield

@@ -55,7 +55,7 @@ Design, assignment, frozen decision rules, confounds.
 - YYYY-MM-DD: started (deploy sha / PR).
 ```
 
-## Open (9)
+## Open (10)
 
 | check_on | experiment | status | primary metric | hypothesis |
 | --- | --- | --- | --- | --- |
@@ -66,6 +66,7 @@ Design, assignment, frozen decision rules, confounds.
 | 2026-11-20 | [crosspost_content_tags_v5c](2026-10-31-crosspost-content-tags.md) | running | Gate A kappa >=0.6; Gate B refit coefficient <= -0.05 with CI excluding 0 | Relatable jokes and tweet screenshots get ~8-10% fewer RU forwards at equal source and likes; down-weighting them raises forwards per post |
 | 2026-11-20 | [explore_budget_v1](2026-10-30-explore-budget.md) | running | likes per active user per week, memes per session | Spend exploration only on labeling fresh memes, show fresh winners to everyone, and fill the idle-return slot from like_spread |
 | 2026-11-21 | [raw_impr_rank_reaction_rate](2026-10-31-raw-impr-rank-reaction-rate.md) | running | like rate of memes with raw_impr_rank = 0, 3 weeks before vs after deploy | Within-source reaction rate (reactions/views) beats views for ranking cold memes |
+| 2026-11-28 | [crosspost_quirk_fix_ab](2026-11-01-crosspost-quirk-fix-ab.md) | running | mean zf (fix - control) per channel, 95% CI | Fixing the two crosspost scoring quirks (impression penalty 0 instead of 0.8 RU / 0.5 EN; x0.5 instead of x1.0 for sources without history) lets better memes reach the channels and raises forwards per post |
 | 2026-11-28 | [crosspost_src_fwd_v5f](2026-11-01-crosspost-src-forward-rate.md) | running | RU Spearman gain rho_v5f - rho_v5 with 95% CI excluding 0 | Memes whose source post was forwarded more than usual for that source get more forwards in our channels |
 | 2026-12-11 | [monthly_reminder_v1](2026-10-30-monthly-reminder.md) | running | react_30d_pct treated - holdout | One monthly HQ meme raises 30d activity of idle users who reacted before by >=3 pp at <2% blocks |
 

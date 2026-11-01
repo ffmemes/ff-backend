@@ -2,7 +2,6 @@
 
 import math
 
-from src.crossposting import scoring
 from src.crossposting.scoring import FACTORS, score
 from src.crossposting.service import _build_decision_log
 
@@ -64,11 +63,19 @@ def test_decision_log_ranks_picks_and_legacy_keys():
         _cand(102, 100, theta_src=0.9, user_taste_z=0.0, src_fwd_pct=0.9),
         _cand(103, 100, theta_src=0.8, user_taste_z=0.0),
     ]
-    log = _build_decision_log("tgchannelru", cands, pool_size=50)
+    log = _build_decision_log("tgchannelru", cands, pool_size=50, live="v4", pre="v4")
     a, b, c = log["candidates"]
     assert log["picked_meme_id"] == 101 and log["score_version"] == 4  # live = v4, ties → id
     assert a["picked_by"] == "v4" and a["picks"]["v5"] == 101
-    assert a["picks"] == {"v2": 101, "v4": 101, "v5": 101, "v5c": 102, "v5f": 102}
+    assert a["picks"] == {
+        "v2": 101,
+        "v4": 101,
+        "v5": 101,
+        "v5c": 102,
+        "v5f": 102,
+        "v2q": 101,
+        "v4q": 101,
+    }
     assert (a["ranks"]["v5f"], b["ranks"]["v5f"], c["ranks"]["v5f"]) == (3, 1, 2)
     # legacy flat keys used by docs/analyst readouts
     assert a["score_v5c"] == a["scores"]["v5c"] and a["final_score"] == a["scores"]["v4"]
@@ -77,17 +84,27 @@ def test_decision_log_ranks_picks_and_legacy_keys():
     assert c["src_fwd_pct"] is None and c["score_v5f"] == c["score_v5"]
 
 
-def test_live_shadow_falls_back_to_preselect_without_inputs(monkeypatch):
-    monkeypatch.setitem(scoring.LIVE, "tgchannelen", "v5")
-    log = _build_decision_log("tgchannelen", [_cand(101, 100)], pool_size=1)
+def test_live_shadow_falls_back_to_preselect_without_inputs():
+    log = _build_decision_log("tgchannelen", [_cand(101, 100)], pool_size=1, live="v5", pre="v2")
     top = log["candidates"][0]
     assert top["picked_by"] == "v2" and log["score_version"] == 2
     assert top["score_v5"] is None and "shadow_v5_rank" not in top
 
 
-def test_live_shadow_picks_when_promoted(monkeypatch):
-    monkeypatch.setitem(scoring.LIVE, "tgchannelen", "v5")
+def test_live_shadow_picks_when_promoted():
     cands = [_cand(101, 100, theta_src=0.5), _cand(102, 20, theta_src=2.0)]
-    log = _build_decision_log("tgchannelen", cands, pool_size=2)
+    log = _build_decision_log("tgchannelen", cands, pool_size=2, live="v5", pre="v2")
     assert log["picked_meme_id"] == 102 and log["score_version"] == 5
     assert log["candidates"][0]["final_score"] == log["candidates"][0]["score_v5"]
+
+
+def test_quirk_fix_factors():
+    f = FACTORS
+    low = _cand(1, 5, raw_impr_rank=2)
+    assert f["impr_factor"](low, "tgchannelru") == 0.0
+    assert f["impr_factor_q"](low, "tgchannelru") == 0.8
+    assert f["impr_factor_q"](low, "tgchannelen") == 0.5
+    assert f["src_quality_mult"](_cand(1, 5, src_signal=None), "") == 0.5
+    assert f["src_quality_q"](_cand(1, 5, src_signal=None), "") == 1.0
+    assert f["src_quality_q"](_cand(1, 5, src_signal=100.0), "") == 2.0
+    assert score(low, "tgchannelru", "v4") == 0.0 and score(low, "tgchannelru", "v4q") > 0

@@ -21,9 +21,20 @@ Row = dict[str, Any]
 # impr_penalty is 0, not the intended 0.8 (RU) / 0.5 (EN): the old SQL bound it into
 # `CASE ... THEN 1 ELSE :impr_penalty END`, which Postgres typed integer, so asyncpg
 # sent 0. Production has always zeroed memes with raw_impr_rank > 1; kept as-is.
+# The intended values live on in the quirk-fix A/B arm (v4q / v2q).
 CHANNEL_PARAMS: dict[str, dict[str, Any]] = {
-    "tgchannelru": {"impr_penalty": 0.0, "age_threshold": 7, "language_code": "ru"},
-    "tgchannelen": {"impr_penalty": 0.0, "age_threshold": 90, "language_code": "en"},
+    "tgchannelru": {
+        "impr_penalty": 0.0,
+        "impr_penalty_intended": 0.8,
+        "age_threshold": 7,
+        "language_code": "ru",
+    },
+    "tgchannelen": {
+        "impr_penalty": 0.0,
+        "impr_penalty_intended": 0.5,
+        "age_threshold": 90,
+        "language_code": "en",
+    },
 }
 
 
@@ -61,6 +72,16 @@ FACTORS: dict[str, Callable[[Row, str], float | None]] = {
         1.0 if r["nmemes_sent"] <= 1 else (r["nlikes"] + r["ndislikes"]) / r["nmemes_sent"]
     ),
     "src_quality_mult": _src_quality_mult,
+    # quirk-fix arm (experiments/2026-11-01-crosspost-quirk-fix-ab.md): intended
+    # impression penalty, and a neutral 1.0 for sources without enough history
+    "impr_factor_q": lambda r, c: (
+        1.0 if r["raw_impr_rank"] <= 1 else CHANNEL_PARAMS[c]["impr_penalty_intended"]
+    ),
+    "src_quality_q": lambda r, c: (
+        1.0
+        if r.get("src_signal") is None or not r.get("median_signal")
+        else _src_quality_mult(r, c)
+    ),
     "invited_boost": lambda r, c: 1.0 + min(r["invited_count"], 10) * 0.1,
     # v4: meme-level like volume (offline 2026-08-09)
     "like_volume_factor": lambda r, c: math.log(r["nlikes"] + 1.0),
@@ -86,18 +107,26 @@ _V2 = (
     "src_quality_mult",
     "invited_boost",
 )
+_V2Q = tuple(
+    {"impr_factor": "impr_factor_q", "src_quality_mult": "src_quality_q"}.get(f, f) for f in _V2
+)
 SCORES: dict[str, tuple[str, ...]] = {
     "v2": _V2,
     "v4": (*_V2, "like_volume_factor"),
     "v5": ("v5_base",),
     "v5c": ("v5_base", "content_mult_v1"),
     "v5f": ("v5_base", "src_fwd_mult"),
+    "v2q": _V2Q,
+    "v4q": (*_V2Q, "like_volume_factor"),
 }
 # crossposting.score_version / decision_log.score_version for the picking score.
-SCORE_VERSION = {"v2": 2, "v4": 4, "v5": 5, "v5c": 6, "v5f": 7}
+SCORE_VERSION = {"v2": 2, "v4": 4, "v5": 5, "v5c": 6, "v5f": 7, "v2q": 8, "v4q": 9}
 
 PRESELECT = {"tgchannelru": "v4", "tgchannelen": "v2"}
 LIVE = {"tgchannelru": "v4", "tgchannelen": "v2"}
+# Live A/B: each decision picks one arm at random and uses it for both PRESELECT and
+# LIVE. Remove the channel's entry to end the test (PRESELECT/LIVE apply again).
+AB_ARMS = {"tgchannelru": ("v4", "v4q"), "tgchannelen": ("v2", "v2q")}
 
 
 def score(row: Row, channel: str, name: str) -> float | None:
