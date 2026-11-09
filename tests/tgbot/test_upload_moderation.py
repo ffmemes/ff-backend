@@ -198,7 +198,7 @@ async def test_auto_review_does_not_revive_exact_file_id_duplicate(monkeypatch):
         patch.object(
             moderation,
             "add_watermark_to_meme_content",
-            new=AsyncMock(return_value=b"watermarked"),
+            return_value=b"watermarked",
         ),
         patch.object(
             moderation,

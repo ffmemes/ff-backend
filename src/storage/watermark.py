@@ -4,6 +4,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageStat
 
+from src.storage.constants import MemeType
+
 
 def draw_text_with_outline(
     draw: ImageDraw,
@@ -113,19 +115,16 @@ def draw_corner_watermark(
         return Image.alpha_composite(base, txt).convert("RGB")
 
 
-# TODO: async?
-def add_watermark(image_content: bytes) -> BytesIO | None:
-    image_bytes = BytesIO(image_content)
+def add_watermark_to_meme_content(meme_content: bytes, meme_type: MemeType) -> bytes | None:
+    if meme_type != MemeType.IMAGE:
+        return meme_content
 
     try:
-        image = draw_corner_watermark(image_bytes, text="@ffmemesbot")
+        image = draw_corner_watermark(BytesIO(meme_content), text="@ffmemesbot")
     except Exception as e:
         print(f"Error while adding watermark: {e}")
         return None
 
     buff = BytesIO()
-    buff.name = "image.jpeg"
     image.save(buff, "JPEG")
-    buff.seek(0)
-
-    return buff
+    return buff.getvalue()

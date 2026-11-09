@@ -13,10 +13,6 @@ from telegram.ext import ContextTypes
 from src import localizer
 from src.config import settings
 from src.flows.storage.describe_memes import describe_single_meme
-from src.flows.storage.memes import (
-    add_watermark_to_meme_content,
-    upload_meme_content_to_tg,
-)
 from src.observability.sentry import (
     capture_handled_exception,
     capture_handled_issue,
@@ -31,7 +27,8 @@ from src.storage.deduplication import (
     resolve_duplicate,
 )
 from src.storage.service import update_meme
-from src.storage.upload import download_meme_content_from_tg
+from src.storage.upload import download_meme_content_from_tg, upload_meme_content_to_tg
+from src.storage.watermark import add_watermark_to_meme_content
 from src.tgbot.handlers.treasury.constants import TrxType
 from src.tgbot.handlers.treasury.payments import pay_if_not_paid_with_alert
 from src.tgbot.handlers.upload.constants import SUPPORTED_LANGUAGES
@@ -273,7 +270,7 @@ async def _uploaded_meme_auto_review(
         )
 
     logging.info(f"Adding watermark to meme {meme['id']} content")
-    watermarked_meme_content = await add_watermark_to_meme_content(image_bytes, meme["type"])
+    watermarked_meme_content = add_watermark_to_meme_content(image_bytes, meme["type"])
     if watermarked_meme_content is None:
         capture_handled_issue(
             "user_upload.watermark_failed",

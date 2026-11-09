@@ -4,7 +4,7 @@ from prefect import flow, get_run_logger
 
 from src.flows.hooks import notify_telegram_on_failure
 from src.storage import ads
-from src.storage.constants import MemeStatus, MemeType
+from src.storage.constants import MemeStatus
 from src.storage.deduplication import (
     deduplicate_pending_meme,
     sweep_file_id_duplicates,
@@ -24,7 +24,7 @@ from src.storage.upload import (
     download_meme_content_file,
     upload_meme_content_to_tg,
 )
-from src.storage.watermark import add_watermark
+from src.storage.watermark import add_watermark_to_meme_content
 
 
 async def analyse_meme_caption(meme: dict[str, Any]) -> None:
@@ -46,16 +46,6 @@ async def analyse_meme_caption(meme: dict[str, Any]) -> None:
             return
 
 
-async def add_watermark_to_meme_content(meme_content: bytes, meme_type: MemeType) -> bytes | None:
-    if meme_type == MemeType.IMAGE:
-        # we can add watermark only to photos right now
-        watermarked_content = add_watermark(meme_content)
-        if watermarked_content is None:
-            return None
-        return watermarked_content.getvalue()
-    return meme_content
-
-
 async def upload_meme_to_telegram(
     meme: dict[str, Any],
 ) -> dict[str, Any] | None:
@@ -68,9 +58,7 @@ async def upload_meme_to_telegram(
         await update_meme(meme["id"], status=MemeStatus.BROKEN_CONTENT_LINK)
         return None
 
-    watermarked_meme_content = await add_watermark_to_meme_content(
-        meme_original_content, meme["type"]
-    )
+    watermarked_meme_content = add_watermark_to_meme_content(meme_original_content, meme["type"])
     if watermarked_meme_content is None:
         logger.warning(f"Can't add watermark to {meme['id']}/{meme['type']} content")
         return None
@@ -105,15 +93,7 @@ async def _process_unloaded_memes(
             meme = await upload_meme_to_telegram(unloaded_meme)
         except Exception as e:
             logger.warning(f"Meme {unloaded_meme['id']}: upload error: {e}")
-            fail_count += 1
-            consecutive_fails += 1
-            if consecutive_fails >= 5:
-                logger.error(
-                    f"5 consecutive failures — stopping batch. "
-                    f"Processed {i + 1}/{total}, {ok_count} ok, {fail_count} failed."
-                )
-                break
-            continue
+            meme = None
 
         if not meme:
             fail_count += 1
