@@ -14,7 +14,7 @@ from src.database import (
     meme_source,
 )
 from src.storage.constants import MemeSourceType, MemeStatus, MemeType
-from src.tgbot.service import get_or_create_meme_source
+from src.tgbot.repo.meme_sources import get_or_create_meme_source
 
 
 async def create_meme_raw_upload(msg: Message) -> dict[str, Any]:
