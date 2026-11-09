@@ -93,15 +93,7 @@ async def _process_unloaded_memes(
             meme = await upload_meme_to_telegram(unloaded_meme)
         except Exception as e:
             logger.warning(f"Meme {unloaded_meme['id']}: upload error: {e}")
-            fail_count += 1
-            consecutive_fails += 1
-            if consecutive_fails >= 5:
-                logger.error(
-                    f"5 consecutive failures — stopping batch. "
-                    f"Processed {i + 1}/{total}, {ok_count} ok, {fail_count} failed."
-                )
-                break
-            continue
+            meme = None
 
         if not meme:
             fail_count += 1
