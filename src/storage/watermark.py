@@ -4,6 +4,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageStat
 
+from src.storage.constants import MemeType
+
 
 def draw_text_with_outline(
     draw: ImageDraw,
@@ -113,7 +115,6 @@ def draw_corner_watermark(
         return Image.alpha_composite(base, txt).convert("RGB")
 
 
-# TODO: async?
 def add_watermark(image_content: bytes) -> BytesIO | None:
     image_bytes = BytesIO(image_content)
 
@@ -129,3 +130,12 @@ def add_watermark(image_content: bytes) -> BytesIO | None:
     buff.seek(0)
 
     return buff
+
+
+def add_watermark_to_meme_content(meme_content: bytes, meme_type: MemeType) -> bytes | None:
+    if meme_type != MemeType.IMAGE:
+        return meme_content
+    watermarked_content = add_watermark(meme_content)
+    if watermarked_content is None:
+        return None
+    return watermarked_content.getvalue()
