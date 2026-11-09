@@ -145,16 +145,16 @@ async def get_users_to_broadcast_post_from_tgchannelru():
 async def get_users_with_language(
     language_code: str,
 ):
-    select_query = f"""
+    select_query = """
         SELECT UL.user_id
         FROM user_language UL
         JOIN "user" U
             ON U.id = UL.user_id
-        WHERE UL.language_code = '{language_code}'
+        WHERE UL.language_code = :language_code
             AND U.blocked_bot_at IS NULL
             AND U.type NOT IN ('waitlist', 'blocked_bot')
     """
-    return await fetch_all(text(select_query))
+    return await fetch_all(text(select_query).bindparams(language_code=language_code))
 
 
 async def get_users_inactive_since_days(days: int) -> list[int]:
