@@ -72,17 +72,6 @@ async def get_user_upload_ban_status(user_id: int) -> dict[str, Any] | None:
     return await fetch_one(query, {"user_id": user_id})
 
 
-async def get_or_create_meme_source_for_meme_upload(
-    meme_upload: dict[str, Any],
-) -> dict[str, Any]:
-    return await get_or_create_meme_source(
-        url="tg://user?id={}".format(meme_upload["user_id"]),
-        type=MemeSourceType.USER_UPLOAD,
-        status=MemeStatus.CREATED,
-        added_by=meme_upload["user_id"],
-    )
-
-
 async def create_meme_from_meme_raw_upload(
     meme_upload: dict[str, Any],
 ) -> dict[str, Any]:
@@ -102,12 +91,18 @@ async def create_meme_from_meme_raw_upload(
     else:
         meme_type = MemeType.IMAGE
 
-    meme_source_for_meme_upload = await get_or_create_meme_source_for_meme_upload(meme_upload)
+    user_id = meme_upload["user_id"]
+    upload_source = await get_or_create_meme_source(
+        url=f"tg://user?id={user_id}",
+        type=MemeSourceType.USER_UPLOAD,
+        status=MemeStatus.CREATED,
+        added_by=user_id,
+    )
 
     query = (
         insert(meme)
         .values(
-            meme_source_id=meme_source_for_meme_upload["id"],
+            meme_source_id=upload_source["id"],
             raw_meme_id=meme_upload["id"],
             status=MemeStatus.CREATED,
             type=meme_type,
