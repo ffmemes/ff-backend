@@ -78,7 +78,7 @@ async def _image_hash(meme_id: int, meme_type: MemeType, content: bytes, media: 
 async def _upload_meme_content_to_tg(
     meme_id: int,
     meme_type: MemeType,
-    content: bytes,  # ??
+    content: bytes,
 ) -> dict[str, Any] | None:
     file_id = None
     media = None
@@ -166,8 +166,6 @@ async def upload_meme_content_to_tg(
     *,
     observability_context: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
-    # just a wrapper to handle retries
-
     meme_result = None
     max_attempts = 3
     content_size = len(content)

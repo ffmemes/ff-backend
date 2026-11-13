@@ -136,11 +136,6 @@ def _get_ru_caption_for_crossposting_meme(meme: MemeData, channel: Channel) -> s
     cta = random.choice(CTAS)
     ref_link = "https://t.me/ffmemesbot?start=sc_{}_{}".format(meme.id, channel.value)
 
-    # emoji = get_random_emoji()
-    # referral_html = f"""{emoji} <i><a href="{ref_link}">Fast Food Memes</a></i>"""
-    # caption = escape(meme.caption, quote=False) if meme.caption else ""
-    # text = caption + "\n\n" + referral_html
-
     text = cta + ": " + f"""<a href="{ref_link}">@ffmemesbot</a>"""
 
     return text
@@ -220,8 +215,7 @@ async def post_meme_to_tgchannelen():
     next_meme = MemeData(**meme_data)
     logger.info(f"Next meme for TG Channel EN: {next_meme.id}")
 
-    # Persist the ranker decision for retro analysis. Failure must NOT propagate
-    # — Prefect retry would republish the meme.
+    # Ranker logging is best effort so analytics cannot block posting.
     if decision:
         try:
             await log_ranker_decision(**decision)
@@ -280,8 +274,7 @@ async def post_meme_to_tgchannelru():
     next_meme = MemeData(**meme_data)
     logger.info(f"Next meme for TG Channel RU: {next_meme.id}")
 
-    # Persist the ranker decision for retro analysis. Failure must NOT propagate
-    # — Prefect retry would republish the meme.
+    # Ranker logging is best effort so analytics cannot block posting.
     if decision:
         try:
             await log_ranker_decision(**decision)

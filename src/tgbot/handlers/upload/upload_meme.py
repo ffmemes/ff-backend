@@ -271,7 +271,6 @@ async def handle_message_with_meme(update: Update, context: ContextTypes.DEFAULT
         raise Exception(f"not supported format: {update.message.to_json()}")
 
 
-# callback: RULES_ACCEPTED_CALLBACK_DATA
 async def handle_rules_accepted_callback(
     update: Update,
     _: ContextTypes.DEFAULT_TYPE,
@@ -292,7 +291,6 @@ async def handle_rules_accepted_callback(
     )
 
 
-# callback_data = LANG_SETTINGS_END_CALLBACK_DATA
 async def handle_meme_upload_lang_other(
     update: Update,
     _: ContextTypes.DEFAULT_TYPE,
@@ -304,7 +302,6 @@ async def handle_meme_upload_lang_other(
     )
 
 
-# callback: RULES_ACCEPTED_CALLBACK_DATA
 async def handle_meme_upload_lang_selected(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
@@ -319,8 +316,6 @@ async def handle_meme_upload_lang_selected(
     meme = await create_meme_from_meme_raw_upload(meme_upload)
 
     await log(f"""📥 Meme {meme["id"]} uploaded by #{update.effective_user.id}""", context.bot)
-
-    # TODO: create a meme object from meme_raw_upload
 
     await _edit_upload_callback_caption(
         update.callback_query.message,

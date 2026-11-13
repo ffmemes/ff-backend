@@ -697,13 +697,9 @@ def _is_transient_connection_error(exc: BaseException) -> bool:
     return _is_stale_connection_error(exc) or _is_concurrent_use_error(exc)
 
 
-# Shared retry budget for stale / concurrent-use connection errors.
-# Three retries (25 ms + 50 ms + 100 ms backoff) give the event loop enough
-# time to dispose dirty connections under burst webhook concurrency.
-# Under traffic spikes the LIFO pool can hand out several consecutively
-# dirty connections; 2 retries proved insufficient (9 Sentry events on
-# 2026-04-12).  Bumping to 3 retries with wider backoff makes exhaustion
-# astronomically unlikely while adding only ~175 ms worst-case latency.
+# The LIFO pool can return consecutive stale/concurrent-use connections under load.
+# Two retries proved insufficient (9 Sentry events on 2026-04-12); three retries
+# allow 25 + 50 + 100 ms of backoff before propagating the failure.
 _TRANSIENT_MAX_RETRIES = 3
 
 

@@ -33,8 +33,6 @@ async def add_user_languages(
     user_id: int,
     language_codes: Sequence[str],
 ) -> None:
-    # Prepare a list of dictionaries where each dictionary represents
-    # the values to be inserted for one row.
     values_to_insert = [
         {"user_id": user_id, "language_code": language_code} for language_code in language_codes
     ]
