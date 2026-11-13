@@ -19,21 +19,16 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_application: FastAPI) -> AsyncGenerator:
-    # Startup
     tgbot_app.application = tgbot_app.setup_application(settings.ENVIRONMENT.is_deployed)
     await tgbot_app.application.initialize()
 
-    # flush all redis keys on startup for debug
-    # await redis.redis_client.flushall()
-
-    # if is_webhook:  # all gunicorn workers will call this and hit rate limit
-    #     await bot.setup_webhook(bot.application)
+    # Do not register the webhook here: every Gunicorn worker runs lifespan,
+    # so startup registration would repeatedly hit Telegram's rate limit.
 
     yield
 
     if settings.ENVIRONMENT.is_testing:
         return
-    # Shutdown
     await redis.pool.disconnect()
 
 

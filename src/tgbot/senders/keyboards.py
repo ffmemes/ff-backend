@@ -21,8 +21,6 @@ from src.tgbot.constants import (
 )
 from src.tgbot.sharing import build_meme_share_button
 
-# IDEA: use sometimes another emoji pair like 🤣/🤮
-
 HEART_EMOJI = ["❤️", "♥️", "💙", "💜", "💛", "🧡", "💚", "🩵"]
 
 
@@ -36,7 +34,6 @@ def meme_reaction_keyboard(
 ):
     like = random.choice(HEART_EMOJI)
     dislike = "⏬"
-    # like, dislike = "👍", "👎"
 
     def reaction_callback(reaction_id: int) -> str:
         callback_data = MEME_BUTTON_CALLBACK_DATA_PATTERN.format(

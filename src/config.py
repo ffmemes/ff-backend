@@ -80,13 +80,6 @@ class Config(BaseSettings):
     TELEGRAM_API_HASH: str | None = None
     TELEGRAM_SESSION_STRING: str | None = None
 
-    # @model_validator(mode="after")
-    # def validate_sentry_non_local(self) -> "Config":
-    #     if self.ENVIRONMENT.is_deployed and not self.SENTRY_DSN:
-    #         raise ValueError("Sentry is not set")
-
-    #     return self
-
 
 settings = Config()
 

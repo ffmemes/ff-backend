@@ -3,7 +3,6 @@ from pathlib import Path
 
 import yaml
 
-# not sure where to put this const
 DEFAULT_LANG = "en"
 
 ALMOST_CIS_LANGUAGES = [
