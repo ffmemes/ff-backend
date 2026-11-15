@@ -1,16 +1,16 @@
 ---
 id: crosspost_content_tags_v5c
-status: running
+status: killed
 hypothesis: Relatable jokes and tweet screenshots get ~8-10% fewer RU forwards at equal source and likes; down-weighting them raises forwards per post
 primary_metric: Gate A kappa >=0.6; Gate B refit coefficient <= -0.05 with CI excluding 0
 guardrails: tagged_pct, corr_v5c - corr_v5
 unit: channel_post
 variants: shadow (logged only, score_v5c)
 started: 2026-10-31
-check_on: 2026-11-20
-decided: 
-result: unknown
-learning: 
+check_on:
+decided: 2026-11-15
+result: Gate A fails on 477 post-prompt-change labels; relatable kappa 0.235 vs required 0.60, tweet_screenshot 0.769; no live rollout
+learning: Retire this tag multiplier candidate for failed measurement quality; the underlying content effect remains untested online
 code: Describe Memes content tags, src/crossposting/scoring.py
 readout: docs/analyst/crossposting-content-tags-gates.py, docs/analyst/crossposting-content-tags-shadow.sql
 ---
@@ -18,9 +18,9 @@ readout: docs/analyst/crossposting-content-tags-gates.py, docs/analyst/crosspost
 # Experiment: Crosspost content tags (relatable / tweet screenshot)
 
 - **Created:** 2026-10-31
-- **Status:** active. Tags are collected and a shadow score is logged; the production pick is unchanged.
+- **Status:** current candidate rejected on 2026-11-15. Tags and shadow scores still log; the production pick is unchanged.
 - **Channels:** `tgchannelru` decides. `tgchannelen` is logged for reference only.
-- **Check date:** **2026-11-20**
+- **Check date:** closed **2026-11-15**; no automatic prompt-repair cycle.
 - **Research:** [`docs/analyst/research/2026-10-30-forward-drivers/`](../docs/analyst/research/2026-10-30-forward-drivers/README.md)
 - **Gates:** [`docs/analyst/crossposting-content-tags-gates.py`](../docs/analyst/crossposting-content-tags-gates.py)
 - **Shadow readout:** [`docs/analyst/crossposting-content-tags-shadow.sql`](../docs/analyst/crossposting-content-tags-shadow.sql)
@@ -77,7 +77,7 @@ Also report `crossposting-content-tags-shadow.sql`:
 
 ## Metrics after
 
-_(fill on 2026-11-20)_
+See the 2026-11-15 readout and decision below.
 
 - 2026-10-31 ~16:00 UTC: prompt example changed from `false` to `true or false` for both booleans (models echoed the example). Count Gate A only on tags with calculated_at after this deploy.
 
@@ -93,4 +93,19 @@ _(fill on 2026-11-20)_
 
 ## Readout 2026-11-15
 
-Interim Gate A on477 overlapping labels with post-prompt-change tags: relatable kappa .235 (<.6), tweet_screenshot .769. A fails; no live multiplier. Gate B not run in this review. RU chosen-pick tagging9.2%. [Full snapshot](../docs/analyst/readouts/2026-11-15-experiment-review.md).
+Gate A on 477 overlapping labels with post-prompt-change tags: relatable kappa .235 (<.6), tweet_screenshot .769. A fails; no live multiplier. Gate B not run in this review. RU chosen-pick tagging 9.2%. [Full snapshot](../docs/analyst/readouts/2026-11-15-experiment-review.md).
+
+## Decision 2026-11-15 — retire this version
+
+Reject the current implementation as a rollout candidate. The original A-failure
+branch above proposed another prompt revision; this dated prioritization decision
+supersedes that next action after the request to replace failed tests with ideas
+that can materially grow the project. Do not silently tune the prompt and reopen
+the same evidence window. A future version needs a new record, versioned tags,
+fresh Gate A validation and Gate B before any live change.
+
+`killed` describes the rollout candidate, not proof that content tags cannot work.
+No online growth effect was tested. Existing free OCR/tag collection and shadow
+logging remain in production; this documentation change does not disable them or
+claim that cleanup was deployed. New effort goes first to activation and channel
+acquisition rather than another multiplier repair.

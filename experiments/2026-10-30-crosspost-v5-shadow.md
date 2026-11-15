@@ -7,7 +7,7 @@ guardrails: n_posted >= 60 per channel
 unit: channel_post
 variants: shadow (logged only, v5_src_beta_taste_v1)
 started: 2026-10-30
-check_on: 2026-11-14
+check_on: 2026-11-21
 decided: 
 result: unknown
 learning: 
@@ -20,7 +20,7 @@ readout: docs/analyst/crossposting-v5-shadow.sql
 Created: 2026-10-30
 Status: **active (shadow only, production pick unchanged)**
 Channels: `tgchannelru`, `tgchannelen`
-Check date: **2026-11-14**
+Check date: **2026-11-21**, extended under the insufficient-sample rule below.
 Readout: [`docs/analyst/crossposting-v5-shadow.sql`](../docs/analyst/crossposting-v5-shadow.sql)
 
 ## Evidence (DS study 2026-10-30)
@@ -92,3 +92,8 @@ _(fill on 2026-11-14)_
 ## Readout 2026-11-15
 
 Checkpoint: original pooled RU n=71 corr v5 .233 vs v4 -.392; concurrent quirk A/B/comparator confound. Modern matched posts n=65: RU v5 .227 vs actual ranker .225; original-control subset n=37. EN SQL uses v4 instead of v2. Do not promote from pooled readout; fix comparator and assess arms separately. [Full snapshot](../docs/analyst/readouts/2026-11-15-experiment-review.md).
+
+Decision: retain the Nov21 checkpoint under the original sample extension; modern
+control cohorts have 37 RU / 39 EN posts, below 60. This is not a pass. Before any
+promotion, register the correct channel/arm comparator and finish the live quirk
+A/B; a shadow correlation is not evidence of incremental growth over its winner.
