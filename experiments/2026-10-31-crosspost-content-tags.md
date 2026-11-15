@@ -89,3 +89,8 @@ _(fill on 2026-11-20)_
   shadow scores rank only the production top-5 (`PRESELECT`), not the whole pool.
   Replay before/after: same pick and top-5 on 120 local fixture runs, the last 40 prod
   decisions and the current prod pool (both channels).
+
+
+## Readout 2026-11-15
+
+Interim Gate A on477 overlapping labels with post-prompt-change tags: relatable kappa .235 (<.6), tweet_screenshot .769. A fails; no live multiplier. Gate B not run in this review. RU chosen-pick tagging9.2%. [Full snapshot](../docs/analyst/readouts/2026-11-15-experiment-review.md).

@@ -87,3 +87,8 @@ deployed. Evidence from the 2026-09-07 blast suggests a first run brings about
   receive the other steps, which is shared background for both arms.
 - Holdout skips are not stored as `user_meme_reaction` rows. Use the
   assignment table for denominators.
+
+
+## Readout 2026-11-15
+
+Interim: 15m holdout/treatment n=79/443, 24h=77/425, below >=150/arm. Baseline-adjusted reaction deltas have CIs spanning zero; no cadence change. Check Nov20, extend per protocol if sample still insufficient. [Full snapshot](../docs/analyst/readouts/2026-11-15-experiment-review.md).

@@ -87,3 +87,8 @@ _(fill on 2026-11-14)_
   shadow scores rank only the production top-5 (`PRESELECT`), not the whole pool.
   Replay before/after: same pick and top-5 on 120 local fixture runs, the last 40 prod
   decisions and the current prod pool (both channels).
+
+
+## Readout 2026-11-15
+
+Checkpoint: original pooled RU n=71 corr v5 .233 vs v4 -.392; concurrent quirk A/B/comparator confound. Modern matched posts n=65: RU v5 .227 vs actual ranker .225; original-control subset n=37. EN SQL uses v4 instead of v2. Do not promote from pooled readout; fix comparator and assess arms separately. [Full snapshot](../docs/analyst/readouts/2026-11-15-experiment-review.md).

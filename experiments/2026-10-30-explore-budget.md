@@ -137,3 +137,8 @@ it also needs dedup-id exclusion and pos2/fresh_ru guardrails the views do not
 have). On 2026-11-20 also report `v_experiment_user` user-level means
 (`reactions_per_week`, `likes_per_week`, `memes_per_session`, segment
 `<> 'excluded'`) as a cross-check; definitions in `docs/analyst/north_star.sql`.
+
+
+## Readout 2026-11-15
+
+Interim primary excludes automated accounts and 7,762 restored ids: ordinary users likes/week 99.23 -> 55.21, memes/session 25.31 -> 21.64; C/T n=165/173. Baseline imbalance and wide CIs; fresh RU labeling 2267/2535=89.43% below 90%. Not a rollout candidate; Nov20 decision unchanged. [Full snapshot](../docs/analyst/readouts/2026-11-15-experiment-review.md).

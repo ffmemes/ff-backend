@@ -41,3 +41,8 @@ Fewer than 150 users per arm: extend 2 weeks.
 - 2026-10-30: code merged, flag off.
 
 - 2026-10-31: verified MONTHLY_REMINDER_ENABLED=true in the prod Prefect runner; status set to running (started = date verified, first send follows the flow schedule).
+
+
+## Readout 2026-11-15
+
+Interim: D7 reactors treatment 69/941 vs holdout 8/925 (+6.47 pp, 95% CI +4.75..+8.36); D14 85/941 vs16/925. Currently blocked 21/941=2.23% vs1/925, above treatment <2% point gate. No closed D30 windows; Dec11 decision unchanged. [Full snapshot](../docs/analyst/readouts/2026-11-15-experiment-review.md).

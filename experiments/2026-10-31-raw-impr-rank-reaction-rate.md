@@ -33,3 +33,8 @@ switch is gradual.
 
 Kill (revert to views) if the like rate of rank-0 memes does not rise over 3 weeks
 after deploy vs 3 weeks before. No readout SQL committed yet.
+
+
+## Readout 2026-11-15
+
+Checkpoint: live rank is overwritten in place and no frozen readout SQL exists. Current-rank joins cannot recover rank-at-send pre/post cohorts. Investigate historical reconstruction before Nov21; otherwise register prospective measurement. No valid outcome estimate yet. [Full snapshot](../docs/analyst/readouts/2026-11-15-experiment-review.md).

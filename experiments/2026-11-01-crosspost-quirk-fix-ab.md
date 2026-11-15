@@ -31,3 +31,8 @@ readout: docs/analyst/crossposting-quirk-fix-ab.sql
 - **Overlap:** v5f shadow (`crosspost_src_fwd_v5f`) is log-only and still ranks within whichever
   top-N the arm preselected. Its Spearman readout pools both arms.
 - **End the test:** remove the channel from `AB_ARMS`, then set `LIVE`/`PRESELECT` to the winner.
+
+
+## Readout 2026-11-15
+
+Interim >=48h image posts: RU control/fix n=37/28, delta zf +0.307 +/-0.183; EN n=39/26, -0.123 +/-0.258 (approx 95%). Keep Nov28 decision. Fix actually restores 0.8/0.5 and neutral x1; front-matter hypothesis describes the direction backwards. [Full snapshot](../docs/analyst/readouts/2026-11-15-experiment-review.md).

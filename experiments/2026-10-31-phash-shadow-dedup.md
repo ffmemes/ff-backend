@@ -30,3 +30,8 @@ backfill, label sample pairs for precision, then decide on merges (Hamming dista
 the upgrade path).
 
 - 2026-10-31: check_on set to 2026-11-14: run scripts/admin/backfill_image_hash.py for 30 days of images, then docs/analyst/phash-shadow.sql; turn merging on only if a 50-pair sample shows >=95% true duplicates.
+
+
+## Readout 2026-11-15
+
+Checkpoint:630 valid-hash collision groups,778 potential additional merges, new live images6203/6203 hashed. Precision unmeasured here;50-pair validation remains. Sample must exclude0/-1 and reflect production candidate choice; no automatic merges authorized by this result. [Full snapshot](../docs/analyst/readouts/2026-11-15-experiment-review.md).

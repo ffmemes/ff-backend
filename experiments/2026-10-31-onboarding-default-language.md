@@ -52,3 +52,8 @@ FROM "user" u WHERE u.created_at >= now() - interval '42 days' GROUP BY 1 ORDER 
 **2026-11-14**.
 
 Not doing: a multi-select language picker for new users (it is already one tap; `/lang` is settings).
+
+
+## Readout 2026-11-15
+
+Interim: 14d pre/post first-meme delivery 49/62 -> 57/58, first tap 30/62 -> 18/58; post-merge no-language 0/60. Bug fixed, activation uplift not established. [Full snapshot](../docs/analyst/readouts/2026-11-15-experiment-review.md).

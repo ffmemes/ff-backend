@@ -82,3 +82,8 @@ _(fill on 2026-11-28)_
   shadow scores rank only the production top-5 (`PRESELECT`), not the whole pool.
   Replay before/after: same pick and top-5 on 120 local fixture runs, the last 40 prod
   decisions and the current prod pool (both channels).
+
+
+## Readout 2026-11-15
+
+Interim: chosen-pick coverage RU 3.9%, EN15.8%; RU 0/76 changed v5f picks. Only3/66 mature RU posts covered. RU current candidate age median618 days, collector targets20-48h source posts. Coverage gate fails; fix candidate-pool coverage before judging score. [Full snapshot](../docs/analyst/readouts/2026-11-15-experiment-review.md).
