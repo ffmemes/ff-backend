@@ -73,8 +73,8 @@ class MatchedComparisonTest(unittest.TestCase):
             manifest_path = Path(directory) / "manifest.json"
             manifest_path.write_text(json.dumps(manifest))
             kwargs = {
-                "start": compare.EVALUATION_START,
-                "end": compare.EVALUATION_END,
+                "start": base.timestamp("2026-12-01"),
+                "end": base.timestamp("2026-12-15"),
                 "label_cutoff": base.timestamp("2026-12-16"),
                 "as_of": base.timestamp("2026-12-16"),
                 "min_idle": 7,
@@ -205,19 +205,59 @@ class MatchedComparisonTest(unittest.TestCase):
             "training_first_send": "2026-10-01",
             "training_last_send": "2026-11-19",
             "evaluation_plan": {
-                "start": compare.EVALUATION_START.isoformat(),
-                "end": compare.EVALUATION_END.isoformat(),
+                "start": "2026-12-01T00:00:00+00:00",
+                "end": "2026-12-15T00:00:00+00:00",
             },
         }
-        with self.assertRaisesRegex(ValueError, "December outcomes unavailable"):
+        with self.assertRaisesRegex(ValueError, "prospective outcomes unavailable"):
             compare.evaluate_frozen([], bundle, base.timestamp("2026-11-21"))
-        rows = synthetic_rows(compare.EVALUATION_END, days=14)
+        rows = synthetic_rows(base.timestamp("2026-12-15"), days=14)
         unchanged = json.dumps(bundle, sort_keys=True)
         with patch.object(base, "fit_models", side_effect=AssertionError("refit")):
             report = compare.evaluate_frozen(rows, bundle, base.timestamp("2026-12-16"))
         self.assertEqual(report["evaluation"]["status"], "evaluated")
         self.assertEqual(unchanged, json.dumps(bundle, sort_keys=True))
         self.assertEqual(report["evaluation"]["sends"], len(rows))
+
+    def test_december_cutoff_uses_january_window_and_keeps_maturity_guards(self):
+        cutoff = base.timestamp("2026-12-21")
+        start, end = compare.prospective_window(cutoff)
+        self.assertEqual(start, base.timestamp("2027-01-01"))
+        self.assertEqual(end, base.timestamp("2027-01-15"))
+        pending, untrained = compare.train_comparison([], cutoff, LIMITS)
+        self.assertIsNone(untrained)
+        self.assertEqual(pending["evaluation_plan"]["start"], start.isoformat())
+        self.assertEqual(
+            pending["evaluation_plan"]["required_as_of"], base.timestamp("2027-01-16").isoformat()
+        )
+        bundle = {
+            "version": compare.VERSION,
+            "models": constant_models(),
+            "limits": LIMITS,
+            "training_cutoff": cutoff.isoformat(),
+            "training_first_send": "2026-11-01",
+            "training_last_send": "2026-12-19",
+            "evaluation_plan": {"start": start.isoformat(), "end": end.isoformat()},
+        }
+        with self.assertRaisesRegex(ValueError, "2027-01-16"):
+            compare.evaluate_frozen([], bundle, base.timestamp("2027-01-15"))
+        rows = synthetic_rows(end, days=14)
+        with patch.object(base, "fit_models", side_effect=AssertionError("refit")):
+            report = compare.evaluate_frozen(rows, bundle, base.timestamp("2027-01-16"))
+        self.assertEqual(report["evaluation"]["status"], "evaluated")
+        self.assertEqual(report["evaluation_start"], start.isoformat())
+        wrong_plan = dict(bundle, evaluation_plan={"start": "2026-12-01", "end": "2026-12-15"})
+        with self.assertRaisesRegex(ValueError, "month after training cutoff"):
+            compare.evaluate_frozen(rows, wrong_plan, base.timestamp("2027-01-16"))
+        wrong_observation = dict(
+            bundle, evaluation_plan=dict(bundle["evaluation_plan"], required_as_of="2027-01-15")
+        )
+        with self.assertRaisesRegex(ValueError, "observation cutoff"):
+            compare.evaluate_frozen(rows, wrong_observation, base.timestamp("2027-01-16"))
+        self.assertEqual(
+            compare.prospective_window(base.timestamp("2026-11-21")),
+            (base.timestamp("2026-12-01"), base.timestamp("2026-12-15")),
+        )
 
 
 if __name__ == "__main__":

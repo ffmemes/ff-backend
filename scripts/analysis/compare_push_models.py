@@ -2,8 +2,8 @@
 
 Train writes aggregate JSON and a private frozen bundle for five feature arms.
 Every outer fold chooses regularization using only earlier, matured inner folds.
-Evaluate uses unchanged weights on the predeclared December 1-14 window and
-rejects incomplete observation windows. Neither command queries production.
+Evaluate uses unchanged weights on days 1-14 of the month following training
+cutoff and rejects incomplete observation windows. Neither command queries production.
 """
 
 from __future__ import annotations
@@ -52,8 +52,25 @@ CONTRASTS = {
     },
     "content_beyond_long_user_secondary": {"long_user": 1, "full_long": -1},
 }
-EVALUATION_START = base.timestamp("2026-12-01")
-EVALUATION_END = EVALUATION_START + timedelta(days=14)
+
+
+def prospective_window(cutoff) -> tuple:
+    start = datetime(
+        cutoff.year + (cutoff.month == 12), cutoff.month % 12 + 1, 1, tzinfo=timezone.utc
+    )
+    return start, start + timedelta(days=14)
+
+
+def frozen_window(bundle: dict) -> tuple:
+    start, end = prospective_window(base.timestamp(bundle["training_cutoff"]))
+    plan = bundle["evaluation_plan"]
+    if base.timestamp(plan["start"]) != start or base.timestamp(plan["end"]) != end:
+        raise ValueError(
+            "frozen evaluation must cover days 1-14 of the month after training cutoff"
+        )
+    if "required_as_of" in plan and base.timestamp(plan["required_as_of"]) != end + HORIZON:
+        raise ValueError("frozen observation cutoff must be 24 hours after its evaluation window")
+    return start, end
 
 
 def file_digest(path: Path) -> str:
@@ -307,6 +324,7 @@ def descriptive_groups(rows: list, probabilities: dict, limits: dict) -> dict:
 
 
 def train_comparison(rows: list, cutoff, limits: dict) -> tuple[dict, dict | None]:
+    evaluation_start, evaluation_end = prospective_window(cutoff)
     eligible = [row for row in rows if row["sent_at"] + HORIZON <= cutoff]
     folds = []
     pooled = []
@@ -343,9 +361,9 @@ def train_comparison(rows: list, cutoff, limits: dict) -> tuple[dict, dict | Non
         "descriptive": descriptive_groups(pooled, pooled_probabilities, limits),
         "final_regularization": tuning,
         "evaluation_plan": {
-            "start": EVALUATION_START.isoformat(),
-            "end": EVALUATION_END.isoformat(),
-            "required_as_of": (EVALUATION_END + HORIZON).isoformat(),
+            "start": evaluation_start.isoformat(),
+            "end": evaluation_end.isoformat(),
+            "required_as_of": (evaluation_end + HORIZON).isoformat(),
             "status": "unavailable_until_complete",
         },
         "interpretation": "Matched prediction ablation on the same observed deliveries; "
@@ -391,12 +409,13 @@ def evaluate_frozen(rows: list, bundle: dict, as_of) -> dict:
         for name, features in FEATURE_SETS.items()
     ):
         raise ValueError("frozen arm feature schema differs from its declared ablation")
-    start = base.timestamp(bundle["evaluation_plan"]["start"])
-    end = base.timestamp(bundle["evaluation_plan"]["end"])
-    if start != EVALUATION_START or end != EVALUATION_END or start < cutoff:
-        raise ValueError("frozen evaluation must be the aligned December 1-14 window")
+    start, end = frozen_window(bundle)
     if as_of < end + HORIZON:
-        raise ValueError("December outcomes unavailable; require as-of December 16 or later")
+        raise ValueError(
+            "prospective outcomes unavailable; require as-of "
+            + (end + HORIZON).isoformat()
+            + " or later"
+        )
     test = [row for row in rows if start <= row["sent_at"] < end]
     probabilities = predictions(test, bundle["models"])
     return {
@@ -424,7 +443,11 @@ def main() -> None:
     train.add_argument("--input", type=Path, required=True)
     train.add_argument("--manifest", type=Path, help="default: manifest.json beside input")
     train.add_argument("--as-of", required=True)
-    train.add_argument("--cutoff", default="2026-11-21")
+    train.add_argument(
+        "--cutoff",
+        default="2026-11-21",
+        help="UTC training cutoff; evaluation is fixed to next month's days 1-14",
+    )
     train.add_argument("--model-out", type=Path, required=True)
     train.add_argument("--min-idle-days", type=float, default=7)
     train.add_argument("--min-train", type=int, default=200)
@@ -443,8 +466,8 @@ def main() -> None:
         manifest_path = args.manifest or args.input.with_name("manifest.json")
         if args.command == "train":
             cutoff = base.timestamp(args.cutoff)
-            if cutoff > as_of or cutoff >= EVALUATION_START:
-                raise ValueError("training cutoff must be observed and before December 1")
+            if cutoff > as_of:
+                raise ValueError("training cutoff must be observed")
             limits = {
                 name: getattr(args, name)
                 for name in ("min_train", "min_test", "min_users", "min_class")
@@ -474,16 +497,19 @@ def main() -> None:
             report["bundle_written"] = bundle is not None
         else:
             bundle = json.loads(args.model.read_text())
-            if as_of < EVALUATION_END + HORIZON:
+            start, end = frozen_window(bundle)
+            if as_of < end + HORIZON:
                 raise ValueError(
-                    "December outcomes unavailable; require as-of December 16 or later"
+                    "prospective outcomes unavailable; require as-of "
+                    + (end + HORIZON).isoformat()
+                    + " or later"
                 )
             receipt = verify_manifest(
                 args.input,
                 manifest_path,
-                start=EVALUATION_START,
-                end=EVALUATION_END,
-                label_cutoff=EVALUATION_END + HORIZON,
+                start=start,
+                end=end,
+                label_cutoff=end + HORIZON,
                 as_of=as_of,
                 min_idle=bundle["min_idle_days"],
             )
