@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from prefect import flow, get_run_logger
 
+from src.broadcasts.exploration import MAX_ENROLLMENTS_PER_RUN, dispatch_opportunity
 from src.broadcasts.service import (
     drop_holdout,
     get_monthly_reminder_user_ids,
@@ -69,6 +70,14 @@ async def _broadcast_cadence_step(step: str, from_minutes_ago: int, to_minutes_a
     holdout_pct = CADENCE_HOLDOUT_PCT.get(step)
     if holdout_pct and settings.BROADCAST_CADENCE_HOLDOUT_ENABLED:
         user_ids = await drop_holdout(f"{CADENCE_HOLDOUT_EXPERIMENT}_{step}", user_ids, holdout_pct)
+    if step == "1w":
+        for index, user_id in enumerate(user_ids):
+            try:
+                await dispatch_opportunity(user_id, index < MAX_ENROLLMENTS_PER_RUN)
+            except Exception:
+                get_run_logger().exception("Weekly opportunity failed for user %s", user_id)
+            await asyncio.sleep(0.2)
+        return
     await broadcast_next_meme_to_users(user_ids)
 
 

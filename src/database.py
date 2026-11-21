@@ -693,6 +693,42 @@ experiment_assignment = Table(
 )
 
 
+push_content_control = Table(
+    "push_content_control",
+    metadata,
+    Column("campaign", String, primary_key=True),
+    Column("enabled", Boolean, nullable=False, server_default=text("true")),
+    Column("ends_at", DateTime, nullable=False),
+    Column("pause_reason", String),
+)
+
+push_content_opportunity = Table(
+    "push_content_opportunity",
+    metadata,
+    Column("id", BigInteger, Identity(), primary_key=True),
+    Column("campaign", ForeignKey("push_content_control.campaign"), nullable=False),
+    Column("user_id", ForeignKey("user.id", ondelete="CASCADE"), nullable=False),
+    Column("opportunity_at", DateTime, nullable=False),
+    Column("enrolled", Boolean, nullable=False),
+    Column("variant", String, nullable=False),
+    Column("state", String, nullable=False, server_default="reserved"),
+    Column("assigned_at", DateTime, nullable=False, server_default=text("timezone('UTC', now())")),
+    Column("meme_id", ForeignKey("meme.id", ondelete="SET NULL")),
+    Column("recommended_by", String),
+    Column("selection", JSONB),
+    Column("attempted_at", DateTime),
+    Column("accepted_at", DateTime),
+    Column("telegram_message_id", BigInteger),
+    Column("error_code", String),
+    UniqueConstraint(
+        "campaign",
+        "user_id",
+        "opportunity_at",
+        name="push_content_opportunity_campaign_user_id_opportunity_at_key",
+    ),
+)
+
+
 def _is_transient_connection_error(exc: BaseException) -> bool:
     return _is_stale_connection_error(exc) or _is_concurrent_use_error(exc)
 

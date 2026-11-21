@@ -191,3 +191,53 @@ async def test_send_meme_to_user_continues_recording_after_cancellation(monkeypa
     await asyncio.wait_for(reaction_finished.wait(), timeout=0.1)
 
     assert calls == ["send_meme", "create_reaction_started", "create_reaction_finished"]
+
+
+@pytest.mark.asyncio
+async def test_receipt_failure_still_records_delivered_reaction(monkeypatch):
+    reaction = AsyncMock()
+    receipt = AsyncMock(side_effect=ValueError("receipt storage unavailable"))
+    monkeypatch.setattr(meme_sender, "get_user_info", AsyncMock(return_value={}))
+    monkeypatch.setattr(
+        meme_sender, "prepare_meme_delivery", AsyncMock(return_value=_prepared_delivery())
+    )
+    message = object()
+    monkeypatch.setattr(meme_sender, "send_new_message_with_meme", AsyncMock(return_value=message))
+    monkeypatch.setattr(meme_sender, "create_user_meme_reaction", reaction)
+    with pytest.raises(ValueError, match="receipt storage"):
+        await meme_sender.send_meme_to_user(object(), 12001, _meme(), on_accepted=receipt)
+    receipt.assert_awaited_once_with(message)
+    reaction.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_cancelled_experimental_send_waits_for_receipt(monkeypatch):
+    receipt_started = asyncio.Event()
+    release_receipt = asyncio.Event()
+    recorded = []
+
+    async def receipt(message):
+        receipt_started.set()
+        await release_receipt.wait()
+        recorded.append(message)
+
+    reaction = AsyncMock()
+    monkeypatch.setattr(meme_sender, "get_user_info", AsyncMock(return_value={}))
+    monkeypatch.setattr(
+        meme_sender, "prepare_meme_delivery", AsyncMock(return_value=_prepared_delivery())
+    )
+    message = object()
+    monkeypatch.setattr(meme_sender, "send_new_message_with_meme", AsyncMock(return_value=message))
+    monkeypatch.setattr(meme_sender, "create_user_meme_reaction", reaction)
+    task = asyncio.create_task(
+        meme_sender.send_meme_to_user(object(), 12001, _meme(), on_accepted=receipt)
+    )
+    await receipt_started.wait()
+    task.cancel()
+    await asyncio.sleep(0)
+    assert not task.done()
+    release_receipt.set()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert recorded == [message]
+    reaction.assert_awaited_once()
