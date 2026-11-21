@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Tuple
+from typing import Awaitable, Callable, Tuple
 
 from telegram import (
     Bot,
@@ -31,7 +31,9 @@ async def send_meme_to_user(
     meme: MemeData,
     reaction_context: str | None = None,
     recommended_by: str | None = None,
-):
+    on_accepted: Callable[[Message], Awaitable[None]] | None = None,
+    on_sending: Callable[[], Awaitable[None]] | None = None,
+) -> Message | None:
     """Send a meme to a user.
 
     ``recommended_by`` overrides the queue label when recording delivery
@@ -48,18 +50,36 @@ async def send_meme_to_user(
     )
     meme.caption = prepared.caption
 
+    if on_sending is not None:
+        await on_sending()
     sent_message = await send_new_message_with_meme(bot, user_id, meme, prepared.reply_markup)
     if sent_message is None:
         return
 
-    delivery_task = asyncio.create_task(_record_delivered_meme_reaction(user_id, meme))
+    async def complete_delivery():
+        receipt_error = None
+        if on_accepted is not None:
+            try:
+                await on_accepted(sent_message)
+            except Exception as exc:
+                receipt_error = exc
+        await _record_delivered_meme_reaction(user_id, meme)
+        if receipt_error is not None:
+            raise receipt_error
+
+    delivery_task = asyncio.create_task(complete_delivery())
     try:
         await asyncio.shield(delivery_task)
     except asyncio.CancelledError:
+        if on_accepted is not None:
+            # Experimental dispatch must observe the receipt before quarantining a timeout.
+            await asyncio.shield(delivery_task)
+            raise
         delivery_task.add_done_callback(
             lambda task: _log_direct_meme_delivery_result(task, user_id, meme.id)
         )
         raise
+    return sent_message
 
 
 def _log_direct_meme_delivery_result(

@@ -53,6 +53,38 @@ month 13:00 MSK) uses `send_meme_broadcast()` with
 same month is deduped. Both carry holdouts logged in `experiment_assignment`;
 see `experiments/2026-10-30-broadcast-cadence-holdout.md`.
 
+### One-week push content experiment
+
+The existing hourly **Broadcast 1w** schedule owns all sends for this test.
+Each randomized user has already passed the cadence holdout. The experiment
+records the decision and Telegram receipt in `push_content_opportunity`.
+Use the [preregistration](../experiments/2026-11-21-dormant-push-exploration.md)
+and its [aggregate readout](analyst/dormant-push-exploration.sql) to check
+enrollment, deliveries, candidate probabilities and outcomes.
+
+Apply the experiment migration before starting the updated Prefect runner.
+Switch between scheduled runs after the previous weekly run has completed.
+Verify the runner's deployed revision, both existing HQ and cadence flags,
+the active weekly schedule, and the control row:
+
+```sql
+SELECT campaign, enabled, ends_at, pause_reason FROM push_content_control
+WHERE campaign = 'dormant_push_exploration_v1';
+```
+
+To stop new experimental picks immediately, an operator with write access runs:
+
+```sql
+UPDATE push_content_control SET enabled = false, pause_reason = 'operator_pause'
+WHERE campaign = 'dormant_push_exploration_v1';
+```
+
+The current runner can then serve the weekly HQ policy with the same duplicate
+protection. Retain opportunity rows when investigating uncertain outcomes.
+Check the next natural run and the readout before considering a restart.
+The legacy offline training export targets its original delivery labels. Use
+the experiment records to analyze randomized choices and candidate features.
+
 ### 3. Monitor
 
 ```bash
