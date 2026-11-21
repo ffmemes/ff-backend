@@ -29,7 +29,8 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-VERSION = "push-reactivation-logistic-v1"
+V1_VERSION = "push-reactivation-logistic-v1"
+VERSION = "push-reactivation-logistic-v2"
 REGULARIZATION_GRID = (0.03, 0.3, 1.0)
 FALLBACK_C = 0.3
 TUNED_MODELS = ("user_only", "user_content")
@@ -40,6 +41,8 @@ USER_FEATURES = (
     "user_push_reaction_rate",
     "user_feed_callback_count",
     "hours_since_push",
+    "taste_feed_count",
+    "taste_feed_like_rate",
 )
 CONTENT_FEATURES = (
     "user_source_reaction_count",
@@ -51,7 +54,15 @@ CONTENT_FEATURES = (
     "meme_age_days",
     "meme_is_video",
     "meme_is_animation",
+    "taste_source_count",
+    "taste_source_like_rate",
 )
+TASTE_FEATURES = {
+    "taste_feed_count",
+    "taste_feed_like_rate",
+    "taste_source_count",
+    "taste_source_like_rate",
+}
 OPTIONAL_FEATURES = {"meme_age_days", "meme_is_video", "meme_is_animation"}
 MODEL_FEATURES = {
     "intercept": (),
@@ -80,9 +91,13 @@ def number(value: str | None) -> float | None:
     return result
 
 
-def read_rows(handle, as_of: datetime, min_idle: float) -> tuple[list[dict], dict]:
+def read_rows(
+    handle, as_of: datetime, min_idle: float, version: str = VERSION
+) -> tuple[list[dict], dict]:
     reader = csv.DictReader(handle)
-    missing = REQUIRED - set(reader.fieldnames or ())
+    feature_names = FEATURE_NAMES - TASTE_FEATURES if version == V1_VERSION else FEATURE_NAMES
+    required = REQUIRED - TASTE_FEATURES if version == V1_VERSION else REQUIRED
+    missing = required - set(reader.fieldnames or ())
     if missing:
         raise ValueError("missing CSV columns: " + ", ".join(sorted(missing)))
     rows = []
@@ -99,7 +114,7 @@ def read_rows(handle, as_of: datetime, min_idle: float) -> tuple[list[dict], dic
             sent_at = timestamp(raw["sent_at"])
             if raw["y_24h"] not in {"0", "1"}:
                 raise ValueError("y_24h must be 0 or 1")
-            features = {name: number(raw.get(name)) for name in FEATURE_NAMES}
+            features = {name: number(raw.get(name)) for name in feature_names}
             if not (raw["path"] == "push" or raw["path"].startswith("broadcast")):
                 counts["non_push"] += 1
                 continue
@@ -326,6 +341,28 @@ def dormancy_diagnostics(rows: list, models: dict, args) -> list:
     return result
 
 
+def training_feature_coverage(rows: list) -> list:
+    """Describe available personal source/taste history without consulting outcomes."""
+    result = []
+    names = ("user_source_reaction_count", "taste_source_count", "taste_feed_count")
+    for label, lower, upper in (
+        ("7_to_29", 7, 29),
+        ("29_to_90", 29, 90),
+        ("90_to_365", 90, 365.000001),
+    ):
+        group = [row for row in rows if lower <= row["features"]["idle_days"] < upper]
+        counts = {
+            "cohort": label,
+            "sends": len(group),
+            "users": len({row["user"] for row in group}),
+        }
+        for name in names:
+            covered = [row for row in group if (row["features"].get(name) or 0) > 0]
+            counts[name] = {"sends": len(covered), "users": len({row["user"] for row in covered})}
+        result.append(counts)
+    return result
+
+
 def temporal_split(rows: list[dict], start: datetime, end: datetime) -> tuple[list, list]:
     train = [row for row in rows if row["sent_at"] + timedelta(hours=24) <= start]
     test = [row for row in rows if start <= row["sent_at"] < end]
@@ -441,8 +478,9 @@ def tune_development(rows: list, cutoff: datetime, as_of: datetime, args) -> tup
 def run(args) -> tuple[dict, dict | None]:
     as_of = timestamp(args.as_of)
     frozen = json.loads(Path(args.frozen_model).read_text()) if args.frozen_model else None
-    if frozen and frozen.get("version") != VERSION:
+    if frozen and frozen.get("version") not in {V1_VERSION, VERSION}:
         raise ValueError("unsupported frozen model version")
+    requested_version = frozen["version"] if frozen else VERSION
     cutoff = timestamp(frozen["training_cutoff"] if frozen else args.holdout_start)
     if cutoff > as_of:
         raise ValueError("training cutoff must not be later than --as-of")
@@ -459,12 +497,12 @@ def run(args) -> tuple[dict, dict | None]:
     min_idle = frozen["min_idle_days"] if frozen else args.min_idle_days
     fold_days = frozen["final_days"] if frozen else args.fold_days
     if args.input == "-":
-        rows, filters = read_rows(sys.stdin, as_of, min_idle)
+        rows, filters = read_rows(sys.stdin, as_of, min_idle, requested_version)
     else:
         with Path(args.input).open(newline="") as handle:
-            rows, filters = read_rows(handle, as_of, min_idle)
+            rows, filters = read_rows(handle, as_of, min_idle, requested_version)
     report = {
-        "version": VERSION,
+        "version": requested_version,
         "as_of": as_of.isoformat(),
         "filters": filters,
         "target": "observed push stored-reaction proxy within 24h",
@@ -488,6 +526,10 @@ def run(args) -> tuple[dict, dict | None]:
     report["regularization"] = tuning
     end = evaluation_start + timedelta(days=fold_days)
     train, _ = temporal_split(rows, cutoff, cutoff)
+    if requested_version == VERSION:
+        report["training_feature_coverage"] = (
+            frozen["training_feature_coverage"] if frozen else training_feature_coverage(train)
+        )
     test = [row for row in rows if evaluation_start <= row["sent_at"] < end]
     final = {
         "start": evaluation_start.isoformat(),
@@ -513,11 +555,13 @@ def run(args) -> tuple[dict, dict | None]:
             "min_idle_days": min_idle,
             "final_days": fold_days,
             "horizon_hours": 24,
-            "transforms": "log1p for counts, idle_days, hours_since_push; median imputation; "
+            "transforms": "log1p for counts, idle_days, hours_since_push, meme_age_days; "
+            "training median imputation; "
             "training mean/std scaling; appended missing indicators in feature order",
             "regularization": tuning,
             "models": fit_models(train, tuning["selected_C"]),
             "development_positive_every_fold": development_pass,
+            "training_feature_coverage": report["training_feature_coverage"],
             "reproducibility": {
                 "driver_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                 "python": sys.version.split()[0],
@@ -534,6 +578,9 @@ def run(args) -> tuple[dict, dict | None]:
         final.update(evaluate(train, test, bundle["models"], known_users))
         final["dormancy_diagnostics"] = dormancy_diagnostics(test, bundle["models"], args)
         final["subgroup_rule"] = "Descriptive only; subgroup results never change candidate gate."
+    if frozen:
+        # A scoring extract can start after training; report original fit support.
+        final["train"] = frozen.get("training_support")
     report["final"] = final
     if frozen:
         development_pass = frozen.get("development_positive_every_fold", False)

@@ -74,6 +74,90 @@ class BacktestTest(unittest.TestCase):
         self.assertEqual(counts["immature"], 1)
         self.assertEqual(counts["unknown_idle"], 1)
 
+    def test_v2_taste_transforms_and_outcome_free_coverage(self):
+        features = {
+            "taste_feed_count": 9,
+            "taste_feed_like_rate": 0.4,
+            "taste_source_count": 3,
+            "taste_source_like_rate": 0.7,
+            "meme_age_days": 99,
+        }
+        values = backtest.transformed(features, list(features))
+        self.assertEqual(values, [math.log1p(9), 0.4, math.log1p(3), 0.7, math.log1p(99)])
+        rows = [
+            {
+                "user": "one",
+                "y": label,
+                "features": dict(features, idle_days=40, user_source_reaction_count=0),
+            }
+            for label in (0, 1)
+        ]
+        coverage = backtest.training_feature_coverage(rows)
+        self.assertEqual(coverage[1]["taste_source_count"], {"sends": 2, "users": 1})
+        self.assertEqual(coverage[1]["user_source_reaction_count"], {"sends": 0, "users": 0})
+        flipped = [dict(row, y=1 - row["y"]) for row in rows]
+        self.assertEqual(coverage, backtest.training_feature_coverage(flipped))
+
+    def test_frozen_v1_accepts_original_csv_and_reports_v1(self):
+        import csv
+
+        columns = sorted(backtest.REQUIRED - backtest.TASTE_FEATURES)
+        with tempfile.TemporaryDirectory() as directory:
+            csv_path = Path(directory) / "v1.csv"
+            with csv_path.open("w", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=columns)
+                writer.writeheader()
+                for index in range(2):
+                    row = dict.fromkeys(columns, "0.5")
+                    row.update(
+                        event_id=str(index),
+                        user_key=str(index),
+                        sent_at="2026-11-02",
+                        y_24h=str(index),
+                        path="broadcast_reengagement",
+                        idle_days="8",
+                    )
+                    writer.writerow(row)
+            models = {}
+            for name, features in backtest.MODEL_FEATURES.items():
+                names = [feature for feature in features if feature not in backtest.TASTE_FEATURES]
+                models[name] = {
+                    "feature_names": names,
+                    "imputation": [0] * len(names),
+                    "means": [0] * len(names),
+                    "scales": [1] * len(names),
+                    "coefficients": [0] * (2 * len(names)),
+                    "intercept": 0,
+                }
+            bundle = {
+                "version": backtest.V1_VERSION,
+                "training_cutoff": "2026-11-01",
+                "training_first_send": "2026-10-01",
+                "training_last_send": "2026-10-30",
+                "min_idle_days": 7,
+                "final_days": 14,
+                "regularization": {},
+                "models": models,
+            }
+            model_path = Path(directory) / "v1.json"
+            model_path.write_text(json.dumps(bundle))
+            args = SimpleNamespace(
+                input=str(csv_path),
+                as_of="2026-11-17",
+                frozen_model=str(model_path),
+                min_train=1,
+                min_test=1,
+                min_users=1,
+                min_class=1,
+            )
+            report, reused = backtest.run(args)
+            self.assertEqual(report["version"], backtest.V1_VERSION)
+            self.assertEqual(report["final"]["status"], "evaluated")
+            self.assertEqual(reused, bundle)
+            self.assertNotIn("training_feature_coverage", report)
+            with csv_path.open() as handle, self.assertRaisesRegex(ValueError, "taste_feed_count"):
+                backtest.read_rows(handle, backtest.timestamp("2026-11-17"), 7)
+
     def test_frozen_model_does_not_refit_and_final_waits_for_full_window(self):
         from unittest.mock import patch
 

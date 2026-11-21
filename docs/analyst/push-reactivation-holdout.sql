@@ -2,7 +2,9 @@
 -- as_of: UTC midnight. Include ordinary users with a fully observed 14-day window.
 -- Both arms can generate any valid callback, including an organic return.
 -- The day 7-14 measure requires a callback to a personal feed meme after day 7.
--- The block timestamp is cleared on unblock, so this measures recorded blocks.
+-- A send may reveal a pre-existing block; holdouts lack the same delivery probe.
+-- The timestamp is cleared on unblock, so this only measures recorded blocks.
+-- The day 7-14 callback may be on a feed meme delivered before assignment.
 WITH assigned AS (
     SELECT ea.experiment_id, ea.variant, ea.user_id, ea.assigned_at, u.blocked_bot_at
     FROM experiment_assignment ea

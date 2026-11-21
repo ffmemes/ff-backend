@@ -64,8 +64,8 @@ def main():
     if args.as_of > datetime.now(UTC).date():
         parser.error("as-of cannot include future outcomes")
     end = args.as_of - timedelta(days=1)
-    if not args.start < args.holdout_start < end:
-        parser.error("expected start < holdout-start < as-of minus one day")
+    if not args.start < min(end, args.holdout_start) or args.holdout_start > args.as_of:
+        parser.error("need historical deliveries and a training cutoff on or before as-of")
     if args.output.exists():
         parser.error("choose a new output directory to preserve the previous model")
     psql = args.psql[1:] if args.psql[:1] == ["--"] else args.psql
@@ -96,8 +96,12 @@ def main():
             subprocess.run(run + fit, stdin=rows, stdout=report, check=True)
         if args.previous_model:
             previous = json.loads(args.previous_model.read_text())
-            if previous["final_days"] != args.fold_days:
-                raise ValueError("Use the same evaluation window for both models")
+            current = json.loads((staging / "report.json").read_text())
+            if (
+                previous["final_days"] != args.fold_days
+                or previous["min_idle_days"] != current["min_idle_days"]
+            ):
+                raise ValueError("Both models must use the same window and dormancy threshold")
             rows.seek(0)
             evaluate = [
                 "--frozen-model",

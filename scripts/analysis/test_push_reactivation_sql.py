@@ -30,13 +30,15 @@ def literal(value):
 
 
 def fixture():
-    users = {1, 2, 3, 6, 10, 11, 12, 20, 30, 31, 32, 33, 34, 35}
+    users = {1, 2, 3, 6, 10, 11, 12, 20, 30, 31, 32, 33, 34, 35, 50, 51, 52, 53}
     memes = {}
     rows = []
 
-    def add(user, meme, sent, reacted=None, path="lr_smoothed", source=None, kind="image"):
+    def add(
+        user, meme, sent, reacted=None, path="lr_smoothed", source=None, kind="image", reaction=1
+    ):
         memes[meme] = (meme, source or meme, kind, datetime(2020, 1, 1))
-        rows.append((user, meme, path, sent, 1 if reacted else None, reacted))
+        rows.append((user, meme, path, sent, reaction if reacted else None, reacted))
 
     # Inclusive 35-day boundary, outside boundary, same-time callback, synthetic
     # callbacks and excluded actors must all produce distinguishable outcomes.
@@ -102,6 +104,46 @@ def fixture():
         path="broadcast_reengagement_hq",
     )
     add(35, 3500, datetime(2026, 11, 9), path="broadcast_reengagement_hq")
+
+    # Taste v2: equal timestamps exercise deterministic top-200 ties before
+    # source aggregation. The lowest meme ID is the one discarded.
+    taste_at = DECISION - 8 * DAY
+    for index in range(201):
+        add(
+            50,
+            5000 + index,
+            taste_at,
+            taste_at,
+            source=50000 if index % 2 == 0 else 50001,
+            reaction=1 if index % 2 == 0 else 2,
+        )
+    add(50, 5300, DECISION - timedelta(hours=1), DECISION, source=50000)
+    add(50, 5301, DECISION - DAY, DECISION - DAY, path="uploaded_meme", source=50000)
+    add(50, 5302, DECISION - DAY, DECISION - DAY, path="friend_challenge", source=50000)
+    add(50, 5303, taste_at, taste_at, path="broadcast_reengagement_hq", source=50000)
+    add(
+        50,
+        5304,
+        DECISION - 365 * DAY - MICROSECOND,
+        DECISION - 365 * DAY - MICROSECOND,
+        source=50000,
+    )
+    add(50, 5305, DECISION - 7 * DAY, taste_at, source=50000)
+    add(50, 5306, DECISION - 7 * DAY, DECISION - 7 * DAY, source=50000, reaction=3)
+    add(50, 5400, DECISION, path="broadcast_reengagement_hq", source=50000)
+    for user, gap in ((51, 7 * DAY), (52, 7 * DAY - MICROSECOND)):
+        add(user, user * 1000, DECISION - gap, DECISION - gap, source=user)
+        add(user, user * 1000 + 1, DECISION, path="broadcast_reengagement_hq", source=user)
+
+    add(
+        53,
+        53000,
+        DECISION - 90 * DAY,
+        DECISION - 90 * DAY,
+        path="broadcast_reengagement_hq",
+        source=53,
+    )
+    add(53, 53001, DECISION, path="broadcast_reengagement_hq", source=53)
 
     def values(records):
         return ",\n".join("(" + ",".join(map(literal, row)) + ")" for row in records)
@@ -185,10 +227,38 @@ class ExtractionTest(unittest.TestCase):
             sorted(self.rows, key=lambda r: r["event_id"]),
         )
         self.assertEqual(len({r["event_id"] for r in split}), len(split))
-        self.assertEqual(len(self.rows), 12)
+        self.assertEqual(len(self.rows), 16)
         self.assertEqual(event(self.rows, 35, 3500)["sent_at"], "2026-11-09T00:00:00.000000Z")
         later = extract("2026-11-13", 1)
         self.assertEqual(event(later, 33, 3300)["sent_at"], "2026-11-11T00:00:00.000000Z")
+
+    def test_taste_cap_ties_source_and_valid_callback_filters(self):
+        row = event(self.rows, 50, 5400)
+        self.assertEqual(row["taste_feed_count"], "200")
+        self.assertEqual(float(row["taste_feed_like_rate"]), 0.5)
+        self.assertEqual(row["taste_source_count"], "100")
+        self.assertAlmostEqual(float(row["taste_source_like_rate"]), 101 / 102)
+
+    def test_taste_dormancy_gate_and_365d_boundary(self):
+        row = event(self.rows, 10, 1001)
+        self.assertEqual(row["taste_feed_count"], "1")
+        self.assertAlmostEqual(float(row["taste_feed_like_rate"]), 2 / 3)
+        self.assertEqual(row["taste_source_count"], "0")
+        self.assertEqual(float(row["taste_source_like_rate"]), 0.5)
+        self.assertEqual(event(self.rows, 51, 51001)["taste_source_count"], "1")
+        no_feed = event(self.rows, 53, 53001)
+        self.assertEqual(no_feed["taste_feed_count"], "0")
+        self.assertEqual(no_feed["taste_source_count"], "0")
+        self.assertEqual(float(no_feed["taste_feed_like_rate"]), 0.5)
+        self.assertEqual(float(no_feed["taste_source_like_rate"]), 0.5)
+        for user, meme in ((1, 100), (11, 1101), (52, 52001)):
+            for name in (
+                "taste_feed_count",
+                "taste_feed_like_rate",
+                "taste_source_count",
+                "taste_source_like_rate",
+            ):
+                self.assertEqual(event(self.rows, user, meme)[name], "")
 
     def test_media_metadata_and_private_columns(self):
         video = event(self.rows, 30, 3000)

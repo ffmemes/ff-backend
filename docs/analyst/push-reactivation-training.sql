@@ -31,6 +31,12 @@
 -- legacy_proxy_score is affinity x posterior feed-like-rate. Historical
 -- lr_smoothed snapshots are absent, so it does not replay the deployed picker.
 -- User features are observational and do not estimate incremental send uplift.
+-- Prospective v2 taste features are available only for observed idle >=7d.
+-- Per opportunity, cap at the last 200 genuine feed callbacks in the preceding
+-- 365 days before aggregation. Ties use reacted_at, sent_at, meme_id descending.
+-- This uses the user_id/reacted_at index with a bounded top-N seek. Source
+-- identity has the same current-mapping limitation as other source features.
+-- Counts are explicit, rates use Beta(1,1); non-dormant/unknown rows get NULL.
 -- Content age assumes stored meme.created_at is the immutable creation time,
 -- and media type is stable. Age is NULL when creation follows the historical
 -- send. OCR, mutable language and current aggregate quality are not features.
@@ -216,8 +222,39 @@ SELECT md5(e.user_id::text || ':' || e.meme_id::text || ':' || p.salt) AS event_
             THEN EXTRACT(EPOCH FROM (e.event_at - content.created_at)) / 86400.0
        END AS meme_age_days,
        (content.type = 'video')::int AS meme_is_video,
-       (content.type = 'animation')::int AS meme_is_animation
+       (content.type = 'animation')::int AS meme_is_animation,
+       taste.taste_feed_count,
+       taste.taste_feed_like_rate,
+       taste.taste_source_count,
+       taste.taste_source_like_rate
 FROM examples e
 JOIN meme content ON content.id = e.meme_id
+LEFT JOIN LATERAL (
+    SELECT COUNT(*) AS taste_feed_count,
+           (COUNT(*) FILTER (WHERE recent.reaction_id = 1) + 1.0)
+               / (COUNT(*) + 2.0) AS taste_feed_like_rate,
+           COUNT(*) FILTER (WHERE prior_meme.meme_source_id = e.source_id)
+               AS taste_source_count,
+           (COUNT(*) FILTER (WHERE prior_meme.meme_source_id = e.source_id
+                                  AND recent.reaction_id = 1) + 1.0)
+               / (COUNT(*) FILTER (WHERE prior_meme.meme_source_id = e.source_id) + 2.0)
+               AS taste_source_like_rate
+    FROM (
+        SELECT r.meme_id, r.reaction_id
+        FROM user_meme_reaction r
+        WHERE e.idle_days >= 7
+          AND r.user_id = e.user_id
+          AND r.reacted_at IS NOT NULL
+          AND r.reacted_at < e.event_at
+          AND r.reacted_at >= e.event_at - INTERVAL '365 days'
+          AND r.reacted_at >= r.sent_at
+          AND r.reaction_id IN (1, 2)
+          AND r.recommended_by NOT LIKE 'broadcast%'
+          AND r.recommended_by NOT IN ('friend_challenge', 'uploaded_meme')
+        ORDER BY r.reacted_at DESC, r.sent_at DESC, r.meme_id DESC
+        LIMIT 200
+    ) recent
+    JOIN meme prior_meme ON prior_meme.id = recent.meme_id
+) taste ON e.idle_days >= 7
 CROSS JOIN params p
 ORDER BY e.event_at, event_id;
