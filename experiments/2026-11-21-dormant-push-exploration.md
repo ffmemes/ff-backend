@@ -1,12 +1,12 @@
 ---
 id: dormant_push_exploration_v1
-status: proposed
+status: running
 hypothesis: Uniform exploration among up to three HQ candidates increases the chance of a button press within 24 hours of the existing one-week push
 primary_metric: first assigned person's callback on the accepted selected meme within 24h of assignment (ITT)
 guardrails: ambiguous dispatch or stale reservations, accepted and failed deliveries, recorded blocks, candidate coverage and latency
 unit: user
 variants: hq:50,explore:50 within the existing 1w send arm
-started:
+started: 2026-11-21
 check_on: 2026-11-23
 decided:
 result: unknown
@@ -111,4 +111,6 @@ so a later retry cannot send twice.
 ## Log
 
 - 2026-11-21 — Preregistered before exposure. Local historical aggregates measured
-  through November 21. Production activation and first receipt pending.
+  through November 21. The first scheduled exposure follows production activation.
+
+- 2026-11-21 21:31 UTC — Production activation verified after [PR #400](https://github.com/ffmemes/ff-backend/pull/400). The dedicated Prefect runner loaded `f3bea4fc`, the database was at revision `b6d8f0a2c4e6`, and the weekly deployment was ready with its hourly schedule active. The experiment, HQ picker and 20% silent cadence holdout were enabled. The aggregate readout returned zero assignments at activation. Eligible users enter on ordinary scheduled runs.
