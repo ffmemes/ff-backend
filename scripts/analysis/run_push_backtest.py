@@ -8,6 +8,7 @@ import secrets
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -15,7 +16,7 @@ HERE = Path(__file__).resolve().parent
 SQL = HERE.parents[1] / "docs" / "analyst" / "push-reactivation-training.sql"
 
 
-def collect(psql, start, end, batch_days, file):
+def collect(psql, start, end, batch_days, file, *, batches=None):
     """Write only complete, matching CSV batches to an anonymous temporary file."""
     sql = SQL.read_text()
     salt = secrets.token_hex(32)
@@ -30,6 +31,7 @@ def collect(psql, start, end, batch_days, file):
             "BEGIN READ ONLY;\nSET LOCAL timezone = 'UTC';\n"
             "SET LOCAL statement_timeout = '30s';\n" + sql + "\nROLLBACK;\n"
         )
+        started = time.monotonic()
         result = subprocess.run(psql, input=request.encode(), stdout=subprocess.PIPE, timeout=65)
         result.check_returncode()
         header, newline, rows = result.stdout.partition(b"\n")
@@ -42,6 +44,15 @@ def collect(psql, start, end, batch_days, file):
             raise ValueError("SQL schema changed between batches")
         file.write(rows)
         count = rows.count(b"\n")
+        if batches is not None:
+            batches.append(
+                {
+                    "start_inclusive": start.isoformat(),
+                    "end_exclusive": stop.isoformat(),
+                    "rows": count,
+                    "seconds": round(time.monotonic() - started, 3),
+                }
+            )
         print(f"{start} to {stop}: {count} deliveries", file=sys.stderr, flush=True)
         start = stop
     file.seek(0)

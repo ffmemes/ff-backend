@@ -92,11 +92,17 @@ def number(value: str | None) -> float | None:
 
 
 def read_rows(
-    handle, as_of: datetime, min_idle: float, version: str = VERSION
+    handle,
+    as_of: datetime,
+    min_idle: float,
+    version: str = VERSION,
+    *,
+    required_features: tuple = (),
 ) -> tuple[list[dict], dict]:
     reader = csv.DictReader(handle)
     feature_names = FEATURE_NAMES - TASTE_FEATURES if version == V1_VERSION else FEATURE_NAMES
     required = REQUIRED - TASTE_FEATURES if version == V1_VERSION else REQUIRED
+    required = required | set(required_features)
     missing = required - set(reader.fieldnames or ())
     if missing:
         raise ValueError("missing CSV columns: " + ", ".join(sorted(missing)))
@@ -133,6 +139,7 @@ def read_rows(
                     "sent_at": sent_at,
                     "y": int(raw["y_24h"]),
                     "features": features,
+                    "path": raw["path"],
                 }
             )
         except (ValueError, TypeError) as error:
@@ -170,13 +177,18 @@ def score_features(model: dict, features: dict) -> float:
     return 1 / (1 + math.exp(-max(-700, min(700, logit))))
 
 
-def fit_models(rows: list[dict], regularization: dict | None = None) -> dict:
+def fit_models(
+    rows: list[dict],
+    regularization: dict | None = None,
+    *,
+    feature_sets: dict | None = None,
+) -> dict:
     import numpy as np
     from sklearn.linear_model import LogisticRegression
 
     labels = np.array([row["y"] for row in rows])
     models = {}
-    for name, features in MODEL_FEATURES.items():
+    for name, features in (MODEL_FEATURES if feature_sets is None else feature_sets).items():
         model = {
             "feature_names": list(features),
             "imputation": [],
