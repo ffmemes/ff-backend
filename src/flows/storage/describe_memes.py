@@ -70,7 +70,6 @@ async def describe_single_meme(
     file_id = meme_row["telegram_file_id"]
     existing_ocr = meme_row["ocr_result"] or {}
 
-    # Download image from Telegram
     try:
         image_bytes = await download_meme_content_from_tg(file_id)
     except Exception as e:
@@ -80,7 +79,6 @@ async def describe_single_meme(
 
     image_b64 = base64.b64encode(image_bytes).decode("utf-8")
 
-    # Call vision model
     try:
         result = await call_openrouter_vision(image_b64, log, deadline=deadline, keys=keys)
     except Exception as e:

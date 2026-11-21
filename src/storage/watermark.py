@@ -16,10 +16,8 @@ def draw_text_with_outline(
     outline_colour: tuple,
 ) -> None:
     x, y = position
-    # Draw outline
     for adj in range(-1, 2):
         for ops in range(-1, 2):
-            # Avoid the center pixel
             if adj != 0 or ops != 0:
                 draw.text((x + adj, y + ops), text, font=font, fill=outline_colour)
     draw.text(position, text, font=font, fill=text_colour)
@@ -42,39 +40,27 @@ def find_least_detailed_corner(img: Image, text_bbox: tuple, margin: int) -> tup
     - A tuple (x, y) representing the top-left coordinate
         of the selected corner for text placement.
     """
-    # Convert the original image to grayscale for intensity analysis
     gray_img = img.convert("L")
     img_w, img_h = img.size
-    # Calculate the width and height of the text bounding box
     text_width = text_bbox[2] - text_bbox[0]
     text_height = text_bbox[3] - text_bbox[1]
-    # Define dictionary with the coordinates of each corner with some margin applied
     corners = {
         "top_left": (margin, margin),
         "top_right": (img_w - text_width - margin, margin),
         "bottom_left": (margin, img_h - text_height - margin),
         "bottom_right": (img_w - text_width - margin, img_h - text_height - margin),
     }
-    # Initialize with infinity for comparison
     least_detailed_score = float("inf")
-    # To store the x, y coordinates for watermark
     selected_corner = None
     selected_wm_colour = None
-    # Iterate through each corner to find the one with the least detail background
     for _, (x, y) in corners.items():
-        # Crop the image around the current corner
-        # according to the text bounding box size
         sector = gray_img.crop((x, y, x + text_width, y + text_height))
-        # Calculate mean intensity of the cropped area
         mean_intensity = ImageStat.Stat(sector).mean[0]
-        # Determine how close the mean intensity is to either black (0) or white (255)
-        # indicates how uniform the background of the selected sector is
+        # Use mean brightness near black or white as a cheap proxy for a quiet background.
         distance_to_extreme = min(abs(0 - mean_intensity), abs(255 - mean_intensity))
-        # Update if this corner has a lower score (closer to black or white)
         if distance_to_extreme < least_detailed_score:
             least_detailed_score = distance_to_extreme
             selected_corner = (x, y)
-            # Selecting watermark colour based on mean intensity
             selected_wm_colour = (0, 0, 0) if mean_intensity > 178 else (255, 255, 255)
 
     return selected_corner, selected_wm_colour
@@ -110,7 +96,6 @@ def draw_corner_watermark(
         text_position, text_colour = find_least_detailed_corner(base, text_bbox, margin)
         outline_colour = (0, 0, 0, 255) if text_colour == (255, 255, 255) else (255, 255, 255, 255)
         draw_text_with_outline(d, text_position, text, font, text_colour, outline_colour)
-        # text opacity
         txt.putalpha(txt.getchannel("A").point(lambda x: x * text_opacity))
         return Image.alpha_composite(base, txt).convert("RGB")
 

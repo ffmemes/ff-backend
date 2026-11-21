@@ -70,10 +70,6 @@ async def handle_forwarded_from_tgchannelru(
 
         await update.message.reply_text(f"Forwarding post to {len(users)}")
         await log(f"Forwarding post to {len(users)}", context.bot)
-
-        # return await update.message.reply_text(
-        #     f"Can't parse caption: {escape(str(update.message.to_dict()))}"
-        # )
     else:
         url = urls[0]
         meme_id_str = url.replace("https://t.me/ffmemesbot?start=sc_", "").split("_")[0]

@@ -29,7 +29,6 @@ async def handle_invited_user(
 
     invitor_user_id = share_link.sharer_user_id
 
-    # get invitor user
     invitor_user = await get_user_by_id(invitor_user_id)
     if not invitor_user:
         return  # Invitor doesn't exist
@@ -45,7 +44,6 @@ User #{invited_user["id"]}/{invited_user_name}
 was already invited by #{invited_user["inviter_id"]}"""
         )
 
-    # set inviter id
     await update_user(invited_user["id"], inviter_id=invitor_user_id)
 
     # Don't reward if the inviter cannot receive the bot notification.

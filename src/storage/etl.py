@@ -55,10 +55,6 @@ async def insert_parsed_posts_from_telegram(
     *,
     discover_candidates: bool = True,
 ) -> None:
-    # 1. find which memes are already in the database
-    # 2. update existing memes
-    # 3. insert new memes
-
     result = await fetch_all(
         select(meme_raw_telegram.c.post_id)
         .where(meme_raw_telegram.c.meme_source_id == meme_source_id)
@@ -202,10 +198,6 @@ async def etl_memes_from_raw_telegram_posts(
     *,
     fresh_only: bool = True,
 ) -> None:
-    # get transformed posts
-    # find ones that are already in the database
-    # create rows and update rows
-    #
     # Engagement filters before raw posts enter the meme table:
     # 1. From each source's latest 10 posts, only promote the top 5 by views.
     #    Raw rows are still stored, so this threshold can be replayed later.
@@ -324,15 +316,6 @@ async def etl_memes_from_raw_telegram_posts(
             "top_viewed_posts_limit": TG_TOP_VIEWED_POSTS_LIMIT,
         },
     )
-
-    # find rows which already exist in db by two index columns:
-    # meme_source_id and raw_meme_id
-    # so we can update existing rows and create new ones
-
-    # join two tables meme_raw_telegram and meme to get
-    # the meme_source_id and raw_meme_id pairs
-    # which are not present in memes table.
-    # That will indicate that we need to create new rows
 
     memes_not_in_memes_table = await fetch_all(
         text(

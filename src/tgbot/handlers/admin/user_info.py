@@ -71,10 +71,5 @@ async def delete_user_data_confirmation_page(
 
 async def delete_user_data(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Deletes all user data we have for testing purposes"""
-    # user = await get_user_info(update.effective_user.id)
-    # if user["type"] != UserType.ADMIN:
-    #     return
-
-    # TODO: "are you sure" button + callback
     await delete_user(update.effective_user.id)
     await update.effective_user.send_message("Ciao 👋\n\n --> press /start to try again 👾")

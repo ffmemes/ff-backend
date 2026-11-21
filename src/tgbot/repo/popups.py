@@ -50,11 +50,12 @@ async def update_user_popup_log(
         user_popup_logs.update()
         .where(user_popup_logs.c.user_id == user_id)
         .where(user_popup_logs.c.popup_id == popup_id)
-        .where(user_popup_logs.c.reacted_at.is_(None))  # not sure abot that
+        # Only the first click may claim the reaction.
+        .where(user_popup_logs.c.reacted_at.is_(None))
         .values(reacted_at=datetime.utcnow())
     )
     res = await execute(update_query)
     reaction_is_new = res.rowcount > 0
     if not reaction_is_new:
         logging.warning(f"User {user_id} already reacted to popup {popup_id}!")
-    return reaction_is_new  # so I can filter double clicks
+    return reaction_is_new
