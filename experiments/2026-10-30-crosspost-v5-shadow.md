@@ -1,16 +1,16 @@
 ---
 id: crosspost_v5_shadow
-status: running
+status: inconclusive
 hypothesis: v5 score (source Beta hit rate x user taste, x like volume on RU) tracks channel virality better than v4
 primary_metric: corr(score_v5, zf) - corr(v4, zf) >= 0.05 on posted picks, per channel
 guardrails: n_posted >= 60 per channel
 unit: channel_post
 variants: shadow (logged only, v5_src_beta_taste_v1)
 started: 2026-10-30
-check_on: 2026-11-14
-decided: 
-result: unknown
-learning: 
+check_on:
+decided: 2026-11-22
+result: Nov21 extension cutoff, mature comparable original-control RU n=54 and EN n=58 vs required 60 each. Correlation gains +0.186 RU and +0.146 EN.
+learning: Match the posted meme and actual channel and arm scorer. Retest against the winner of the live quirk A/B if the question survives.
 code: src/crossposting/scoring.py
 readout: docs/analyst/crossposting-v5-shadow.sql
 ---
@@ -18,7 +18,7 @@ readout: docs/analyst/crossposting-v5-shadow.sql
 # Experiment: Crosspost v5 shadow score (RU + EN)
 
 Created: 2026-10-30
-Status: **active (shadow only, production pick unchanged)**
+Status: **inconclusive** after the November 21 extension.
 Channels: `tgchannelru`, `tgchannelen`
 Check date: **2026-11-14**
 Readout: [`docs/analyst/crossposting-v5-shadow.sql`](../docs/analyst/crossposting-v5-shadow.sql)
@@ -87,3 +87,7 @@ _(fill on 2026-11-14)_
   shadow scores rank only the production top-5 (`PRESELECT`), not the whole pool.
   Replay before/after: same pick and top-5 on 120 local fixture runs, the last 40 prod
   decisions and the current prod pool (both channels).
+
+## November 22 review
+
+The November 14 checkpoint was extended to November 21 under the registered sample rule. The November 21 end-of-day cohort missed the minimum in both channels after excluding legacy rows with an unusable comparator. The reconstruction uses the latest available forward labels. Close this assessment. Keep shadow telemetry separate from a future promotion decision. [November 22 evidence](../docs/analyst/readouts/2026-11-22-experiment-check.md).

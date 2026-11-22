@@ -114,3 +114,7 @@ so a later retry cannot send twice.
   through November 21. The first scheduled exposure follows production activation.
 
 - 2026-11-21 21:31 UTC — Production activation verified after [PR #400](https://github.com/ffmemes/ff-backend/pull/400). The dedicated Prefect runner loaded `f3bea4fc`, the database was at revision `b6d8f0a2c4e6`, and the weekly deployment was ready with its hourly schedule active. The experiment, HQ picker and 20% silent cadence holdout were enabled. The aggregate readout returned zero assignments at activation. Eligible users enter on ordinary scheduled runs.
+
+## November 22 review
+
+First assignment November 21 at 23:07 UTC, rounded. At November 22 14:30 UTC, HQ enrolled six and Explore two. Telegram accepted all eight, with three recorded candidates and a matching delivery for each. One Explore assignment chose a non-top meme. One exact-meme callback had arrived. Zero people had mature 24-hour or 14-day outcomes. All 17 hourly runs completed. Keep the November 23 operations check. [November 22 evidence](../docs/analyst/readouts/2026-11-22-experiment-check.md).

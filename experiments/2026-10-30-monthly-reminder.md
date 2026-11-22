@@ -7,7 +7,7 @@ guardrails: blocked_30d_pct treated <2%
 unit: user
 variants: treatment:50,holdout:50
 started: 2026-10-31
-check_on: 2026-12-11
+check_on: 2026-11-28
 decided: 
 result: unknown
 learning: 
@@ -41,3 +41,7 @@ Fewer than 150 users per arm: extend 2 weeks.
 - 2026-10-30: code merged, flag off.
 
 - 2026-10-31: verified MONTHLY_REMINDER_ENABLED=true in the prod Prefect runner; status set to running (started = date verified, first send follows the flow schedule).
+
+## November 22 review
+
+At individual D21, 90/941 send users and 25/925 holdout users reacted. Recorded blocks were 24/941 and 2/925 respectively. D30 has zero mature users. Check the harm threshold on November 28 ahead of the December 1 repeat. Recommend suppressing that repeat, subject to an operational decision and verification. The frozen final D30 decision remains December 11. [November 22 evidence](../docs/analyst/readouts/2026-11-22-experiment-check.md).

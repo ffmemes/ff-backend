@@ -7,7 +7,7 @@ guardrails: blocks <1%, weekly-reactor % not lower in holdout, >=150 users/arm
 unit: user
 variants: push:85,holdout:15 (15m, 24h); push:80,holdout:20 (1w, 2w, 4w)
 started: 2026-10-30
-check_on: 2026-11-20
+check_on: 2026-12-04
 decided: 
 result: unknown
 learning: 
@@ -87,3 +87,7 @@ deployed. Evidence from the 2026-09-07 blast suggests a first run brings about
   receive the other steps, which is shared background for both arms.
 - Holdout skips are not stored as `user_meme_reaction` rows. Use the
   assignment table for denominators.
+
+## November 22 review
+
+On November 20 the 15-minute and 24-hour holdouts had 85 and 80 people. Apply the registered two-week extension to December 4. At the November 22 check the counts were 87 and 80, so a feasibility decision is needed if the minimum of 150 is still out of reach. The late-step checkpoint remains December 11. The one-week content mixture changed November 21 at 21:31 UTC. [November 22 evidence](../docs/analyst/readouts/2026-11-22-experiment-check.md).
