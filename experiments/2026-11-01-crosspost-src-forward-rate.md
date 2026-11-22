@@ -82,3 +82,7 @@ _(fill on 2026-11-28)_
   shadow scores rank only the production top-5 (`PRESELECT`), not the whole pool.
   Replay before/after: same pick and top-5 on 120 local fixture runs, the last 40 prod
   decisions and the current prod pool (both channels).
+
+## November 22 review
+
+Only 3.6% of selected RU memes had source-forward coverage. The feature was present on 4/100 mature RU posts, and no RU decision selected a different meme from v5. On November 28 assess whether a coverage repair can address the age of winning memes before spending the registered two-week extension. [November 22 evidence](../docs/analyst/readouts/2026-11-22-experiment-check.md).

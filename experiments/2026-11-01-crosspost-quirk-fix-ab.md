@@ -31,3 +31,7 @@ readout: docs/analyst/crossposting-quirk-fix-ab.sql
 - **Overlap:** v5f shadow (`crosspost_src_fwd_v5f`) is log-only and still ranks within whichever
   top-N the arm preselected. Its Spearman readout pools both arms.
 - **End the test:** remove the channel from `AB_ARMS`, then set `LIVE`/`PRESELECT` to the winner.
+
+## November 22 review
+
+November 22 interim mature posts show a positive RU difference in normalized log-forwards (+0.263, 58 control and 41 fix) and an uncertain EN difference (−0.075, 61 and 37). EN mean views were lower for the fix. Complete the November 28 check separately by channel. [November 22 evidence](../docs/analyst/readouts/2026-11-22-experiment-check.md).

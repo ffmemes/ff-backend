@@ -1,16 +1,16 @@
 ---
 id: onboarding_default_language_v1
-status: running
+status: shipped
 hypothesis: Defaulting unknown/bare-en users to en (instead of a blocking picker) gets every signup a first meme and more first reactions
 primary_metric: share of signups with >=1 meme sent, share with a first reaction
 guardrails: no-language signups = 0
 unit: user
 variants: none (pre/post bug fix)
 started: 2026-10-31
-check_on: 2026-11-14
-decided: 
-result: unknown
-learning: 
+check_on:
+decided: 2026-11-15
+result: first-meme delivery 49/62 -> 57/58; no-language 0/60 after merge; first tap 30/62 -> 18/58; mature reached-5 10/37 -> 10/38
+learning: Keep the language bug fix; restored delivery does not establish activation uplift, which needs a separate randomized test
 code: src/tgbot/handlers/start.py, language.py (PR #385)
 readout: experiments/2026-10-31-onboarding-default-language.md (inline SQL)
 ---
@@ -20,7 +20,7 @@ readout: experiments/2026-10-31-onboarding-default-language.md (inline SQL)
 | Field | Value |
 |-------|--------|
 | **ID** | `onboarding_default_language_v1` |
-| **Status** | **live** (not an A/B; bug fix) |
+| **Status** | **shipped**, review closed 2026-11-15 (not an A/B; bug fix) |
 | **Code** | `src/tgbot/handlers/start.py` (language seeded above the deep-link ladder), `language.py` picker callback |
 
 ## Hypothesis
@@ -49,6 +49,18 @@ FROM "user" u WHERE u.created_at >= now() - interval '42 days' GROUP BY 1 ORDER 
 
 ## Next check
 
-**2026-11-14**.
+Closed on **2026-11-15**. No further experiment checkpoint; ordinary delivery monitoring continues.
 
 Not doing: a multi-select language picker for new users (it is already one tap; `/lang` is settings).
+
+
+## Readout 2026-11-15
+
+Interim: 14d pre/post first-meme delivery 49/62 -> 57/58, first tap 30/62 -> 18/58; post-merge no-language 0/60. Bug fixed, activation uplift not established. [Reconciled evidence](../docs/analyst/readouts/2026-11-22-experiment-check.md).
+
+## Decision 2026-11-15
+
+Keep the already deployed fix and close the delivery review as shipped. This is
+not a win for the activation hypothesis: in equally mature cohorts, reached-5
+was 10/37 before and 10/38 after. The non-randomized comparison cannot attribute
+the first-tap decline to this fix. Test organic onboarding activation in a separate randomized experiment.

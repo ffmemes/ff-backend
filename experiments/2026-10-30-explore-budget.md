@@ -1,26 +1,26 @@
 ---
 id: explore_budget_v1
-status: running
+status: killed
 hypothesis: Spend exploration only on labeling fresh memes, show fresh winners to everyone, and fill the idle-return slot from like_spread
 primary_metric: likes per active user per week, memes per session
 guardrails: fresh_ru_labeled_share >=0.90, empty-queue errors, pos2_abandon <= control
 unit: user
 variants: control:50,treatment:50
 started: 2026-10-30
-check_on: 2026-11-20
-decided: 
-result: unknown
-learning: 
+check_on:
+decided: 2026-11-22
+result: Nov20 ordinary n=175/186, likes/user/week 75.10 to 51.13 and memes/session 24.26 to 22.53. Both stop-rule conditions met. Production switch pending.
+learning: Separate the post-push feed choice from moderator labeling and fresh inventory in the next test.
 code: EXPLORE_BUDGET_V1_ENABLED, src/recommendations/pipeline.py, candidates.py, blender_experiments.py, src/feed_turn/planner.py
-readout: docs/analyst/explore-budget-v1.sql
+readout: docs/analyst/explore-budget-decision.sql, docs/analyst/explore-budget-v1.sql
 ---
 
 # Experiment: Explore budget v1 (labeling budget + fresh-viral + idle-return slot)
 
 Created: 2026-10-30
-Status: active
+Status: stop decision recorded November 22. See the runtime checkpoint below.
 Owner: engineer / analyst
-Deployed: pending (first `explore_budget_v1` assignment row = start)
+Deployed in October 2026, confirmed by production assignment rows.
 Measure after: 2026-11-20
 
 ## Hypothesis
@@ -137,3 +137,7 @@ it also needs dedup-id exclusion and pos2/fresh_ru guardrails the views do not
 have). On 2026-11-20 also report `v_experiment_user` user-level means
 (`reactions_per_week`, `likes_per_week`, `memes_per_session`, segment
 `<> 'excluded'`) as a cross-check; definitions in `docs/analyst/north_star.sql`.
+
+## November 22 review
+
+The November 20 cutoff triggered the directional stop rule for ordinary users. Both user-level 95% intervals include zero. Moderator outcomes improved, while the adoption rule requires both segments. Both production feed producers still had the experiment enabled at 14:30 UTC on November 22. The operational stop requires disabling the switch on each producer and allowing already-built queues to drain. [November 22 evidence](../docs/analyst/readouts/2026-11-22-experiment-check.md).

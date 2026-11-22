@@ -1,0 +1,102 @@
+{
+  "as_of_utc": "2026-11-20 23:59:59",
+  "restored_ids_count": 7762,
+  "rows": [
+    {
+      "scenario": "all_sends",
+      "seg": "mod",
+      "variant": "control",
+      "n": 86,
+      "sends": 84413,
+      "sessions": 1790,
+      "likes_user_wk": 67.04118,
+      "memes_session": 37.22828,
+      "restored_low_sent": 37943,
+      "low_sent_sends": 68111
+    },
+    {
+      "scenario": "all_sends",
+      "seg": "mod",
+      "variant": "treatment",
+      "n": 92,
+      "sends": 95855,
+      "sessions": 2531,
+      "likes_user_wk": 108.31965,
+      "memes_session": 33.90356,
+      "restored_low_sent": 3789,
+      "low_sent_sends": 53578
+    },
+    {
+      "scenario": "all_sends",
+      "seg": "user",
+      "variant": "control",
+      "n": 177,
+      "sends": 97229,
+      "sessions": 2341,
+      "likes_user_wk": 93.03081,
+      "memes_session": 30.94795,
+      "restored_low_sent": 0,
+      "low_sent_sends": 0
+    },
+    {
+      "scenario": "all_sends",
+      "seg": "user",
+      "variant": "treatment",
+      "n": 189,
+      "sends": 78880,
+      "sessions": 2419,
+      "likes_user_wk": 66.35057,
+      "memes_session": 27.02767,
+      "restored_low_sent": 0,
+      "low_sent_sends": 0
+    },
+    {
+      "scenario": "primary",
+      "seg": "mod",
+      "variant": "control",
+      "n": 84,
+      "sends": 42646,
+      "sessions": 1653,
+      "likes_user_wk": 41.32312,
+      "memes_session": 20.83254,
+      "restored_low_sent": 0,
+      "low_sent_sends": 30168
+    },
+    {
+      "scenario": "primary",
+      "seg": "mod",
+      "variant": "treatment",
+      "n": 92,
+      "sends": 81260,
+      "sessions": 2467,
+      "likes_user_wk": 92.30266,
+      "memes_session": 30.52127,
+      "restored_low_sent": 0,
+      "low_sent_sends": 49789
+    },
+    {
+      "scenario": "primary",
+      "seg": "user",
+      "variant": "control",
+      "n": 175,
+      "sends": 73815,
+      "sessions": 2267,
+      "likes_user_wk": 75.09695,
+      "memes_session": 24.25865,
+      "restored_low_sent": 0,
+      "low_sent_sends": 0
+    },
+    {
+      "scenario": "primary",
+      "seg": "user",
+      "variant": "treatment",
+      "n": 186,
+      "sends": 58022,
+      "sessions": 2357,
+      "likes_user_wk": 51.12947,
+      "memes_session": 22.53491,
+      "restored_low_sent": 0,
+      "low_sent_sends": 0
+    }
+  ]
+}
