@@ -36,26 +36,21 @@ async def create_or_update_user(
     indicates if user was created (True) or updated (False).
     """
     sql = f"""
-        WITH upsert AS (
-            INSERT
-            INTO "user"
-            (id, type, last_active_at)
-            VALUES ({id}, '{UserType.USER.value}', NOW())
-            ON CONFLICT(id)
-            DO UPDATE SET
-                blocked_bot_at = NULL,
-                last_active_at = NOW(),
-                type = CASE
-                    WHEN "user".type = '{UserType.BLOCKED_BOT.value}'
-                        THEN '{UserType.USER.value}'
-                    ELSE "user".type
-                END
-            RETURNING "user".*, (xmax = 0) as created
-        )
-        SELECT *, created FROM upsert
+        INSERT INTO "user" (id, type, last_active_at)
+        VALUES (:id, '{UserType.USER.value}', NOW())
+        ON CONFLICT(id)
+        DO UPDATE SET
+            blocked_bot_at = NULL,
+            last_active_at = NOW(),
+            type = CASE
+                WHEN "user".type = '{UserType.BLOCKED_BOT.value}'
+                    THEN '{UserType.USER.value}'
+                ELSE "user".type
+            END
+        RETURNING new.*, old.id IS NULL AS created
     """
 
-    result = await fetch_one(text(sql))
+    result = await fetch_one(text(sql), {"id": id})
     created = result.pop("created")
     return result, created
 

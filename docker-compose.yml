@@ -65,11 +65,11 @@ services:
   app_db:
     container_name: app_db
     hostname: app_db
-    image: library/postgres:14.1
+    image: postgres:19.0
     env_file:
       - .env
     volumes:
-      - app_pg_data:/var/lib/postgresql/data
+      - app_pg19_data:/var/lib/postgresql
       - app_pg_data_backups:/backups
       - ./scripts/postgres:/scripts
     ports:
@@ -87,7 +87,7 @@ services:
 
 
 volumes:
-  app_pg_data:
+  app_pg19_data:
     driver: "local"
   app_pg_data_backups:
     driver: "local"

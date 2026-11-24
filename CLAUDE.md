@@ -54,7 +54,7 @@ docker compose exec app pytest
 
 - **Bot**: python-telegram-bot, webhook in prod / `start-polling.py` locally
 - **API**: FastAPI + Uvicorn
-- **DB**: PostgreSQL 14, SQLAlchemy `Table` objects in `src/database.py` (not ORM models)
+- **DB**: PostgreSQL 19, SQLAlchemy `Table` objects in `src/database.py` (not ORM models)
 - **Cache/Queue**: Redis recommendation queues
 - **Jobs**: Prefect via `scripts/serve_flows.py`
 - **Describe Memes**: free OpenRouter vision only — see `AGENTS.md` / `specs/describe-memes.md`

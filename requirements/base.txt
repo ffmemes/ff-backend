@@ -6,7 +6,7 @@ httpx==0.28.*
 
 pydantic==2.14.*
 pydantic-settings==2.16.*
-asyncpg==0.31.*
+asyncpg==0.32.*
 fastapi==0.136.*
 uvicorn[standard]==0.46.*
 
