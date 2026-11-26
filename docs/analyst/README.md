@@ -5,6 +5,7 @@ These queries and reports support product-health monitoring and experiment analy
 
 ## Data Access
 - **Database**: Read-only PostgreSQL user (`analyst_readonly`) via `ANALYST_DATABASE_URL` in `.env`
+- **Connection**: prod Postgres has no public port. Run `scripts/analyst-tunnel.sh` (needs `FF_DB_SSH` in `.env`) and keep `ANALYST_DATABASE_URL` on `127.0.0.1:15432`.
 - **Statement timeout**: 30 seconds (kills runaway queries)
 - **Future tables**: Automatically accessible (DEFAULT PRIVILEGES granted)
 
