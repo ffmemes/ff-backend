@@ -128,7 +128,8 @@ PRESELECT = {"tgchannelru": "v4q", "tgchannelen": "v2"}
 LIVE = {"tgchannelru": "v4q", "tgchannelen": "v2"}
 # Live A/B: each decision picks one arm at random and uses it for both PRESELECT and
 # LIVE. Remove the channel's entry to end the test (PRESELECT/LIVE apply again).
-# Quirk-fix A/B ended 2026-11-27: RU fix won, EN no effect (experiments/2026-11-01-crosspost-quirk-fix-ab.md).
+# Quirk-fix A/B ended 2026-11-27: RU fix won, EN no effect
+# (experiments/2026-11-01-crosspost-quirk-fix-ab.md).
 AB_ARMS: dict[str, tuple[str, str]] = {}
 
 
