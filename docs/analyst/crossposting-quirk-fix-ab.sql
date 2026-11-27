@@ -7,6 +7,8 @@
 -- diff_zf / ci95 are fix minus control within the channel (Welch, normal approx).
 -- changed_pct: share of fix-arm decisions where the control score would have picked
 -- a different meme from the same top-N (how often the fix actually mattered).
+-- Old top-1 policy only: decisions of the top-N draw policy (2026-11-27, candidates carry
+-- propensity) are excluded; per-candidate fields come from the picked candidate.
 WITH posts AS (
     SELECT cp.channel, cp.score_version, cp.views, cp.forwards,
            LN(1 + cp.forwards) AS lfw,
@@ -21,6 +23,11 @@ WITH posts AS (
       AND m.type = 'image'
       AND cp.created_at >= '2026-11-01'
       AND cp.created_at < NOW() - INTERVAL '48 hours'
+      AND NOT EXISTS (
+          SELECT 1 FROM crossposting_decision_log d
+          WHERE d.channel = cp.channel AND d.picked_meme_id = cp.meme_id
+            AND d.candidates->0 ? 'propensity'
+      )
 ),
 labeled AS (
     SELECT *, lfw - AVG(lfw) OVER (PARTITION BY channel, wk) AS zf,
@@ -34,12 +41,15 @@ arms AS (
 ),
 changed AS (
     SELECT channel,
-           ROUND(100.0 * AVG((candidates->0->'picks'->>'v4q'
-                   IS DISTINCT FROM candidates->0->'picks'->>'v4')::int), 1) AS ru,
-           ROUND(100.0 * AVG((candidates->0->'picks'->>'v2q'
-                   IS DISTINCT FROM candidates->0->'picks'->>'v2')::int), 1) AS en
-    FROM crossposting_decision_log
-    WHERE decided_at >= '2026-11-01' AND score_version IN (8, 9)
+           ROUND(100.0 * AVG((pc->'picks'->>'v4q'
+                   IS DISTINCT FROM pc->'picks'->>'v4')::int), 1) AS ru,
+           ROUND(100.0 * AVG((pc->'picks'->>'v2q'
+                   IS DISTINCT FROM pc->'picks'->>'v2')::int), 1) AS en
+    FROM crossposting_decision_log d
+    CROSS JOIN LATERAL jsonb_array_elements(d.candidates) pc
+    WHERE d.decided_at >= '2026-11-01' AND d.score_version IN (8, 9)
+      AND (pc->>'meme_id')::int = d.picked_meme_id
+      AND NOT (pc ? 'propensity')
     GROUP BY 1
 )
 SELECT a.channel, a.arm, a.n, ROUND(a.mzf::numeric, 3) AS mean_zf,

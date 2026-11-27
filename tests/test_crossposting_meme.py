@@ -133,6 +133,7 @@ async def clean_xpost(monkeypatch):
     monkeypatch.setattr("src.crossposting.service.AB_ARMS", {})
     # deterministic top-1 picks; the top-N draw is covered in tests/crossposting/test_model.py
     monkeypatch.setattr("src.crossposting.service.settings.CROSSPOST_TOP_N", 1)
+    monkeypatch.setattr("src.crossposting.service.settings.CROSSPOST_EXPLORE_EPS", 0.0)
     async with engine.connect() as conn:
         await _wipe(conn)
     yield
@@ -612,9 +613,38 @@ async def _add_model(conn, features, coefs, version=1):
             intercept=0.0,
             alpha=10.0,
             n_train=200,
+            spec_hash="test",
+            coefs_hash="test",
             is_active=True,
         )
     )
+
+
+@pytest.mark.asyncio
+async def test_pool_sample_is_logged_and_explorable(clean_xpost, monkeypatch):
+    monkeypatch.setattr("src.crossposting.service.settings.CROSSPOST_TOP_N", 3)
+    monkeypatch.setattr("src.crossposting.service.settings.CROSSPOST_EXPLORE_EPS", 0.1)
+    async with engine.connect() as conn:
+        await create_meme_source(conn, id=10600, language_code="ru")
+        for i in range(23):
+            await create_meme(conn, id=10601 + i, meme_source_id=10600)
+            await create_meme_stats(conn, meme_id=10601 + i, nlikes=10 + i, ndislikes=2)
+        await conn.commit()
+
+    picked, decision = await get_next_meme_for_channel("tgchannelru")
+    cands = decision["candidates"]
+    sample = [c for c in cands if c["pool_sample"]]
+    assert len(cands) == 23 and len(sample) == 3  # top-20 + the 3 memes left in the pool
+    assert {c["meme_id"] for c in sample} == {10601, 10602, 10603}  # lowest v4 scores
+    assert all(c["rank"] is None and "src_prior_z" in c for c in sample)
+    assert sum(c["propensity"] for c in cands) == pytest.approx(1)
+    assert min(c["propensity"] for c in cands) == pytest.approx(0.1 / 23)
+    assert (decision["policy"], decision["top_n"], decision["explore_eps"]) == (
+        "score_topN_v1",
+        3,
+        0.1,
+    )
+    await log_ranker_decision(**decision)
 
 
 async def _add_three_memes(conn):
@@ -716,6 +746,7 @@ async def test_training_rows_join_decision_with_24h_label(clean_xpost):
                         "nmemes_sent": 20,
                         "age_days": 6,
                         "caption_present": True,
+                        "src_views_pct": 0.7,  # logged at decision: wins over the backfill
                         "final_score": 1.5,
                     }
                 ],
@@ -728,7 +759,7 @@ async def test_training_rows_join_decision_with_24h_label(clean_xpost):
     (row,) = [r for r in await training_rows("tgchannelru") if r["posted_at"] == posted]
     assert (row["zf"], row["score"]) == (0.0, 1.5)
     assert row["x"]["lr"] == 10 / 11 and row["x"]["is_upload"] == 1.0
-    assert row["x"]["has_caption"] == 1.0 and row["x"]["src_views_missing"] == 1.0
+    assert row["x"]["has_caption"] == 1.0 and row["x"]["src_views_pct"] == 0.7
 
 
 @pytest.mark.asyncio

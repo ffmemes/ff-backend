@@ -1,5 +1,6 @@
 """Channel model loop — pure functions, no DB."""
 
+import logging
 import math
 import random
 from datetime import datetime, timedelta
@@ -10,15 +11,19 @@ from src.crossposting.model import (
     FEATURES,
     Model,
     add_zf,
+    coefs_hash,
+    compare,
     features,
     fit_ridge,
     load_model,
     source_prior,
     spearman,
+    spec_hash,
     walk_forward,
 )
 from src.crossposting.service import _build_decision_log
-from src.flows.crossposting.model_loop import format_digest, should_activate
+from src.flows.crossposting import model_loop
+from src.flows.crossposting.model_loop import format_digest, should_promote
 
 INPUTS = {"is_upload": False, "src_views_pct": 0.8, "src_prior_z": 0.1, "src_prior_n": 3}
 
@@ -75,6 +80,13 @@ def test_fit_ridge_recovers_coefficients_and_predicts():
     # a constant column cannot divide by zero
     const = fit_ridge([{**x, "is_upload": 0.0} for x in xs], y)
     assert const["scale"][FEATURES.index("is_upload")] == 1.0
+    # a row's own spec (features, alpha) drives the refit
+    sub = fit_ridge(xs, y, ["lr", "ln_likes"], alpha=1e-6)
+    assert sub["features"] == ["lr", "ln_likes"] and sub["coefs"][1] == pytest.approx(
+        fit["coefs"][i], rel=1e-3
+    )
+    assert spec_hash(["lr", "ln_likes"], 1e-6) != spec_hash(list(FEATURES), 1e-6)
+    assert coefs_hash(sub) == coefs_hash({**sub}) != coefs_hash(fit)
 
 
 @pytest.mark.parametrize(
@@ -117,6 +129,38 @@ def test_decision_log_draws_uniformly_from_model_top_n():
     assert by_id[100]["picked_by"] == "v4" and by_id[100]["final_score"] is not None
 
 
+def test_exploration_propensities_sum_to_one_and_reach_every_candidate():
+    pool = [_cand(200, 5, pool_sample=True, **INPUTS)]
+    cands = [_cand(100 + i, 10 + i, **INPUTS) for i in range(5)] + pool  # K = 6, N = 3
+    logs = [
+        _build_decision_log(
+            "tgchannelru",
+            cands,
+            6,
+            "v4",
+            "v4",
+            model=_model(),
+            top_n=3,
+            explore_eps=0.5,
+            rng=random.Random(seed),
+        )
+        for seed in range(200)
+    ]
+    assert {log["picked_meme_id"] for log in logs} == {100, 101, 102, 103, 104, 200}
+    by_id = {c["meme_id"]: c for c in logs[0]["candidates"]}
+    assert by_id[104]["propensity"] == pytest.approx(0.5 / 3 + 0.5 / 6)
+    assert by_id[100]["propensity"] == pytest.approx(0.5 / 6)
+    assert sum(c["propensity"] for c in by_id.values()) == pytest.approx(1)
+    assert logs[0]["explore_eps"] == 0.5
+    # the pool sample is ranked by the model too, and flagged without a PRESELECT rank
+    assert (by_id[200]["pool_sample"], by_id[200]["rank"], by_id[200]["policy_rank"]) == (
+        True,
+        None,
+        6,
+    )
+    assert by_id[100]["pool_sample"] is False and by_id[100]["rank"] == 1
+
+
 def test_decision_log_falls_back_to_score_when_model_cannot_score():
     cands = [_cand(101, 100), _cand(102, 20)]  # no model inputs attached
     log = _build_decision_log("tgchannelru", cands, 2, "v4", "v4", model=_model(-1.0), top_n=1)
@@ -146,15 +190,21 @@ def test_zf_is_log_forwards_minus_msk_week_mean():
 
 
 def test_source_prior_uses_mature_posts_and_shrinks():
-    at = datetime(2026, 11, 27)
-    labels = [
-        {"source_id": 1, "posted_at": at - timedelta(hours=47), "zf": 5.0},  # not mature
-        {"source_id": 1, "posted_at": at - timedelta(days=3), "zf": 1.0},
-        {"source_id": 1, "posted_at": at - timedelta(days=100), "zf": 0.5},
-        {"source_id": 1, "posted_at": at - timedelta(days=181), "zf": 9.0},  # too old
-        {"source_id": 2, "posted_at": at - timedelta(days=3), "zf": 9.0},
-    ]
-    assert source_prior(labels, 1, at) == (1.5 / 7, 2)
+    at = datetime(2026, 11, 27)  # Friday
+    labels = add_zf(
+        [
+            {"source_id": 1, "posted_at": at - timedelta(days=3), "f24": 9},
+            {"source_id": 2, "posted_at": at - timedelta(days=3), "f24": 0},
+            {"source_id": 1, "posted_at": at - timedelta(days=100), "f24": 4},
+            {"source_id": 1, "posted_at": at - timedelta(days=181), "f24": 99},  # too old
+            # after the cutoff: neither counted nor part of the week means (no look-ahead)
+            {"source_id": 1, "posted_at": at - timedelta(hours=47), "f24": 99},
+            {"source_id": 3, "posted_at": at + timedelta(hours=1), "f24": 99},  # the target
+        ]
+    )
+    z_recent = math.log(10) - (math.log(10) + 0) / 2  # vs its week's posts matured by `at`
+    z, n = source_prior(labels, 1, at)
+    assert (z, n) == (pytest.approx((z_recent + 0.0) / 7), 2)
     assert source_prior(labels, 3, at) == (0.0, 0)
 
 
@@ -163,30 +213,101 @@ def test_spearman_handles_ties():
     assert spearman([1, 1, 1], [1, 2, 3]) == 0.0
 
 
-def test_walk_forward_scores_model_against_logged_score():
-    rng = random.Random(3)
-    start, rows = datetime(2026, 6, 1), []
-    for i in range(500):
+def _wf_rows(n=500, seed=3, noise=0.5):
+    rng, start = random.Random(seed), datetime(2026, 6, 1)
+    rows = []
+    for i in range(n):
         x = {f: rng.gauss(0, 1) for f in FEATURES}
-        rows.append(
-            {
-                "posted_at": start + timedelta(hours=8 * i),
-                "x": x,
-                "zf": x["ln_likes"] + rng.gauss(0, 0.5),
-                "score": rng.random(),  # a score with no signal
-            }
-        )
-    wf = walk_forward(rows)
-    assert wf["weeks"] >= 10 and wf["spearman_model"] > 0.5
-    assert wf["delta"] == pytest.approx(wf["spearman_model"] - wf["spearman_score"], abs=1e-4)
-    assert walk_forward(rows[:100]) == {"weeks": 0, "n": 0}
+        zf = x["ln_likes"] + rng.gauss(0, noise)
+        rows.append({"posted_at": start + timedelta(hours=8 * i), "x": x, "zf": zf})
+    return rows
 
 
-def test_en_activates_only_when_walk_forward_not_worse():
-    assert should_activate("tgchannelru", {"delta": -0.2})
-    assert should_activate("tgchannelen", {"delta": 0.0})
-    assert not should_activate("tgchannelen", {"delta": -0.01})
-    assert not should_activate("tgchannelen", {"weeks": 0, "n": 0})
+def test_walk_forward_is_out_of_sample_and_compare_splits_thirds():
+    rows = _wf_rows()
+    test = walk_forward(rows)
+    assert test and min(r["posted_at"] for r in test) > rows[149]["posted_at"]
+    test = [{**r, "base": random.Random(i).random()} for i, r in enumerate(test)]
+    m = compare(test)
+    assert m["spearman_model"] > 0.5 and len(m["thirds"]) == 3 and min(m["thirds"]) > 0.3
+    assert m["delta"] == pytest.approx(m["spearman_model"] - m["spearman_base"], abs=1e-4)
+    assert compare(test[:20]) == {"n": 20}
+    assert walk_forward(rows[:100]) == []
+
+
+def test_promotion_rule():
+    now = datetime(2026, 12, 10)
+    better = {"delta": 0.01, "thirds": [0.02, -0.01, 0.03]}
+    assert should_promote(better, None, now) == (True, "promoted")
+    assert should_promote(better, now - timedelta(days=8), now) == (True, "promoted")
+    assert should_promote(better, now - timedelta(days=6), now) == (False, "cooldown")
+    one_third = {"delta": 0.05, "thirds": [0.2, -0.01, -0.01]}
+    assert should_promote(one_third, None, now) == (False, "not_better")
+    worse_overall = {"delta": -0.01, "thirds": [0.01, 0.01, -0.2]}
+    assert should_promote(worse_overall, None, now) == (False, "not_better")
+    assert should_promote({"n": 12}, None, now) == (False, "too_few_posts")
+
+
+@pytest.mark.asyncio
+async def test_refit_keeps_active_spec_and_stores_inactive_unless_better(monkeypatch):
+    now = datetime(2026, 12, 10)
+    rows = [{**r, "score": random.Random(i).random()} for i, r in enumerate(_wf_rows(noise=0))]
+    active = {
+        "version": 4,
+        "features": ["ln_likes", "lr"],  # an agent's spec: the refit must keep it
+        "coefs": [1.0, 0.0],  # frozen and perfect on these rows: nothing beats it
+        "mean": [0.0, 0.0],
+        "scale": [1.0, 1.0],
+        "intercept": 0.0,
+        "alpha": 3.0,
+        "train_to": rows[200]["posted_at"],
+        "activated_at": now - timedelta(days=30),
+        "created_at": now - timedelta(days=30),
+    }
+    saved = {}
+
+    async def fake_active(channel):
+        return active
+
+    async def fake_rows(channel):
+        return rows
+
+    async def fake_save(channel, fit, alpha, rows_, metrics, promote):
+        saved.update(fit=fit, alpha=alpha, metrics=metrics, promote=promote)
+        return 5
+
+    monkeypatch.setattr(model_loop, "_active_row", fake_active)
+    monkeypatch.setattr(model_loop, "training_rows", fake_rows)
+    monkeypatch.setattr(model_loop, "_save_model", fake_save)
+    monkeypatch.setattr(model_loop, "_now", lambda: now)
+    await model_loop.retrain_channel("tgchannelru")
+    assert saved["fit"]["features"] == ["ln_likes", "lr"] and saved["alpha"] == 3.0
+    assert saved["metrics"]["baseline"] == "v4" and saved["promote"] is False
+    assert saved["metrics"]["decision"] == "not_better"
+    assert saved["metrics"]["since"] > str(active["train_to"])  # out of sample for v4 only
+
+    # no active model: default spec, judged against the logged live score (random here)
+    active = None
+    await model_loop.retrain_channel("tgchannelru")
+    assert saved["fit"]["features"] == list(FEATURES) and saved["metrics"]["baseline"] == "score"
+    assert saved["promote"] is True
+
+
+@pytest.mark.asyncio
+async def test_refit_failure_on_one_channel_does_not_stop_the_other(monkeypatch):
+    calls = []
+
+    async def fake_retrain(channel):
+        calls.append(channel)
+        if channel == "tgchannelru":
+            raise RuntimeError("boom")
+        return "ok"
+
+    monkeypatch.setattr(model_loop, "retrain_channel", fake_retrain)
+    monkeypatch.setattr(model_loop, "get_run_logger", lambda: logging.getLogger("test"))
+    with pytest.raises(RuntimeError, match="tgchannelru"):
+        await model_loop.retrain_channel_models.fn()
+    assert calls == ["tgchannelru", "tgchannelen"]
 
 
 def test_digest_shows_labels_draw_rank_and_health():
@@ -200,34 +321,38 @@ def test_digest_shows_labels_draw_rank_and_health():
         "model_version": 5,
         "cand": {"policy_rank": 2, "model_pred": 0.05},
     }
+    explored = {**post, "telegram_message_id": 124, "cand": {"policy_rank": 9}}
     health = {"last_snapshot": now - timedelta(minutes=14), "posts_24h": 5, "decisions_24h": 5}
-    model_row = {
-        "version": 5,
-        "created_at": now,
+    active = {"version": 5, "created_at": now, "activated_at": now, "is_active": True}
+    nightly = {
+        "version": 6,
         "n_train": 1043,
-        "metrics": {"delta": 0.08},
-        "is_active": True,
+        "metrics": {"baseline": "v5", "delta": 0.01, "thirds": [0.1, -0.1, 0.0]},
+        "is_active": False,
     }
+    nightly["metrics"]["decision"] = "not_better"
     text = format_digest(
         [
             {
                 "channel": "tgchannelru",
                 "now": now,
-                "posts": [post],
-                "model": model_row,
-                "health": {**health, "posts_to_label": 1},
+                "posts": [post, explored],
+                "models": [active, nightly],
+                "health": {**health, "posts_to_label": 2},
             },
             {
                 "channel": "tgchannelen",
                 "now": now,
                 "posts": [],
-                "model": None,
+                "models": [],
                 "health": {**health, "last_snapshot": None, "posts_to_label": 2},
             },
         ]
     )
     assert "https://t.me/fastfoodmemes/123" in text
     assert "f24 12 · zf +0.21 · жребий 2/3 · v5 прогноз +0.05" in text
-    assert "модель v5 от 27.11, n 1043, wf Δρ +0.08, активна" in text
+    assert "модель v5 активна с 27.11; ночная v6 (n 1043) против v5: Δρ +0.01, лучше в 1/3" in text
+    assert "не продвинута: не лучше" in text
+    assert "жребий 9/3 (исследование)" in text
     assert "✅ снапшот 14 мин назад" in text
     assert "<b>EN</b> · модели нет" in text and "⚠️ снапшот нет" in text

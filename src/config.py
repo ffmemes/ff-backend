@@ -76,6 +76,9 @@ class Config(BaseSettings):
     MONTHLY_REMINDER_HOLDOUT_PCT: int = 50
     # Crosspost picks uniformly among the policy's top-N (propensity 1/N in the decision log).
     CROSSPOST_TOP_N: int = 3
+    # ... except with this probability, uniformly among all logged candidates (exploration):
+    # propensity = (1 - eps) / N * [rank <= N] + eps / K.
+    CROSSPOST_EXPLORE_EPS: float = 0.1
     # Owner's Telegram user id for the daily channel digest; unset → ADMIN_LOGS_CHAT_ID.
     CHANNEL_DIGEST_CHAT_ID: str | None = None
 

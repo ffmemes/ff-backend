@@ -11,17 +11,22 @@
 -- coverage_pct     share of decisions whose posted pick has src_fwd_pct
 -- v5f_vs_v5_pct    share of decisions where the v5f top-1 differs from the v5 top-1
 -- rho_v5f/rho_v5   Spearman(score, zf) over posted picks (score logged at decision time)
+-- Old top-1 policy only: decisions of the top-N draw policy (2026-11-27, candidates carry
+-- propensity) are excluded; per-candidate fields come from the picked candidate.
 -- rho_*_cov        same, only picks that have src_fwd_pct (where v5f can differ)
 WITH dec AS (
     SELECT d.channel, d.decided_at, d.picked_meme_id,
-           (d.candidates->0->>'shadow_v5_pick_meme_id')::int AS v5_pick,
-           (d.candidates->0->>'shadow_v5f_pick_meme_id')::int AS v5f_pick,
-           (d.candidates->0->>'score_v5')::float AS score_v5,
-           (d.candidates->0->>'score_v5f')::float AS score_v5f,
-           d.candidates->0->>'src_fwd_pct' IS NOT NULL AS covered
+           (pc->>'shadow_v5_pick_meme_id')::int AS v5_pick,
+           (pc->>'shadow_v5f_pick_meme_id')::int AS v5f_pick,
+           (pc->>'score_v5')::float AS score_v5,
+           (pc->>'score_v5f')::float AS score_v5f,
+           pc->>'src_fwd_pct' IS NOT NULL AS covered
     FROM crossposting_decision_log d
+    CROSS JOIN LATERAL jsonb_array_elements(d.candidates) pc
     WHERE d.channel IN ('tgchannelru', 'tgchannelen')
-      AND d.candidates->0 ? 'score_v5f'
+      AND (pc->>'meme_id')::int = d.picked_meme_id
+      AND NOT (pc ? 'propensity')
+      AND pc ? 'score_v5f'
 ),
 posts AS (
     SELECT cp.channel, cp.meme_id, LN(1 + cp.forwards) AS lfw,

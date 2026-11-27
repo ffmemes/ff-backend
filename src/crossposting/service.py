@@ -313,6 +313,7 @@ async def log_ranker_decision(
     candidates: list[dict[str, Any]],
     policy: str | None = None,
     top_n: int | None = None,
+    explore_eps: float | None = None,
     model_version: int | None = None,
 ) -> None:
     """Insert one row into crossposting_decision_log. Failures must be wrapped
@@ -327,6 +328,7 @@ async def log_ranker_decision(
         candidates=candidates,
         policy=policy,
         top_n=top_n,
+        explore_eps=explore_eps,
         model_version=model_version,
     )
     await execute(insert_stmt)
@@ -392,6 +394,9 @@ _POOL_QUERY = """
       AND M.meme_source_id NOT IN (SELECT meme_source_id FROM recent_src)
 """
 
+# Random pool memes outside the top-N preselect, logged and drawable for exploration.
+POOL_SAMPLE = 5
+
 # Flat per-candidate keys still read by docs/analyst/crossposting-*.sql readouts.
 _LEGACY_SHADOWS = ("v5", "v5c", "v5f")
 
@@ -423,12 +428,14 @@ def _build_decision_log(
     pre: str,
     model: Model | None = None,
     top_n: int = 1,
+    explore_eps: float = 0.0,
     rng: Any = random,
 ) -> dict[str, Any]:
-    """Score the preselected top-N with every score; return log_ranker_decision kwargs.
+    """Score the logged candidates with every score; return log_ranker_decision kwargs.
 
-    The policy ranks by ``model`` (else the live score) and draws uniformly from its
-    first ``top_n``; each candidate logs its policy rank and selection probability.
+    The policy ranks all K candidates by ``model`` (else the live score), then draws
+    uniformly from all K with probability ``explore_eps``, else from its first ``top_n``.
+    Each candidate logs its policy rank and selection probability (they sum to 1).
     """
     scored = [score_all(r, channel) for r in top]
     picks: dict[str, int] = {}
@@ -447,8 +454,9 @@ def _build_decision_log(
     key = preds if preds is not None else [s[picked_by] for _, s in scored]
     order = sorted(range(len(top)), key=lambda i: (-key[i], top[i]["id"]))
     policy_rank = {i: rank for rank, i in enumerate(order, start=1)}
-    n = max(1, min(top_n, len(top)))
-    drawn = top[order[rng.randrange(n)]]
+    k, n = len(top), max(1, min(top_n, len(top)))
+    explore_eps = min(max(float(explore_eps), 0.0), 1.0)
+    drawn = top[order[rng.randrange(k) if rng.random() < explore_eps else rng.randrange(n)]]
 
     log_candidates = []
     for i, (row, (factors, scores)) in enumerate(zip(top, scored, strict=True)):
@@ -456,7 +464,8 @@ def _build_decision_log(
         scores = {k: _round(v, 6) for k, v in scores.items()}
         log_candidates.append(
             {
-                "rank": i + 1,  # PRESELECT order
+                "rank": None if row.get("pool_sample") else i + 1,  # PRESELECT order
+                "pool_sample": bool(row.get("pool_sample")),
                 "meme_id": row["id"],
                 "source_id": row.get("meme_source_id"),
                 "nlikes": row.get("nlikes"),
@@ -481,7 +490,7 @@ def _build_decision_log(
                 "src_prior_n": row.get("src_prior_n"),
                 "model_pred": _round(preds[i], 4) if preds else None,
                 "policy_rank": policy_rank[i],
-                "propensity": 1 / n if policy_rank[i] <= n else 0.0,
+                "propensity": (1 - explore_eps) / n * (policy_rank[i] <= n) + explore_eps / k,
                 "factors": factors,
                 "scores": scores,
                 "ranks": ranks[i],
@@ -506,6 +515,7 @@ def _build_decision_log(
         "candidates": log_candidates,
         "policy": "model_topN_v1" if preds else "score_topN_v1",
         "top_n": n,
+        "explore_eps": explore_eps,
         "model_version": model.version if preds else None,
     }
 
@@ -528,6 +538,11 @@ async def get_next_meme_for_channel(
     if channel in AB_ARMS:
         pre = live = random.choice(AB_ARMS[channel])
     top = heapq.nsmallest(log_top_n, rows, key=lambda r: (-score(r, channel, pre), r["id"]))
+    # A few random pool memes outside the top give exploration (and IPS) support off the top.
+    top_ids = {r["id"] for r in top}
+    sample = random.sample(rows, min(len(rows), log_top_n + POOL_SAMPLE))
+    for r in [r for r in sample if r["id"] not in top_ids][:POOL_SAMPLE]:
+        top.append({**r, "pool_sample": True})
     # Shadow inputs and the model must never block posting: failures rank by score.
     try:
         await _attach_shadow_inputs(top, channel)
@@ -550,5 +565,6 @@ async def get_next_meme_for_channel(
         pre=pre,
         model=model,
         top_n=settings.CROSSPOST_TOP_N,
+        explore_eps=settings.CROSSPOST_EXPLORE_EPS,
     )
     return await _picked_meme_dict(decision["picked_meme_id"]), decision

@@ -1,10 +1,12 @@
 """Channel model loop: nightly ridge refit and the daily digest to the owner.
 
-Posting ranks by the active ``crossposting_model`` row and draws from its top-N
-(src/crossposting/service.py). Here: refit on every labeled decision (post older than 36h,
-zf_24h from snapshots), store a new version, activate it; send a short daily summary.
+Posting ranks by the active ``crossposting_model`` row (src/crossposting/service.py).
+Nightly: refit the active row's spec (features, alpha) on every labeled decision (post older
+than 36h, zf_24h from snapshots) and store it as an inactive version. It is promoted only by
+PROMOTION_RULE, at most once per PROMOTE_EVERY; otherwise the active row stays.
 """
 
+import logging
 from datetime import UTC, datetime, timedelta
 from html import escape
 from typing import Any
@@ -16,10 +18,15 @@ from telegram.constants import ParseMode
 from src.config import settings
 from src.crossposting.model import (
     ALPHA,
+    FEATURES,
+    Model,
+    coefs_hash,
+    compare,
     features,
     fit_ridge,
     load_model,
     source_prior,
+    spec_hash,
     walk_forward,
 )
 from src.crossposting.service import fetch_labels, fetch_model_static_inputs
@@ -28,11 +35,15 @@ from src.flows.hooks import notify_telegram_on_failure
 from src.tgbot.bot import bot
 from src.tgbot.constants import TELEGRAM_CHANNEL_EN_LINK, TELEGRAM_CHANNEL_RU_LINK
 
+logger = logging.getLogger(__name__)
+
 CHANNELS = {"tgchannelru": TELEGRAM_CHANNEL_RU_LINK, "tgchannelen": TELEGRAM_CHANNEL_EN_LINK}
 MIN_TRAIN = 150
-# EN labels are mostly noise (median 1 forward): its model goes live only when walk-forward
-# is not worse than the current score; otherwise EN stays on score_topN (2026-11-27 readout).
-WF_GATED = {"tgchannelen"}
+PROMOTE_EVERY = timedelta(days=7)
+# Promote the nightly version when, on the same out-of-sample posts, its walk-forward Spearman
+# beats the active model (frozen, on posts after its training window) or, with no active
+# model, the logged live score: better in >= 2 of 3 time segments and not worse overall.
+PROMOTION_RULE = "wins>=2/3 and delta>=0"
 
 # Latest decision per picked meme (a retried flow can log twice) with its picked candidate.
 _PICKED_QUERY = """
@@ -64,7 +75,8 @@ async def _picked(channel: str, labels: list[dict[str, Any]], since: datetime) -
 
 
 async def training_rows(channel: str) -> list[dict[str, Any]]:
-    """One row per labeled decision: logged bot stats + static inputs + source prior at decision."""
+    """One row per labeled decision: logged bot stats and static inputs (backfilled for rows
+    logged before they existed) + the source prior as known at the decision."""
     labels = await fetch_labels(channel, until=_now() - timedelta(hours=36))
     picked = await _picked(channel, labels, since=datetime(2000, 1, 1))
     static = await fetch_model_static_inputs([p["meme_id"] for p in picked])
@@ -80,6 +92,7 @@ async def training_rows(channel: str) -> list[dict[str, Any]]:
                 "age_days": c.get("age_days"),
                 "has_caption": c.get("caption_present"),
                 **static.get(p["meme_id"], {}),
+                **{k: c[k] for k in ("is_upload", "src_views_pct") if k in c},
                 "src_prior_z": prior_z,
                 "src_prior_n": prior_n,
             }
@@ -91,33 +104,55 @@ async def training_rows(channel: str) -> list[dict[str, Any]]:
     return rows
 
 
-def should_activate(channel: str, wf: dict[str, Any]) -> bool:
-    return channel not in WF_GATED or wf.get("delta", -1.0) >= 0
+def should_promote(
+    metrics: dict[str, Any], last_activated: datetime | None, now: datetime
+) -> tuple[bool, str]:
+    if last_activated is not None and now - last_activated < PROMOTE_EVERY:
+        return False, "cooldown"
+    thirds = metrics.get("thirds")
+    if not thirds:
+        return False, "too_few_posts"
+    if sum(d > 0 for d in thirds) >= 2 and metrics["delta"] >= 0:
+        return True, "promoted"
+    return False, "not_better"
 
 
-async def _save_model(channel: str, fit: dict, rows: list[dict], wf: dict, active: bool) -> int:
-    """New version; the newest decides whether the channel has an active model at all."""
+async def _active_row(channel: str) -> dict[str, Any] | None:
+    return await fetch_one(
+        text("SELECT * FROM crossposting_model WHERE channel = :channel AND is_active"),
+        {"channel": channel},
+    )
+
+
+async def _save_model(
+    channel: str, fit: dict, alpha: float, rows: list[dict], metrics: dict, promote: bool
+) -> int:
+    """Store a new version; when promoted it replaces the active one in the same transaction."""
     m = crossposting_model.c
     version = select(func.coalesce(func.max(m.version), 0) + 1).where(m.channel == channel)
 
     async def tx(conn):
-        await conn.execute(
-            update(crossposting_model)
-            .where(m.channel == channel, m.is_active)
-            .values(is_active=False)
-        )
+        if promote:
+            await conn.execute(
+                update(crossposting_model)
+                .where(m.channel == channel, m.is_active)
+                .values(is_active=False)
+            )
         res = await conn.execute(
             insert(crossposting_model)
             .values(
                 channel=channel,
                 version=version.scalar_subquery(),
                 **fit,
-                alpha=ALPHA,
+                alpha=alpha,
                 train_from=min(r["posted_at"] for r in rows),
                 train_to=max(r["posted_at"] for r in rows),
                 n_train=len(rows),
-                metrics=wf,
-                is_active=active,
+                metrics=metrics,
+                spec_hash=spec_hash(fit["features"], alpha),
+                coefs_hash=coefs_hash(fit),
+                is_active=promote,
+                activated_at=_now() if promote else None,
             )
             .returning(m.version)
         )
@@ -126,20 +161,51 @@ async def _save_model(channel: str, fit: dict, rows: list[dict], wf: dict, activ
     return await run_in_transaction(tx)
 
 
+async def retrain_channel(channel: str) -> str:
+    now = _now()
+    active_row = await _active_row(channel)
+    active: Model | None = None
+    feats, alpha = list(FEATURES), ALPHA
+    if active_row is not None:
+        try:
+            active = load_model(active_row)
+            feats, alpha = active.features, float(active_row["alpha"])
+        except (ValueError, TypeError):
+            logger.warning(f"{channel}: active model unusable, refitting the default spec")
+    rows = await training_rows(channel)
+    if len(rows) < MIN_TRAIN:
+        return f"{channel}: {len(rows)} labeled decisions < {MIN_TRAIN}, no refit"
+    fit = fit_ridge([r["x"] for r in rows], [r["zf"] for r in rows], feats, alpha)
+    load_model({**fit, "version": 0})  # refuse to store what posting would reject
+    test = walk_forward(rows, feats, alpha)
+    if active is not None:
+        # frozen coefficients are out of sample only after their training window
+        test = [{**r, "base": active.predict(r["x"])} for r in test]
+        trained_to = active_row["train_to"] or active_row["created_at"]
+        test = [r for r in test if r["posted_at"] > trained_to]
+        baseline = f"v{active.version}"
+    else:
+        test = [{**r, "base": r["score"]} for r in test]
+        baseline = "score"
+    metrics = {**compare(test), "baseline": baseline, "rule": PROMOTION_RULE}
+    last = (active_row["activated_at"] or active_row["created_at"]) if active else None
+    promote, metrics["decision"] = should_promote(metrics, last, now)
+    version = await _save_model(channel, fit, alpha, rows, metrics, promote)
+    return f"{channel}: v{version} n={len(rows)} {metrics}"
+
+
 @flow(timeout_seconds=900, on_failure=[notify_telegram_on_failure])
 async def retrain_channel_models():
-    logger = get_run_logger()
+    log = get_run_logger()
+    failed = []
     for channel in CHANNELS:
-        rows = await training_rows(channel)
-        if len(rows) < MIN_TRAIN:
-            logger.warning(f"{channel}: {len(rows)} labeled decisions < {MIN_TRAIN}, no refit")
-            continue
-        fit = fit_ridge([r["x"] for r in rows], [r["zf"] for r in rows])
-        load_model({**fit, "version": 0})  # refuse to store what posting would reject
-        wf = walk_forward(rows)
-        active = should_activate(channel, wf)
-        version = await _save_model(channel, fit, rows, wf, active)
-        logger.info(f"{channel}: model v{version} n={len(rows)} active={active} wf={wf}")
+        try:
+            log.info(await retrain_channel(channel))
+        except Exception:
+            log.exception(f"{channel}: refit failed")
+            failed.append(channel)
+    if failed:
+        raise RuntimeError(f"channel model refit failed: {failed}")
 
 
 # ── Daily digest ──
@@ -158,9 +224,13 @@ _HEALTH_QUERY = """
            AND cp.created_at BETWEEN NOW() - INTERVAL '48 hours' AND NOW() - INTERVAL '24 hours'
         ) AS posts_to_label
 """
-_MODEL_QUERY = """
-    SELECT version, created_at, n_train, metrics, is_active FROM crossposting_model
-    WHERE channel = :channel ORDER BY version DESC LIMIT 1
+# The active row and the latest nightly version (often the same row).
+_MODELS_QUERY = """
+    SELECT version, created_at, activated_at, n_train, metrics, is_active
+    FROM crossposting_model
+    WHERE channel = :channel
+      AND (is_active OR version = (SELECT MAX(version) FROM crossposting_model
+                                   WHERE channel = :channel))
 """
 
 
@@ -181,7 +251,7 @@ async def _channel_digest(channel: str) -> dict[str, Any]:
         "channel": channel,
         "now": now,
         "posts": posts,
-        "model": await fetch_one(text(_MODEL_QUERY), {"channel": channel}),
+        "models": await fetch_all(text(_MODELS_QUERY), {"channel": channel}),
         "health": await fetch_one(text(_HEALTH_QUERY), {"channel": channel}),
     }
 
@@ -190,30 +260,48 @@ def _fmt(x: float | None) -> str:
     return "—" if x is None else f"{x:+.2f}"
 
 
+_DECISIONS = {
+    "promoted": "продвинута",
+    "cooldown": "не продвинута: активной меньше 7 дней",
+    "too_few_posts": "не продвинута: мало постов для сравнения",
+    "not_better": "не продвинута: не лучше",
+}
+
+
+def _models_line(models: list[dict[str, Any]]) -> str:
+    active = next((m for m in models if m["is_active"]), None)
+    latest = max(models, key=lambda m: m["version"], default=None)
+    head = "модели нет, ранжирует скор"
+    if active is not None:
+        since = active["activated_at"] or active["created_at"]
+        head = f"модель v{active['version']} активна с {since:%d.%m}"
+    if latest is not None and latest is not active:
+        mt = latest["metrics"] or {}
+        wins = sum(d > 0 for d in mt.get("thirds") or [])
+        head += (
+            f"; ночная v{latest['version']} (n {latest['n_train']}) против "
+            f"{mt.get('baseline', '—')}: Δρ {_fmt(mt.get('delta'))}, лучше в {wins}/3, "
+            f"{_DECISIONS.get(mt.get('decision'), '—')}"
+        )
+    return head
+
+
 def format_digest(digests: list[dict[str, Any]]) -> str:
     lines = ["📈 <b>Каналы за сутки</b>: посты 24–48 ч назад, метка = форварды за 24 ч"]
     for d in digests:
-        ch, m, h = d["channel"], d["model"], d["health"]
+        ch, h = d["channel"], d["health"]
         name = "RU" if ch == "tgchannelru" else "EN"
-        if m is None:
-            head = "модели нет, ранжирует скор"
-        else:
-            delta = (m["metrics"] or {}).get("delta")
-            state = "активна" if m["is_active"] else "не активна, ранжирует скор"
-            head = (
-                f"модель v{m['version']} от {m['created_at']:%d.%m}, n {m['n_train']}, "
-                f"wf Δρ {_fmt(delta)}, {state}"
-            )
-        lines += ["", f"<b>{name}</b> · {head}"]
+        lines += ["", f"<b>{name}</b> · {_models_line(d['models'])}"]
         for p in d["posts"]:
             c = p.get("cand") or {}
-            rank = f"{c['policy_rank']}/{p['top_n']}" if p.get("top_n") else "—"
+            rank, n = c.get("policy_rank"), p.get("top_n")
+            draw = "—" if not n else f"{rank}/{n}" + (" (исследование)" if rank > n else "")
             ver = f"v{p['model_version']}" if p.get("model_version") else "скор"
             link = f"{CHANNELS[ch]}/{p['telegram_message_id']}"
             when = (p["posted_at"] + timedelta(hours=3)).strftime("%d.%m %H:%M")
             lines.append(
                 f'• <a href="{escape(link)}">{when}</a> f24 {p["f24"]} · zf {_fmt(p["zf"])}'
-                f" · жребий {rank} · {ver} прогноз {_fmt(c.get('model_pred'))}"
+                f" · жребий {draw} · {ver} прогноз {_fmt(c.get('model_pred'))}"
             )
         if d["posts"]:
             mean = sum(p["zf"] for p in d["posts"]) / len(d["posts"])

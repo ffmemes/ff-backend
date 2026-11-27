@@ -8,6 +8,8 @@ writes a ``crossposting_model`` row; posting loads the active row with ``load_mo
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 from collections import defaultdict
 from dataclasses import dataclass
@@ -89,10 +91,15 @@ def load_model(row: dict[str, Any]) -> Model:
     return Model(int(row["version"]), feats, coefs, mean, scale, intercept)
 
 
-def fit_ridge(xs: list[dict[str, float]], y: list[float], alpha: float = ALPHA) -> dict[str, Any]:
-    """Ridge on standardized FEATURES (= sklearn StandardScaler + Ridge(alpha)), closed form."""
-    n, p = len(xs), len(FEATURES)
-    cols = [[x[f] for x in xs] for f in FEATURES]
+def fit_ridge(
+    xs: list[dict[str, float]],
+    y: list[float],
+    features: list[str] | tuple[str, ...] = FEATURES,
+    alpha: float = ALPHA,
+) -> dict[str, Any]:
+    """Ridge on standardized ``features`` (= sklearn StandardScaler + Ridge(alpha)), closed form."""
+    n, p = len(xs), len(features)
+    cols = [[x[f] for x in xs] for f in features]
     mean = [sum(c) / n for c in cols]
     scale = [math.sqrt(sum((v - m) ** 2 for v in c) / n) or 1.0 for c, m in zip(cols, mean)]
     z = [[(v - m) / s for v in c] for c, m, s in zip(cols, mean, scale)]
@@ -104,12 +111,24 @@ def fit_ridge(xs: list[dict[str, float]], y: list[float], alpha: float = ALPHA) 
     ]
     b = [sum(map(math.prod, zip(z[i], yc))) for i in range(p)]
     return {
-        "features": list(FEATURES),
+        "features": list(features),
         "coefs": _solve(a, b),
         "mean": mean,
         "scale": scale,
         "intercept": ybar,
     }
+
+
+def _sha256(obj: Any) -> str:
+    return hashlib.sha256(json.dumps(obj, sort_keys=True).encode()).hexdigest()
+
+
+def spec_hash(features: list[str], alpha: float) -> str:
+    return _sha256({"features": list(features), "alpha": float(alpha), "target": "zf_24h"})
+
+
+def coefs_hash(fit: dict[str, Any]) -> str:
+    return _sha256({k: fit[k] for k in ("features", "coefs", "mean", "scale", "intercept")})
 
 
 def _solve(a: list[list[float]], b: list[float]) -> list[float]:
@@ -130,20 +149,31 @@ def msk_week(t: datetime) -> date:
 
 
 def add_zf(labels: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Set zf = ln(1 + f24) - mean over its MSK week, in place (labels of one channel)."""
+    """Set lf = ln(1 + f24), week and zf = lf - mean over its MSK week, in place (one channel)."""
     weeks: dict[date, list[float]] = defaultdict(list)
     for r in labels:
-        weeks[msk_week(r["posted_at"])].append(math.log1p(r["f24"]))
+        r["lf"], r["week"] = math.log1p(r["f24"]), msk_week(r["posted_at"])
+        weeks[r["week"]].append(r["lf"])
     mu = {w: sum(v) / len(v) for w, v in weeks.items()}
     for r in labels:
-        r["zf"] = math.log1p(r["f24"]) - mu[msk_week(r["posted_at"])]
+        r["zf"] = r["lf"] - mu[r["week"]]
     return labels
 
 
 def source_prior(labels: list[dict[str, Any]], source_id: int, at: datetime) -> tuple[float, int]:
-    """Own-channel source prior: sum of zf of the source's posts 48h-180d before ``at``, / (n+5)."""
-    lo, hi = at - timedelta(days=180), at - timedelta(hours=48)
-    zs = [r["zf"] for r in labels if r["source_id"] == source_id and lo <= r["posted_at"] < hi]
+    """Own-channel source prior as known at ``at``: the source's posts 48h-180d before it, zf
+    against week means of posts matured by then only (later posts, the target included, never
+    count); sum(zf) / (n + 5). labels: add_zf output."""
+    past = [r for r in labels if r["posted_at"] < at - timedelta(hours=48)]
+    weeks: dict[date, list[float]] = defaultdict(list)
+    for r in past:
+        weeks[r["week"]].append(r["lf"])
+    lo = at - timedelta(days=180)
+    zs = [
+        r["lf"] - sum(weeks[r["week"]]) / len(weeks[r["week"]])
+        for r in past
+        if r["source_id"] == source_id and r["posted_at"] >= lo
+    ]
     return sum(zs) / (len(zs) + PRIOR_K), len(zs)
 
 
@@ -169,40 +199,58 @@ def spearman(a: list[float], b: list[float]) -> float:
     return cov / den if den else 0.0
 
 
-def _week_pct(v: list[float]) -> list[float]:
-    return [(r + 0.5) / len(v) for r in _ranks(v)]
+def _week_pct(rows: list[dict[str, Any]], key: str) -> list[float]:
+    """Percentile of rows[key] within each row's MSK week."""
+    by_week: dict[date, list[int]] = defaultdict(list)
+    for i, r in enumerate(rows):
+        by_week[msk_week(r["posted_at"])].append(i)
+    out = [0.0] * len(rows)
+    for idx in by_week.values():
+        for i, rank in zip(idx, _ranks([float(rows[i][key]) for i in idx])):
+            out[i] = (rank + 0.5) / len(idx)
+    return out
 
 
-def walk_forward(rows: list[dict[str, Any]], min_train: int = 150) -> dict[str, Any]:
-    """Weekly walk-forward on published posts: fit on posts whose label matured before the
-    MSK week, rank that week. Spearman(within-week percentile, zf) of the model vs the
-    logged live ``final_score`` on the same posts. rows: {posted_at, x, zf, score}."""
+def walk_forward(
+    rows: list[dict[str, Any]],
+    features: list[str] | tuple[str, ...] = FEATURES,
+    alpha: float = ALPHA,
+    min_train: int = 150,
+) -> list[dict[str, Any]]:
+    """Out-of-sample predictions on published posts: each MSK week is ranked by a fit on posts
+    whose label matured before it. rows: {posted_at, x, zf, score}; returns test rows + pred."""
     by_week: dict[date, list[dict[str, Any]]] = defaultdict(list)
     for r in rows:
         by_week[msk_week(r["posted_at"])].append(r)
-    pm: list[float] = []
-    ps: list[float] = []
-    zf: list[float] = []
-    weeks = 0
+    out = []
     for w in sorted(by_week):
         cutoff = datetime.combine(w, time()) - MSK - timedelta(hours=36)
         train = [r for r in rows if r["posted_at"] < cutoff]
-        test = [r for r in by_week[w] if r["score"] is not None]
-        if len(train) < min_train or len(test) < 2:
+        if len(train) < min_train:
             continue
-        fit = fit_ridge([r["x"] for r in train], [r["zf"] for r in train])
+        fit = fit_ridge([r["x"] for r in train], [r["zf"] for r in train], features, alpha)
         m = Model(0, **fit)
-        pm += _week_pct([m.predict(r["x"]) for r in test])
-        ps += _week_pct([float(r["score"]) for r in test])
-        zf += [r["zf"] for r in test]
-        weeks += 1
-    if not weeks:
-        return {"weeks": 0, "n": 0}
-    sm, ss = spearman(pm, zf), spearman(ps, zf)
+        out += [{**r, "pred": m.predict(r["x"])} for r in by_week[w]]
+    return out
+
+
+def compare(test: list[dict[str, Any]], min_segment: int = 10) -> dict[str, Any]:
+    """Spearman(within-week percentile, zf) of ``pred`` vs ``base`` on the same posts, overall
+    and in three consecutive time segments (deltas = pred minus base)."""
+    test = sorted((r for r in test if r.get("base") is not None), key=lambda r: r["posted_at"])
+    if len(test) < 3 * min_segment:
+        return {"n": len(test)}
+    pm, pb, zf = _week_pct(test, "pred"), _week_pct(test, "base"), [r["zf"] for r in test]
+    cuts = [0, len(test) // 3, 2 * len(test) // 3, len(test)]
+    thirds = [
+        spearman(pm[a:b], zf[a:b]) - spearman(pb[a:b], zf[a:b]) for a, b in zip(cuts, cuts[1:])
+    ]
+    sm, sb = spearman(pm, zf), spearman(pb, zf)
     return {
-        "weeks": weeks,
-        "n": len(zf),
+        "n": len(test),
+        "since": str(test[0]["posted_at"]),
         "spearman_model": round(sm, 4),
-        "spearman_score": round(ss, 4),
-        "delta": round(sm - ss, 4),
+        "spearman_base": round(sb, 4),
+        "delta": round(sm - sb, 4),
+        "thirds": [round(d, 4) for d in thirds],
     }

@@ -575,6 +575,7 @@ crossposting_decision_log = Table(
     # policy_rank, propensity, model_pred and the model inputs.
     Column("policy", String),
     Column("top_n", Integer),
+    Column("explore_eps", Float),
     Column("model_version", Integer),
     Index(
         "ix_crossposting_decision_log_channel_time",
@@ -600,8 +601,11 @@ crossposting_model = Table(
     Column("train_from", DateTime),
     Column("train_to", DateTime),
     Column("n_train", Integer, nullable=False),
-    Column("metrics", JSONB),  # walk-forward vs the live score
+    Column("metrics", JSONB),  # walk-forward vs the active model (or the live score)
+    Column("spec_hash", String, nullable=False),  # sha256 of features + alpha + target
+    Column("coefs_hash", String, nullable=False),
     Column("is_active", Boolean, server_default="false", nullable=False),
+    Column("activated_at", DateTime),
     UniqueConstraint("channel", "version"),
     Index(
         "ux_crossposting_model_active",

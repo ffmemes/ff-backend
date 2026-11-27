@@ -25,14 +25,20 @@ def upgrade():
         train_to TIMESTAMP,
         n_train INTEGER NOT NULL,
         metrics JSONB,
+        spec_hash VARCHAR NOT NULL,
+        coefs_hash VARCHAR NOT NULL,
         is_active BOOLEAN NOT NULL DEFAULT false,
+        activated_at TIMESTAMP,
         CONSTRAINT crossposting_model_channel_key UNIQUE (channel, version)
     );
     CREATE UNIQUE INDEX ux_crossposting_model_active ON crossposting_model (channel)
         WHERE is_active;
+    -- the posting flow writes this table; never queue behind a long lock
+    SET lock_timeout = '5s';
     ALTER TABLE crossposting_decision_log
         ADD COLUMN policy VARCHAR,
         ADD COLUMN top_n INTEGER,
+        ADD COLUMN explore_eps DOUBLE PRECISION,
         ADD COLUMN model_version INTEGER;
     """)
 
@@ -40,6 +46,6 @@ def upgrade():
 def downgrade():
     op.execute("""
     ALTER TABLE crossposting_decision_log
-        DROP COLUMN policy, DROP COLUMN top_n, DROP COLUMN model_version;
+        DROP COLUMN policy, DROP COLUMN top_n, DROP COLUMN explore_eps, DROP COLUMN model_version;
     DROP TABLE crossposting_model;
     """)

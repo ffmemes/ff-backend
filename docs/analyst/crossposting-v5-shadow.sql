@@ -9,15 +9,20 @@
 -- zf_v5_pick_disagree   mean zf of the v5 pick when it disagreed AND was posted later
 --                       (counterfactual exists only for memes that got posted)
 -- corr_v5 / corr_v4     corr(score, zf) over posted picks (score logged at decision time)
+-- Old top-1 policy only: decisions of the top-N draw policy (2026-11-27, candidates carry
+-- propensity) are excluded; per-candidate fields come from the picked candidate.
 -- Decision rule: canary v5 on a channel if corr_v5 - corr_v4 >= 0.05 with n_posted >= 60.
 WITH dec AS (
     SELECT d.channel, d.decided_at, d.picked_meme_id,
-           (d.candidates->0->>'shadow_v5_pick_meme_id')::int AS v5_pick,
-           (d.candidates->0->>'score_v5')::float AS score_v5,
-           COALESCE(d.candidates->0->'scores'->>'v4', d.candidates->0->>'final_score')::float AS score_v4
+           (pc->>'shadow_v5_pick_meme_id')::int AS v5_pick,
+           (pc->>'score_v5')::float AS score_v5,
+           COALESCE(pc->'scores'->>'v4', pc->>'final_score')::float AS score_v4
     FROM crossposting_decision_log d
+    CROSS JOIN LATERAL jsonb_array_elements(d.candidates) pc
     WHERE d.channel IN ('tgchannelru', 'tgchannelen')
-      AND d.candidates->0->>'shadow_v5_pick_meme_id' IS NOT NULL
+      AND (pc->>'meme_id')::int = d.picked_meme_id
+      AND NOT (pc ? 'propensity')
+      AND pc->>'shadow_v5_pick_meme_id' IS NOT NULL
 ),
 posts AS (
     SELECT cp.channel, cp.meme_id, LN(1 + cp.forwards) AS lfw,
