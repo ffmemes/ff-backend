@@ -1,6 +1,6 @@
 ---
 id: crosspost_quirk_fix_ab
-status: done
+status: shipped
 hypothesis: Fixing the two crosspost scoring quirks (impression penalty 0 instead of 0.8 RU / 0.5 EN; x0.5 instead of x1.0 for sources without history) lets better memes reach the channels and raises forwards per post
 primary_metric: mean zf (fix - control) per channel, 95% CI
 guardrails: avg views per post not lower than control; no posting gaps
