@@ -124,11 +124,12 @@ SCORE_VERSION = {"v2": 2, "v4": 4, "v5": 5, "v5c": 6, "v5f": 7, "v2q": 8, "v4q":
 # ... when the active crossposting_model ranked the pick (decision_log.policy = model_topN_v1).
 MODEL_SCORE_VERSION = 10
 
-PRESELECT = {"tgchannelru": "v4", "tgchannelen": "v2"}
-LIVE = {"tgchannelru": "v4", "tgchannelen": "v2"}
+PRESELECT = {"tgchannelru": "v4q", "tgchannelen": "v2"}
+LIVE = {"tgchannelru": "v4q", "tgchannelen": "v2"}
 # Live A/B: each decision picks one arm at random and uses it for both PRESELECT and
 # LIVE. Remove the channel's entry to end the test (PRESELECT/LIVE apply again).
-AB_ARMS = {"tgchannelru": ("v4", "v4q"), "tgchannelen": ("v2", "v2q")}
+# Quirk-fix A/B ended 2026-11-27: RU fix won, EN no effect (experiments/2026-11-01-crosspost-quirk-fix-ab.md).
+AB_ARMS: dict[str, tuple[str, str]] = {}
 
 
 def score(row: Row, channel: str, name: str) -> float | None:
