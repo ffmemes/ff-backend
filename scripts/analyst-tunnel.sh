@@ -12,4 +12,4 @@ port=${FF_DB_LOCAL_PORT:-15432}
 ip=$(ssh -o BatchMode=yes "$FF_DB_SSH" \
   "docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' $container" | cut -d' ' -f1)
 echo "tunnel 127.0.0.1:$port -> $container ($ip:5432); Ctrl-C to close"
-exec ssh -o BatchMode=yes -o ExitOnForwardFailure=yes -N -L "$port:$ip:5432" "$FF_DB_SSH"
+exec ssh -o BatchMode=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -N -L "$port:$ip:5432" "$FF_DB_SSH"
