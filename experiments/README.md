@@ -55,21 +55,21 @@ Design, assignment, frozen decision rules, confounds.
 - YYYY-MM-DD: started (deploy sha / PR).
 ```
 
-## Open (6)
+## Open (5)
 
 | check_on | experiment | status | primary metric | hypothesis |
 | --- | --- | --- | --- | --- |
 | 2026-11-23 | [dormant_push_exploration_v1](2026-11-21-dormant-push-exploration.md) | running | first assigned person's callback on the accepted selected meme within 24h of assignment (ITT) | Uniform exploration among up to three HQ candidates increases the chance of a button press within 24 hours of the existing one-week push |
-| 2026-11-28 | [crosspost_quirk_fix_ab](2026-11-01-crosspost-quirk-fix-ab.md) | running | mean zf (fix - control) per channel, 95% CI | Fixing the two crosspost scoring quirks (impression penalty 0 instead of 0.8 RU / 0.5 EN; x0.5 instead of x1.0 for sources without history) lets better memes reach the channels and raises forwards per post |
 | 2026-11-28 | [crosspost_src_fwd_v5f](2026-11-01-crosspost-src-forward-rate.md) | running | RU Spearman gain rho_v5f - rho_v5 with 95% CI excluding 0 | Memes whose source post was forwarded more than usual for that source get more forwards in our channels |
 | 2026-11-28 | [monthly_reminder_v1](2026-10-30-monthly-reminder.md) | running | react_30d_pct treated - holdout | One monthly HQ meme raises 30d activity of idle users who reacted before by >=3 pp at <2% blocks |
 | 2026-11-28 | [phash_shadow_v1](2026-10-31-phash-shadow-dedup.md) | running | precision on sampled exact-hash pairs, agreement with duplicate_of | An exact 64-bit dHash match finds duplicates OCR cannot (videos, animations, text-free images) with high precision |
 | 2026-12-04 | [broadcast_cadence_holdout_v1](2026-10-30-broadcast-cadence-holdout.md) | running | reactions/user/week (15m, 24h); active d7-14 (1w, 2w, 4w) | The 15m push mostly re-times sessions heavy users would start anyway; later steps (24h, 1w, 2w, 4w) bring back lapsing users |
 
-## Decided (33, newest first)
+## Decided (34, newest first)
 
 | decided | experiment | status | result | learning |
 | --- | --- | --- | --- | --- |
+| 2026-11-27 | [crosspost_quirk_fix_ab](2026-11-01-crosspost-quirk-fix-ab.md) | shipped | RU fix wins (v4q live); EN no effect, fix views lower, stays v2 | the impression-penalty and no-history quirks hurt RU; EN is insensitive to them |
 | 2026-11-22 | [explore_budget_v1](2026-10-30-explore-budget.md) | killed | Nov20 ordinary n=175/186, likes/user/week 75.10 to 51.13 and memes/session 24.26 to 22.53. Both stop-rule conditions met. Production switch pending. | Separate the post-push feed choice from moderator labeling and fresh inventory in the next test. |
 | 2026-11-22 | [crosspost_v5_shadow](2026-10-30-crosspost-v5-shadow.md) | inconclusive | Nov21 extension cutoff, mature comparable original-control RU n=54 and EN n=58 vs required 60 each. Correlation gains +0.186 RU and +0.146 EN. | Match the posted meme and actual channel and arm scorer. Retest against the winner of the live quirk A/B if the question survives. |
 | 2026-11-15 | [raw_impr_rank_reaction_rate](2026-10-31-raw-impr-rank-reaction-rate.md) | inconclusive | no valid pre/post estimate; feed impressions do not retain rank/version at selection or send, and meme_stats rank is overwritten | A current-rank join cannot measure historical rank-0 cohorts; retain the deployed algorithm without claiming uplift and measure future changes prospectively |

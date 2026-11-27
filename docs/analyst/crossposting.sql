@@ -10,6 +10,12 @@
 -- - Channel deep links: user_deep_link_log.deep_link LIKE 'sc_%_%'
 -- - Channel forwards/views: crossposting + crossposting_snapshots
 -- - Passive lifecycle: channel_lifecycle_event from Telethon admin logs
+-- - Ranker journal: crossposting_decision_log (policy, top_n, explore_eps, model_version;
+--   candidates[] = top-20 + pool_sample memes, with policy_rank, propensity, model_pred and
+--   the model inputs). Rows without propensity are the old top-1 policy.
+-- - Ranking models: crossposting_model, one is_active row per channel. Refit nightly as an
+--   inactive version by src/flows/crossposting/model_loop.py, promoted by its PROMOTION_RULE
+--   (zf_24h label: _LABELS_QUERY in src/crossposting/service.py)
 --
 -- Reference:
 -- - specs/crossposting-share-optimization-2026-05-18.md

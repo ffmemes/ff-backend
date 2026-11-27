@@ -74,6 +74,16 @@ class Config(BaseSettings):
     # Owner flips on after deploy. Set HOLDOUT_PCT=0 after the v1 readout.
     MONTHLY_REMINDER_ENABLED: bool = False
     MONTHLY_REMINDER_HOLDOUT_PCT: int = 50
+    # Crosspost picks uniformly among the policy's top-N (propensity 1/N in the decision log).
+    CROSSPOST_TOP_N: int = 3
+    # ... except with this probability, uniformly among all logged candidates (exploration):
+    # propensity = (1 - eps) / N * [rank <= N] + eps / K.
+    CROSSPOST_EXPLORE_EPS: float = 0.1
+    # While a model is active, this share of decisions ranks by the live score instead
+    # (policy score_control_v1): the frozen control the nightly rollback compares against.
+    CROSSPOST_CONTROL_SHARE: float = 0.2
+    # Owner's Telegram user id for the daily channel digest; unset → ADMIN_LOGS_CHAT_ID.
+    CHANNEL_DIGEST_CHAT_ID: str | None = None
 
     PREFECT_API_URL: str | None = None
 

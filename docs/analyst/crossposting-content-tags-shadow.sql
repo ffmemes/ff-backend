@@ -8,18 +8,23 @@
 -- tagged_pct      share of decisions whose posted pick has Describe Memes tags
 -- v5c_vs_v5_pct   share of decisions where the v5c top-1 differs from the v5 top-1
 -- corr_v5c/corr_v5 corr(score, zf) over posted picks (score logged at decision time)
+-- Old top-1 policy only: decisions of the top-N draw policy (2026-11-27, candidates carry
+-- propensity) are excluded; per-candidate fields come from the picked candidate.
 -- zf_flagged/zf_clean mean zf of posted picks with >=1 / 0 content flags (tagged only)
 WITH dec AS (
     SELECT d.channel, d.decided_at, d.picked_meme_id,
-           (d.candidates->0->>'shadow_v5_pick_meme_id')::int AS v5_pick,
-           (d.candidates->0->>'shadow_v5c_pick_meme_id')::int AS v5c_pick,
-           (d.candidates->0->>'score_v5')::float AS score_v5,
-           (d.candidates->0->>'score_v5c')::float AS score_v5c,
-           (d.candidates->0->>'content_mult_v1')::float AS mult,
-           d.candidates->0->>'content_format' IS NOT NULL AS tagged
+           (pc->>'shadow_v5_pick_meme_id')::int AS v5_pick,
+           (pc->>'shadow_v5c_pick_meme_id')::int AS v5c_pick,
+           (pc->>'score_v5')::float AS score_v5,
+           (pc->>'score_v5c')::float AS score_v5c,
+           (pc->>'content_mult_v1')::float AS mult,
+           pc->>'content_format' IS NOT NULL AS tagged
     FROM crossposting_decision_log d
+    CROSS JOIN LATERAL jsonb_array_elements(d.candidates) pc
     WHERE d.channel IN ('tgchannelru', 'tgchannelen')
-      AND d.candidates->0 ? 'score_v5c'
+      AND (pc->>'meme_id')::int = d.picked_meme_id
+      AND NOT (pc ? 'propensity')
+      AND pc ? 'score_v5c'
 ),
 posts AS (
     SELECT cp.channel, cp.meme_id, LN(1 + cp.forwards) AS lfw,

@@ -1,16 +1,21 @@
 import heapq
 import logging
+import math
 import random
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert
 
+from src.config import settings
 from src.crossposting.constants import Channel
+from src.crossposting.model import Model, add_zf, features, load_model, source_prior
 from src.crossposting.scoring import (
     AB_ARMS,
     CHANNEL_PARAMS,
     LIVE,
+    MODEL_SCORE_VERSION,
     PRESELECT,
     SCORE_VERSION,
     SCORES,
@@ -209,6 +214,96 @@ async def _attach_shadow_inputs(candidates: list[dict[str, Any]], channel: str) 
             c["pre_inbot_share_click_users"] = r["pre_inbot_share_click_users"]
 
 
+# zf_24h labels: forwards at the snapshot nearest +24h (21-27h window), ranked image posts.
+# Shared by posting (source prior), the nightly refit and the daily digest.
+_LABELS_QUERY = """
+    SELECT cp.meme_id, m.meme_source_id AS source_id, cp.created_at AS posted_at,
+           cp.telegram_message_id, s.forwards AS f24
+    FROM crossposting cp
+    JOIN meme m ON m.id = cp.meme_id
+    JOIN LATERAL (
+        SELECT s.forwards
+        FROM crossposting_snapshots s
+        WHERE s.channel = cp.channel
+          AND s.telegram_message_id = cp.telegram_message_id
+          AND s.snapshot_at BETWEEN cp.created_at + INTERVAL '21 hours'
+                                AND cp.created_at + INTERVAL '27 hours'
+          AND s.views > 0
+          AND s.forwards IS NOT NULL
+        ORDER BY ABS(EXTRACT(EPOCH FROM s.snapshot_at - cp.created_at) - 86400)
+        LIMIT 1
+    ) s ON true
+    WHERE cp.channel = :channel
+      AND cp.telegram_message_id IS NOT NULL
+      AND cp.score_version NOT IN (0, 1)  -- reward albums, unranked/default posts
+      AND m.type = 'image'
+      AND cp.created_at >= :since
+      AND cp.created_at < :until
+"""
+
+
+async def fetch_labels(
+    channel: str, since: datetime = datetime(2000, 1, 1), until: datetime = datetime(2100, 1, 1)
+) -> list[dict[str, Any]]:
+    """Labeled posts of ``channel`` with zf (week means over the fetched range)."""
+    params = {"channel": channel, "since": since, "until": until}
+    return add_zf(await fetch_all(text(_LABELS_QUERY), params))
+
+
+# Model inputs that do not depend on decision time: user upload, and the source post's views
+# percentile among its source's posts within ±45 days (NULL without a Telegram post or with
+# < 10 reference posts). The same query serves posting and the nightly refit.
+_MODEL_STATIC_QUERY = """
+    SELECT m.id AS meme_id, (ms.type = 'user upload') AS is_upload, v.pct AS src_views_pct
+    FROM meme m
+    JOIN meme_source ms ON ms.id = m.meme_source_id
+    LEFT JOIN meme_raw_telegram r
+        ON r.id = m.raw_meme_id AND r.meme_source_id = m.meme_source_id
+    LEFT JOIN LATERAL (
+        SELECT (COUNT(*) FILTER (WHERE o.views < r.views)
+                + 0.5 * COUNT(*) FILTER (WHERE o.views = r.views))::float / COUNT(*) AS pct,
+               COUNT(*) AS n
+        FROM meme_raw_telegram o
+        WHERE o.meme_source_id = r.meme_source_id
+          AND o.views > 0
+          AND o.date BETWEEN r.date - INTERVAL '45 days' AND r.date + INTERVAL '45 days'
+    ) v ON r.views > 0 AND v.n >= 10
+    WHERE m.id = ANY(:meme_ids)
+"""
+
+
+async def fetch_model_static_inputs(meme_ids: list[int]) -> dict[int, dict[str, Any]]:
+    rows = await fetch_all(text(_MODEL_STATIC_QUERY), {"meme_ids": meme_ids})
+    return {
+        int(r["meme_id"]): {
+            "is_upload": bool(r["is_upload"]),
+            "src_views_pct": _round(r["src_views_pct"], 4),
+        }
+        for r in rows
+    }
+
+
+async def _attach_model_inputs(candidates: list[dict[str, Any]], channel: str) -> None:
+    """Attach model.MODEL_INPUTS to the top-N in place."""
+    static = await fetch_model_static_inputs([int(c["id"]) for c in candidates])
+    now = datetime.now(UTC).replace(tzinfo=None)
+    # 190d: the prior reads 180d back; whole MSK weeks keep its zf equal to the refit's.
+    labels = await fetch_labels(channel, since=now - timedelta(days=190))
+    for c in candidates:
+        if int(c["id"]) in static:
+            c.update(static[int(c["id"])])
+            c["src_prior_z"], c["src_prior_n"] = source_prior(labels, c["meme_source_id"], now)
+
+
+async def get_active_model(channel: str) -> Model | None:
+    """Active crossposting_model row, validated (raises when it is unusable)."""
+    row = await fetch_one(
+        text("SELECT * FROM crossposting_model WHERE channel = :channel AND is_active"),
+        {"channel": channel},
+    )
+    return None if row is None else load_model(row)
+
+
 async def log_ranker_decision(
     channel: str,
     picked_meme_id: int | None,
@@ -216,6 +311,10 @@ async def log_ranker_decision(
     median_signal: float | None,
     pool_size: int | None,
     candidates: list[dict[str, Any]],
+    policy: str | None = None,
+    top_n: int | None = None,
+    explore_eps: float | None = None,
+    model_version: int | None = None,
 ) -> None:
     """Insert one row into crossposting_decision_log. Failures must be wrapped
     in try/except by the caller (logging miss << duplicate album publish).
@@ -227,6 +326,10 @@ async def log_ranker_decision(
         median_signal=median_signal,
         candidate_pool_size=pool_size,
         candidates=candidates,
+        policy=policy,
+        top_n=top_n,
+        explore_eps=explore_eps,
+        model_version=model_version,
     )
     await execute(insert_stmt)
 
@@ -291,6 +394,12 @@ _POOL_QUERY = """
       AND M.meme_source_id NOT IN (SELECT meme_source_id FROM recent_src)
 """
 
+# Random pool memes outside the top-N preselect, logged and drawable for exploration.
+POOL_SAMPLE = 5
+# Hard caps: a bad env value must not turn posting into a random draw.
+MAX_TOP_N = 5
+MAX_EXPLORE_EPS = 0.15
+
 # Flat per-candidate keys still read by docs/analyst/crossposting-*.sql readouts.
 _LEGACY_SHADOWS = ("v5", "v5c", "v5f")
 
@@ -299,10 +408,38 @@ def _round(x: float | None, nd: int) -> float | None:
     return None if x is None else round(float(x), nd)
 
 
+def _model_preds(model: Model | None, top: list[dict[str, Any]]) -> list[float] | None:
+    if model is None:
+        return None
+    try:
+        xs = [features(r) for r in top]
+        preds = None if None in xs else [model.predict(x) for x in xs]
+    except Exception:
+        logger.warning("crosspost model v%s scoring failed", model.version, exc_info=True)
+        preds = None
+    if preds is None or not all(map(math.isfinite, preds)):
+        logger.warning("crosspost model v%s cannot score these inputs; using score", model.version)
+        return None
+    return preds
+
+
 def _build_decision_log(
-    channel: str, top: list[dict[str, Any]], pool_size: int, live: str, pre: str
+    channel: str,
+    top: list[dict[str, Any]],
+    pool_size: int,
+    live: str,
+    pre: str,
+    model: Model | None = None,
+    top_n: int = 1,
+    explore_eps: float = 0.0,
+    rng: Any = random,
 ) -> dict[str, Any]:
-    """Score the preselected top-N with every score; return log_ranker_decision kwargs."""
+    """Score the logged candidates with every score; return log_ranker_decision kwargs.
+
+    The policy ranks all K candidates by ``model`` (else the live score), then draws
+    uniformly from all K with probability ``explore_eps``, else from its first ``top_n``.
+    Each candidate logs its policy rank and selection probability (they sum to 1).
+    """
     scored = [score_all(r, channel) for r in top]
     picks: dict[str, int] = {}
     ranks: list[dict[str, int]] = [{} for _ in top]
@@ -316,6 +453,17 @@ def _build_decision_log(
         picks[name] = top[order[0]]["id"]
     # LIVE may need shadow inputs; if they failed to load, fall back to PRESELECT.
     picked_by = live if live in picks else pre
+    preds = _model_preds(model, top)
+    key = preds if preds is not None else [s[picked_by] for _, s in scored]
+    order = sorted(range(len(top)), key=lambda i: (-key[i], top[i]["id"]))
+    policy_rank = {i: rank for rank, i in enumerate(order, start=1)}
+    # Exploit draws from the score's preselect only: pool samples reach a post only through ε.
+    exploit = [i for i in order if not top[i].get("pool_sample")] or order
+    k, n = len(top), max(1, min(top_n, MAX_TOP_N, len(exploit)))
+    explore_eps = min(max(float(explore_eps), 0.0), MAX_EXPLORE_EPS)
+    exploit_set = set(exploit[:n])
+    explore = rng.random() < explore_eps
+    drawn = top[order[rng.randrange(k)] if explore else exploit[rng.randrange(n)]]
 
     log_candidates = []
     for i, (row, (factors, scores)) in enumerate(zip(top, scored, strict=True)):
@@ -323,7 +471,8 @@ def _build_decision_log(
         scores = {k: _round(v, 6) for k, v in scores.items()}
         log_candidates.append(
             {
-                "rank": i + 1,  # PRESELECT order
+                "rank": None if row.get("pool_sample") else i + 1,  # PRESELECT order
+                "pool_sample": bool(row.get("pool_sample")),
                 "meme_id": row["id"],
                 "source_id": row.get("meme_source_id"),
                 "nlikes": row.get("nlikes"),
@@ -342,6 +491,14 @@ def _build_decision_log(
                 "relatable": row.get("relatable"),
                 "politics_news": row.get("politics_news"),
                 "src_fwd_pct": row.get("src_fwd_pct"),
+                "is_upload": row.get("is_upload"),
+                "src_views_pct": row.get("src_views_pct"),
+                "src_prior_z": _round(row.get("src_prior_z"), 4),
+                "src_prior_n": row.get("src_prior_n"),
+                "model_pred": _round(preds[i], 4) if preds else None,
+                "policy_rank": policy_rank[i],
+                "exploit": i in exploit_set,
+                "propensity": (1 - explore_eps) / n * (i in exploit_set) + explore_eps / k,
                 "factors": factors,
                 "scores": scores,
                 "ranks": ranks[i],
@@ -359,16 +516,20 @@ def _build_decision_log(
 
     return {
         "channel": channel,
-        "picked_meme_id": picks[picked_by],
-        "score_version": SCORE_VERSION[picked_by],
+        "picked_meme_id": drawn["id"],
+        "score_version": MODEL_SCORE_VERSION if preds else SCORE_VERSION[picked_by],
         "median_signal": _round(top[0].get("median_signal"), 4),
         "pool_size": pool_size,
         "candidates": log_candidates,
+        "policy": "model_topN_v1" if preds else "score_topN_v1",
+        "top_n": n,
+        "explore_eps": explore_eps,
+        "model_version": model.version if preds else None,
     }
 
 
 async def get_next_meme_for_channel(
-    channel: str, log_top_n: int = 5
+    channel: str, log_top_n: int = 20
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     """Pick the crosspost meme for ``channel`` (tgchannelru / tgchannelen).
 
@@ -385,10 +546,39 @@ async def get_next_meme_for_channel(
     if channel in AB_ARMS:
         pre = live = random.choice(AB_ARMS[channel])
     top = heapq.nsmallest(log_top_n, rows, key=lambda r: (-score(r, channel, pre), r["id"]))
-    # Shadow inputs must never block posting.
+    # A few random pool memes outside the top give exploration (and IPS) support off the top.
+    top_ids = {r["id"] for r in top}
+    sample = random.sample(rows, min(len(rows), log_top_n + POOL_SAMPLE))
+    for r in [r for r in sample if r["id"] not in top_ids][:POOL_SAMPLE]:
+        top.append({**r, "pool_sample": True})
+    # Shadow inputs and the model must never block posting: failures rank by score.
     try:
         await _attach_shadow_inputs(top, channel)
     except Exception:
         logger.warning("crosspost shadow inputs failed", exc_info=True)
-    decision = _build_decision_log(channel, top, pool_size=len(rows), live=live, pre=pre)
+    try:
+        await _attach_model_inputs(top, channel)
+    except Exception:
+        logger.warning("crosspost model inputs failed", exc_info=True)
+    try:
+        model = await get_active_model(channel)
+    except Exception:
+        logger.warning("crosspost model unusable, ranking by score", exc_info=True)
+        model = None
+    # Frozen control arm while a model is active: the guardrail the nightly rollback reads.
+    control = model is not None and random.random() < settings.CROSSPOST_CONTROL_SHARE
+    if control:
+        model = None
+    decision = _build_decision_log(
+        channel,
+        top,
+        pool_size=len(rows),
+        live=live,
+        pre=pre,
+        model=model,
+        top_n=settings.CROSSPOST_TOP_N,
+        explore_eps=settings.CROSSPOST_EXPLORE_EPS,
+    )
+    if control:
+        decision["policy"] = "score_control_v1"
     return await _picked_meme_dict(decision["picked_meme_id"]), decision
