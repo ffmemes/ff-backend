@@ -205,4 +205,7 @@ if __name__ == "__main__":
             schedules=[CronSchedule(cron="*/15 * * * *", timezone=LON)],
             parameters={"batch_size": 18},
         ),
+        # Coolify starts the new container before stopping the old one; pausing on
+        # shutdown would pause the schedules the new runner just registered.
+        pause_on_shutdown=False,
     )
