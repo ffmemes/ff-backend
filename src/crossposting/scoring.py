@@ -121,6 +121,8 @@ SCORES: dict[str, tuple[str, ...]] = {
 }
 # crossposting.score_version / decision_log.score_version for the picking score.
 SCORE_VERSION = {"v2": 2, "v4": 4, "v5": 5, "v5c": 6, "v5f": 7, "v2q": 8, "v4q": 9}
+# ... when the active crossposting_model ranked the pick (decision_log.policy = model_topN_v1).
+MODEL_SCORE_VERSION = 10
 
 PRESELECT = {"tgchannelru": "v4", "tgchannelen": "v2"}
 LIVE = {"tgchannelru": "v4", "tgchannelen": "v2"}

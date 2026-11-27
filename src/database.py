@@ -571,10 +571,43 @@ crossposting_decision_log = Table(
     # src_signal, src_quality_mult, lr_factor, impr_factor, age_factor,
     # caption_factor, sent_factor, invited_boost, final_score}
     Column("candidates", JSONB, nullable=False),
+    # model_topN_v1 / score_topN_v1 (NULL before 2026-11-27); candidates[] also carry
+    # policy_rank, propensity, model_pred and the model inputs.
+    Column("policy", String),
+    Column("top_n", Integer),
+    Column("model_version", Integer),
     Index(
         "ix_crossposting_decision_log_channel_time",
         "channel",
         "decided_at",
+    ),
+)
+
+# Crosspost ranking model as data (src/crossposting/model.py); one active row per channel.
+crossposting_model = Table(
+    "crossposting_model",
+    metadata,
+    Column("id", Integer, Identity(), primary_key=True),
+    Column("channel", String, nullable=False),
+    Column("version", Integer, nullable=False),
+    Column("created_at", DateTime, server_default=func.now(), nullable=False),
+    Column("features", JSONB, nullable=False),
+    Column("coefs", JSONB, nullable=False),
+    Column("mean", JSONB, nullable=False),
+    Column("scale", JSONB, nullable=False),
+    Column("intercept", Float, nullable=False),
+    Column("alpha", Float, nullable=False),
+    Column("train_from", DateTime),
+    Column("train_to", DateTime),
+    Column("n_train", Integer, nullable=False),
+    Column("metrics", JSONB),  # walk-forward vs the live score
+    Column("is_active", Boolean, server_default="false", nullable=False),
+    UniqueConstraint("channel", "version"),
+    Index(
+        "ux_crossposting_model_active",
+        "channel",
+        unique=True,
+        postgresql_where=text("is_active"),
     ),
 )
 

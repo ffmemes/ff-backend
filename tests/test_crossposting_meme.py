@@ -8,15 +8,18 @@ from sqlalchemy.dialects.postgresql import insert
 
 from src.crossposting import scoring
 from src.crossposting.scoring import score
-from src.crossposting.service import get_next_meme_for_channel, log_ranker_decision
+from src.crossposting.service import fetch_labels, get_next_meme_for_channel, log_ranker_decision
 from src.database import (
     crossposting,
     crossposting_decision_log,
+    crossposting_model,
+    crossposting_snapshots,
     engine,
     meme_raw_telegram,
     user_deep_link_log,
 )
 from src.flows.crossposting.meme import _clean_caption
+from src.flows.crossposting.model_loop import training_rows
 from tests.factories import (
     TEST_ID_START,
     cleanup_test_data,
@@ -87,6 +90,7 @@ def test_like_volume_factor_raises_score_for_more_likes():
 
 
 async def _wipe(conn):
+    await conn.execute(delete(crossposting_model))
     await conn.execute(delete(crossposting).where(crossposting.c.meme_id >= TEST_ID_START))
     await conn.execute(
         delete(crossposting_decision_log).where(
@@ -127,6 +131,8 @@ async def _insert_crossposting(
 @pytest_asyncio.fixture()
 async def clean_xpost(monkeypatch):
     monkeypatch.setattr("src.crossposting.service.AB_ARMS", {})
+    # deterministic top-1 picks; the top-N draw is covered in tests/crossposting/test_model.py
+    monkeypatch.setattr("src.crossposting.service.settings.CROSSPOST_TOP_N", 1)
     async with engine.connect() as conn:
         await _wipe(conn)
     yield
@@ -516,7 +522,7 @@ async def test_ranker_decision_log_records_top5(clean_xpost):
     async with engine.connect() as conn:
         await create_meme_source(conn, id=10400, language_code="ru")
         # Create 7 eligible candidates from the same source (so all pass filters
-        # and rank by score). log_top_n defaults to 5 → top-5 logged.
+        # and rank by score). log_top_n defaults to 20 → all 7 logged.
         for i in range(7):
             mid = 10401 + i
             await create_meme(
@@ -558,7 +564,7 @@ async def test_ranker_decision_log_records_top5(clean_xpost):
     assert row["picked_meme_id"] == picked["id"]
     assert row["score_version"] == 4
     assert row["candidate_pool_size"] == 7  # 7 eligible memes
-    assert len(row["candidates"]) == 5  # top-5 logged (LIMIT 5)
+    assert len(row["candidates"]) == 7  # all 7 logged (top-20)
     # Each entry has the documented score breakdown keys
     required_keys = {
         "rank",
@@ -590,7 +596,139 @@ async def test_ranker_decision_log_records_top5(clean_xpost):
     assert row["candidates"][0]["like_volume_factor"] > 1.0
     # Rank order matches list order
     ranks = [c["rank"] for c in row["candidates"]]
-    assert ranks == [1, 2, 3, 4, 5]
+    assert ranks == [1, 2, 3, 4, 5, 6, 7]
+
+
+async def _add_model(conn, features, coefs, version=1):
+    n = len(features)
+    await conn.execute(
+        insert(crossposting_model).values(
+            channel="tgchannelru",
+            version=version,
+            features=features,
+            coefs=coefs,
+            mean=[0.0] * n,
+            scale=[1.0] * n,
+            intercept=0.0,
+            alpha=10.0,
+            n_train=200,
+            is_active=True,
+        )
+    )
+
+
+async def _add_three_memes(conn):
+    await create_meme_source(conn, id=10900, language_code="ru")
+    for i, nlikes in enumerate((50, 10, 30)):
+        await create_meme(conn, id=10901 + i, meme_source_id=10900)
+        await create_meme_stats(conn, meme_id=10901 + i, nlikes=nlikes, ndislikes=2)
+
+
+@pytest.mark.asyncio
+async def test_active_model_ranks_and_logs_policy(clean_xpost):
+    async with engine.connect() as conn:
+        await _add_three_memes(conn)
+        await _add_model(conn, ["ln_likes"], [-1.0])  # prefers fewer likes; v4 picks 10901
+        await conn.commit()
+
+    picked, decision = await get_next_meme_for_channel("tgchannelru")
+    assert picked["id"] == 10902
+    assert (decision["policy"], decision["top_n"], decision["model_version"]) == (
+        "model_topN_v1",
+        1,
+        1,
+    )
+    assert decision["score_version"] == 10
+    cand = next(c for c in decision["candidates"] if c["meme_id"] == 10902)
+    assert (cand["policy_rank"], cand["propensity"]) == (1, 1.0)
+    assert cand["model_pred"] == round(-math.log(11), 4)
+    assert (cand["is_upload"], cand["src_views_pct"], cand["src_prior_n"]) == (False, None, 0)
+    assert cand["picked_by"] == "v4" and cand["picks"]["v4"] == 10901
+    await log_ranker_decision(**decision)
+    async with engine.connect() as conn:
+        row = (
+            await conn.execute(
+                text(
+                    "SELECT policy, top_n, model_version FROM crossposting_decision_log "
+                    "WHERE picked_meme_id = 10902"
+                )
+            )
+        ).one()
+    assert tuple(row) == ("model_topN_v1", 1, 1)
+
+
+@pytest.mark.asyncio
+async def test_invalid_active_model_falls_back_to_score(clean_xpost):
+    async with engine.connect() as conn:
+        await _add_three_memes(conn)
+        await _add_model(conn, ["ln_likes", "not_a_feature"], [-1.0, 1.0])
+        await conn.commit()
+
+    picked, decision = await get_next_meme_for_channel("tgchannelru")
+    assert picked["id"] == 10901
+    assert (decision["policy"], decision["model_version"], decision["score_version"]) == (
+        "score_topN_v1",
+        None,
+        4,
+    )
+
+
+@pytest.mark.asyncio
+async def test_training_rows_join_decision_with_24h_label(clean_xpost):
+    posted = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=3)
+    async with engine.connect() as conn:
+        await create_meme_source(conn, id=10950, type="user upload", language_code="ru")
+        await create_meme(conn, id=10951, meme_source_id=10950)
+        await conn.execute(
+            insert(crossposting).values(
+                channel="tgchannelru",
+                meme_id=10951,
+                created_at=posted,
+                telegram_message_id=999951,
+                score_version=4,
+            )
+        )
+        await conn.execute(
+            insert(crossposting_snapshots),
+            [
+                {
+                    "channel": "tgchannelru",
+                    "meme_id": 10951,
+                    "telegram_message_id": 999951,
+                    "views": 500,
+                    "forwards": forwards,
+                    "snapshot_at": posted + timedelta(hours=hours),
+                }
+                for hours, forwards in ((1, 2), (23, 8), (30, 11))
+            ],
+        )
+        await conn.execute(
+            insert(crossposting_decision_log).values(
+                channel="tgchannelru",
+                decided_at=posted - timedelta(minutes=1),
+                picked_meme_id=10951,
+                score_version=4,
+                candidates=[
+                    {
+                        "meme_id": 10951,
+                        "nlikes": 9,
+                        "ndislikes": 1,
+                        "nmemes_sent": 20,
+                        "age_days": 6,
+                        "caption_present": True,
+                        "final_score": 1.5,
+                    }
+                ],
+            )
+        )
+        await conn.commit()
+
+    labels = await fetch_labels("tgchannelru", since=posted - timedelta(hours=1))
+    assert [(r["meme_id"], r["f24"], r["zf"]) for r in labels] == [(10951, 8, 0.0)]
+    (row,) = [r for r in await training_rows("tgchannelru") if r["posted_at"] == posted]
+    assert (row["zf"], row["score"]) == (0.0, 1.5)
+    assert row["x"]["lr"] == 10 / 11 and row["x"]["is_upload"] == 1.0
+    assert row["x"]["has_caption"] == 1.0 and row["x"]["src_views_missing"] == 1.0
 
 
 @pytest.mark.asyncio

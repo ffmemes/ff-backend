@@ -27,6 +27,7 @@ from src.flows.crossposting.meme import (
     post_meme_to_tgchannelen,
     post_meme_to_tgchannelru,
 )
+from src.flows.crossposting.model_loop import retrain_channel_models, send_channel_digest
 from src.flows.crossposting.stats_collector import (
     collect_channel_stats,
     collect_young_channel_stats,
@@ -176,6 +177,15 @@ if __name__ == "__main__":
         collect_young_channel_stats.to_deployment(
             name="Collect Young Channel Stats",
             schedules=[CronSchedule(cron="30 * * * *", timezone=LON)],
+        ),
+        # ── Channel model loop: nightly refit, morning digest to the owner ──
+        retrain_channel_models.to_deployment(
+            name="Retrain channel models",
+            schedules=[CronSchedule(cron="30 4 * * *", timezone=MSK)],
+        ),
+        send_channel_digest.to_deployment(
+            name="Channel digest",
+            schedules=[CronSchedule(cron="0 9 * * *", timezone=MSK)],
         ),
         # ── Weekly report ──
         post_weekly_burger_report.to_deployment(

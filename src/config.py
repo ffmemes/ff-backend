@@ -74,6 +74,10 @@ class Config(BaseSettings):
     # Owner flips on after deploy. Set HOLDOUT_PCT=0 after the v1 readout.
     MONTHLY_REMINDER_ENABLED: bool = False
     MONTHLY_REMINDER_HOLDOUT_PCT: int = 50
+    # Crosspost picks uniformly among the policy's top-N (propensity 1/N in the decision log).
+    CROSSPOST_TOP_N: int = 3
+    # Owner's Telegram user id for the daily channel digest; unset → ADMIN_LOGS_CHAT_ID.
+    CHANNEL_DIGEST_CHAT_ID: str | None = None
 
     PREFECT_API_URL: str | None = None
 
