@@ -92,7 +92,12 @@ async def training_rows(channel: str) -> list[dict[str, Any]]:
                 "age_days": c.get("age_days"),
                 "has_caption": c.get("caption_present"),
                 **static.get(p["meme_id"], {}),
-                **{k: c[k] for k in ("is_upload", "src_views_pct") if k in c},
+                # logged inputs win; is_upload is None when they failed to load at decision
+                **(
+                    {k: c.get(k) for k in ("is_upload", "src_views_pct")}
+                    if c.get("is_upload") is not None
+                    else {}
+                ),
                 "src_prior_z": prior_z,
                 "src_prior_n": prior_n,
             }

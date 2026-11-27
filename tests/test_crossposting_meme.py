@@ -746,6 +746,7 @@ async def test_training_rows_join_decision_with_24h_label(clean_xpost):
                         "nmemes_sent": 20,
                         "age_days": 6,
                         "caption_present": True,
+                        "is_upload": True,
                         "src_views_pct": 0.7,  # logged at decision: wins over the backfill
                         "final_score": 1.5,
                     }

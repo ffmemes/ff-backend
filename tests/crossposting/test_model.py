@@ -294,6 +294,37 @@ async def test_refit_keeps_active_spec_and_stores_inactive_unless_better(monkeyp
 
 
 @pytest.mark.asyncio
+async def test_training_rows_prefer_logged_inputs_unless_they_failed(monkeypatch):
+    t = datetime(2026, 11, 20, 10)
+    labels = add_zf([{"meme_id": m, "source_id": 1, "posted_at": t, "f24": 5} for m in (1, 2, 3)])
+    base = {"nlikes": 9, "ndislikes": 1, "nmemes_sent": 20, "age_days": 3, "final_score": 1.0}
+    cands = {
+        1: {**base, "is_upload": False, "src_views_pct": 0.7},  # logged at decision
+        2: {**base, "is_upload": None, "src_views_pct": None},  # inputs failed then
+        3: base,  # logged before the model inputs existed
+    }
+
+    async def fake_labels(channel, until):
+        return labels
+
+    async def fake_picked(channel, labels_, since):
+        return [{**r, "decided_at": t, "cand": cands[r["meme_id"]]} for r in labels_]
+
+    async def fake_static(meme_ids):
+        return {m: {"is_upload": True, "src_views_pct": 0.2} for m in meme_ids}
+
+    monkeypatch.setattr(model_loop, "fetch_labels", fake_labels)
+    monkeypatch.setattr(model_loop, "_picked", fake_picked)
+    monkeypatch.setattr(model_loop, "fetch_model_static_inputs", fake_static)
+    xs = [r["x"] for r in await model_loop.training_rows("tgchannelru")]
+    assert [(x["is_upload"], x["src_views_pct"]) for x in xs] == [
+        (0.0, 0.7),
+        (1.0, 0.2),
+        (1.0, 0.2),
+    ]
+
+
+@pytest.mark.asyncio
 async def test_refit_failure_on_one_channel_does_not_stop_the_other(monkeypatch):
     calls = []
 
