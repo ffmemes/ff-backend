@@ -7,6 +7,8 @@ PROMOTION_RULE, at most once per PROMOTE_EVERY; otherwise the active row stays.
 """
 
 import logging
+import math
+import statistics
 from datetime import UTC, datetime, timedelta
 from html import escape
 from typing import Any
@@ -30,7 +32,13 @@ from src.crossposting.model import (
     walk_forward,
 )
 from src.crossposting.service import fetch_labels, fetch_model_static_inputs
-from src.database import crossposting_model, fetch_all, fetch_one, run_in_transaction
+from src.database import (
+    crossposting_model,
+    execute,
+    fetch_all,
+    fetch_one,
+    run_in_transaction,
+)
 from src.flows.hooks import notify_telegram_on_failure
 from src.tgbot.bot import bot
 from src.tgbot.constants import TELEGRAM_CHANNEL_EN_LINK, TELEGRAM_CHANNEL_RU_LINK
@@ -44,6 +52,12 @@ PROMOTE_EVERY = timedelta(days=7)
 # beats the active model (frozen, on posts after its training window) or, with no active
 # model, the logged live score: better in >= 2 of 3 time segments and not worse overall.
 PROMOTION_RULE = "wins>=2/3 and delta>=0"
+# Guardrail: deactivate the active model when its posts' raw ln(1+f24) is below the concurrent
+# control arm (score_control_v1) by more than ROLLBACK_SE standard errors over the last
+# ROLLBACK_WINDOW; then no promotion for ROLLBACK_WINDOW.
+ROLLBACK_WINDOW = timedelta(days=14)
+ROLLBACK_MIN_POSTS = 10
+ROLLBACK_SE = 2.0
 
 # Latest decision per picked meme (a retried flow can log twice) with its picked candidate.
 _PICKED_QUERY = """
@@ -122,6 +136,43 @@ def should_promote(
     return False, "not_better"
 
 
+def rollback_check(model_lf: list[float], control_lf: list[float]) -> tuple[bool, dict]:
+    guard: dict[str, Any] = {"n_model": len(model_lf), "n_control": len(control_lf)}
+    if min(len(model_lf), len(control_lf)) < ROLLBACK_MIN_POSTS:
+        return False, guard
+    diff = statistics.fmean(model_lf) - statistics.fmean(control_lf)
+    se = math.sqrt(
+        statistics.variance(model_lf) / len(model_lf)
+        + statistics.variance(control_lf) / len(control_lf)
+    )
+    guard |= {"diff": round(diff, 4), "se": round(se, 4)}
+    return diff < -ROLLBACK_SE * se, guard
+
+
+async def _guard(channel: str, active_row: dict[str, Any], now: datetime) -> tuple[bool, dict]:
+    """Active model arm vs the control arm on labeled posts since activation (<= 14 days)."""
+    since = max(active_row["activated_at"] or active_row["created_at"], now - ROLLBACK_WINDOW)
+    labels = await fetch_labels(channel, since=since, until=now - timedelta(hours=27))
+    arms: dict[str, list[float]] = {"model": [], "control": []}
+    for p in await _picked(channel, labels, since=since):
+        if p["policy"] == "score_control_v1":
+            arms["control"].append(math.log1p(p["f24"]))
+        elif p["policy"] == "model_topN_v1" and p["model_version"] == active_row["version"]:
+            arms["model"].append(math.log1p(p["f24"]))
+    return rollback_check(arms["model"], arms["control"])
+
+
+async def _recent_rollback(channel: str, now: datetime) -> bool:
+    row = await fetch_one(
+        text(
+            "SELECT 1 FROM crossposting_model WHERE channel = :channel AND created_at >= :since"
+            " AND metrics->>'decision' = 'rolled_back' LIMIT 1"
+        ),
+        {"channel": channel, "since": now - ROLLBACK_WINDOW},
+    )
+    return row is not None
+
+
 async def _active_row(channel: str) -> dict[str, Any] | None:
     return await fetch_one(
         text("SELECT * FROM crossposting_model WHERE channel = :channel AND is_active"),
@@ -177,6 +228,20 @@ async def retrain_channel(channel: str) -> str:
             feats, alpha = active.features, float(active_row["alpha"])
         except (ValueError, TypeError):
             logger.warning(f"{channel}: active model unusable, refitting the default spec")
+    guard: dict[str, Any] = {}
+    rolled_back = False
+    if active_row is not None:
+        rolled_back, guard = await _guard(channel, active_row, now)
+        if rolled_back:
+            await execute(
+                text(
+                    "UPDATE crossposting_model SET is_active = false"
+                    " WHERE channel = :channel AND is_active"
+                ),
+                {"channel": channel},
+            )
+            logger.warning(f"{channel}: model v{active_row['version']} rolled back {guard}")
+            active, active_row = None, None
     rows = await training_rows(channel)
     if len(rows) < MIN_TRAIN:
         return f"{channel}: {len(rows)} labeled decisions < {MIN_TRAIN}, no refit"
@@ -192,9 +257,13 @@ async def retrain_channel(channel: str) -> str:
     else:
         test = [{**r, "base": r["score"]} for r in test]
         baseline = "score"
-    metrics = {**compare(test), "baseline": baseline, "rule": PROMOTION_RULE}
+    metrics = {**compare(test), "baseline": baseline, "rule": PROMOTION_RULE, "guard": guard}
     last = (active_row["activated_at"] or active_row["created_at"]) if active else None
     promote, metrics["decision"] = should_promote(metrics, last, now)
+    if rolled_back:
+        promote, metrics["decision"] = False, "rolled_back"
+    elif promote and await _recent_rollback(channel, now):
+        promote, metrics["decision"] = False, "rollback_cooldown"
     version = await _save_model(channel, fit, alpha, rows, metrics, promote)
     return f"{channel}: v{version} n={len(rows)} {metrics}"
 
@@ -270,6 +339,8 @@ _DECISIONS = {
     "cooldown": "не продвинута: активной меньше 7 дней",
     "too_few_posts": "не продвинута: мало постов для сравнения",
     "not_better": "не продвинута: не лучше",
+    "rolled_back": "ОТКАТ: активная модель хуже контроля, ранжирует скор",
+    "rollback_cooldown": "не продвинута: откат меньше 14 дней назад",
 }
 
 
@@ -300,7 +371,10 @@ def format_digest(digests: list[dict[str, Any]]) -> str:
         for p in d["posts"]:
             c = p.get("cand") or {}
             rank, n = c.get("policy_rank"), p.get("top_n")
-            draw = "—" if not n else f"{rank}/{n}" + (" (исследование)" if rank > n else "")
+            explored = not c.get("exploit", rank <= n) if n else False
+            draw = "—" if not n else f"{rank}/{n}" + (" (исследование)" if explored else "")
+            if p.get("policy") == "score_control_v1":
+                draw += " (контроль)"
             ver = f"v{p['model_version']}" if p.get("model_version") else "скор"
             link = f"{CHANNELS[ch]}/{p['telegram_message_id']}"
             when = (p["posted_at"] + timedelta(hours=3)).strftime("%d.%m %H:%M")

@@ -79,6 +79,9 @@ class Config(BaseSettings):
     # ... except with this probability, uniformly among all logged candidates (exploration):
     # propensity = (1 - eps) / N * [rank <= N] + eps / K.
     CROSSPOST_EXPLORE_EPS: float = 0.1
+    # While a model is active, this share of decisions ranks by the live score instead
+    # (policy score_control_v1): the frozen control the nightly rollback compares against.
+    CROSSPOST_CONTROL_SHARE: float = 0.2
     # Owner's Telegram user id for the daily channel digest; unset → ADMIN_LOGS_CHAT_ID.
     CHANNEL_DIGEST_CHAT_ID: str | None = None
 

@@ -7,7 +7,7 @@ from sqlalchemy import delete, text
 from sqlalchemy.dialects.postgresql import insert
 
 from src.crossposting import scoring
-from src.crossposting.scoring import score
+from src.crossposting.scoring import LIVE, SCORE_VERSION, score
 from src.crossposting.service import fetch_labels, get_next_meme_for_channel, log_ranker_decision
 from src.database import (
     crossposting,
@@ -134,6 +134,7 @@ async def clean_xpost(monkeypatch):
     # deterministic top-1 picks; the top-N draw is covered in tests/crossposting/test_model.py
     monkeypatch.setattr("src.crossposting.service.settings.CROSSPOST_TOP_N", 1)
     monkeypatch.setattr("src.crossposting.service.settings.CROSSPOST_EXPLORE_EPS", 0.0)
+    monkeypatch.setattr("src.crossposting.service.settings.CROSSPOST_CONTROL_SHARE", 0.0)
     async with engine.connect() as conn:
         await _wipe(conn)
     yield
@@ -180,7 +181,7 @@ async def test_select_excludes_source_posted_within_24h(clean_xpost):
     assert decision is not None
     assert decision["picked_meme_id"] == 10004
     assert decision["candidates"][0]["meme_id"] == 10004
-    assert decision["score_version"] == 4
+    assert decision["score_version"] == SCORE_VERSION[LIVE["tgchannelru"]]
 
 
 @pytest.mark.asyncio
@@ -202,7 +203,7 @@ async def test_like_volume_prefers_higher_nlikes_same_source(clean_xpost):
     picked, decision = await get_next_meme_for_channel("tgchannelru")
     assert picked is not None
     assert picked["id"] == 10502
-    assert decision["score_version"] == 4
+    assert decision["score_version"] == SCORE_VERSION[LIVE["tgchannelru"]]
     assert (
         decision["candidates"][0]["like_volume_factor"]
         > decision["candidates"][1]["like_volume_factor"]
@@ -563,7 +564,7 @@ async def test_ranker_decision_log_records_top5(clean_xpost):
     row = rows[0]
     assert row["channel"] == "tgchannelru"
     assert row["picked_meme_id"] == picked["id"]
-    assert row["score_version"] == 4
+    assert row["score_version"] == SCORE_VERSION[LIVE["tgchannelru"]]
     assert row["candidate_pool_size"] == 7  # 7 eligible memes
     assert len(row["candidates"]) == 7  # all 7 logged (top-20)
     # Each entry has the documented score breakdown keys
@@ -673,7 +674,7 @@ async def test_active_model_ranks_and_logs_policy(clean_xpost):
     assert (cand["policy_rank"], cand["propensity"]) == (1, 1.0)
     assert cand["model_pred"] == round(-math.log(11), 4)
     assert (cand["is_upload"], cand["src_views_pct"], cand["src_prior_n"]) == (False, None, 0)
-    assert cand["picked_by"] == "v4" and cand["picks"]["v4"] == 10901
+    assert cand["picked_by"] == "v4q" and cand["picks"]["v4q"] == 10901
     await log_ranker_decision(**decision)
     async with engine.connect() as conn:
         row = (
@@ -699,7 +700,7 @@ async def test_invalid_active_model_falls_back_to_score(clean_xpost):
     assert (decision["policy"], decision["model_version"], decision["score_version"]) == (
         "score_topN_v1",
         None,
-        4,
+        SCORE_VERSION[LIVE["tgchannelru"]],
     )
 
 

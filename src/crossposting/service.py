@@ -214,7 +214,7 @@ async def _attach_shadow_inputs(candidates: list[dict[str, Any]], channel: str) 
             c["pre_inbot_share_click_users"] = r["pre_inbot_share_click_users"]
 
 
-# zf_24h labels: forwards at the snapshot nearest +24h (20-36h window), ranked image posts.
+# zf_24h labels: forwards at the snapshot nearest +24h (21-27h window), ranked image posts.
 # Shared by posting (source prior), the nightly refit and the daily digest.
 _LABELS_QUERY = """
     SELECT cp.meme_id, m.meme_source_id AS source_id, cp.created_at AS posted_at,
@@ -226,8 +226,8 @@ _LABELS_QUERY = """
         FROM crossposting_snapshots s
         WHERE s.channel = cp.channel
           AND s.telegram_message_id = cp.telegram_message_id
-          AND s.snapshot_at BETWEEN cp.created_at + INTERVAL '20 hours'
-                                AND cp.created_at + INTERVAL '36 hours'
+          AND s.snapshot_at BETWEEN cp.created_at + INTERVAL '21 hours'
+                                AND cp.created_at + INTERVAL '27 hours'
           AND s.views > 0
           AND s.forwards IS NOT NULL
         ORDER BY ABS(EXTRACT(EPOCH FROM s.snapshot_at - cp.created_at) - 86400)
@@ -396,6 +396,9 @@ _POOL_QUERY = """
 
 # Random pool memes outside the top-N preselect, logged and drawable for exploration.
 POOL_SAMPLE = 5
+# Hard caps: a bad env value must not turn posting into a random draw.
+MAX_TOP_N = 5
+MAX_EXPLORE_EPS = 0.15
 
 # Flat per-candidate keys still read by docs/analyst/crossposting-*.sql readouts.
 _LEGACY_SHADOWS = ("v5", "v5c", "v5f")
@@ -454,9 +457,13 @@ def _build_decision_log(
     key = preds if preds is not None else [s[picked_by] for _, s in scored]
     order = sorted(range(len(top)), key=lambda i: (-key[i], top[i]["id"]))
     policy_rank = {i: rank for rank, i in enumerate(order, start=1)}
-    k, n = len(top), max(1, min(top_n, len(top)))
-    explore_eps = min(max(float(explore_eps), 0.0), 1.0)
-    drawn = top[order[rng.randrange(k) if rng.random() < explore_eps else rng.randrange(n)]]
+    # Exploit draws from the score's preselect only: pool samples reach a post only through ε.
+    exploit = [i for i in order if not top[i].get("pool_sample")] or order
+    k, n = len(top), max(1, min(top_n, MAX_TOP_N, len(exploit)))
+    explore_eps = min(max(float(explore_eps), 0.0), MAX_EXPLORE_EPS)
+    exploit_set = set(exploit[:n])
+    explore = rng.random() < explore_eps
+    drawn = top[order[rng.randrange(k)] if explore else exploit[rng.randrange(n)]]
 
     log_candidates = []
     for i, (row, (factors, scores)) in enumerate(zip(top, scored, strict=True)):
@@ -490,7 +497,8 @@ def _build_decision_log(
                 "src_prior_n": row.get("src_prior_n"),
                 "model_pred": _round(preds[i], 4) if preds else None,
                 "policy_rank": policy_rank[i],
-                "propensity": (1 - explore_eps) / n * (policy_rank[i] <= n) + explore_eps / k,
+                "exploit": i in exploit_set,
+                "propensity": (1 - explore_eps) / n * (i in exploit_set) + explore_eps / k,
                 "factors": factors,
                 "scores": scores,
                 "ranks": ranks[i],
@@ -557,6 +565,10 @@ async def get_next_meme_for_channel(
     except Exception:
         logger.warning("crosspost model unusable, ranking by score", exc_info=True)
         model = None
+    # Frozen control arm while a model is active: the guardrail the nightly rollback reads.
+    control = model is not None and random.random() < settings.CROSSPOST_CONTROL_SHARE
+    if control:
+        model = None
     decision = _build_decision_log(
         channel,
         top,
@@ -567,4 +579,6 @@ async def get_next_meme_for_channel(
         top_n=settings.CROSSPOST_TOP_N,
         explore_eps=settings.CROSSPOST_EXPLORE_EPS,
     )
+    if control:
+        decision["policy"] = "score_control_v1"
     return await _picked_meme_dict(decision["picked_meme_id"]), decision

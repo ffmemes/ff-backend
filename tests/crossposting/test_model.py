@@ -141,17 +141,17 @@ def test_exploration_propensities_sum_to_one_and_reach_every_candidate():
             "v4",
             model=_model(),
             top_n=3,
-            explore_eps=0.5,
+            explore_eps=0.15,
             rng=random.Random(seed),
         )
-        for seed in range(200)
+        for seed in range(800)
     ]
     assert {log["picked_meme_id"] for log in logs} == {100, 101, 102, 103, 104, 200}
     by_id = {c["meme_id"]: c for c in logs[0]["candidates"]}
-    assert by_id[104]["propensity"] == pytest.approx(0.5 / 3 + 0.5 / 6)
-    assert by_id[100]["propensity"] == pytest.approx(0.5 / 6)
+    assert by_id[104]["propensity"] == pytest.approx(0.85 / 3 + 0.15 / 6)
+    assert by_id[100]["propensity"] == pytest.approx(0.15 / 6)
     assert sum(c["propensity"] for c in by_id.values()) == pytest.approx(1)
-    assert logs[0]["explore_eps"] == 0.5
+    assert logs[0]["explore_eps"] == 0.15
     # the pool sample is ranked by the model too, and flagged without a PRESELECT rank
     assert (by_id[200]["pool_sample"], by_id[200]["rank"], by_id[200]["policy_rank"]) == (
         True,
@@ -159,6 +159,29 @@ def test_exploration_propensities_sum_to_one_and_reach_every_candidate():
         6,
     )
     assert by_id[100]["pool_sample"] is False and by_id[100]["rank"] == 1
+
+
+def test_pool_sample_never_enters_exploit_top_n_and_knobs_are_capped():
+    cands = [_cand(100 + i, 10 + i, **INPUTS) for i in range(8)]
+    cands.append(_cand(200, 99, pool_sample=True, **INPUTS))  # the model's favourite
+    log = _build_decision_log(
+        "tgchannelru", cands, 9, "v4", "v4", model=_model(), top_n=50, explore_eps=1.0
+    )
+    by_id = {c["meme_id"]: c for c in log["candidates"]}
+    assert by_id[200]["policy_rank"] == 1 and by_id[200]["exploit"] is False
+    assert by_id[200]["propensity"] == pytest.approx(0.15 / 9)
+    assert (log["top_n"], log["explore_eps"]) == (5, 0.15)
+    assert sum(c["exploit"] for c in log["candidates"]) == 5
+    assert sum(c["propensity"] for c in log["candidates"]) == pytest.approx(1)
+
+
+def test_rollback_fires_only_when_model_arm_is_clearly_worse():
+    from src.flows.crossposting.model_loop import rollback_check
+
+    control = [2.0, 2.2, 1.8, 2.1, 1.9, 2.0, 2.3, 1.7, 2.0, 2.0]
+    assert rollback_check([x - 1.0 for x in control], control)[0] is True
+    assert rollback_check([x - 0.05 for x in control], control)[0] is False
+    assert rollback_check(control[:5], control) == (False, {"n_model": 5, "n_control": 10})
 
 
 def test_decision_log_falls_back_to_score_when_model_cannot_score():
@@ -264,6 +287,7 @@ async def test_refit_keeps_active_spec_and_stores_inactive_unless_better(monkeyp
         "activated_at": now - timedelta(days=30),
         "created_at": now - timedelta(days=30),
     }
+    active_backup = active
     saved = {}
 
     async def fake_active(channel):
@@ -291,6 +315,22 @@ async def test_refit_keeps_active_spec_and_stores_inactive_unless_better(monkeyp
     await model_loop.retrain_channel("tgchannelru")
     assert saved["fit"]["features"] == list(FEATURES) and saved["metrics"]["baseline"] == "score"
     assert saved["promote"] is True
+
+    # the active model loses to the control arm: deactivated, refit stays inactive
+    active = active_backup
+    deactivated = []
+
+    async def fake_guard(channel, row, now_):
+        return True, {"n_model": 12, "n_control": 11, "diff": -0.6, "se": 0.2}
+
+    async def fake_execute(q, params):
+        deactivated.append(params["channel"])
+
+    monkeypatch.setattr(model_loop, "_guard", fake_guard)
+    monkeypatch.setattr(model_loop, "execute", fake_execute)
+    await model_loop.retrain_channel("tgchannelru")
+    assert deactivated == ["tgchannelru"] and saved["promote"] is False
+    assert saved["metrics"]["decision"] == "rolled_back" and saved["metrics"]["baseline"] == "score"
 
 
 @pytest.mark.asyncio
